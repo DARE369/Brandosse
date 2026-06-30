@@ -1,0 +1,240 @@
+/* ==========================================================================
+   Shared Design System Compatibility + Shared UI Primitives
+   ========================================================================= */
+
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
+  --color-brand-primary: var(--brand-primary, var(--color-primary));
+  --color-brand-accent: var(--brand-accent, var(--color-primary));
+  --color-brand-accent-alt: var(--brand-secondary, var(--color-info));
+  --color-brand-glow: var(--accent-glow, var(--color-primary-subtle));
+
+  --color-neutral-0: var(--color-bg-surface);
+  --color-neutral-50: var(--color-bg-page);
+  --color-neutral-100: color-mix(in srgb, var(--color-bg-page) 82%, var(--color-bg-surface));
+  --color-neutral-150: color-mix(in srgb, var(--color-border) 74%, var(--color-bg-surface));
+  --color-neutral-200: var(--color-border);
+  --color-neutral-300: var(--color-border-strong);
+  --color-neutral-400: var(--color-text-tertiary);
+  --color-neutral-500: var(--color-text-secondary);
+  --color-neutral-600: color-mix(in srgb, var(--color-text-primary) 62%, var(--color-text-secondary));
+  --color-neutral-700: color-mix(in srgb, var(--color-text-primary) 76%, var(--color-text-secondary));
+  --color-neutral-800: color-mix(in srgb, var(--color-text-primary) 88%, var(--color-bg-page));
+  --color-neutral-900: var(--color-text-primary);
+
+  --surface-page: var(--color-bg-page);
+  --surface-card: var(--color-bg-surface);
+  --surface-card-hover: var(--color-bg-hover);
+  --surface-overlay: color-mix(in srgb, var(--color-text-primary) 32%, transparent);
+  --surface-panel: var(--color-bg-surface);
+  --surface-rail: var(--color-bg-elevated);
+  --surface-sidebar: var(--color-sidebar-bg, var(--color-bg-elevated));
+
+  --border-default: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --border-focus: var(--color-border-focus);
+
+  --status-draft-bg: var(--color-bg-subtle);
+  --status-draft-border: color-mix(in srgb, var(--color-text-tertiary) 55%, transparent);
+  --status-draft-text: var(--color-text-secondary);
+  --status-draft-dot: var(--color-text-tertiary);
+
+  --status-scheduled-bg: var(--color-info-bg);
+  --status-scheduled-border: var(--color-info-border);
+  --status-scheduled-text: var(--color-info-text);
+  --status-scheduled-dot: var(--color-info);
+
+  --status-publishing-bg: var(--color-warning-bg);
+  --status-publishing-border: var(--color-warning-border);
+  --status-publishing-text: var(--color-warning-text);
+  --status-publishing-dot: var(--color-warning);
+
+  --status-published-bg: var(--color-success-bg);
+  --status-published-border: var(--color-success-border);
+  --status-published-text: var(--color-success-text);
+  --status-published-dot: var(--color-success);
+
+  --status-failed-bg: var(--color-danger-bg);
+  --status-failed-border: var(--color-danger-border);
+  --status-failed-text: var(--color-danger-text);
+  --status-failed-dot: var(--color-danger);
+
+  --status-archived-bg: var(--color-bg-elevated);
+  --status-archived-border: color-mix(in srgb, var(--color-text-tertiary) 55%, transparent);
+  --status-archived-text: var(--color-text-tertiary);
+  --status-archived-dot: var(--color-text-tertiary);
+
+  --platform-youtube: #ff0000;
+  --platform-tiktok: #111111;
+  --platform-tiktok-alt: #69c9d0;
+  --platform-facebook: #1877f2;
+  --platform-x: var(--color-text-primary);
+  --platform-instagram: #e1306c;
+  --platform-linkedin: #0a66c2;
+  --platform-pinterest: #e60023;
+
+  --color-ai-primary: var(--brand-secondary, var(--chart-2));
+  --color-ai-light: color-mix(in srgb, var(--color-ai-primary) 12%, transparent);
+  --color-ai-glow: color-mix(in srgb, var(--color-ai-primary) 16%, transparent);
+}
+
+/* Shared status badge */
+.status-badge-ui {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  font-family: var(--font-body);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.status-badge-ui.size-sm {
+  padding: 4px 8px;
+  font-size: var(--text-xs);
+}
+
+.status-badge-ui.size-md {
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+}
+
+.status-badge-ui .status-dot-inline {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  display: inline-block;
+}
+
+.status-icon-spin {
+  animation: status-spin 0.9s linear infinite;
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status-badge-ui.status-draft {
+  background: var(--status-draft-bg);
+  border-color: var(--status-draft-border);
+  color: var(--status-draft-text);
+}
+
+.status-badge-ui.status-scheduled {
+  background: var(--status-scheduled-bg);
+  border-color: var(--status-scheduled-border);
+  color: var(--status-scheduled-text);
+}
+
+.status-badge-ui.status-publishing {
+  background: var(--status-publishing-bg);
+  border-color: var(--status-publishing-border);
+  color: var(--status-publishing-text);
+}
+
+.status-badge-ui.status-published {
+  background: var(--status-published-bg);
+  border-color: var(--status-published-border);
+  color: var(--status-published-text);
+}
+
+.status-badge-ui.status-failed {
+  background: var(--status-failed-bg);
+  border-color: var(--status-failed-border);
+  color: var(--status-failed-text);
+}
+
+.status-badge-ui.status-archived {
+  background: var(--status-archived-bg);
+  border-color: var(--status-archived-border);
+  color: var(--status-archived-text);
+}
+
+.status-dot.status-draft {
+  background: var(--status-draft-dot);
+}
+
+.status-dot.status-scheduled {
+  background: var(--status-scheduled-dot);
+}
+
+.status-dot.status-publishing {
+  background: var(--status-publishing-dot);
+}
+
+.status-dot.status-published {
+  background: var(--status-published-dot);
+}
+
+.status-dot.status-failed {
+  background: var(--status-failed-dot);
+}
+
+.status-dot.status-archived {
+  background: var(--status-archived-dot);
+}
+
+/* Shared platform icon */
+.platform-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.platform-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  transition: color var(--transition-fast, 150ms ease-out);
+}
+
+.platform-icon-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.platform-icon-fallback-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72em;
+  font-weight: var(--weight-semibold);
+}
+
+.platform-icon.platform-youtube {
+  color: var(--platform-youtube);
+}
+
+.platform-icon.platform-tiktok {
+  color: var(--platform-tiktok);
+}
+
+.platform-icon.platform-facebook {
+  color: var(--platform-facebook);
+}
+
+.platform-icon.platform-x {
+  color: var(--platform-x);
+}
+
+.platform-icon.platform-instagram {
+  color: var(--platform-instagram);
+}
+
+.platform-icon.platform-linkedin {
+  color: var(--platform-linkedin);
+}

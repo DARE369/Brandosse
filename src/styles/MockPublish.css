@@ -1,0 +1,478 @@
+.mock-publish-modal-shell {
+  --mock-publish-accent: var(--color-primary);
+  --mock-publish-accent-strong: var(--color-primary-hover);
+  --mock-publish-surface: var(--color-bg-surface, var(--public-dark-text));
+  --mock-publish-surface-alt: var(--color-bg-elevated);
+  --mock-publish-panel: color-mix(in srgb, var(--mock-publish-surface) 92%, var(--mock-publish-surface-alt));
+  --mock-publish-border: color-mix(in srgb, var(--color-border) 90%, transparent);
+  --mock-publish-text: var(--color-text-primary);
+  --mock-publish-muted: var(--color-text-secondary);
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.mock-publish-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--color-bg-page) 72%, transparent);
+  backdrop-filter: blur(7px);
+}
+
+.mock-publish-modal {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1060px);
+  max-height: min(100%, 92vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden auto;
+  border-radius: 28px;
+  border: 1px solid var(--mock-publish-border);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--mock-publish-accent) 10%, transparent) 0%, transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--mock-publish-surface) 96%, var(--public-dark-text) 4%) 0%, color-mix(in srgb, var(--mock-publish-surface-alt) 78%, var(--public-dark-text) 22%) 100%);
+  box-shadow: 0 34px 90px rgba(2, 6, 23, 0.35);
+}
+
+.mock-publish-modal-header,
+.mock-publish-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.3rem 1.5rem;
+}
+
+.mock-publish-modal-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--mock-publish-border) 86%, transparent);
+}
+
+.mock-publish-modal-footer {
+  border-top: 1px solid color-mix(in srgb, var(--mock-publish-border) 86%, transparent);
+  background: color-mix(in srgb, var(--mock-publish-surface-alt) 56%, var(--public-dark-text) 44%);
+}
+
+.mock-publish-modal-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.mock-publish-modal-title > svg {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--mock-publish-accent) 14%, transparent);
+  color: var(--mock-publish-accent);
+}
+
+.mock-publish-modal-title h3,
+.mock-publish-preview-header strong {
+  margin: 0;
+  color: var(--mock-publish-text);
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.mock-publish-modal-title p,
+.mock-publish-preview-header span,
+.mock-publish-preview-body p,
+.mock-publish-error-card p,
+.mock-publish-info-grid span,
+.mock-publish-attempt-tabs button small {
+  margin: 0;
+  color: var(--mock-publish-muted);
+}
+
+.mock-publish-icon-button,
+.mock-publish-primary,
+.mock-publish-secondary,
+.mock-publish-attempt-tabs button,
+.mock-publish-info-grid article button,
+.mock-publish-info-grid article a {
+  appearance: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.mock-publish-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 14px;
+  border-color: color-mix(in srgb, var(--mock-publish-border) 92%, transparent);
+  background: color-mix(in srgb, var(--mock-publish-surface-alt) 72%, var(--public-dark-text) 28%);
+  color: var(--mock-publish-muted);
+}
+
+.mock-publish-icon-button:hover,
+.mock-publish-icon-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--mock-publish-accent) 24%, var(--mock-publish-border));
+  color: var(--mock-publish-text);
+  outline: none;
+}
+
+.mock-publish-attempt-tabs {
+  display: flex;
+  gap: 0.8rem;
+  padding: 0 1.5rem 1rem;
+  overflow-x: auto;
+}
+
+.mock-publish-attempt-tabs button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
+  min-width: 148px;
+  padding: 0.88rem 0.95rem;
+  border-radius: 18px;
+  border-color: color-mix(in srgb, var(--mock-publish-border) 90%, transparent);
+  background: color-mix(in srgb, var(--mock-publish-surface-alt) 72%, var(--public-dark-text) 28%);
+  text-align: left;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--public-dark-text) 50%, transparent);
+}
+
+.mock-publish-attempt-tabs button span {
+  color: var(--mock-publish-text);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.mock-publish-attempt-tabs button small {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.mock-publish-attempt-tabs button.active {
+  border-color: color-mix(in srgb, var(--mock-publish-accent) 32%, transparent);
+  background: color-mix(in srgb, var(--mock-publish-accent) 11%, var(--public-dark-text));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--mock-publish-accent) 12%, transparent);
+}
+
+.mock-publish-attempt-tabs button.active small {
+  color: var(--mock-publish-accent-strong);
+}
+
+.mock-publish-modal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 1.25rem;
+  padding: 0 1.5rem 1.5rem;
+}
+
+.mock-publish-preview-card,
+.mock-publish-modal-details {
+  border: 1px solid color-mix(in srgb, var(--mock-publish-border) 92%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--mock-publish-surface) 88%, var(--mock-publish-surface-alt));
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+}
+
+.mock-publish-preview-card {
+  overflow: hidden;
+}
+
+.mock-publish-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1rem 0.9rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--mock-publish-border) 86%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--public-dark-text) 72%, transparent), rgba(255, 255, 255, 0));
+}
+
+.mock-publish-preview-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mock-publish-preview-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--mock-publish-accent) 18%, transparent);
+  background: color-mix(in srgb, var(--mock-publish-accent) 10%, var(--public-dark-text));
+}
+
+.mock-publish-preview-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mock-publish-preview-identity > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.mock-publish-preview-media {
+  min-height: 340px;
+  background: color-mix(in srgb, var(--mock-publish-accent) 4%, var(--mock-publish-surface-alt));
+}
+
+.mock-publish-preview-media.media-video {
+  aspect-ratio: 16 / 9;
+}
+
+.preview-tiktok .mock-publish-preview-media {
+  aspect-ratio: 9 / 16;
+  min-height: 520px;
+}
+
+.mock-publish-preview-media img,
+.mock-publish-preview-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mock-publish-media-fallback {
+  display: grid;
+  place-items: center;
+  min-height: inherit;
+  color: var(--mock-publish-muted);
+  background:
+    radial-gradient(circle at center, color-mix(in srgb, var(--mock-publish-accent) 10%, transparent), transparent 58%),
+    color-mix(in srgb, var(--mock-publish-surface-alt) 86%, var(--public-dark-text) 14%);
+}
+
+.mock-publish-preview-body {
+  padding: 1rem;
+}
+
+.mock-publish-preview-body p {
+  line-height: 1.68;
+  color: var(--mock-publish-text);
+}
+
+.mock-publish-modal-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.mock-publish-error-card {
+  border-radius: 18px;
+  padding: 1rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-danger-bg) 92%, transparent), color-mix(in srgb, var(--color-bg-surface) 94%, transparent));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 22%, transparent);
+}
+
+.mock-publish-error-card code {
+  display: block;
+  white-space: pre-wrap;
+  padding: 0.95rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-bg-surface) 78%, transparent);
+  font-size: 0.84rem;
+  color: var(--color-danger-text);
+}
+
+.mock-publish-error-card p {
+  margin-top: 0.85rem;
+  line-height: 1.6;
+}
+
+.mock-publish-info-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.mock-publish-info-grid article {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--mock-publish-border) 88%, transparent);
+  background: color-mix(in srgb, var(--mock-publish-surface-alt) 74%, var(--public-dark-text) 26%);
+}
+
+.mock-publish-info-grid article strong {
+  color: var(--mock-publish-text);
+  font-size: 0.94rem;
+  word-break: break-word;
+}
+
+.mock-publish-info-grid article button,
+.mock-publish-info-grid article a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  padding: 0.44rem 0.72rem;
+  border-radius: 999px;
+  border-color: color-mix(in srgb, var(--mock-publish-accent) 18%, var(--mock-publish-border));
+  background: color-mix(in srgb, var(--mock-publish-accent) 8%, var(--public-dark-text));
+  color: var(--mock-publish-accent-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mock-publish-info-grid article button:hover,
+.mock-publish-info-grid article button:focus-visible,
+.mock-publish-info-grid article a:hover,
+.mock-publish-info-grid article a:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--mock-publish-accent) 28%, transparent);
+  outline: none;
+}
+
+.mock-publish-primary,
+.mock-publish-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.86rem 1.05rem;
+  border-radius: 15px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.mock-publish-primary {
+  border-color: color-mix(in srgb, var(--mock-publish-accent) 36%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mock-publish-accent) 76%, var(--public-dark-text) 10%), color-mix(in srgb, var(--mock-publish-accent-strong) 88%, var(--color-text-primary) 12%));
+  color: var(--public-dark-text);
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--mock-publish-accent) 24%, transparent);
+}
+
+.mock-publish-secondary {
+  border-color: color-mix(in srgb, var(--mock-publish-border) 92%, transparent);
+  background: color-mix(in srgb, var(--mock-publish-surface-alt) 70%, var(--public-dark-text) 30%);
+  color: var(--mock-publish-text);
+}
+
+.mock-publish-primary:hover,
+.mock-publish-primary:focus-visible,
+.mock-publish-secondary:hover,
+.mock-publish-secondary:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.mock-publish-primary:hover,
+.mock-publish-primary:focus-visible {
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--mock-publish-accent) 28%, transparent);
+}
+
+.mock-publish-secondary:hover,
+.mock-publish-secondary:focus-visible {
+  border-color: color-mix(in srgb, var(--mock-publish-accent) 20%, var(--mock-publish-border));
+}
+
+@media (max-width: 900px) {
+  .mock-publish-modal-body {
+    grid-template-columns: 1fr;
+  }
+
+  .mock-publish-modal-footer {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 640px) {
+  .mock-publish-modal-shell {
+    padding: 14px;
+  }
+
+  .mock-publish-modal-header,
+  .mock-publish-modal-footer,
+  .mock-publish-attempt-tabs,
+  .mock-publish-modal-body {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .mock-publish-modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .mock-publish-primary,
+  .mock-publish-secondary {
+    width: 100%;
+  }
+}
+
+/* Personal UI realignment */
+.mock-publish-modal-shell {
+  --mock-publish-accent: var(--dash-accent);
+  --mock-publish-accent-strong: var(--dash-accent-hover);
+  --mock-publish-surface: var(--dash-panel);
+  --mock-publish-surface-alt: var(--dash-panel-2);
+  --mock-publish-panel: color-mix(in srgb, var(--dash-panel-2) 88%, var(--dash-panel));
+  --mock-publish-border: color-mix(in srgb, var(--dash-border) 92%, transparent);
+  --mock-publish-text: var(--dash-text-1);
+  --mock-publish-muted: var(--dash-text-2);
+}
+
+.mock-publish-modal {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--mock-publish-accent) 12%, transparent) 0%, transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--mock-publish-surface-alt) 96%, white 4%) 0%, var(--mock-publish-surface) 100%);
+  border-color: color-mix(in srgb, var(--mock-publish-border) 96%, transparent);
+  box-shadow: 0 34px 90px color-mix(in srgb, var(--color-bg-page) 56%, transparent);
+}
+
+.mock-publish-modal-footer,
+.mock-publish-preview-header,
+.mock-publish-info-grid article {
+  background: color-mix(in srgb, var(--mock-publish-surface-alt) 84%, transparent);
+}
+
+.mock-publish-preview-media {
+  background: color-mix(in srgb, var(--mock-publish-accent) 6%, var(--mock-publish-surface-alt));
+}
+
+.mock-publish-media-fallback {
+  background:
+    radial-gradient(circle at center, color-mix(in srgb, var(--mock-publish-accent) 12%, transparent), transparent 58%),
+    color-mix(in srgb, var(--mock-publish-surface-alt) 92%, var(--color-bg-page) 8%);
+}
+
+.mock-publish-error-card {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-danger) 22%, var(--color-bg-page)), color-mix(in srgb, var(--color-bg-page) 92%, transparent));
+  border-color: color-mix(in srgb, var(--color-danger-text) 28%, transparent);
+}
+
+.mock-publish-error-card code {
+  background: color-mix(in srgb, var(--color-bg-page) 76%, transparent);
+  color: var(--color-danger-text);
+}
+
+.mock-publish-primary {
+  border-radius: 999px;
+}
+
+.mock-publish-secondary,
+.mock-publish-info-grid article button,
+.mock-publish-info-grid article a {
+  background: color-mix(in srgb, var(--mock-publish-surface-alt) 82%, transparent);
+  border-color: color-mix(in srgb, var(--mock-publish-border) 96%, transparent);
+  border-radius: 999px;
+}

@@ -1,0 +1,151 @@
+.invitation-accept-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--public-accent) 16%, transparent), transparent 36%),
+    linear-gradient(180deg, var(--public-dark-bg-2) 0%, var(--public-dark-bg-3) 100%);
+}
+
+.invitation-accept-card {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 32px;
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in srgb, var(--public-dark-text-muted) 20%, transparent);
+  background: var(--public-dark-panel);
+  box-shadow: var(--shadow-overlay);
+  color: var(--public-dark-text-soft);
+}
+
+.invitation-accept-kicker {
+  color: var(--public-accent-light);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.invitation-accept-card h1 {
+  margin: 0;
+  font-family: var(--font-display, "Sora", "Manrope", sans-serif);
+  font-size: clamp(1.85rem, 3vw, 2.4rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  color: var(--public-dark-text);
+}
+
+.invitation-accept-card p {
+  margin: 0;
+  color: var(--public-dark-text-soft);
+  line-height: 1.7;
+}
+
+.invitation-accept-card strong {
+  color: var(--public-dark-text);
+}
+
+.invitation-accept-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.invitation-accept-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.invitation-accept-details div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--public-dark-text-muted) 20%, transparent);
+  background: var(--public-dark-panel-soft);
+}
+
+.invitation-accept-details span {
+  color: var(--public-dark-text-muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.invitation-accept-details strong {
+  color: var(--public-dark-text);
+  font-size: 0.95rem;
+}
+
+.invitation-accept-secondary {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--public-dark-text-muted) 28%, transparent);
+  background: color-mix(in srgb, var(--public-dark-card-hover) 70%, transparent);
+  color: var(--public-dark-text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.invitation-accept-form {
+  display: grid;
+  gap: 14px;
+}
+
+.invitation-accept-field {
+  display: grid;
+  gap: 8px;
+  color: var(--public-dark-text-soft);
+  font-size: 0.84rem;
+}
+
+.invitation-accept-field input {
+  width: 100%;
+  min-height: 50px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--public-dark-text-muted) 26%, transparent);
+  background: var(--public-dark-panel);
+  color: var(--public-dark-text);
+  font: inherit;
+  padding: 0 14px;
+  outline: none;
+}
+
+.invitation-accept-field input:focus {
+  border-color: color-mix(in srgb, var(--public-accent-light) 85%, transparent);
+  box-shadow: 0 0 0 3px var(--public-primary-glow);
+}
+
+.invitation-accept-page .auth-submit:focus-visible,
+.invitation-accept-secondary:focus-visible,
+.invitation-accept-field input:focus-visible {
+  outline: 2px solid var(--public-accent-light);
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .invitation-accept-card {
+    padding: 24px;
+    border-radius: 20px;
+  }
+
+  .invitation-accept-details {
+    grid-template-columns: 1fr;
+  }
+
+  .invitation-accept-actions {
+    flex-direction: column;
+  }
+
+  .invitation-accept-secondary,
+  .invitation-accept-actions .auth-submit {
+    width: 100%;
+  }
+}

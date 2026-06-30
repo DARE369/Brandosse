@@ -1,0 +1,31 @@
+# deps
+node_modules/
+
+# env secrets — real files are never committed; .env.example is the reference
+.env
+.env.*
+!.env.example
+
+# build
+dist/
+build/
+.next/
+.next-dev-*.log
+.vite-dev-*.log
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+
+
+
+video-worker/venv/
+video-worker/__pycache__/
+video-worker/.env
+video-worker/logs/
+/tmp/video-engine/

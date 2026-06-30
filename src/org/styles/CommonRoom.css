@@ -1,0 +1,1345 @@
+.common-room-page {
+  --room-bg: var(--org-bg);
+  --room-surface: var(--org-panel);
+  --room-surface-2: var(--org-panel-hover);
+  --room-surface-3: var(--org-panel-elevated);
+  --room-border: var(--org-border);
+  --room-border-strong: var(--org-border-strong);
+  --room-text: var(--org-text-1);
+  --room-text-muted: var(--org-text-2);
+  --room-text-dim: color-mix(in srgb, var(--org-text-2) 84%, transparent);
+  --room-accent: var(--org-accent);
+  --room-accent-light: var(--org-accent-light);
+  --room-accent-soft: color-mix(in srgb, var(--org-accent) 14%, transparent);
+  --room-blue: var(--org-info);
+  --room-blue-soft: color-mix(in srgb, var(--org-info) 14%, transparent);
+  --room-success: var(--org-success);
+  --room-success-soft: color-mix(in srgb, var(--org-success) 14%, transparent);
+  --room-danger: var(--org-danger);
+  --room-danger-soft: color-mix(in srgb, var(--org-danger) 12%, transparent);
+  font-family: var(--font-body, "Manrope", system-ui, sans-serif);
+}
+
+.common-room-page h1,
+.common-room-page h2,
+.common-room-page h3 {
+  font-family: var(--font-display, "Sora", "Manrope", sans-serif);
+}
+
+.common-room-page .org-empty-state,
+.common-room-loading-state {
+  min-height: 420px;
+}
+
+.common-room-eyebrow {
+  color: var(--room-accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.common-room-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.common-room-page-header h1 {
+  margin: 10px 0 0;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1;
+  color: var(--room-text);
+}
+
+.common-room-page-header p {
+  margin: 12px 0 0;
+  color: var(--room-text-muted);
+  max-width: 760px;
+  line-height: 1.65;
+}
+
+.common-room-page-actions,
+.common-room-picker-actions,
+.common-room-modal-actions,
+.common-room-composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.common-room-button,
+.common-room-icon-button,
+.common-room-channel-card,
+.common-room-scope-option,
+.common-room-reference-card {
+  border: 1px solid transparent;
+  font-family: inherit;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+}
+
+.common-room-button,
+.common-room-icon-button {
+  cursor: pointer;
+}
+
+.common-room-button:hover,
+.common-room-icon-button:hover,
+.common-room-channel-card:hover,
+.common-room-scope-option:hover,
+.common-room-reference-card:hover {
+  transform: translateY(-1px);
+}
+
+.common-room-button {
+  min-height: 44px;
+  border-radius: 14px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.common-room-button.primary {
+  background: var(--room-accent);
+  color: var(--color-text-inverse);
+}
+
+.common-room-button.ghost,
+.common-room-icon-button,
+.common-room-scope-option,
+.common-room-reference-card {
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  border-color: var(--room-border);
+  color: var(--room-text);
+}
+
+.common-room-button.compact {
+  min-height: 38px;
+  padding-inline: 14px;
+  font-size: 0.86rem;
+}
+
+.common-room-button.danger {
+  background: var(--room-danger-soft);
+  border-color: color-mix(in srgb, var(--org-danger) 20%, transparent);
+  color: var(--room-danger);
+}
+
+.common-room-button:disabled,
+.common-room-icon-button:disabled,
+.common-room-scope-option:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.common-room-icon-button {
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.common-room-icon-button.subtle {
+  color: var(--room-text-muted);
+}
+
+.common-room-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.9fr) minmax(0, 1.55fr) minmax(300px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.common-room-rail,
+.common-room-chat,
+.common-room-settings,
+.common-room-modal-panel,
+.common-room-picker-panel {
+  border: 1px solid var(--room-border);
+  border-radius: 22px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--room-surface) 96%, transparent) 0%, color-mix(in srgb, var(--room-surface-3) 98%, transparent) 100%);
+  box-shadow: var(--org-shadow-md);
+}
+
+.common-room-rail,
+.common-room-settings {
+  padding: 18px;
+}
+
+.common-room-rail-header,
+.common-room-chat-header,
+.common-room-settings-header,
+.common-room-picker-header,
+.common-room-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.common-room-rail-header strong,
+.common-room-settings-header strong,
+.common-room-chat-header strong,
+.common-room-picker-header h3,
+.common-room-modal-header h3 {
+  color: var(--room-text);
+}
+
+.common-room-rail-header span,
+.common-room-settings-header span,
+.common-room-chat-header span,
+.common-room-picker-header p,
+.common-room-modal-header p {
+  color: var(--room-text-muted);
+  line-height: 1.55;
+}
+
+.common-room-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 720px;
+}
+
+.common-room-channel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.common-room-section-label {
+  color: var(--room-text-dim);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.common-room-section-empty,
+.common-room-picker-empty,
+.common-room-message-empty {
+  border: 1px dashed color-mix(in srgb, var(--org-panel) 8%, transparent);
+  border-radius: 18px;
+  color: var(--room-text-muted);
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  padding: 18px;
+  line-height: 1.6;
+}
+
+.common-room-channel-card {
+  width: 100%;
+  padding: 14px 15px;
+  border-radius: 18px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  gap: 12px;
+}
+
+.common-room-channel-card.active {
+  border-color: var(--room-border-strong);
+  background: color-mix(in srgb, var(--room-surface-2) 96%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--room-accent) 16%, transparent);
+}
+
+.common-room-channel-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.common-room-channel-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.common-room-channel-name-row strong {
+  color: var(--room-text);
+  font-size: 0.96rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.common-room-channel-hash {
+  color: var(--room-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.common-room-channel-main span {
+  color: var(--room-text-muted);
+  line-height: 1.55;
+  font-size: 0.87rem;
+}
+
+.common-room-channel-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.common-room-channel-pill {
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--org-panel) 5%, transparent);
+  color: var(--room-text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.common-room-channel-pill.private {
+  background: color-mix(in srgb, var(--org-text-3) 14%, transparent);
+  color: var(--org-text-2);
+}
+
+.common-room-channel-pill.accent {
+  background: var(--room-accent-soft);
+  color: var(--room-accent-light);
+}
+
+.common-room-channel-pill.muted {
+  background: color-mix(in srgb, var(--org-danger) 12%, transparent);
+  color: var(--color-danger-text);
+}
+
+.common-room-channel-count {
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--room-accent-soft);
+  color: var(--room-accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.common-room-chat {
+  min-height: 720px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.common-room-chat-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--room-border);
+}
+
+.common-room-message-stream {
+  flex: 1;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.common-room-date-separator {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 2px;
+}
+
+.common-room-date-separator span {
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--org-panel) 4%, transparent);
+  color: var(--room-text-dim);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.common-room-message-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.common-room-message-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--room-accent) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--room-accent) 34%, transparent);
+  color: var(--room-accent-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.84rem;
+  flex-shrink: 0;
+}
+
+.common-room-message-avatar.ai {
+  background: color-mix(in srgb, var(--room-accent) 14%, transparent);
+  color: var(--room-accent-light);
+  border: 1px solid color-mix(in srgb, var(--room-accent) 20%, transparent);
+}
+
+.common-room-message-body {
+  min-width: 0;
+  border: 1px solid var(--room-border);
+  border-radius: 20px;
+  background: var(--room-surface-3);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.common-room-message-card.ai .common-room-message-body {
+  background: color-mix(in srgb, var(--room-accent) 8%, var(--room-surface-3));
+  border-color: color-mix(in srgb, var(--room-accent) 18%, var(--room-border));
+}
+
+.common-room-message-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.common-room-message-meta strong {
+  color: var(--room-text);
+  font-size: 0.92rem;
+}
+
+.common-room-message-meta span,
+.common-room-message-meta time,
+.common-room-reference-copy span {
+  color: var(--room-text-dim);
+  font-size: 0.82rem;
+}
+
+.common-room-message-body p,
+.common-room-reference-copy strong {
+  margin: 0;
+  color: var(--room-text);
+  line-height: 1.65;
+}
+
+.common-room-reference-card {
+  width: 100%;
+  min-height: 74px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.common-room-reference-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--org-info) 14%, transparent);
+  color: var(--room-blue);
+}
+
+.common-room-reference-icon.pipeline {
+  background: var(--room-accent-soft);
+  color: var(--room-accent);
+}
+
+.common-room-reference-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.common-room-reference-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.common-room-composer {
+  padding: 18px 20px 20px;
+  border-top: 1px solid var(--room-border);
+}
+
+.common-room-composer-box {
+  border: 1px solid var(--room-border);
+  border-radius: 20px;
+  background: var(--room-surface-3);
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.common-room-composer-box textarea,
+.common-room-field input,
+.common-room-field select,
+.common-room-field textarea,
+.common-room-search input,
+.common-room-prefixed-input input {
+  width: 100%;
+  border: 1px solid var(--room-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  color: var(--room-text);
+  font-family: inherit;
+}
+
+.common-room-composer-box textarea,
+.common-room-field textarea,
+.common-room-field input,
+.common-room-field select,
+.common-room-search input {
+  padding: 12px 14px;
+}
+
+.common-room-composer-box textarea {
+  min-height: 124px;
+  resize: vertical;
+}
+
+.common-room-composer-box textarea::placeholder,
+.common-room-field input::placeholder,
+.common-room-field textarea::placeholder,
+.common-room-search input::placeholder,
+.common-room-prefixed-input input::placeholder {
+  color: var(--room-text-dim);
+}
+
+.common-room-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.common-room-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 720px;
+}
+
+.common-room-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.common-room-settings-header {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--room-border);
+}
+
+.common-room-settings-header .close {
+  display: none;
+}
+
+.common-room-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.common-room-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.common-room-field span {
+  color: var(--room-text-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.common-room-scope-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.common-room-scope-option {
+  min-height: 42px;
+  border-radius: 14px;
+  padding: 0 12px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.common-room-scope-option.active {
+  border-color: var(--room-border-strong);
+  background: color-mix(in srgb, var(--org-panel-elevated) 96%, transparent);
+  color: var(--room-accent);
+}
+
+.common-room-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.common-room-member-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.common-room-member-choice {
+  border: 1px solid var(--room-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.common-room-member-choice.active {
+  border-color: var(--room-border-strong);
+  background: color-mix(in srgb, var(--org-panel-elevated) 96%, transparent);
+}
+
+.common-room-member-choice input {
+  margin-top: 2px;
+}
+
+.common-room-member-choice div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.common-room-member-choice strong {
+  color: var(--room-text);
+  font-size: 0.9rem;
+}
+
+.common-room-member-choice span {
+  color: var(--room-text-dim);
+  font-size: 0.82rem;
+}
+
+.common-room-member-row {
+  border: 1px solid var(--room-border);
+  border-radius: 16px;
+  background: var(--room-surface-3);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.common-room-member-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--org-panel) 6%, transparent);
+  color: var(--room-text);
+  font-weight: 700;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.common-room-member-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.common-room-member-copy strong {
+  color: var(--room-text);
+  font-size: 0.9rem;
+}
+
+.common-room-member-copy span {
+  color: var(--room-text-dim);
+  font-size: 0.82rem;
+}
+
+.common-room-modal-actions.stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.common-room-toggle-row {
+  border: 1px solid var(--room-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.common-room-toggle-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--room-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.common-room-toggle-row input {
+  flex-shrink: 0;
+}
+
+.common-room-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+}
+
+.common-room-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--org-bg) 76%, transparent);
+}
+
+.common-room-modal-panel,
+.common-room-picker-panel {
+  position: relative;
+  width: min(620px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 22px;
+}
+
+.common-room-modal-panel {
+  max-width: 620px;
+}
+
+.common-room-picker-panel {
+  width: min(1040px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.common-room-picker-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.85fr);
+  gap: 18px;
+}
+
+.common-room-picker-list,
+.common-room-picker-preview {
+  border: 1px solid var(--room-border);
+  border-radius: 18px;
+  background: var(--room-surface-3);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 420px;
+}
+
+.common-room-picker-preview {
+  justify-content: space-between;
+}
+
+.common-room-search,
+.common-room-prefixed-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--room-text-dim);
+}
+
+.common-room-search input,
+.common-room-prefixed-input input {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  outline: none;
+}
+
+.common-room-search,
+.common-room-prefixed-input {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--room-border);
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  padding: 0 14px;
+}
+
+.common-room-channel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.common-room-picker-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.common-room-picker-item {
+  width: 100%;
+  border: 1px solid var(--room-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--room-text-muted);
+  font-family: inherit;
+}
+
+.common-room-picker-item strong {
+  color: var(--room-text);
+  font-size: 0.92rem;
+}
+
+.common-room-picker-item.active {
+  border-color: var(--room-border-strong);
+  background: color-mix(in srgb, var(--org-panel-elevated) 96%, transparent);
+}
+
+.common-room-picker-upload {
+  border: 1px solid var(--room-border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.common-room-picker-preview-card {
+  border: 1px solid var(--room-border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  padding: 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.common-room-picker-thumbnail {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--org-panel) 5%, transparent);
+  color: var(--room-text-muted);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.common-room-picker-thumbnail.icon-only {
+  background: var(--room-accent-soft);
+  color: var(--room-accent);
+}
+
+.common-room-picker-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.common-room-picker-preview-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.common-room-picker-preview-copy strong {
+  color: var(--room-text);
+  font-size: 1rem;
+}
+
+.common-room-picker-preview-copy p {
+  margin: 0;
+  color: var(--room-text-muted);
+  line-height: 1.6;
+}
+
+.common-room-picker-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.common-room-picker-stat-grid div {
+  border: 1px solid var(--room-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--org-panel) 3%, transparent);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.common-room-picker-stat-grid span {
+  color: var(--room-text-dim);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.common-room-picker-stat-grid strong {
+  color: var(--room-text);
+  line-height: 1.55;
+}
+
+.common-room-loading-state,
+.common-room-message-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.common-room-message-empty {
+  min-height: 260px;
+  flex-direction: column;
+}
+
+.common-room-section-empty.compact {
+  min-height: 0;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 12px 14px;
+}
+
+.common-room-error-text {
+  margin: 14px 0 0;
+  color: var(--room-danger);
+}
+
+.spin {
+  animation: common-room-spin 1s linear infinite;
+}
+
+@keyframes common-room-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1240px) {
+  .common-room-layout {
+    grid-template-columns: minmax(250px, 0.9fr) minmax(0, 1.55fr);
+  }
+
+  .common-room-settings {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    bottom: 24px;
+    width: min(360px, calc(100vw - 32px));
+    z-index: 60;
+    transform: translateX(calc(100% + 24px));
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.22s ease, opacity 0.22s ease;
+    overflow-y: auto;
+  }
+
+  .common-room-settings.open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .common-room-settings-header .close {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 960px) {
+  .common-room-page-header,
+  .common-room-composer-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .common-room-page-actions,
+  .common-room-composer-tools {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .common-room-layout,
+  .common-room-picker-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .common-room-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .common-room-rail,
+  .common-room-chat {
+    min-height: 0;
+  }
+
+  .common-room-picker-preview,
+  .common-room-picker-list {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .common-room-modal,
+  .common-room-settings {
+    padding: 16px;
+  }
+
+  .common-room-page-actions,
+  .common-room-modal-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .common-room-button,
+  .common-room-button.compact {
+    width: 100%;
+  }
+
+  .common-room-chat-header,
+  .common-room-message-stream,
+  .common-room-composer,
+  .common-room-rail,
+  .common-room-settings,
+  .common-room-modal-panel,
+  .common-room-picker-panel {
+    padding: 16px;
+  }
+
+  .common-room-picker-stat-grid,
+  .common-room-scope-toggle {
+    grid-template-columns: 1fr;
+  }
+
+  .common-room-message-card,
+  .common-room-picker-preview-card,
+  .common-room-reference-card {
+    grid-template-columns: 1fr;
+  }
+
+  .common-room-message-avatar,
+  .common-room-reference-icon,
+  .common-room-picker-thumbnail {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+}
+
+/* ============================================================================
+   Stage 6 - Common Room
+   Org collaboration shell refresh.
+   ============================================================================ */
+.common-room-page {
+  --room-shell-glow: color-mix(in srgb, var(--room-accent) 18%, transparent);
+  --room-shell-border: color-mix(in srgb, var(--room-border) 82%, var(--room-accent) 10%);
+}
+
+.common-room-page-header {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 2px;
+  padding: 28px 30px;
+  border: 1px solid var(--room-shell-border);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--room-accent) 16%, transparent) 0%, transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--room-surface) 96%, transparent) 0%, color-mix(in srgb, var(--room-surface-3) 98%, transparent) 100%);
+  box-shadow: var(--org-shadow-lg);
+}
+
+.common-room-page-header::after {
+  content: '';
+  position: absolute;
+  inset: auto -72px -86px auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--room-accent) 20%, transparent) 0%, transparent 72%);
+  pointer-events: none;
+}
+
+.common-room-button,
+.common-room-icon-button,
+.common-room-channel-card,
+.common-room-scope-option,
+.common-room-reference-card,
+.common-room-picker-item,
+.common-room-member-choice,
+.common-room-toggle-row {
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.common-room-button.primary {
+  background: linear-gradient(135deg, var(--room-accent-light), var(--room-accent));
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--room-accent) 18%, transparent);
+}
+
+.common-room-button.primary:hover {
+  box-shadow: 0 18px 34px color-mix(in srgb, var(--room-accent) 22%, transparent);
+}
+
+.common-room-button.ghost,
+.common-room-icon-button,
+.common-room-scope-option,
+.common-room-reference-card,
+.common-room-picker-item,
+.common-room-member-choice,
+.common-room-toggle-row,
+.common-room-search,
+.common-room-prefixed-input,
+.common-room-composer-box textarea,
+.common-room-field input,
+.common-room-field select,
+.common-room-field textarea {
+  border-color: color-mix(in srgb, var(--room-border) 82%, var(--room-accent) 10%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2.5%, transparent), transparent 78%),
+    color-mix(in srgb, var(--room-surface-3) 92%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent);
+}
+
+.common-room-layout {
+  gap: 20px;
+  align-items: stretch;
+}
+
+.common-room-rail,
+.common-room-chat,
+.common-room-settings,
+.common-room-modal-panel,
+.common-room-picker-panel {
+  border-color: var(--room-shell-border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 3%, transparent), transparent 18%),
+    linear-gradient(180deg, color-mix(in srgb, var(--room-surface) 96%, transparent) 0%, color-mix(in srgb, var(--room-surface-3) 98%, transparent) 100%);
+  box-shadow: var(--org-shadow-lg);
+}
+
+.common-room-rail,
+.common-room-settings {
+  padding: 20px;
+}
+
+.common-room-chat {
+  position: relative;
+}
+
+.common-room-chat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--org-panel) 2%, transparent) 0%, transparent 30%),
+    linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--org-bg) 12%, transparent) 100%);
+  pointer-events: none;
+}
+
+.common-room-chat-header,
+.common-room-settings-header {
+  position: relative;
+  z-index: 1;
+}
+
+.common-room-channel-card,
+.common-room-reference-card,
+.common-room-picker-item,
+.common-room-member-choice {
+  border-color: color-mix(in srgb, var(--room-border) 84%, var(--room-accent) 8%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2.5%, transparent), transparent 82%),
+    color-mix(in srgb, var(--room-surface-3) 92%, transparent);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--org-bg) 14%, transparent);
+}
+
+.common-room-channel-card:hover,
+.common-room-reference-card:hover,
+.common-room-picker-item:hover,
+.common-room-member-choice:hover {
+  border-color: color-mix(in srgb, var(--room-accent) 18%, var(--room-border));
+  box-shadow:
+    0 16px 28px color-mix(in srgb, var(--org-bg) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--room-accent) 10%, transparent);
+}
+
+.common-room-channel-card.active,
+.common-room-picker-item.active,
+.common-room-member-choice.active,
+.common-room-scope-option.active {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--room-accent) 16%, transparent) 0%, transparent 84%),
+    color-mix(in srgb, var(--room-surface-2) 96%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--room-accent) 14%, transparent);
+}
+
+.common-room-message-stream {
+  position: relative;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2%, transparent), transparent 14%),
+    transparent;
+}
+
+.common-room-date-separator span,
+.common-room-channel-pill,
+.common-room-channel-count {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent);
+}
+
+.common-room-message-body {
+  border-color: color-mix(in srgb, var(--room-border) 84%, var(--room-accent) 8%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2.5%, transparent), transparent 78%),
+    color-mix(in srgb, var(--room-surface-3) 96%, transparent);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--org-bg) 14%, transparent);
+}
+
+.common-room-message-card.ai .common-room-message-body {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 14%, transparent) 0%, transparent 58%),
+    color-mix(in srgb, var(--room-surface-3) 96%, transparent);
+}
+
+.common-room-composer {
+  padding: 18px 20px 22px;
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--org-bg) 18%, transparent) 100%);
+}
+
+.common-room-composer-box {
+  border-color: color-mix(in srgb, var(--room-border) 84%, var(--room-accent) 10%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2.8%, transparent), transparent 82%),
+    color-mix(in srgb, var(--room-surface-3) 96%, transparent);
+  box-shadow:
+    0 16px 28px color-mix(in srgb, var(--org-bg) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 4%, transparent);
+}
+
+.common-room-composer-box textarea:focus,
+.common-room-field input:focus,
+.common-room-field select:focus,
+.common-room-field textarea:focus,
+.common-room-search input:focus,
+.common-room-prefixed-input input:focus {
+  outline: none;
+}
+
+.common-room-search:focus-within,
+.common-room-prefixed-input:focus-within,
+.common-room-composer-box textarea:focus,
+.common-room-field input:focus,
+.common-room-field select:focus,
+.common-room-field textarea:focus {
+  border-color: color-mix(in srgb, var(--room-accent) 22%, var(--room-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--room-accent) 12%, transparent);
+}
+
+.common-room-modal-backdrop {
+  background: color-mix(in srgb, var(--org-bg) 80%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.common-room-modal-panel,
+.common-room-picker-panel {
+  overflow: hidden;
+}
+
+.common-room-picker-list,
+.common-room-picker-preview,
+.common-room-picker-preview-card,
+.common-room-picker-upload {
+  border-color: color-mix(in srgb, var(--room-border) 84%, var(--room-accent) 8%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2%, transparent), transparent 78%),
+    color-mix(in srgb, var(--room-surface-3) 94%, transparent);
+}
+
+.common-room-button:focus-visible,
+.common-room-icon-button:focus-visible,
+.common-room-channel-card:focus-visible,
+.common-room-scope-option:focus-visible,
+.common-room-reference-card:focus-visible,
+.common-room-search input:focus-visible,
+.common-room-prefixed-input input:focus-visible,
+.common-room-field input:focus-visible,
+.common-room-field select:focus-visible,
+.common-room-field textarea:focus-visible,
+.common-room-picker-item:focus-visible,
+.common-room-member-choice:focus-visible,
+.common-room-toggle-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--room-accent) 12%, transparent);
+}
+
+@media (max-width: 1024px) {
+  .common-room-page-header {
+    padding: 24px 22px;
+  }
+}
+
+@media (max-width: 720px) {
+  .common-room-page-header,
+  .common-room-rail,
+  .common-room-settings,
+  .common-room-modal-panel,
+  .common-room-picker-panel {
+    border-radius: 22px;
+  }
+}

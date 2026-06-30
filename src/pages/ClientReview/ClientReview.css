@@ -1,0 +1,124 @@
+.client-review-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--public-accent) 12%, transparent), transparent 42%),
+    var(--public-dark-bg-2);
+  color: var(--public-dark-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+
+.client-review-shell {
+  width: min(640px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.client-review-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+
+.client-review-header span {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--public-accent-light);
+}
+
+.client-review-header h1 {
+  margin: 0;
+}
+
+.client-review-card {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--public-dark-border);
+  background: var(--public-dark-panel);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.client-review-state {
+  align-items: flex-start;
+}
+
+.client-review-media {
+  width: 100%;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  max-height: 360px;
+}
+
+.client-review-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.client-review-feedback {
+  display: grid;
+  gap: 8px;
+  color: var(--public-dark-text-soft);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.client-review-feedback textarea {
+  min-height: 120px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--public-dark-text) 10%, transparent);
+  background: color-mix(in srgb, var(--public-dark-bg-2) 66%, transparent);
+  color: inherit;
+  padding: 12px;
+  font: inherit;
+  resize: vertical;
+}
+
+.client-review-primary,
+.client-review-secondary {
+  min-height: 46px;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  font-weight: 600;
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.client-review-primary {
+  background: var(--color-success);
+  color: var(--public-dark-bg);
+}
+
+.client-review-secondary {
+  background: transparent;
+  border-color: var(--public-dark-border-strong);
+  color: inherit;
+}
+
+.client-review-primary:disabled,
+.client-review-secondary:disabled,
+.client-review-feedback textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.client-review-primary:focus-visible,
+.client-review-secondary:focus-visible,
+.client-review-feedback textarea:focus-visible {
+  outline: 2px solid var(--public-accent-light);
+  outline-offset: 3px;
+}
+
+@media (max-width: 520px) {
+  .client-review-action-row {
+    grid-template-columns: 1fr;
+  }
+}

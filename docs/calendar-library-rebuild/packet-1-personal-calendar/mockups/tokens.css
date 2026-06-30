@@ -1,0 +1,574 @@
+/* =============================================================================
+   TOKENS.CSS — SINGLE SOURCE OF TRUTH  ·  Design system: "Midnight Aurora"
+   -----------------------------------------------------------------------------
+   3-tier architecture (industry standard):
+     TIER 1  Primitives   raw, theme-agnostic values (ramps, type, space)
+     TIER 2  Semantics    --color-* roles, themed (light default + dark)
+     TIER 3  Bridges       every legacy/namespace alias points at TIER 2
+
+   RULES (do not violate — this is why the UI is now consistent):
+   - Primitives are defined ONCE. Never redefine a primitive elsewhere.
+   - Only TIER 2 changes per theme. TIER 3 is theme-agnostic (derives from T2).
+   - New code consumes TIER 2 semantics or TIER 3 aliases — never raw hex.
+   - To re-skin the entire product, change TIER 1 + TIER 2 here only.
+   ============================================================================= */
+
+/* =============================================================================
+   TIER 1 — PRIMITIVES (raw, theme-agnostic)
+   ============================================================================= */
+:root {
+  /* ── Type ── */
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --text-xs: 0.72rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.4;
+  --leading-normal: 1.55;
+  --leading-loose: 1.7;
+
+  /* ── Space ── */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  /* ── Radius (Midnight Aurora scale) ── */
+  --r-xs: 6px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px; --r-2xl: 24px; --r-full: 999px;
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-full: var(--r-full);
+
+  /* ── Motion ── */
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-fast: 140ms var(--ease-standard);
+  --transition-base: 200ms var(--ease-standard);
+  --transition-slow: 300ms ease-in-out;
+  --transition-speed: 0.2s;
+
+  /* ── Layout ── */
+  --nav-h: 56px;
+  --sidebar-w: 218px;
+  --sidebar-w-collapsed: 72px;
+  --ui-nav-height: 64px;          /* canonical nav height — shared by user/org/admin shells */
+  --ui-sidebar-width: 248px;      /* canonical sidebar width — shared by all three shells */
+  --ui-sidebar-collapsed-width: 72px;
+  --ui-page-gutter: clamp(16px, 2.4vw, 32px);
+  --ui-page-max: 1440px;
+  --ui-page-section-gap: 24px;
+  --ui-control-height-sm: 34px;
+  --ui-control-height-md: 40px;
+  --ui-control-height-lg: 46px;
+
+  /* ── Color primitives: Violet (brand/primary) ── */
+  --violet-50:#F1F0FC; --violet-100:#E4E3FA; --violet-200:#C9C7F4; --violet-300:#A9A6EC;
+  --violet-400:#8582E2; --violet-500:#5B5BD6; --violet-600:#4747C4; --violet-700:#3A39A3;
+  --violet-800:#2E2E80; --violet-900:#232260;
+
+  /* ── Color primitives: Coral (accent / key CTA) ── */
+  --coral-300:#FFA593; --coral-400:#FF8770; --coral-500:#FF6B57; --coral-600:#ED5038; --coral-700:#C73D28;
+
+  /* ── Color primitives: Teal (secondary / insights, charts) ── */
+  --teal-300:#5EE0CE; --teal-400:#2DC9B4; --teal-500:#12A594; --teal-600:#0E8576; --teal-700:#0B6A5E;
+
+  /* ── Color primitives: Warm Ink (neutrals) ── */
+  --ink-0:#FFFFFF; --ink-25:#FAF9FD; --ink-50:#F4F3F9; --ink-100:#ECEAF3; --ink-150:#E1DEEC;
+  --ink-200:#D2CFE0; --ink-300:#B4B0C6; --ink-400:#8E8AA3; --ink-500:#6B6880; --ink-600:#4E4B60;
+  --ink-700:#353347; --ink-800:#211F30; --ink-900:#15151F; --ink-950:#0D0D16;
+
+  /* ── Color primitives: Status hues ── */
+  --green-500:#1EA672; --green-400:#34D399;
+  --amber-500:#E0931E; --amber-400:#F2C96D;
+  --red-500:#E2556B;   --red-400:#FB7185;
+  --blue-500:#4A7DF6;  --blue-400:#60A5FA;
+
+  /* ── Brandosse blend anchors (LOCKED accent hexes; TIER 2 references these) ──
+     Dark "Midnight Studio" and Light "Solar Paper" swap these symmetrically. */
+  --bz-violet:       #7C5CFC;  /* dark primary  */
+  --bz-violet-hover: #9277FF;
+  --bz-violet-light: #6B4EFF;  /* light accent/secondary */
+  --bz-violet-light-hover: #5A3FE0;
+  --bz-violet-text:  #A98EFD;
+  --bz-coral:        #FF6B6B;  /* dark accent/secondary */
+  --bz-coral-hover:  #FF8585;
+  --bz-coral-strong: #FF4D2E;  /* light primary */
+  --bz-coral-strong-hover: #E63E1F;
+  --bz-coral-text:   #C73011;
+  --bz-positive-dark:  #4ECBA4;
+  --bz-positive-light: #1A9E5F;
+}
+
+/* =============================================================================
+   TIER 2 — SEMANTIC ROLES (LIGHT, default)
+   ============================================================================= */
+:root,
+:root[data-theme="light"] {
+  /* Display font: editorial serif in light (Solar Paper) */
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+
+  /* Surfaces — Solar Paper (warm white) */
+  --color-bg-page: #FAFAF7;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-subtle: #F4F2EC;
+  --color-bg-hover: #F0EFEA;
+
+  /* Primary (action) — coral leads in light */
+  --color-primary: var(--bz-coral-strong);
+  --color-primary-hover: var(--bz-coral-strong-hover);
+  --color-primary-subtle: rgba(255,77,46,0.10);
+  --color-primary-text: var(--bz-coral-text);
+  --color-on-primary: #FFFFFF;
+
+  /* Accent (key CTA / highlight) — violet in light */
+  --color-accent: var(--bz-violet-light);
+  --color-accent-hover: var(--bz-violet-light-hover);
+  --color-accent-subtle: rgba(107,78,255,0.10);
+  --color-on-accent: #FFFFFF;
+
+  /* Secondary (insights) — violet in light (matches accent) */
+  --color-secondary: var(--bz-violet-light);
+  --color-secondary-hover: var(--bz-violet-light-hover);
+  --color-secondary-subtle: rgba(107,78,255,0.10);
+
+  /* Text */
+  --color-text-primary: #141210;
+  --color-text-secondary: rgba(20,18,16,0.60);
+  --color-text-tertiary: rgba(20,18,16,0.58); /* raised from 0.40 to meet WCAG AA on light surfaces */
+  --color-text-disabled: rgba(20,18,16,0.28);
+  --color-text-inverse: #ffffff;
+  --color-text-link: var(--color-primary);
+  --color-text-link-hover: var(--color-primary-hover);
+
+  /* Borders */
+  --color-border: rgba(20,18,16,0.08);
+  --color-border-strong: rgba(20,18,16,0.18);
+  --color-border-focus: color-mix(in srgb, var(--color-primary) 55%, transparent);
+
+  /* Status */
+  --color-success: var(--bz-positive-light); --color-success-bg: rgba(26,158,95,.12); --color-success-border: rgba(26,158,95,.24); --color-success-text: #117047;
+  --color-warning: var(--amber-500); --color-warning-bg: rgba(224,147,30,.12); --color-warning-border: rgba(224,147,30,.22); --color-warning-text: #8A5A06;
+  --color-danger:  var(--red-500);   --color-danger-bg:  rgba(226,85,107,.10); --color-danger-border:  rgba(226,85,107,.22); --color-danger-text:  #A3293D;
+  --color-info:    var(--blue-500);  --color-info-bg:    rgba(74,125,246,.10); --color-info-border:    rgba(74,125,246,.22); --color-info-text:    #2957C7;
+
+  /* Sidebar / navbar */
+  --color-sidebar-bg: rgba(255,255,255,0.9);
+  --color-sidebar-border: rgba(20,18,16,0.08);
+  --color-sidebar-active-bg: var(--color-primary-subtle);
+  --color-sidebar-active-bar: var(--color-primary);
+  --color-sidebar-active-text: var(--color-primary-text);
+  --color-sidebar-text: var(--color-text-secondary);
+  --color-navbar-bg: rgba(255,255,255,0.82);
+  --color-navbar-border: rgba(20,18,16,0.08);
+
+  /* Glass (Solar Paper: opaque white) */
+  --glass-bg: #FFFFFF;
+  --glass-border: rgba(20,18,16,0.08);
+
+  /* Elevation (light: warm 3-step ink shadows) */
+  --shadow-sm: 0 1px 3px rgba(20,18,16,.06), 0 1px 2px rgba(20,18,16,.04);
+  --shadow-md: 0 4px 12px rgba(20,18,16,.08), 0 2px 4px rgba(20,18,16,.04);
+  --shadow-lg: 0 12px 32px rgba(20,18,16,.12), 0 4px 8px rgba(20,18,16,.06);
+  --shadow-xl: 0 20px 48px rgba(20,18,16,.16);
+  --shadow-overlay: 0 16px 40px rgba(20,18,16,.14);
+  --shadow-soft: 0 12px 32px rgba(20,18,16,.10);
+}
+
+/* =============================================================================
+   TIER 2 — SEMANTIC ROLES (DARK)
+   ============================================================================= */
+:root[data-theme="dark"] {
+  /* Display font: geometric sans in dark (Midnight Studio) */
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+
+  /* Surfaces — Midnight Studio */
+  --color-bg-page: #0D0E14;
+  --color-bg-surface: #1C1B26;
+  --color-bg-elevated: #22212E;
+  --color-bg-subtle: #14131D;
+  --color-bg-hover: rgba(255,255,255,0.04);
+
+  /* Primary (action) — violet leads in dark */
+  --color-primary: var(--bz-violet);
+  --color-primary-hover: var(--bz-violet-hover);
+  --color-primary-subtle: rgba(124,92,252,0.18);
+  --color-primary-text: var(--bz-violet-text);
+  --color-on-primary: #0D0E14;
+
+  /* Accent (key CTA / highlight) — coral in dark */
+  --color-accent: var(--bz-coral);
+  --color-accent-hover: var(--bz-coral-hover);
+  --color-accent-subtle: rgba(255,107,107,0.18);
+  --color-on-accent: #1A0E0A;
+
+  /* Secondary (insights) — coral in dark (matches accent) */
+  --color-secondary: var(--bz-coral);
+  --color-secondary-hover: var(--bz-coral-hover);
+  --color-secondary-subtle: rgba(255,107,107,0.18);
+
+  --color-text-primary: #E8E6F0;
+  --color-text-secondary: #8A87A0;
+  --color-text-tertiary: #7A7391; /* raised from #524E6A to meet WCAG AA on dark surfaces */
+  --color-text-disabled: #3C3950;
+  --color-text-inverse: #0D0E14;
+  --color-text-link: var(--color-primary-text);
+  --color-text-link-hover: #C8C6F4;
+
+  --color-border: rgba(255,255,255,0.07);
+  --color-border-strong: rgba(255,255,255,0.13);
+  --color-border-focus: color-mix(in srgb, var(--color-primary) 62%, transparent);
+
+  --color-success: var(--bz-positive-dark); --color-success-bg: rgba(78,203,164,.15); --color-success-border: rgba(78,203,164,.28); --color-success-text: #8CEBCF;
+  --color-warning: var(--amber-400); --color-warning-bg: rgba(242,201,109,.14); --color-warning-border: rgba(242,201,109,.26); --color-warning-text: #F7D991;
+  --color-danger:  var(--red-400);   --color-danger-bg:  rgba(251,113,133,.14); --color-danger-border:  rgba(251,113,133,.24); --color-danger-text:  #FDA4AF;
+  --color-info:    var(--blue-400);  --color-info-bg:    rgba(96,165,250,.14); --color-info-border:    rgba(96,165,250,.24); --color-info-text:    #BFDBFE;
+
+  /* Glass (Midnight Studio: subtle frosted white) */
+  --glass-bg: rgba(255,255,255,0.04);
+  --glass-border: rgba(255,255,255,0.08);
+
+  --color-sidebar-bg: rgba(28,27,38,0.94);
+  --color-sidebar-border: rgba(255,255,255,0.07);
+  --color-sidebar-active-bg: rgba(124,92,252,0.18);
+  --color-sidebar-active-bar: var(--color-primary);
+  --color-sidebar-active-text: var(--color-primary-text);
+  --color-sidebar-text: var(--color-text-secondary);
+  --color-navbar-bg: rgba(13,14,20,0.90);
+  --color-navbar-border: rgba(255,255,255,0.07);
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.40);
+  --shadow-md: 0 12px 30px rgba(0,0,0,.50);
+  --shadow-lg: 0 24px 50px rgba(0,0,0,.60);
+  --shadow-xl: 0 32px 72px rgba(0,0,0,.68);
+  --shadow-overlay: 0 20px 48px rgba(0,0,0,.58);
+  --shadow-soft: 0 20px 46px rgba(0,0,0,.46);
+}
+
+/* =============================================================================
+   TIER 3 — BRIDGES & ALIASES (theme-agnostic — derive from TIER 2 only)
+   Every legacy/namespace token used across the app points here so that
+   changing TIER 1/2 re-skins everything. One-way references (no cycles).
+   ============================================================================= */
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  /* ── Brand family ── */
+  --brand-primary: var(--color-primary);
+  --brand-primary-hover: var(--color-primary-hover);
+  --brand-primary-light: var(--color-primary-subtle);
+  --brand-secondary: var(--color-secondary);
+  --brand-secondary-hover: var(--color-secondary-hover);
+  --brand-secondary-light: var(--color-secondary-subtle);
+  --brand-accent: var(--color-accent);
+  --brand-accent-hover: var(--color-accent-hover);
+  --brand-accent-light: var(--color-accent-subtle);
+
+  /* ── Accent family ── */
+  --accent: var(--color-primary);
+  --accent-light: var(--violet-400);
+  --accent-hover: var(--color-primary-hover);
+  --accent-glow: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  --accent-subtle: var(--color-primary-subtle);
+
+  /* ── Surface / bg aliases ── */
+  --bg-base: var(--color-bg-page);
+  --bg-surface: var(--color-bg-surface);
+  --bg-card: var(--color-bg-surface);
+  --bg-card-hover: var(--color-bg-hover);
+  --bg-input: var(--color-bg-subtle);
+  --bg-input-focus: var(--color-bg-surface);
+  --bg: var(--color-bg-page);
+  --card-bg: var(--color-bg-surface);
+  --app-bg: var(--color-bg-page);
+  --panel-bg: var(--color-bg-surface);
+  --element-bg: var(--color-bg-subtle);
+
+  /* ── Border aliases ── */
+  --border: var(--color-border);
+  --border-input: var(--color-border);
+  --border-focus: var(--color-border-focus);
+  --border-color: var(--color-border);
+  --border-hover: var(--color-border-strong);
+
+  /* ── Text aliases ── */
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-tertiary);
+  --text-placeholder: var(--color-text-tertiary);
+  --text: var(--color-text-primary);
+  --text-main: var(--color-text-primary);
+  --text-inverse: var(--color-text-inverse);
+  --muted: var(--color-text-secondary);
+
+  /* ── Status aliases ── */
+  --danger: var(--color-danger);
+  --danger-bg: var(--color-danger-bg);
+  --danger-border: var(--color-danger-border);
+  --success: var(--color-success);
+  --success-bg: var(--color-success-bg);
+  --warning: var(--color-warning);
+  --error: var(--color-danger);
+  --info: var(--color-info);
+
+  /* ── Misc single-word legacy ── */
+  --primary: var(--color-primary);
+  --radius: var(--radius-lg);
+  --border-radius: var(--radius-lg);
+
+  /* ── Focus ring + card defaults ── */
+  --ui-card-radius: var(--radius-lg);
+  --ui-card-border: var(--color-border);
+  --ui-card-shadow: var(--shadow-sm);
+  --ui-focus-ring: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
+
+  /* ── Glass ── */
+  --glass-bg: color-mix(in srgb, var(--color-bg-surface) 70%, transparent);
+  --glass-border: color-mix(in srgb, var(--color-border) 70%, transparent);
+
+  /* ── Brandosse (AI Studio) — now unified to Midnight Aurora ── */
+  --brandosse-primary: var(--color-primary);
+  --brandosse-primary-strong: var(--color-primary-hover);
+  --brandosse-primary-soft: var(--color-primary-subtle);
+  --brandosse-on-primary: var(--color-on-primary);
+  --brandosse-panel-shadow: var(--shadow-md);
+  --brandosse-overlay: color-mix(in srgb, var(--color-bg-page) 56%, transparent);
+  --brandosse-status-bg: color-mix(in srgb, var(--color-bg-surface) 90%, transparent);
+  --brandosse-studio-bg: var(--color-bg-page);
+  --brandosse-studio-panel: var(--color-bg-surface);
+  --brandosse-studio-panel-soft: var(--color-bg-subtle);
+  --brandosse-studio-field: var(--color-bg-subtle);
+  --brandosse-studio-border: var(--color-border);
+  --brandosse-studio-text: var(--color-text-primary);
+  --brandosse-studio-muted: var(--color-text-secondary);
+
+  /* ── Charts (multi-hue is an allowed exception for data viz) ── */
+  --chart-1: var(--color-primary);
+  --chart-2: var(--color-secondary);
+  --chart-3: var(--color-accent);
+  --chart-4: var(--color-danger);
+  --chart-5: var(--color-info);
+  --chart-6: color-mix(in srgb, var(--color-primary) 58%, var(--color-secondary));
+  --chart-success: var(--color-success);
+  --chart-warning: var(--color-warning);
+  --chart-danger: var(--color-danger);
+  --chart-info: var(--color-info);
+  --chart-grid: color-mix(in srgb, var(--color-border) 88%, transparent);
+  --chart-axis: color-mix(in srgb, var(--color-text-secondary) 88%, transparent);
+
+  /* ── Dashboard shell family ── */
+  --dash-bg: var(--color-bg-page);
+  --dash-surface: var(--color-bg-subtle);
+  --dash-panel: var(--color-bg-surface);
+  --dash-panel-2: var(--color-bg-elevated);
+  --dash-panel-hover: var(--color-bg-hover);
+  --dash-border: var(--color-border);
+  --dash-border-hover: var(--color-border-strong);
+  --dash-accent: var(--color-primary);
+  --dash-accent-light: var(--color-primary-text);
+  --dash-accent-hover: var(--color-primary-hover);
+  --dash-accent-sub: var(--color-primary-subtle);
+  --dash-text-1: var(--color-text-primary);
+  --dash-text-2: var(--color-text-secondary);
+  --dash-text-3: var(--color-text-tertiary);
+  --dash-success: var(--color-success);
+  --dash-warning: var(--color-warning);
+  --dash-danger: var(--color-danger);
+  --dash-shadow-sm: var(--shadow-sm);
+  --dash-shadow-md: var(--shadow-md);
+  --dash-shadow-lg: var(--shadow-lg);
+
+  /* ── Org shell family ── */
+  --org-bg: var(--color-bg-page);
+  --org-surface: var(--color-bg-subtle);
+  --org-panel: var(--color-bg-surface);
+  --org-panel-elevated: var(--color-bg-elevated);
+  --org-panel-hover: var(--color-bg-hover);
+  --org-border: var(--color-border);
+  --org-border-strong: var(--color-border-strong);
+  --org-accent: var(--color-primary);
+  --org-accent-light: var(--color-primary-text);
+  --org-text-1: var(--color-text-primary);
+  --org-text-2: var(--color-text-secondary);
+  --org-text-3: var(--color-text-tertiary);
+  --org-success: var(--color-success);
+  --org-warning: var(--color-warning);
+  --org-danger: var(--color-danger);
+  --org-info: var(--color-info);
+  --org-task-status-default: var(--ink-400);
+  --org-task-status-custom: var(--color-secondary);
+  --org-overlay: color-mix(in srgb, var(--color-bg-page) 72%, transparent);
+  --org-subtle-highlight: color-mix(in srgb, var(--color-bg-surface) 6%, transparent);
+  --org-shadow-sm: var(--shadow-sm);
+  --org-shadow-md: var(--shadow-md);
+  --org-shadow-lg: var(--shadow-lg);
+
+  /* ── Admin shell family ── */
+  --admin-bg: var(--color-bg-page);
+  --admin-surface: var(--color-bg-subtle);
+  --admin-panel: var(--color-bg-surface);
+  --admin-panel-2: var(--color-bg-elevated);
+  --admin-panel-hover: var(--color-bg-hover);
+  --admin-border: var(--color-border);
+  --admin-border-strong: var(--color-border-strong);
+  --admin-accent: var(--color-primary);
+  --admin-accent-light: var(--color-primary-text);
+  --admin-accent-sub: var(--color-primary-subtle);
+  --admin-text-1: var(--color-text-primary);
+  --admin-text-2: var(--color-text-secondary);
+  --admin-text-3: var(--color-text-tertiary);
+  --admin-success: var(--color-success);
+  --admin-warning: var(--color-warning);
+  --admin-danger: var(--color-danger);
+  --admin-shadow-sm: var(--shadow-sm);
+  --admin-shadow-md: var(--shadow-md);
+  --admin-shadow-lg: var(--shadow-lg);
+  --admin-chart-1: var(--chart-1);
+  --admin-chart-2: var(--chart-2);
+  --admin-chart-3: var(--chart-3);
+  --admin-chart-4: var(--chart-4);
+  --admin-chart-5: var(--chart-5);
+  --admin-chart-6: var(--chart-6);
+  --admin-chart-grid: var(--chart-grid);
+  --admin-chart-axis: var(--chart-axis);
+
+  /* ── Calendar + Library compatibility layer ── */
+  --color-brand-primary: var(--color-text-primary);
+  --color-brand-accent: var(--color-primary);
+  --color-brand-accent-alt: var(--color-secondary);
+  --color-brand-glow: var(--color-primary);
+
+  --color-neutral-0: var(--color-bg-surface);
+  --color-neutral-50: var(--color-bg-page);
+  --color-neutral-100: var(--color-bg-subtle);
+  --color-neutral-150: var(--color-border);
+  --color-neutral-200: var(--color-border-strong);
+  --color-neutral-300: var(--color-text-tertiary);
+  --color-neutral-400: var(--color-text-tertiary);
+  --color-neutral-500: var(--color-text-secondary);
+  --color-neutral-600: var(--color-text-secondary);
+  --color-neutral-700: var(--color-text-primary);
+  --color-neutral-800: var(--color-text-primary);
+  --color-neutral-900: var(--color-bg-subtle);
+
+  --surface-page: var(--color-bg-page);
+  --surface-card: var(--color-bg-surface);
+  --surface-card-hover: var(--color-bg-hover);
+  --surface-overlay: color-mix(in srgb, var(--color-bg-page) 60%, transparent);
+  --surface-panel: var(--color-bg-surface);
+  --surface-rail: var(--color-bg-surface);
+  --surface-sidebar: var(--color-sidebar-bg);
+  --surface-alt: var(--color-bg-subtle);
+
+  --border-default: var(--color-border);
+  --border-strong: var(--color-border-strong);
+
+  /* Post lifecycle status tokens */
+  --status-draft-bg: var(--color-bg-subtle);
+  --status-draft-border: var(--color-text-tertiary);
+  --status-draft-text: var(--color-text-secondary);
+  --status-draft-dot: var(--color-text-tertiary);
+  --status-scheduled-bg: var(--color-info-bg);
+  --status-scheduled-border: var(--color-info);
+  --status-scheduled-text: var(--color-info-text);
+  --status-scheduled-dot: var(--color-info);
+  --status-publishing-bg: var(--color-warning-bg);
+  --status-publishing-border: var(--color-warning);
+  --status-publishing-text: var(--color-warning-text);
+  --status-publishing-dot: var(--color-warning);
+  --status-published-bg: var(--color-success-bg);
+  --status-published-border: var(--color-success);
+  --status-published-text: var(--color-success-text);
+  --status-published-dot: var(--color-success);
+  --status-failed-bg: var(--color-danger-bg);
+  --status-failed-border: var(--color-danger);
+  --status-failed-text: var(--color-danger-text);
+  --status-failed-dot: var(--color-danger);
+  --status-archived-bg: var(--color-bg-elevated);
+  --status-archived-border: var(--color-text-tertiary);
+  --status-archived-text: var(--color-text-tertiary);
+  --status-archived-dot: var(--color-text-tertiary);
+
+  /* Pipeline + dot statuses (org/theme.css consumers) */
+  --pipeline-draft: var(--color-bg-subtle);
+  --pipeline-pending: var(--color-warning-bg);
+  --pipeline-in-review: var(--color-info-bg);
+  --pipeline-revision: var(--color-warning-bg);
+  --pipeline-approved: var(--color-success-bg);
+  --pipeline-rejected: var(--color-danger-bg);
+  --pipeline-published: var(--color-info-bg);
+  --status-dot-pending: var(--color-warning);
+  --status-dot-review: var(--color-info);
+  --status-dot-revision: var(--color-danger);
+  --status-dot-approved: var(--color-success);
+  --status-dot-published: var(--color-primary);
+  --credit-high: var(--color-success);
+  --credit-medium: var(--color-warning);
+  --credit-low: var(--color-danger);
+  --channel-bg: var(--color-bg-subtle);
+  --message-ai-bg: var(--color-primary-subtle);
+  --message-ai-border: color-mix(in srgb, var(--color-primary) 20%, transparent);
+
+  /* Platform brand colors (real brand hex — allowed exception) */
+  --platform-youtube: #FF0000;
+  --platform-tiktok: #000000;
+  --platform-tiktok-alt: #69C9D0;
+  --platform-facebook: #1877F2;
+  --platform-x: #000000;
+  --platform-instagram: #E1306C;
+  --platform-linkedin: #0A66C2;
+
+  /* AI accents */
+  --color-ai-primary: var(--color-primary);
+  --color-ai-light: var(--color-primary-subtle);
+  --color-ai-glow: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  --color-ai-gradient: linear-gradient(135deg, var(--violet-500) 0%, var(--color-accent) 100%);
+}
+
+/* =============================================================================
+   PUBLIC / LANDING — fixed-dark tokens (intentionally dark regardless of theme)
+   Retinted to Midnight Aurora warm ink.
+   ============================================================================= */
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  --public-dark-bg: var(--ink-950);
+  --public-dark-bg-2: #0F0E1A;
+  --public-dark-bg-3: #15141F;
+  --public-dark-surface: #121120;
+  --public-dark-card: #16151F;
+  --public-dark-card-hover: #1D1C28;
+  --public-dark-text: #F4F3F9;
+  --public-dark-text-soft: #CBC8DA;
+  --public-dark-text-muted: #9A96AE;
+  --public-dark-text-dim: #6B6880;
+  --public-dark-border: rgba(255,255,255,0.09);
+  --public-dark-border-strong: rgba(255,255,255,0.16);
+  --public-dark-panel: rgba(22,21,31,0.88);
+  --public-dark-panel-soft: rgba(22,21,31,0.64);
+  --public-dark-scrim: rgba(13,13,22,0.88);
+  --public-dark-grid-line: rgba(255,255,255,0.028);
+  --public-dark-shadow: 0 24px 80px rgba(0,0,0,0.40);
+  --public-dark-shadow-lg: 0 28px 70px rgba(0,0,0,0.50);
+  --public-accent: var(--color-primary);
+  --public-accent-light: var(--violet-400);
+  --public-accent-soft: var(--color-secondary);
+  --public-accent-purple: var(--color-accent);
+  --public-primary-glow: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  --public-primary-border: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  --public-primary-border-strong: color-mix(in srgb, var(--color-primary) 45%, transparent);
+}

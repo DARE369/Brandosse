@@ -1,0 +1,123 @@
+.context-selector-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 42%),
+    var(--color-bg-page);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.context-selector-shell {
+  width: min(960px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.context-selector-brand {
+  font-size: 0.875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-link);
+  font-weight: 700;
+}
+
+.context-selector-shell h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+}
+
+.context-selector-shell p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.context-selector-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.context-card {
+  min-height: 240px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface);
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 20px;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.context-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+.context-card--primary {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.context-card:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 3px;
+}
+
+.context-card-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-inverse);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.context-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.context-card strong {
+  font-size: 0.95rem;
+}
+
+.context-card-badge,
+.context-card-last-used {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--public-accent) 15%, transparent);
+  color: var(--color-text-link);
+}
+
+.context-card-subtitle,
+.context-card-description {
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-card:hover {
+    transform: none;
+  }
+}

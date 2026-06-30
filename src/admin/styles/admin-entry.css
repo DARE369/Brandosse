@@ -1,0 +1,11 @@
+/* Admin-only stylesheets, bundled here and imported by app/app/admin/layout.jsx
+   so they ship only on /app/admin routes (not to personal/org users).
+   The .scss is included via CSS @import — Turbopack treats it as CSS, matching
+   the prior app-entry.css behavior and avoiding a hard `sass` dependency. */
+@import "../components/CreateOrgPanel.css";
+@import "../pages/AdminModeration/AdminModeration.scss";
+@import "../pages/AdminModeration/AdminModerationPage.css";
+@import "./AdminAccounts.css";
+@import "./AdminDashboard.css";
+@import "./AdminShell.css";
+@import "./AdminWorkspace.css";

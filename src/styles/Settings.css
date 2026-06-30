@@ -1,0 +1,356 @@
+/* ==========================================================================
+   Settings Route Shell
+   ========================================================================== */
+
+.settings-shell {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  overflow: auto;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary) 8%, transparent), transparent 34%),
+    radial-gradient(circle at bottom left, color-mix(in srgb, var(--color-primary) 5%, transparent), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-page) 92%, var(--color-bg-surface)) 0%, var(--color-bg-page) 100%);
+}
+
+.settings-container {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: clamp(20px, 3vw, 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.settings-container > * {
+  min-width: 0;
+}
+
+.settings-page-header {
+  padding: 20px 22px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 92%, transparent);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 38%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-elevated) 96%, var(--public-dark-text) 4%) 0%, var(--color-bg-surface) 100%);
+  box-shadow: 0 18px 34px color-mix(in srgb, var(--color-bg-page) 28%, transparent);
+}
+
+.settings-page-header .ui-page-header-copy h1 {
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+}
+
+.settings-shell .toast {
+  --toast-accent: var(--color-primary);
+  --toast-bg: color-mix(in srgb, var(--color-primary-subtle) 76%, var(--color-bg-surface));
+  --toast-border: color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  position: sticky;
+  top: 18px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--toast-border);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--toast-bg) 90%, var(--public-dark-text) 10%) 0%, var(--color-bg-surface) 100%);
+  box-shadow: 0 22px 52px color-mix(in srgb, var(--toast-accent) 12%, rgba(15, 23, 42, 0.12));
+  color: var(--color-text-primary);
+  animation: settings-toast-enter 180ms ease-out;
+}
+
+.settings-shell .toast::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 18px 0 0 18px;
+  background: var(--toast-accent);
+}
+
+.settings-shell .toast button {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--toast-accent) 14%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg-surface) 88%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.settings-shell .toast button:hover {
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--toast-accent) 28%, var(--color-border));
+}
+
+.toast-success {
+  --toast-accent: var(--color-success);
+  --toast-bg: var(--color-success-bg);
+  --toast-border: var(--color-success-border);
+}
+
+.toast-error {
+  --toast-accent: var(--color-danger);
+  --toast-bg: var(--color-danger-bg);
+  --toast-border: var(--color-danger-border);
+}
+
+.toast-warning {
+  --toast-accent: var(--color-warning);
+  --toast-bg: var(--color-warning-bg);
+  --toast-border: var(--color-warning-border);
+}
+
+.toast-info {
+  --toast-accent: var(--color-primary);
+  --toast-bg: color-mix(in srgb, var(--color-primary-subtle) 76%, var(--color-bg-surface));
+  --toast-border: color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+}
+
+@keyframes settings-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-container {
+    padding: 16px;
+  }
+
+  .settings-shell .toast {
+    top: 12px;
+    padding: 13px 14px;
+  }
+}
+
+/* Personal UI realignment */
+.settings-shell {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 32%),
+    radial-gradient(circle at bottom left, color-mix(in srgb, var(--color-primary) 8%, transparent), transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-page) 92%, var(--color-bg-surface) 8%) 0%, var(--color-bg-page) 100%);
+}
+
+.settings-shell .toast {
+  --toast-bg: color-mix(in srgb, var(--color-primary-subtle) 62%, var(--color-bg-elevated));
+  --toast-border: color-mix(in srgb, var(--toast-accent) 22%, var(--color-border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--toast-bg) 92%, white 8%) 0%, var(--color-bg-surface) 100%);
+  box-shadow: 0 22px 52px rgba(1, 3, 10, 0.34);
+}
+
+.settings-shell .toast button {
+  background: color-mix(in srgb, var(--color-bg-subtle) 88%, transparent);
+  border-color: color-mix(in srgb, var(--toast-accent) 20%, var(--color-border));
+}
+
+/* ==========================================================================
+   Stage 11 - Personal Settings Foundation
+   ========================================================================== */
+
+.settings-tab-bar-extended {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.settings-tab-bar .ui-tab.is-active {
+  border-color: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 22%, var(--settings-border, var(--color-border)));
+  background: color-mix(in srgb, var(--dash-accent-sub, var(--color-primary-subtle)) 74%, var(--settings-surface, var(--color-bg-surface)));
+  color: var(--dash-accent-light, var(--color-primary-text));
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--dash-accent, var(--color-primary)) 14%, transparent);
+}
+
+.settings-foundation-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-foundation-header,
+.settings-foundation-card,
+.settings-foundation-loading {
+  border: 1px solid color-mix(in srgb, var(--color-border) 92%, transparent);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-elevated) 95%, var(--public-dark-text) 5%) 0%, var(--color-bg-surface) 100%);
+  box-shadow: 0 18px 34px rgba(1, 3, 10, 0.24);
+}
+
+.settings-foundation-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+  padding: 18px 20px;
+}
+
+.settings-foundation-header-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary-text);
+  background: color-mix(in srgb, var(--color-primary-subtle) 80%, var(--color-bg-surface));
+}
+
+.settings-foundation-header h1 {
+  margin: 0;
+  font-size: clamp(1.25rem, 1.8vw, 1.5rem);
+  letter-spacing: -0.02em;
+}
+
+.settings-foundation-header p {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+.settings-foundation-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-foundation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-foundation-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-foundation-field span {
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.settings-foundation-field input,
+.settings-foundation-field select {
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 90%, transparent);
+  background: color-mix(in srgb, var(--color-bg-subtle) 88%, var(--color-bg-surface));
+  color: var(--color-text-primary);
+  padding: 0 12px;
+}
+
+.settings-foundation-field input:focus,
+.settings-foundation-field select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-primary) 34%, var(--color-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.settings-foundation-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.settings-primary {
+  min-height: 40px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
+  border-radius: 999px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 72%, var(--color-bg-surface)));
+  color: var(--public-dark-text);
+  font-weight: 600;
+}
+
+.settings-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-primary:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.settings-foundation-loading {
+  min-height: 92px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+}
+
+.settings-toggle-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-toggle-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--color-bg-subtle) 84%, var(--color-bg-surface));
+}
+
+.settings-toggle-row strong {
+  font-size: 0.92rem;
+}
+
+.settings-toggle-row p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.settings-toggle-row input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+}
+
+@media (max-width: 860px) {
+  .settings-foundation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-tab-bar-extended {
+    width: 100%;
+  }
+
+  .settings-tab-bar-extended button {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .settings-foundation-header {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .settings-foundation-card {
+    padding: 14px;
+  }
+}

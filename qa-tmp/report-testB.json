@@ -1,0 +1,32 @@
+{
+  "weekLabel": "Jun 22 – Jun 28, 2026",
+  "chipFound": true,
+  "classAttr": "cal3-post-cell cal3-post-cell--published cal3-post-cell--locked",
+  "titleAttr": "Open to view — drag is disabled for posts that already went out",
+  "hasLockedClass": true,
+  "outerHTML": "<div class=\"cal3-post-cell cal3-post-cell--published cal3-post-cell--locked\" title=\"Open to view — drag is disabled for posts that already went out\" role=\"button\" tabindex=\"0\" aria-disabled=\"true\" aria-roledescription=\"draggable\" aria-describedby=\"DndDescribedBy-10\" style=\"position: absolute; top: 640px; left: 2px; right: 2px; min-height: 44px;\"><div class=\"cal3-post-cell__inner\"><div class=\"cal3-post-cell__platform-bar\" style=\"background: var(--platform-instagram);\"></div><span class=\"cal3-post-cell__time\">10:00 AM</span><span class=\"cal3-post-cell__title\">QA Fixture Published</span></div></div>",
+  "beforeBox": {
+    "x": 464.421875,
+    "y": 498.5,
+    "width": 156.4375,
+    "height": 44
+  },
+  "targetBox": {
+    "x": 623.859375,
+    "y": 626.5,
+    "width": 160.421875,
+    "height": 64
+  },
+  "errorToastSeen": false,
+  "successToastSeenIncorrectly": false,
+  "chipStillFoundAfter": true,
+  "afterBox": {
+    "x": 464.421875,
+    "y": 498.5,
+    "width": 156.4375,
+    "height": 44
+  },
+  "movedPx": 0,
+  "cmdkInputFound": true,
+  "cmdkErrorToastSeen": false
+}

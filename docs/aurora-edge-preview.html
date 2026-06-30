@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Concept C — Aurora Edge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ============ TIER 1 — PRIMITIVES ============ */
+  :root {
+    --cobalt-50:#ECEEFF; --cobalt-100:#DCE0FF; --cobalt-200:#B9C1FF; --cobalt-300:#8E9AFF; --cobalt-400:#6374FF;
+    --cobalt-500:#3D5AFE; --cobalt-600:#2E45E0; --cobalt-700:#2335B5; --cobalt-800:#1B298C; --cobalt-900:#151F66;
+    --mag-300:#FF8AC7; --mag-400:#FF5CAE; --mag-500:#FF2E93; --mag-600:#E5197C; --mag-700:#BD1466;
+    --gray-0:#FFFFFF; --gray-25:#F6F7FB; --gray-50:#EFF1F6; --gray-100:#E5E8F0; --gray-150:#D8DCE8;
+    --gray-200:#C4C9DA; --gray-300:#9DA3BC; --gray-400:#757B96; --gray-500:#565C76; --gray-600:#3A3F56;
+    --gray-700:#282C3E; --gray-800:#181B28; --gray-900:#0F1119; --gray-950:#0A0A0F;
+    --ok:#22C55E; --warn:#F5A524; --err:#FF4D6A; --info:#5B8DEF;
+    --font-display:"Space Grotesk","Inter",system-ui,sans-serif; --font-body:"Inter",system-ui,sans-serif;
+    /* EDGE language: crisp radii, borders over shadows */
+    --r-sm:8px; --r-md:10px; --r-lg:12px; --r-pill:999px;
+  }
+  /* DARK-FIRST: dark is default */
+  [data-theme="dark"] {
+    --surface-page:var(--gray-950); --surface:var(--gray-900); --surface-elevated:var(--gray-800); --surface-subtle:#121420; --surface-hover:rgba(99,116,255,.12);
+    --border:rgba(255,255,255,.11); --border-strong:rgba(255,255,255,.20);
+    --text:#ECEDF2; --text-secondary:#9DA3BC; --text-tertiary:#757B96;
+    --action:var(--cobalt-400); --action-hover:var(--cobalt-300); --action-subtle:rgba(99,116,255,.14); --on-action:#0A0A0F;
+    --accent:var(--mag-500); --accent-hover:var(--mag-400); --on-accent:#fff;
+    --ok-bg:rgba(34,197,94,.14); --warn-bg:rgba(245,165,36,.14); --err-bg:rgba(255,77,106,.14); --info-bg:rgba(91,141,239,.14);
+    --shadow-sm:none; --shadow-md:0 0 0 1px var(--border-strong); --shadow-lg:0 24px 60px rgba(0,0,0,.6);
+    --focus:0 0 0 3px color-mix(in srgb, var(--action) 45%, transparent);
+  }
+  [data-theme="light"] {
+    --surface-page:var(--gray-25); --surface:var(--gray-0); --surface-elevated:var(--gray-0); --surface-subtle:var(--gray-50); --surface-hover:var(--cobalt-50);
+    --border:var(--gray-150); --border-strong:var(--gray-300);
+    --text:#0F1119; --text-secondary:var(--gray-500); --text-tertiary:var(--gray-400);
+    --action:var(--cobalt-500); --action-hover:var(--cobalt-600); --action-subtle:var(--cobalt-50); --on-action:#fff;
+    --accent:var(--mag-500); --accent-hover:var(--mag-600); --on-accent:#fff;
+    --ok-bg:rgba(34,197,94,.10); --warn-bg:rgba(245,165,36,.12); --err-bg:rgba(255,77,106,.10); --info-bg:rgba(91,141,239,.10);
+    --shadow-sm:none; --shadow-md:0 0 0 1px var(--border-strong); --shadow-lg:0 20px 48px rgba(15,17,25,.16);
+    --focus:0 0 0 3px color-mix(in srgb, var(--action) 38%, transparent);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:var(--font-body); background:var(--surface-page); color:var(--text); line-height:1.5; -webkit-font-smoothing:antialiased; transition:background .2s,color .2s; }
+  h1,h2,h3 { font-family:var(--font-display); letter-spacing:-.02em; font-weight:600; }
+  .wrap { max-width:1100px; margin:0 auto; padding:32px 24px 80px; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; }
+  .eyebrow { color:var(--accent); font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:.12em; }
+  .title { font-size:34px; font-weight:700; margin:4px 0; }
+  .sub { color:var(--text-secondary); font-size:15px; max-width:640px; }
+  .toggle { display:inline-flex; gap:4px; background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--r-sm); padding:4px; }
+  .toggle button { font-family:var(--font-body); font-weight:600; font-size:13px; border:none; background:transparent; color:var(--text-secondary); padding:7px 14px; border-radius:6px; cursor:pointer; }
+  .toggle button.active { background:var(--action); color:var(--on-action); }
+  .section { margin-top:40px; }
+  .section h2 { font-size:11px; text-transform:uppercase; letter-spacing:.16em; color:var(--text-tertiary); margin-bottom:14px; font-family:var(--font-body); font-weight:700; }
+  .ramp { display:flex; flex-wrap:wrap; gap:0; border-radius:var(--r-md); overflow:hidden; border:1px solid var(--border); }
+  .swatch { flex:1 1 90px; min-width:90px; height:70px; display:flex; flex-direction:column; justify-content:flex-end; padding:8px; font-size:11px; font-weight:700; }
+  .swatch small { opacity:.8; font-weight:500; }
+  .roles { display:grid; grid-template-columns:repeat(auto-fill,minmax(195px,1fr)); gap:10px; }
+  .role { border:1px solid var(--border); border-radius:var(--r-md); padding:12px; background:var(--surface); }
+  .role .dot { width:100%; height:34px; border-radius:6px; margin-bottom:8px; border:1px solid var(--border); }
+  .role b { font-size:13px; } .role span { display:block; color:var(--text-tertiary); font-size:11px; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:760px){ .cards{ grid-template-columns:1fr; } }
+  /* EDGE cards: flat, strong border, no shadow */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:20px; }
+  .card.elev { border-color:var(--border-strong); }
+  /* EDGE buttons: crisp 8px, bordered secondary, tight */
+  .btn { font-family:var(--font-body); font-weight:600; font-size:14px; border-radius:var(--r-sm); padding:0 18px; height:40px; display:inline-flex; align-items:center; gap:8px; cursor:pointer; border:1px solid transparent; transition:background .12s, box-shadow .12s; }
+  .btn-primary { background:var(--action); color:var(--on-action); }
+  .btn-primary:hover { background:var(--action-hover); }
+  .btn-accent { background:var(--accent); color:var(--on-accent); }
+  .btn-accent:hover { background:var(--accent-hover); box-shadow:0 0 24px color-mix(in srgb,var(--accent) 45%,transparent); }
+  .btn-secondary { background:transparent; color:var(--text); border-color:var(--border-strong); }
+  .btn-secondary:hover { background:var(--surface-subtle); border-color:var(--action); }
+  .btn-ghost { background:transparent; color:var(--action); }
+  .btn-ghost:hover { background:var(--action-subtle); }
+  .btn-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  /* EDGE badges: squared, bordered */
+  .badge { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:5px 10px; border-radius:6px; border:1px solid currentColor; }
+  .badge::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .b-ok{ color:var(--ok); background:var(--ok-bg);} .b-warn{ color:var(--warn); background:var(--warn-bg);} .b-err{ color:var(--err); background:var(--err-bg);} .b-info{ color:var(--info); background:var(--info-bg);} .b-draft{ color:var(--text-tertiary); background:var(--surface-subtle);}
+  .input { width:100%; font-family:var(--font-body); font-size:14px; color:var(--text); background:var(--surface-subtle); border:1px solid var(--border-strong); border-radius:var(--r-sm); padding:11px 13px; }
+  .input:focus { outline:none; border-color:var(--action); box-shadow:var(--focus); }
+  .label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-tertiary); margin-bottom:6px; display:block; }
+  .studio { background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--r-lg); overflow:hidden; }
+  .studio-head { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border); }
+  .studio-head b { font-family:var(--font-display); font-size:15px; font-weight:700; }
+  .studio-media { aspect-ratio:16/10; background:linear-gradient(135deg,var(--cobalt-500),var(--mag-500)); display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-display); font-weight:700; font-size:14px; letter-spacing:.06em; }
+  .studio-body { padding:16px 18px; }
+  .studio-body p { font-size:14px; margin-bottom:6px; }
+  .studio-tags { color:var(--action); font-size:13px; font-weight:600; margin-bottom:14px; }
+  .stat-row { display:flex; gap:10px; margin-top:8px; }
+  .stat { flex:1; background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--r-md); padding:12px 14px; }
+  .stat .n { font-family:var(--font-display); font-size:22px; font-weight:700; }
+  .stat .l { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-tertiary); }
+  .note { margin-top:10px; font-size:12px; color:var(--text-tertiary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div><div class="eyebrow">Concept C · Aurora Edge</div><div class="title">Bold &amp; high-contrast</div></div>
+    <div class="toggle"><button id="lightBtn" onclick="setTheme('light')">Light</button><button id="darkBtn" class="active" onclick="setTheme('dark')">Dark</button></div>
+  </div>
+  <p class="sub">Dark-first, crisp corners, strong 1px borders instead of shadows, dense layout, uppercase micro-labels, electric cobalt + magenta, and a geometric display (Space Grotesk). Feels like a powerful pro tool — Linear / Vercel / Stripe energy.</p>
+
+  <div class="section"><h2>Brand — Cobalt (primary)</h2><div class="ramp" id="cobaltRamp"></div></div>
+  <div class="section"><h2>Accent — Magenta</h2><div class="ramp" id="magRamp"></div></div>
+  <div class="section"><h2>Neutrals — Cool Gray (high contrast)</h2><div class="ramp" id="grayRamp"></div></div>
+
+  <div class="section"><h2>Semantic roles</h2>
+    <div class="roles">
+      <div class="role"><div class="dot" style="background:var(--surface-page)"></div><b>surface-page</b><span>app background</span></div>
+      <div class="role"><div class="dot" style="background:var(--surface)"></div><b>surface</b><span>panels / cards</span></div>
+      <div class="role"><div class="dot" style="background:var(--surface-subtle)"></div><b>surface-subtle</b><span>inputs / wells</span></div>
+      <div class="role"><div class="dot" style="background:var(--action)"></div><b>action</b><span>primary / links</span></div>
+      <div class="role"><div class="dot" style="background:var(--accent)"></div><b>accent</b><span>key CTA</span></div>
+      <div class="role"><div class="dot" style="background:var(--ok)"></div><b>success</b><span>published</span></div>
+      <div class="role"><div class="dot" style="background:var(--warn)"></div><b>warning</b><span>publishing</span></div>
+      <div class="role"><div class="dot" style="background:var(--err)"></div><b>danger</b><span>failed</span></div>
+      <div class="role"><div class="dot" style="background:var(--info)"></div><b>info</b><span>scheduled</span></div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Components &amp; states</h2>
+    <div class="cards">
+      <div class="card">
+        <h3 style="font-size:16px;margin-bottom:14px;">Buttons</h3>
+        <div class="btn-row" style="margin-bottom:14px;"><button class="btn btn-primary">Primary action</button><button class="btn btn-accent">★ Key CTA</button></div>
+        <div class="btn-row"><button class="btn btn-secondary">Secondary</button><button class="btn btn-ghost">Ghost</button></div>
+        <h3 style="font-size:16px;margin:18px 0 10px;">Status badges</h3>
+        <div class="btn-row"><span class="badge b-draft">Draft</span><span class="badge b-info">Scheduled</span><span class="badge b-warn">Publishing</span><span class="badge b-ok">Published</span><span class="badge b-err">Failed</span></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:16px;margin-bottom:14px;">Form field</h3>
+        <label class="label">Caption</label>
+        <input class="input" value="Golden hour glow for the new drop" />
+        <div class="note">Focus the field to see the focus ring.</div>
+        <div class="stat-row">
+          <div class="stat"><div class="n">12</div><div class="l">Scheduled</div></div>
+          <div class="stat"><div class="n">48</div><div class="l">Published</div></div>
+          <div class="stat"><div class="n" style="color:var(--accent)">3</div><div class="l">Drafts</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Golden path — "post ready → Schedule"</h2>
+    <div class="cards">
+      <div class="studio">
+        <div class="studio-head"><b>AI STUDIO</b><span class="badge b-ok">Ready</span></div>
+        <div class="studio-media">YOUR GENERATED VISUAL</div>
+        <div class="studio-body">
+          <p>Soft morning light, clean product hero. On-brand and ready to go.</p>
+          <div class="studio-tags">#newdrop #skincare #goldenhour</div>
+          <div class="btn-row"><button class="btn btn-accent">Schedule post</button><button class="btn btn-secondary">Save draft</button></div>
+        </div>
+      </div>
+      <div class="card elev">
+        <h3 style="font-size:16px;margin-bottom:8px;">Why this works</h3>
+        <p style="font-size:14px;color:var(--text-secondary);margin-bottom:12px;">High contrast and a glowing magenta CTA make the next step unmissable. Borders (not shadows) create a crisp, dense, "serious software" feel. Best when you want to look powerful and modern.</p>
+        <div class="btn-row"><span class="badge b-info">Dark-first</span><span class="badge b-ok">Crisp &amp; dense</span><span class="badge b-draft">Pro tool</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const ramps = {
+    cobaltRamp:[["50","#ECEEFF"],["100","#DCE0FF"],["200","#B9C1FF"],["300","#8E9AFF"],["400","#6374FF"],["500","#3D5AFE"],["600","#2E45E0"],["700","#2335B5"],["800","#1B298C"],["900","#151F66"]],
+    magRamp:[["300","#FF8AC7"],["400","#FF5CAE"],["500","#FF2E93"],["600","#E5197C"],["700","#BD1466"]],
+    grayRamp:[["0","#FFFFFF"],["25","#F6F7FB"],["50","#EFF1F6"],["100","#E5E8F0"],["150","#D8DCE8"],["200","#C4C9DA"],["300","#9DA3BC"],["400","#757B96"],["500","#565C76"],["600","#3A3F56"],["700","#282C3E"],["800","#181B28"],["900","#0F1119"],["950","#0A0A0F"]]
+  };
+  function lum(hex){ const c=hex.replace('#',''); const r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16); return (0.299*r+0.587*g+0.114*b); }
+  for (const [id,arr] of Object.entries(ramps)){ document.getElementById(id).innerHTML=arr.map(([k,hex])=>{ const txt=lum(hex)>150?'#0F1119':'#fff'; return `<div class="swatch" style="background:${hex};color:${txt}">${k}<small>${hex}</small></div>`; }).join(''); }
+  function setTheme(t){ document.documentElement.setAttribute('data-theme',t); document.getElementById('lightBtn').classList.toggle('active',t==='light'); document.getElementById('darkBtn').classList.toggle('active',t==='dark'); }
+</script>
+</body>
+</html>

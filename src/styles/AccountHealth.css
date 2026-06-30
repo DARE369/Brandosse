@@ -1,0 +1,294 @@
+.health-widget-card {
+  border: 1px solid var(--dash-border, var(--color-border));
+  border-radius: 18px;
+  background: var(--dash-panel, var(--color-bg-surface));
+  box-shadow: var(--dash-shadow-sm, var(--shadow-sm));
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.org-shell .health-widget-card {
+  border-color: var(--org-border, var(--color-border));
+  background: color-mix(in srgb, var(--org-panel, var(--color-bg-surface)) 96%, transparent);
+}
+
+.health-widget-header,
+.admin-account-alert-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.health-widget-kicker {
+  display: inline-flex;
+  margin-bottom: 0.35rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--dash-accent-light, var(--color-primary-text));
+}
+
+.health-widget-header h3,
+.admin-account-alert-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--dash-text-1, var(--color-text-primary));
+}
+
+.health-widget-action,
+.admin-account-alert-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  border-radius: 12px;
+  padding: 0.65rem 0.85rem;
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  color: var(--dash-accent-light, var(--color-primary-text));
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.org-shell .health-widget-action {
+  background: color-mix(in srgb, var(--org-accent, var(--color-primary)) 14%, transparent);
+  color: var(--org-accent-light, var(--color-primary-text));
+}
+
+.health-widget-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.health-widget-summary small,
+.health-widget-empty p,
+.health-widget-issue-row span,
+.org-account-health-row span,
+.admin-account-alert-copy small {
+  color: var(--dash-text-2, var(--color-text-secondary));
+  line-height: 1.5;
+}
+
+.org-shell .health-widget-summary small,
+.org-shell .health-widget-empty p,
+.org-shell .org-account-health-row span {
+  color: var(--org-text-2, var(--color-text-secondary));
+}
+
+.health-widget-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.health-widget-pill.healthy,
+.health-widget-inline-status.healthy {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.health-widget-pill.issue,
+.health-widget-inline-status.issue {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.health-widget-card.is-critical .health-widget-pill.issue {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.health-widget-meta-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.health-widget-meta-row > div,
+.org-account-health-row,
+.health-widget-issue-row {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-text-tertiary) 8%, transparent);
+  padding: 0.85rem 0.9rem;
+}
+
+.health-widget-meta-row span,
+.org-account-health-row > div:first-child span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--dash-text-2, var(--color-text-secondary));
+  margin-bottom: 0.25rem;
+}
+
+.health-widget-meta-row strong,
+.org-account-health-row strong,
+.health-widget-issue-row strong,
+.admin-account-alert-copy strong {
+  display: block;
+  color: var(--dash-text-1, var(--color-text-primary));
+  font-size: 0.92rem;
+}
+
+.health-widget-issues,
+.org-account-health-list,
+.admin-account-alert-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.health-widget-issue-row,
+.org-account-health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.health-widget-issue-copy,
+.org-account-health-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.health-widget-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-text-tertiary) 8%, transparent);
+  padding: 1rem;
+}
+
+.health-widget-empty strong {
+  display: block;
+  color: var(--dash-text-1, var(--color-text-primary));
+  margin-bottom: 0.2rem;
+}
+
+.admin-account-alert-panel {
+  border: 1px solid var(--color-warning-border);
+  border-radius: 20px;
+  background: var(--color-warning-bg);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.admin-account-alert-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-bg-subtle) 68%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text-tertiary) 12%, transparent);
+}
+
+.admin-account-alert-row.severity-critical {
+  border-color: color-mix(in srgb, var(--color-danger) 26%, transparent);
+}
+
+.admin-account-alert-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.admin-account-alert-badge {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.admin-account-alert-badge.severity-warning {
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  color: var(--color-warning);
+}
+
+.admin-account-alert-badge.severity-critical {
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+  color: var(--color-danger);
+}
+
+.admin-account-alert-action {
+  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  color: var(--color-text-primary);
+}
+
+.admin-log-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.admin-log-badge.info {
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  color: var(--color-primary-text);
+}
+
+.admin-log-badge.warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.admin-log-badge.error,
+.admin-log-badge.critical {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.admin-log-message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-log-message small {
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 900px) {
+  .health-widget-meta-row {
+    grid-template-columns: 1fr;
+  }
+
+  .health-widget-header,
+  .admin-account-alert-header,
+  .health-widget-issue-row,
+  .org-account-health-row,
+  .admin-account-alert-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .health-widget-issue-copy,
+  .org-account-health-row-meta {
+    justify-content: flex-start;
+  }
+}

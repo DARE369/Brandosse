@@ -1,0 +1,443 @@
+.my-workspace-page {
+  --workspace-surface: color-mix(in srgb, var(--org-panel) 94%, transparent);
+  --workspace-surface-2: color-mix(in srgb, var(--org-panel-elevated) 88%, transparent);
+  --workspace-surface-3: color-mix(in srgb, var(--org-panel-hover) 92%, transparent);
+  --workspace-border: var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent));
+  --workspace-border-strong: var(--org-border-strong);
+  --workspace-text: var(--org-text-1);
+  --workspace-text-muted: var(--org-text-2);
+  --workspace-accent: var(--org-accent);
+  --workspace-accent-light: var(--org-accent-light);
+  --workspace-warning: var(--org-warning);
+  --workspace-success: var(--org-success);
+  --workspace-danger: var(--org-danger);
+  --workspace-shadow: var(--org-shadow-md);
+}
+
+.my-workspace-hero {
+  border: 1px solid var(--workspace-border);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--workspace-accent) 18%, transparent) 0%, transparent 36%),
+    linear-gradient(180deg, var(--workspace-surface) 0%, var(--workspace-surface-2) 100%);
+  box-shadow: var(--workspace-shadow);
+  padding: 28px 30px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.my-workspace-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+}
+
+.my-workspace-kicker {
+  color: var(--workspace-accent-light);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.my-workspace-hero h1 {
+  margin: 0;
+  color: var(--workspace-text);
+  font-family: var(--font-display, "Sora", "Manrope", sans-serif);
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1;
+}
+
+.my-workspace-hero p,
+.my-workspace-hero-note {
+  margin: 0;
+  color: var(--workspace-text-muted);
+  line-height: 1.6;
+}
+
+.my-workspace-hero-actions,
+.my-workspace-action-actions,
+.my-workspace-item-actions,
+.my-workspace-task-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.my-workspace-primary-button,
+.my-workspace-secondary-button,
+.my-workspace-inline-button,
+.my-workspace-icon-button,
+.my-workspace-collapse-button {
+  border: 1px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+}
+
+.my-workspace-primary-button:hover,
+.my-workspace-secondary-button:hover,
+.my-workspace-inline-button:hover,
+.my-workspace-icon-button:hover,
+.my-workspace-collapse-button:hover,
+.my-workspace-task-card:hover {
+  transform: translateY(-1px);
+}
+
+.my-workspace-primary-button,
+.my-workspace-secondary-button {
+  min-height: 46px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.my-workspace-primary-button {
+  background: var(--workspace-accent);
+  color: var(--color-text-inverse);
+}
+
+.my-workspace-secondary-button,
+.my-workspace-inline-button,
+.my-workspace-icon-button,
+.my-workspace-collapse-button {
+  border-color: var(--workspace-border);
+  background: var(--workspace-surface-2);
+  color: var(--workspace-text);
+}
+
+.my-workspace-inline-button {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.my-workspace-icon-button {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--workspace-text-muted);
+}
+
+.my-workspace-collapse-button {
+  min-height: 36px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-workspace-stack,
+.my-workspace-action-list,
+.my-workspace-list,
+.my-workspace-task-list,
+.my-workspace-pulse,
+.my-workspace-pulse-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.my-workspace-action-card,
+.my-workspace-item-card,
+.my-workspace-task-card,
+.my-workspace-pulse-card,
+.my-workspace-collapsed-note {
+  border: 1px solid var(--workspace-border);
+  border-radius: 18px;
+  background: var(--workspace-surface-2);
+  color: inherit;
+}
+
+.my-workspace-action-card,
+.my-workspace-item-card {
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.my-workspace-action-card.tone-warning {
+  border-color: color-mix(in srgb, var(--workspace-warning) 32%, var(--workspace-border));
+}
+
+.my-workspace-action-card.tone-success {
+  border-color: color-mix(in srgb, var(--workspace-success) 30%, var(--workspace-border));
+}
+
+.my-workspace-action-card.tone-danger {
+  border-color: color-mix(in srgb, var(--workspace-danger) 30%, var(--workspace-border));
+}
+
+.my-workspace-action-copy,
+.my-workspace-item-copy,
+.my-workspace-task-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.my-workspace-action-eyebrow {
+  color: var(--workspace-accent-light);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.my-workspace-action-copy strong,
+.my-workspace-item-copy strong,
+.my-workspace-task-main strong {
+  color: var(--workspace-text);
+  line-height: 1.45;
+}
+
+.my-workspace-action-copy p,
+.my-workspace-item-copy p,
+.my-workspace-task-main p,
+.my-workspace-item-copy span,
+.my-workspace-task-main span,
+.my-workspace-pulse-card p,
+.my-workspace-collapsed-note {
+  margin: 0;
+  color: var(--workspace-text-muted);
+  line-height: 1.55;
+}
+
+.my-workspace-status-pill {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  background: color-mix(in srgb, var(--org-panel) 8%, transparent);
+  color: var(--workspace-text-muted);
+}
+
+.my-workspace-status-pill.tone-warning {
+  background: color-mix(in srgb, var(--workspace-warning) 16%, transparent);
+  color: var(--org-warning);
+}
+
+.my-workspace-status-pill.tone-success {
+  background: color-mix(in srgb, var(--workspace-success) 16%, transparent);
+  color: var(--org-success);
+}
+
+.my-workspace-status-pill.tone-danger {
+  background: color-mix(in srgb, var(--workspace-danger) 16%, transparent);
+  color: var(--org-danger);
+}
+
+.my-workspace-task-card {
+  width: 100%;
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.my-workspace-task-card.blocked {
+  border-color: color-mix(in srgb, var(--workspace-danger) 28%, var(--workspace-border));
+}
+
+.my-workspace-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.my-workspace-pulse-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.my-workspace-pulse-card span {
+  color: var(--workspace-text-muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.my-workspace-pulse-card strong {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.my-workspace-collapsed-note {
+  padding: 16px;
+}
+
+@media (max-width: 1024px) {
+  .my-workspace-hero,
+  .my-workspace-action-card,
+  .my-workspace-item-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .my-workspace-pulse-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .my-workspace-hero {
+    padding: 22px 18px;
+  }
+
+  .my-workspace-hero-actions,
+  .my-workspace-action-actions,
+  .my-workspace-item-actions {
+    width: 100%;
+  }
+
+  .my-workspace-primary-button,
+  .my-workspace-secondary-button,
+  .my-workspace-inline-button {
+    width: 100%;
+  }
+
+  .my-workspace-task-top {
+    align-items: flex-start;
+  }
+}
+
+/* ============================================================================
+   Stage 6 - My Workspace
+   Personal org home aligned to the shared org shell.
+   ============================================================================ */
+.my-workspace-page {
+  --workspace-shell-border: color-mix(in srgb, var(--workspace-border) 82%, var(--workspace-accent) 10%);
+}
+
+.my-workspace-hero {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--workspace-shell-border);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--workspace-accent) 18%, transparent) 0%, transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--workspace-surface) 98%, transparent) 0%, color-mix(in srgb, var(--workspace-surface-2) 100%, transparent) 100%);
+  box-shadow: var(--org-shadow-lg);
+}
+
+.my-workspace-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--workspace-accent) 8%, transparent) 0%, transparent 54%),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--org-panel) 2.5%, transparent) 0%, transparent 34%);
+  pointer-events: none;
+}
+
+.my-workspace-hero-copy,
+.my-workspace-hero-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.my-workspace-primary-button,
+.my-workspace-secondary-button,
+.my-workspace-inline-button,
+.my-workspace-icon-button,
+.my-workspace-collapse-button,
+.my-workspace-action-card,
+.my-workspace-item-card,
+.my-workspace-task-card,
+.my-workspace-pulse-card,
+.my-workspace-collapsed-note {
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.my-workspace-primary-button {
+  background: linear-gradient(135deg, var(--workspace-accent-light), var(--workspace-accent));
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--workspace-accent) 18%, transparent);
+}
+
+.my-workspace-secondary-button,
+.my-workspace-inline-button,
+.my-workspace-icon-button,
+.my-workspace-collapse-button,
+.my-workspace-action-card,
+.my-workspace-item-card,
+.my-workspace-task-card,
+.my-workspace-pulse-card,
+.my-workspace-collapsed-note {
+  border-color: color-mix(in srgb, var(--workspace-border) 82%, var(--workspace-accent) 10%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2.5%, transparent), transparent 78%),
+    color-mix(in srgb, var(--workspace-surface-2) 94%, transparent);
+  box-shadow:
+    0 12px 24px color-mix(in srgb, var(--org-bg) 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent);
+}
+
+.my-workspace-action-card:hover,
+.my-workspace-item-card:hover,
+.my-workspace-task-card:hover,
+.my-workspace-pulse-card:hover {
+  border-color: color-mix(in srgb, var(--workspace-accent) 18%, var(--workspace-border));
+  box-shadow:
+    0 18px 32px color-mix(in srgb, var(--org-bg) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--workspace-accent) 10%, transparent);
+}
+
+.my-workspace-status-pill {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent);
+}
+
+.my-workspace-action-eyebrow {
+  color: var(--workspace-accent-light);
+}
+
+.my-workspace-pulse-card {
+  min-height: 0;
+}
+
+.my-workspace-primary-button:focus-visible,
+.my-workspace-secondary-button:focus-visible,
+.my-workspace-inline-button:focus-visible,
+.my-workspace-icon-button:focus-visible,
+.my-workspace-collapse-button:focus-visible,
+.my-workspace-task-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent) 12%, transparent);
+}
+
+/* Member workspace contrast realignment */
+.my-workspace-page {
+  --workspace-border: color-mix(in srgb, var(--org-border) 96%, transparent);
+  --workspace-text-muted: var(--org-text-2, var(--color-text-secondary));
+}
+
+.my-workspace-primary-button,
+.my-workspace-secondary-button,
+.my-workspace-inline-button,
+.my-workspace-collapse-button {
+  border-radius: 999px;
+}

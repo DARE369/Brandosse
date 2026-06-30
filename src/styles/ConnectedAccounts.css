@@ -1,0 +1,1071 @@
+.connected-accounts-tab {
+  --settings-surface: var(--color-bg-surface);
+  --settings-surface-alt: color-mix(in srgb, var(--color-bg-subtle) 80%, var(--color-bg-surface));
+  --settings-border: color-mix(in srgb, var(--color-border) 84%, transparent);
+  --settings-border-strong: var(--color-border-strong);
+  --settings-shadow-soft: 0 18px 38px color-mix(in srgb, var(--color-primary) 8%, rgba(15, 23, 42, 0.12));
+  --settings-shadow: 0 26px 58px color-mix(in srgb, var(--color-primary) 10%, rgba(15, 23, 42, 0.14));
+  --settings-ring: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  color: var(--color-text-primary);
+}
+
+.connected-accounts-header,
+.connected-account-section,
+.connected-account-org-banner,
+.connected-account-card,
+.connected-account-oauth-panel,
+.connected-account-modal,
+.org-accounts-readonly-banner,
+.org-accounts-readonly-group,
+.org-accounts-readonly-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--settings-surface) 96%, var(--public-dark-text) 4%) 0%, var(--settings-surface) 100%);
+  border: 1px solid var(--settings-border);
+  border-radius: 24px;
+  box-shadow: var(--settings-shadow-soft);
+}
+
+.connected-accounts-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.2rem;
+  padding: 1.6rem 1.75rem;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 44%),
+    linear-gradient(180deg, color-mix(in srgb, var(--settings-surface) 96%, var(--public-dark-text) 4%) 0%, var(--settings-surface) 100%);
+}
+
+.connected-accounts-header h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 2.3vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.connected-accounts-header p {
+  margin: 0.55rem 0 0;
+  color: var(--color-text-secondary);
+  max-width: 48rem;
+  line-height: 1.55;
+}
+
+.connected-accounts-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6rem;
+  padding: 0.65rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--settings-border));
+  background: color-mix(in srgb, var(--color-primary-subtle) 80%, var(--settings-surface));
+  color: var(--color-primary-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.connected-account-org-banners {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.connected-account-org-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.15rem;
+}
+
+.connected-account-org-banner svg {
+  color: var(--color-primary);
+}
+
+.connected-account-org-banner strong,
+.connected-account-section-heading h2,
+.connected-account-section-heading h4 {
+  display: block;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.connected-account-org-banner p,
+.connected-account-section-heading span,
+.connected-account-card-subtitle,
+.connected-platform-copy p,
+.connected-account-form-copy p,
+.connected-account-health-copy p,
+.connected-account-event p,
+.connected-account-field small,
+.connected-account-oauth-intro p,
+.connected-account-oauth-intro small,
+.connected-account-oauth-success p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.connected-account-org-banner button,
+.connected-account-card-actions button,
+.connected-account-form-actions button,
+.connected-account-primary,
+.connected-account-secondary {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.connected-account-org-banner button,
+.connected-account-secondary {
+  background: var(--settings-surface-alt);
+  border-color: var(--settings-border);
+  color: var(--color-primary-text);
+  padding: 0.72rem 1rem;
+}
+
+.connected-account-org-banner button:hover,
+.connected-account-secondary:hover,
+.connected-account-card-actions button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary) 22%, var(--settings-border));
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--color-primary) 10%, rgba(15, 23, 42, 0.1));
+}
+
+.connected-account-section {
+  padding: 1.45rem;
+}
+
+.connected-account-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.connected-account-section-heading span {
+  font-size: 0.88rem;
+}
+
+.connected-accounts-empty,
+.connected-account-modal-empty {
+  padding: 1rem;
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 18%, var(--settings-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--settings-surface-alt) 72%, var(--settings-surface));
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.connected-account-modal-empty.error {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.connected-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+}
+
+.connected-platform-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  min-height: 220px;
+  padding: 1.3rem 1.05rem 1.15rem;
+  border: 1px solid var(--settings-border);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--settings-surface) 92%, var(--settings-surface-alt)) 0%, var(--settings-surface) 100%);
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease, background 150ms ease;
+}
+
+.connected-platform-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--connected-platform-accent) 26%, var(--settings-border));
+  box-shadow: 0 20px 42px color-mix(in srgb, var(--connected-platform-accent) 16%, rgba(15, 23, 42, 0.1));
+}
+
+.connected-platform-card.is-connected {
+  border-color: color-mix(in srgb, var(--connected-platform-accent) 22%, var(--settings-border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--connected-platform-accent) 7%, var(--settings-surface)) 0%, var(--settings-surface) 100%);
+}
+
+.connected-platform-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.connected-platform-chip {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--settings-border));
+  border-radius: 999px;
+  padding: 0.35rem 0.62rem;
+  background: color-mix(in srgb, var(--color-primary-subtle) 80%, var(--settings-surface));
+  color: var(--color-primary-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.connected-platform-chip.connected {
+  border-color: var(--color-success-border);
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.connected-platform-chip.soon {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.connected-platform-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--connected-platform-accent) 10%, var(--settings-surface-alt));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--connected-platform-accent) 16%, transparent);
+}
+
+.connected-platform-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 18px;
+}
+
+.connected-platform-logo-fallback {
+  color: var(--connected-platform-accent);
+}
+
+.connected-platform-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.connected-platform-copy strong {
+  font-size: 0.98rem;
+}
+
+.connected-platform-copy strong,
+.connected-account-card-title strong,
+.connected-account-health-copy-row span,
+.connected-account-event strong {
+  font-weight: 700;
+}
+
+.connected-account-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.connected-account-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem 1.15rem 0;
+  overflow: hidden;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.connected-account-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary) 14%, var(--settings-border));
+  box-shadow: 0 20px 40px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+}
+
+.connected-account-card-accent {
+  align-self: stretch;
+  width: 5px;
+  border-radius: 0 999px 999px 0;
+  flex: 0 0 5px;
+}
+
+.connected-account-card-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) 100px auto;
+  gap: 1rem;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.connected-account-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.connected-account-card-platform {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-primary-subtle) 80%, var(--settings-surface-alt));
+  color: var(--color-primary-text);
+  flex: 0 0 auto;
+}
+
+.connected-account-card-title,
+.connected-account-card-subtitle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
+  min-width: 0;
+}
+
+.connected-account-card-title strong,
+.connected-account-card-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connected-account-card-title span {
+  color: var(--color-text-secondary);
+}
+
+.connected-account-card-subtitle {
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.connected-account-card-health {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+}
+
+.connected-account-healthbar {
+  width: 100%;
+  min-width: 74px;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 78%, transparent);
+  overflow: hidden;
+}
+
+.connected-account-healthbar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-success);
+}
+
+.connected-account-healthbar.tone-warning span,
+.connected-account-status.tone-warning {
+  background: var(--color-warning);
+  color: var(--color-warning-text);
+}
+
+.connected-account-healthbar.tone-critical span,
+.connected-account-status.tone-critical {
+  background: var(--color-danger);
+  color: var(--color-danger-text);
+}
+
+.connected-account-healthbar.tone-healthy span,
+.connected-account-status.tone-healthy {
+  background: var(--color-success);
+  color: var(--color-success-text);
+}
+
+.connected-account-card-health small {
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+}
+
+.connected-account-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-success-border);
+  background: var(--color-success-bg);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.connected-account-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.connected-account-card-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.62rem 0.85rem;
+  background: var(--settings-surface-alt);
+  border-color: var(--settings-border);
+  color: var(--color-text-primary);
+}
+
+.connected-account-card-actions button.danger {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+.connected-account-oauth-shell,
+.connected-account-modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.connected-account-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--color-bg-page) 68%, transparent);
+}
+
+.connected-account-oauth-panel,
+.connected-account-modal {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 720px);
+  max-height: min(100%, 92vh);
+  overflow: auto;
+  padding: 1.6rem;
+  box-shadow: var(--settings-shadow);
+}
+
+.connected-account-oauth-panel {
+  width: min(100%, 560px);
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--connected-platform-accent, var(--color-primary)) 12%, transparent), transparent 55%),
+    linear-gradient(180deg, color-mix(in srgb, var(--settings-surface) 96%, var(--public-dark-text) 4%) 0%, var(--settings-surface) 100%);
+}
+
+.connected-account-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--settings-border);
+  border-radius: 999px;
+  background: var(--settings-surface-alt);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.oauth-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+.connected-account-oauth-intro,
+.connected-account-oauth-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  padding: 1rem 0.5rem 0.5rem;
+}
+
+.connected-account-oauth-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--connected-platform-accent, var(--color-primary)) 14%, var(--settings-surface-alt));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--connected-platform-accent, var(--color-primary)) 18%, transparent);
+  color: var(--connected-platform-accent, var(--color-primary));
+}
+
+.connected-account-oauth-intro h3,
+.connected-account-oauth-success h3,
+.connected-account-modal-header h3,
+.connected-account-form-copy h4 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.connected-account-primary,
+.connected-account-form-actions .connected-account-primary {
+  width: 100%;
+  justify-content: center;
+  padding: 0.9rem 1rem;
+  border-color: color-mix(in srgb, var(--connected-platform-accent, var(--color-primary)) 28%, transparent);
+  background: var(--connected-platform-accent, var(--color-primary));
+  color: var(--public-dark-text);
+  box-shadow: 0 16px 30px color-mix(in srgb, var(--connected-platform-accent, var(--color-primary)) 20%, transparent);
+}
+
+.connected-account-primary:hover,
+.connected-account-form-actions .connected-account-primary:hover {
+  transform: translateY(-1px);
+}
+
+.connected-account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.connected-account-form-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.connected-account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.connected-account-field input,
+.connected-account-field select {
+  width: 100%;
+  border: 1px solid var(--settings-border);
+  border-radius: 14px;
+  padding: 0.82rem 0.9rem;
+  background: var(--settings-surface-alt);
+  color: var(--color-text-primary);
+}
+
+.connected-account-handle-input,
+.connected-account-avatar-input {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.connected-account-handle-input {
+  border: 1px solid var(--settings-border);
+  border-radius: 14px;
+  padding-left: 0.85rem;
+  background: var(--settings-surface-alt);
+}
+
+.connected-account-handle-input span {
+  color: var(--color-text-secondary);
+}
+
+.connected-account-handle-input input {
+  border: 0;
+  background: transparent;
+  padding-left: 0;
+}
+
+.connected-account-profile-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.connected-account-profile-types button {
+  border: 1px solid var(--settings-border);
+  border-radius: 999px;
+  padding: 0.62rem 0.9rem;
+  background: var(--settings-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.connected-account-profile-types button.active {
+  border-color: color-mix(in srgb, var(--connected-platform-accent, var(--color-primary)) 24%, var(--settings-border));
+  background: color-mix(in srgb, var(--connected-platform-accent, var(--color-primary)) 12%, var(--settings-surface));
+  color: var(--connected-platform-accent, var(--color-primary-text));
+}
+
+.connected-account-avatar-input {
+  grid-template-columns: 1fr auto;
+}
+
+.connected-account-avatar-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 82%, transparent);
+  overflow: hidden;
+}
+
+.connected-account-avatar-preview span {
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.connected-account-avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.connected-account-form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.connected-account-form-actions > * {
+  flex: 1;
+}
+
+.connected-account-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.connected-account-modal-kicker {
+  display: inline-flex;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.connected-account-health-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.connected-account-health-overview {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.connected-account-health-ring {
+  display: grid;
+  place-items: center;
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, var(--settings-surface) 54%, transparent 55%),
+    conic-gradient(var(--color-primary) calc(var(--health-score, 0) * 1%), color-mix(in srgb, var(--color-border) 82%, transparent) 0);
+}
+
+.connected-account-health-ring-core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.connected-account-health-ring-core strong {
+  font-size: 2rem;
+}
+
+.connected-account-health-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.connected-account-health-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.connected-account-health-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.8rem;
+}
+
+.connected-account-health-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.9rem;
+  border: 1px solid var(--settings-border);
+  border-radius: 16px;
+  background: var(--settings-surface-alt);
+}
+
+.connected-account-health-stats span {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.connected-account-health-stats strong {
+  font-size: 0.95rem;
+}
+
+.connected-account-event-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.connected-account-event {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--settings-border);
+  border-radius: 16px;
+  background: var(--settings-surface-alt);
+}
+
+.connected-account-event small,
+.connected-account-event span {
+  color: var(--color-text-secondary);
+  display: block;
+  text-align: right;
+  font-size: 0.8rem;
+}
+
+.connected-account-event.tone-warning {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+
+.connected-account-event.tone-error,
+.connected-account-event.tone-critical {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+}
+
+.connected-platform-card:focus-visible,
+.connected-account-icon-button:focus-visible,
+.connected-account-field input:focus-visible,
+.connected-account-field select:focus-visible,
+.connected-account-handle-input:focus-within,
+.connected-account-profile-types button:focus-visible {
+  border-color: var(--settings-border-strong);
+  box-shadow: var(--settings-ring);
+}
+
+.platform-icon-fallback-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.82em;
+  font-weight: 800;
+  line-height: 1;
+}
+
+@media (max-width: 960px) {
+  .connected-account-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding-right: 1.1rem;
+  }
+
+  .connected-account-card-main {
+    grid-template-columns: 1fr;
+  }
+
+  .connected-account-card-actions,
+  .connected-account-form-actions,
+  .connected-account-org-banner,
+  .connected-account-health-overview,
+  .connected-accounts-header {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .connected-account-event {
+    grid-template-columns: 1fr;
+  }
+
+  .connected-account-event small,
+  .connected-account-event span {
+    text-align: left;
+  }
+}
+
+.settings-tab-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--settings-surface) 90%, transparent);
+  border: 1px solid var(--settings-border);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  margin-bottom: 1rem;
+}
+
+.settings-tab-bar button {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.72rem 1rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-tab-bar button.active {
+  color: var(--color-primary-text);
+  border-color: color-mix(in srgb, var(--color-primary) 18%, var(--settings-border));
+  background: color-mix(in srgb, var(--color-primary-subtle) 80%, var(--settings-surface));
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.org-accounts-readonly-banner {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  align-items: start;
+}
+
+.org-accounts-readonly-banner svg {
+  color: var(--color-primary);
+}
+
+.org-accounts-readonly-banner strong,
+.org-accounts-readonly-group-heading h2 {
+  display: block;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.org-accounts-readonly-banner p,
+.org-accounts-readonly-group-heading p,
+.org-accounts-readonly-group-heading span,
+.org-accounts-readonly-card-subtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.org-accounts-readonly-groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.org-accounts-readonly-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.3rem;
+}
+
+.org-accounts-readonly-group-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.org-accounts-readonly-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.org-accounts-readonly-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.org-accounts-readonly-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary) 14%, var(--settings-border));
+  box-shadow: 0 20px 40px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+}
+
+.org-accounts-readonly-card-main {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.org-accounts-readonly-card-platform {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.org-accounts-readonly-card-title,
+.org-accounts-readonly-card-subtitle,
+.org-accounts-readonly-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.org-accounts-readonly-card-title strong {
+  font-size: 0.98rem;
+}
+
+.org-accounts-readonly-card-title span {
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+}
+
+.org-accounts-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.org-accounts-pill.shared {
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--settings-border));
+  background: color-mix(in srgb, var(--color-primary-subtle) 80%, var(--settings-surface));
+  color: var(--color-primary-text);
+}
+
+.org-accounts-pill.granted {
+  border: 1px solid var(--color-success-border);
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+@media (max-width: 720px) {
+  .settings-tab-bar,
+  .org-accounts-readonly-group-heading,
+  .org-accounts-readonly-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Personal UI realignment */
+.connected-accounts-tab {
+  --settings-surface: color-mix(in srgb, var(--dash-panel) 96%, transparent);
+  --settings-surface-alt: color-mix(in srgb, var(--dash-panel-2) 92%, var(--dash-panel));
+  --settings-border: color-mix(in srgb, var(--dash-border) 92%, transparent);
+  --settings-border-strong: color-mix(in srgb, var(--dash-border-hover) 90%, transparent);
+  --settings-shadow-soft: 0 18px 36px color-mix(in srgb, var(--color-bg-page) 26%, transparent);
+  --settings-shadow: 0 30px 62px color-mix(in srgb, var(--color-bg-page) 38%, transparent);
+  --settings-ring: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 16%, transparent);
+}
+
+.connected-accounts-header,
+.connected-account-section,
+.connected-account-org-banner,
+.connected-account-card,
+.connected-account-oauth-panel,
+.connected-account-modal,
+.org-accounts-readonly-banner,
+.org-accounts-readonly-group,
+.org-accounts-readonly-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--settings-surface-alt) 96%, white 4%) 0%, var(--settings-surface) 100%);
+  border-color: color-mix(in srgb, var(--settings-border) 96%, transparent);
+  box-shadow: var(--settings-shadow-soft);
+}
+
+.connected-accounts-header {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--dash-accent) 14%, transparent), transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--settings-surface-alt) 96%, white 4%) 0%, var(--settings-surface) 100%);
+}
+
+.connected-account-org-banner button,
+.connected-account-card-actions button,
+.connected-account-form-actions button,
+.connected-account-primary,
+.connected-account-secondary,
+.settings-tab-bar button,
+.org-accounts-pill,
+.connected-accounts-badge {
+  border-radius: 999px;
+}
+
+.settings-tab-bar {
+  background: color-mix(in srgb, var(--settings-surface) 92%, transparent);
+  border-color: color-mix(in srgb, var(--settings-border) 96%, transparent);
+  box-shadow: 0 18px 34px rgba(1, 3, 10, 0.24);
+}
+
+.settings-tab-bar button.active {
+  border-color: color-mix(in srgb, var(--dash-accent) 22%, var(--settings-border));
+  background: color-mix(in srgb, var(--dash-accent-sub) 74%, var(--settings-surface));
+  color: var(--dash-accent-light);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--dash-accent) 14%, transparent);
+}
+
+.connected-account-org-banner button,
+.connected-account-secondary,
+.connected-account-icon-button,
+.connected-account-field input,
+.connected-account-field select,
+.connected-account-handle-input,
+.connected-account-profile-types button {
+  background: color-mix(in srgb, var(--settings-surface-alt) 88%, transparent);
+  border-color: color-mix(in srgb, var(--settings-border) 96%, transparent);
+}
+
+.connected-account-primary {
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--dash-accent) 20%, transparent);
+}

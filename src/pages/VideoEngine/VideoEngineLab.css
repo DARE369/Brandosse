@@ -1,0 +1,367 @@
+/* src/pages/VideoEngine/VideoEngineLab.css */
+
+.video-engine-lab {
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-text-primary) 4%, transparent), color-mix(in srgb, var(--color-primary) 8%, transparent)),
+    var(--color-bg-page);
+  color: var(--color-text-primary);
+  padding: 32px;
+}
+
+.vel-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
+  gap: 24px;
+  align-items: end;
+  max-width: 1180px;
+  margin: 0 auto 24px;
+}
+
+.vel-kicker {
+  color: var(--color-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.vel-header h1 {
+  color: var(--color-text-primary);
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: 0;
+  margin: 0 0 12px;
+}
+
+.vel-header p {
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  line-height: 1.6;
+  max-width: 660px;
+  margin: 0;
+}
+
+.vel-health,
+.vel-panel,
+.vel-stage-row,
+.vel-doc-link {
+  background: color-mix(in srgb, var(--color-bg-surface) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 8px;
+  box-shadow: 0 18px 45px color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+}
+
+.vel-health {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+}
+
+.vel-health-icon {
+  align-items: center;
+  background: var(--color-primary-subtle);
+  border-radius: 8px;
+  color: var(--color-primary);
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.vel-health-online .vel-health-icon {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.vel-health-offline .vel-health-icon {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.vel-health span,
+.vel-health strong {
+  display: block;
+}
+
+.vel-health span {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vel-health strong {
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.vel-health button {
+  background: var(--color-text-primary);
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.vel-health button:focus-visible,
+.vel-doc-link:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+  outline-offset: 3px;
+}
+
+.vel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.vel-panel {
+  padding: 18px;
+}
+
+.vel-panel-wide {
+  grid-column: span 1;
+}
+
+.vel-panel-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.vel-panel-heading svg {
+  color: var(--color-primary);
+  height: 20px;
+  width: 20px;
+}
+
+.vel-panel h2 {
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.vel-stage-list,
+.vel-check-list,
+.vel-doc-grid,
+.vel-url-list {
+  display: grid;
+  gap: 10px;
+}
+
+.vel-stage-row {
+  align-items: center;
+  box-shadow: none;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  padding: 14px;
+}
+
+.vel-stage-label {
+  color: var(--color-primary);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.vel-stage-row h3 {
+  color: var(--color-text-primary);
+  font-size: 0.98rem;
+  margin: 0 0 4px;
+}
+
+.vel-stage-row p,
+.vel-copy {
+  color: var(--color-text-secondary);
+  font-size: 0.91rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.vel-pill {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 7px 9px;
+  white-space: nowrap;
+}
+
+.vel-pill-implemented {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.vel-pill-manual {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.vel-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vel-check-list li {
+  align-items: flex-start;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 0 0 10px;
+}
+
+.vel-check-list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.vel-check-list strong,
+.vel-check-list small,
+.vel-doc-link strong,
+.vel-doc-link small,
+.vel-doc-link code {
+  display: block;
+}
+
+.vel-check-list strong {
+  color: var(--color-text-primary);
+  font-size: 0.92rem;
+}
+
+.vel-check-list small,
+.vel-doc-link small {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.vel-command {
+  background: var(--color-bg-page);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  margin: 14px 0 0;
+  overflow-x: auto;
+  padding: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.vel-doc-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.vel-doc-link {
+  align-items: center;
+  box-shadow: none;
+  color: inherit;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px;
+  text-decoration: none;
+}
+
+.vel-doc-link:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 58%, transparent);
+}
+
+.vel-doc-link strong {
+  color: var(--color-text-primary);
+  font-size: 0.94rem;
+}
+
+.vel-doc-link code {
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.vel-doc-link svg {
+  color: var(--color-text-secondary);
+  flex: 0 0 auto;
+  height: 18px;
+  width: 18px;
+}
+
+.vel-panel-accent {
+  background: var(--color-text-primary);
+  border-color: var(--color-text-primary);
+  color: var(--color-text-inverse);
+}
+
+.vel-panel-accent .vel-panel-heading svg,
+.vel-panel-accent h2 {
+  color: var(--color-text-inverse);
+}
+
+.vel-url-list {
+  margin: 0;
+}
+
+.vel-url-list div {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-inverse) 12%, transparent);
+  padding-bottom: 10px;
+}
+
+.vel-url-list div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.vel-url-list dt {
+  color: color-mix(in srgb, var(--color-primary) 35%, var(--color-text-inverse));
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.vel-url-list dd {
+  color: color-mix(in srgb, var(--color-text-inverse) 86%, transparent);
+  font-size: 0.9rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 860px) {
+  .video-engine-lab {
+    padding: 20px;
+  }
+
+  .vel-header,
+  .vel-grid,
+  .vel-doc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vel-health,
+  .vel-stage-row {
+    grid-template-columns: 1fr;
+  }
+
+  .vel-health {
+    align-items: stretch;
+  }
+
+  .vel-health-icon {
+    display: none;
+  }
+}

@@ -1,0 +1,316 @@
+.admin-accounts-page {
+  position: relative;
+}
+
+.admin-accounts-alert-panel {
+  border-color: color-mix(in srgb, var(--admin-warning) 38%, var(--admin-border));
+}
+
+.admin-accounts-alert-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid color-mix(in srgb, var(--admin-border) 68%, transparent);
+}
+
+.admin-accounts-alert-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.admin-account-row-warning td:first-child {
+  box-shadow: inset 2px 0 0 var(--admin-warning);
+}
+
+.admin-account-row-critical td:first-child {
+  box-shadow: inset 2px 0 0 var(--admin-danger);
+}
+
+.admin-account-health-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 120px;
+}
+
+.admin-account-health-bar {
+  position: relative;
+  width: 72px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--admin-border) 80%, transparent);
+}
+
+.admin-account-health-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.admin-account-health-bar span.tone-success {
+  background: var(--admin-success);
+}
+
+.admin-account-health-bar span.tone-warning {
+  background: var(--admin-warning);
+}
+
+.admin-account-health-bar span.tone-danger {
+  background: var(--admin-danger);
+}
+
+.admin-account-health-value {
+  color: var(--admin-text-2);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.admin-account-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 74;
+  border: 0;
+  background: color-mix(in srgb, var(--admin-bg) 72%, transparent);
+  cursor: pointer;
+}
+
+.admin-pill-info {
+  background: color-mix(in srgb, var(--admin-accent) 14%, transparent);
+  color: var(--admin-accent-light);
+}
+
+.admin-account-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 75;
+  width: min(520px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--admin-border);
+  background: color-mix(in srgb, var(--admin-panel) 96%, transparent);
+  box-shadow: var(--admin-shadow-lg);
+  backdrop-filter: blur(18px);
+}
+
+.admin-account-drawer-header,
+.admin-account-drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-account-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.admin-account-drawer-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  padding: 18px 20px 28px;
+  overflow: auto;
+}
+
+.admin-account-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-account-panel-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-account-score-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  min-height: 220px;
+}
+
+.admin-account-score-value {
+  width: 124px;
+  height: 124px;
+  border-radius: 999px;
+  border: 10px solid color-mix(in srgb, var(--admin-accent) 22%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--admin-text-1);
+}
+
+.admin-filterbar-inline {
+  position: static;
+  top: auto;
+  z-index: auto;
+  margin-bottom: 16px;
+}
+
+.org-connected-access-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 78;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.org-connected-access-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--admin-bg) 72%, transparent);
+}
+
+.org-connected-access-panel {
+  position: relative;
+  z-index: 1;
+  width: min(480px, calc(100vw - 24px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border-radius: 22px;
+  border: 1px solid var(--admin-border);
+  background: color-mix(in srgb, var(--admin-panel) 96%, transparent);
+  box-shadow: var(--admin-shadow-lg);
+}
+
+.org-connected-access-header,
+.org-connected-access-footer,
+.org-connected-access-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.org-connected-access-header {
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.org-connected-access-footer {
+  border-top: 1px solid var(--admin-border);
+}
+
+.org-connected-access-header h3 {
+  margin: 0 0 6px;
+}
+
+.org-connected-access-header p,
+.org-connected-access-note,
+.org-connected-access-row span {
+  color: var(--admin-text-2);
+  font-size: 0.8rem;
+}
+
+.org-connected-access-toggle {
+  padding-top: 16px;
+  padding-bottom: 0;
+}
+
+.org-connected-access-toggle button,
+.org-connected-access-row {
+  border-radius: 14px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-panel-2);
+  color: var(--admin-text-1);
+}
+
+.org-connected-access-toggle button {
+  min-height: 42px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.org-connected-access-toggle button.active {
+  border-color: color-mix(in srgb, var(--admin-accent) 38%, var(--admin-border));
+  background: color-mix(in srgb, var(--admin-accent) 10%, var(--admin-panel-2));
+  color: var(--admin-accent-light);
+}
+
+.org-connected-access-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 20px 0;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--admin-border);
+  background: color-mix(in srgb, var(--admin-panel-2) 92%, transparent);
+}
+
+.org-connected-access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+}
+
+.org-connected-access-row {
+  width: 100%;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.org-connected-access-row.selected {
+  border-color: color-mix(in srgb, var(--admin-accent) 40%, var(--admin-border));
+  background: color-mix(in srgb, var(--admin-accent) 10%, var(--admin-panel-2));
+}
+
+@media (max-width: 1024px) {
+  .admin-account-drawer {
+    width: min(100vw, 100%);
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-accounts-alert-row,
+  .admin-account-drawer-header,
+  .org-connected-access-header,
+  .org-connected-access-footer,
+  .org-connected-access-toggle {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-account-health-cell {
+    min-width: 0;
+  }
+
+  .admin-account-drawer-scroll {
+    padding: 16px;
+  }
+
+  .org-connected-access-shell {
+    padding: 16px;
+  }
+}

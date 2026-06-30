@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Personal Content Calendar — Mockup Gallery (Packet 1, Phase 2)</title>
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="mockup.css" />
+</head>
+<body>
+
+<div class="gallery-shell" id="gallery-shell">
+
+  <!-- ===================================================================
+       Mobile-only nav toggle (Fix 2, 2026-06-24): below 768px the gallery
+       nav becomes an off-canvas drawer, closed by default, so the product
+       preview frames get full viewport width without an extra step.
+       =================================================================== -->
+  <button id="gallery-nav-toggle" class="gallery-nav-toggle" type="button" aria-expanded="false" aria-controls="gallery-nav">
+    <span class="gallery-nav-toggle__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></span>
+    <span>Gallery sections</span>
+  </button>
+  <div id="gallery-nav-backdrop" class="gallery-nav-backdrop"></div>
+
+  <!-- ===================================================================
+       GALLERY NAV — index of every state/view in this single fluid file.
+       Resize the browser at any section to see mobile (~390px) -> tablet
+       (~768px) -> desktop (~1440px) in the SAME markup, per Master Brief §4.
+       =================================================================== -->
+  <nav class="gallery-nav" id="gallery-nav" aria-label="Mockup gallery sections">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap: var(--space-2);">
+      <p class="gallery-nav__brand">Personal Calendar</p>
+      <button id="gallery-nav-close" class="ui-icon-button sm gallery-nav-close" type="button" aria-label="Close gallery navigation">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <p class="gallery-nav__sub">Packet 1 · Phase 2 mockup gallery. Resize this window — every section below is one fluid file, mobile→tablet→desktop.</p>
+
+    <button id="theme-toggle" class="ui-button ui-button-secondary sm" type="button" style="margin-bottom: var(--space-3);">Dark mode</button>
+
+    <p class="gallery-nav__group-label">Views</p>
+    <a href="#month-view">Month view</a>
+    <a href="#list-view">List / Agenda view</a>
+    <a href="#drafts-rail">Drafts rail</a>
+
+    <p class="gallery-nav__group-label">Reschedule modes</p>
+    <a href="#reschedule-drag">1 · Drag</a>
+    <a href="#reschedule-panel">2 · Detail-panel edit</a>
+    <a href="#reschedule-tap">3 · Tap-to-select → tap-destination</a>
+
+    <p class="gallery-nav__group-label">Detail &amp; create</p>
+    <a href="#post-detail-drawer">Post detail drawer</a>
+    <a href="#quick-post">Quick Post composer</a>
+    <a href="#schedule-modal">Schedule modal</a>
+
+    <p class="gallery-nav__group-label">Intelligence layer</p>
+    <a href="#command-bar">⌘K command bar</a>
+    <a href="#cell-palette">Cell command palette</a>
+    <a href="#stats-strip">Stats strip</a>
+
+    <p class="gallery-nav__group-label">States</p>
+    <a href="#state-empty">Empty (new account)</a>
+    <a href="#state-loading">Loading</a>
+    <a href="#state-day-error">Day detail failure</a>
+    <a href="#state-conflict">Drag conflict</a>
+    <a href="#state-stale">Stale write</a>
+
+    <div class="gallery-nav__resize-hint">
+      Tip: drag the bottom-right corner of any preview frame to resize it independently, or resize the whole browser window.
+    </div>
+  </nav>
+
+  <main class="gallery-main">
+
+    <!-- =================================================================
+         INTRO
+         ================================================================= -->
+    <section class="gallery-section" style="border-bottom: 1px solid var(--color-border);">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Calendar &amp; Library Rebuild — Packet 1</p>
+        <h1 class="gallery-section__title">Personal Content Calendar — Mockup Gallery</h1>
+        <p class="gallery-section__desc">
+          Static, interactive HTML/CSS mirroring real tokens extracted from <code>UserDashboard.jsx</code>,
+          <code>CalendarV3.css</code>, and <code>ui-primitives.css</code>. No backend wiring; representative content only.
+          Every view below is fluid — resize the browser to confirm mobile (~390px) → tablet (~768px) → desktop (~1440px)
+          parity in the same markup, per Master Brief §4. Three distinct reschedule interaction modes are demonstrated,
+          all genuinely clickable.
+        </p>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         MONTH VIEW
+         ================================================================= -->
+    <section class="gallery-section" id="month-view">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">View</p>
+        <h2 class="gallery-section__title">Month view (+ live Month/List default-switching)</h2>
+        <p class="gallery-section__desc">
+          Up to 3 grouped cards per day, then "+N more" opens a slide-over list (not a single arbitrary post — spec §3).
+          Platform-icon-stack grouping by <code>generation_id</code>; a post with no <code>generation_id</code> (e.g. a
+          Quick-Post-with-no-asset draft) renders as its own standalone card, never bucketed with other null-generation
+          posts (Research §3.2). Click "+2 more" on Jun 17, or click any card to open the detail drawer.
+          <strong>Fix 1 (2026-06-24):</strong> this frame now also hosts the Agenda/List panel behind the same
+          Month/List header toggle. Below ~600px frame width it loads to Agenda/List by default (Month is one tap
+          away); resize this frame's right edge across 600px to see the on-load default change. See DECISIONS_LOG.md.
+        </p>
+      </div>
+
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Month / List — resize below 600px to see the mobile default switch</span><span class="gallery-frame__hint">drag ↘</span></div>
+
+        <div class="cal3-app">
+          <div class="app-stand-in-nav">
+            <div class="app-stand-in-nav__logo">B</div>
+            <span class="app-stand-in-nav__title">Brandosse</span>
+            <span class="app-stand-in-nav__crumb">/ Calendar</span>
+            <div class="app-stand-in-nav__spacer"></div>
+            <div class="app-stand-in-nav__avatar">SS</div>
+          </div>
+          <div class="cal3-body-shell">
+            <div class="app-stand-in-sidebar">
+              <div class="app-stand-in-sidebar__icon">D</div>
+              <div class="app-stand-in-sidebar__icon is-active">C</div>
+              <div class="app-stand-in-sidebar__icon">L</div>
+              <div class="app-stand-in-sidebar__icon">G</div>
+            </div>
+
+            <div class="cal3-shell">
+              <header class="cal3-header">
+                <div class="cal3-header__nav">
+                  <button class="cal3-icon-btn" aria-label="Previous month" type="button">‹</button>
+                  <button class="cal3-icon-btn" aria-label="Next month" type="button">›</button>
+                </div>
+                <div class="cal3-header__title">
+                  <span class="cal3-header__month-label">June 2026</span>
+                  <span class="cal3-header__today-badge">Today: Jun 23</span>
+                </div>
+                <div class="cal3-header__actions" data-view-group>
+                  <div class="cal3-view-switcher">
+                    <button class="cal3-view-switcher__btn is-active" data-view-switch="month" type="button">Month</button>
+                    <button class="cal3-view-switcher__btn" data-view-switch="list" type="button">List</button>
+                  </div>
+                  <button class="ui-button ui-button-secondary sm" data-open="cmdbar-overlay" type="button">⌘K</button>
+                  <button class="ui-button ui-button-accent sm" data-open="quickpost-modal" type="button">+ Quick Post</button>
+                </div>
+              </header>
+
+              <div id="stats-strip-demo" class="cal3-strip" role="complementary" aria-label="Week intelligence">
+                <div class="cal3-strip__item">
+                  <div class="cal3-strip__icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg></div>
+                  <span class="cal3-strip__label">Scheduled</span><span class="cal3-strip__value">9</span>
+                </div>
+                <div class="cal3-strip__item">
+                  <div class="cal3-strip__icon tone-success"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+                  <span class="cal3-strip__label">Published</span><span class="cal3-strip__value">14</span>
+                </div>
+                <div class="cal3-strip__item">
+                  <span class="cal3-strip__label">Most active</span><span class="cal3-strip__value">Tue</span>
+                </div>
+                <div class="cal3-strip__item">
+                  <span class="cal3-strip__label">Health</span><span class="cal3-strip__badge cal3-strip__badge--ok">Healthy</span>
+                </div>
+                <div class="cal3-strip__tip"><span class="cal3-strip__tip-text">All posts land on Tue/Thu — spacing out Wed could improve reach.</span></div>
+              </div>
+
+              <div class="cal3-body">
+                <div class="cal3-main-col" data-view-panel="month">
+                  <div class="cal3-month">
+                    <div class="cal3-month-header">
+                      <div class="cal3-month-header__cell">Mon</div><div class="cal3-month-header__cell">Tue</div><div class="cal3-month-header__cell">Wed</div>
+                      <div class="cal3-month-header__cell">Thu</div><div class="cal3-month-header__cell">Fri</div><div class="cal3-month-header__cell">Sat</div><div class="cal3-month-header__cell">Sun</div>
+                    </div>
+                    <div class="cal3-month-body">
+
+                      <!-- Week 1 — partial, muted (previous month) -->
+                      <div class="cal3-month-cell cal3-month-cell--muted"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">1</span></div></div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">2</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 2">+</button></div></div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">3</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 3">+</button></div></div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 4">
+                        <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">4</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 4">+</button></div>
+                        <div class="cal3-month-cell__stack">
+                          <div class="post-card-row" data-card-name="LinkedIn carousel — Q3 recap"><button class="post-card" type="button" data-open="post-detail-drawer-demo" draggable="true" id="card-jun4-a">
+                            <span class="post-card__status-dot status-scheduled"></span>
+                            <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span></span>
+                            <span class="post-card__label">Q3 recap carousel</span>
+                            <span class="post-card__time">9:00a</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select LinkedIn carousel — Q3 recap to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                        </div>
+                      </div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">5</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 5">+</button></div></div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">6</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 6">+</button></div></div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">7</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 7">+</button></div></div>
+
+                      <!-- Week 2 -->
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 8">
+                        <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">8</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 8">+</button></div>
+                        <div class="cal3-month-cell__stack">
+                          <div class="post-card-row" data-card-name="Reel: behind the scenes"><button class="post-card" type="button" data-open="post-detail-drawer-demo" draggable="true">
+                            <span class="post-card__status-dot status-published"></span>
+                            <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-instagram)"></span></span>
+                            <span class="post-card__label">Behind the scenes reel</span>
+                            <span class="post-card__time">11:30a</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Reel: behind the scenes to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                        </div>
+                      </div>
+                      <div class="cal3-month-cell cal3-month-cell--today" data-drop-target data-move-destination data-day-label="Jun 9">
+                        <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">9</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 9">+</button></div>
+                      </div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 10">
+                        <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">10</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 10">+</button></div>
+                        <div class="cal3-month-cell__stack">
+                          <div class="post-card-row" data-card-name="Launch announcement (fan-out)"><button class="post-card" type="button" data-open="post-detail-drawer-demo" draggable="true">
+                            <span class="post-card__status-dot status-scheduled"></span>
+                            <span class="post-card__platform-stack">
+                              <span class="post-card__platform-dot" style="background:var(--platform-instagram)"></span>
+                              <span class="post-card__platform-dot" style="background:var(--platform-tiktok-alt)"></span>
+                              <span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span>
+                            </span>
+                            <span class="post-card__label">Launch announcement</span>
+                            <span class="post-card__time">2:00p</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Launch announcement (fan-out) to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                          <span class="ui-field-hint" style="font-size:10px;">1 card · 3 platforms (same generation_id)</span>
+                        </div>
+                      </div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">11</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 11">+</button></div></div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 12">
+                        <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">12</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 12">+</button></div>
+                        <div class="cal3-month-cell__stack">
+                          <div class="post-card-row" data-card-name="Customer spotlight"><button class="post-card" type="button" data-open="post-detail-drawer-demo" draggable="true">
+                            <span class="post-card__status-dot status-failed"></span>
+                            <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-x)"></span></span>
+                            <span class="post-card__label">Customer spotlight</span>
+                            <span class="post-card__time">8:00a</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Customer spotlight to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                        </div>
+                      </div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">13</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 13">+</button></div></div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">14</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 14">+</button></div></div>
+
+                      <!-- Week 3 — the "+N more" overflow day -->
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">15</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 15">+</button></div></div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 16">
+                        <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">16</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 16">+</button></div>
+                        <div class="cal3-month-cell__stack">
+                          <div class="post-card-row" data-card-name="Tip Tuesday"><button class="post-card" type="button" data-open="post-detail-drawer-demo" draggable="true">
+                            <span class="post-card__status-dot status-scheduled"></span>
+                            <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span></span>
+                            <span class="post-card__label">Tip Tuesday post</span>
+                            <span class="post-card__time">9:00a</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Tip Tuesday to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                        </div>
+                      </div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 17">
+                        <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">17</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 17">+</button></div>
+                        <div class="cal3-month-cell__stack">
+                          <div class="post-card-row" data-card-name="Morning quote graphic"><button class="post-card" type="button" draggable="true">
+                            <span class="post-card__status-dot status-scheduled"></span>
+                            <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-instagram)"></span></span>
+                            <span class="post-card__label">Morning quote graphic</span><span class="post-card__time">7:00a</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Morning quote graphic to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                          <div class="post-card-row" data-card-name="Product demo clip"><button class="post-card" type="button" draggable="true">
+                            <span class="post-card__status-dot status-scheduled"></span>
+                            <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-tiktok-alt)"></span></span>
+                            <span class="post-card__label">Product demo clip</span><span class="post-card__time">12:00p</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Product demo clip to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                          <div class="post-card-row" data-card-name="Standalone draft, no generation"><button class="post-card" type="button" draggable="true">
+                            <span class="post-card__status-dot status-draft"></span>
+                            <span class="post-card__label">Standalone text post (no asset)</span><span class="post-card__time">—</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Standalone draft, no generation to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                          <button class="cal3-month-cell__more" type="button" data-open="slideover-jun17">+2 more</button>
+                        </div>
+                      </div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">18</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 18">+</button></div></div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">19</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 19">+</button></div></div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">20</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 20">+</button></div></div>
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">21</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 21">+</button></div></div>
+
+                      <!-- Week 4 -->
+                      <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">22</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 22">+</button></div></div>
+                      <div class="cal3-month-cell cal3-month-cell--today" data-drop-target data-move-destination data-day-label="Jun 23 (today)">
+                        <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">23</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 23">+</button></div>
+                        <div class="cal3-month-cell__stack">
+                          <div class="post-card-row" data-card-name="Publishing now"><button class="post-card" type="button" data-open="post-detail-drawer-demo" draggable="true">
+                            <span class="post-card__status-dot status-publishing"></span>
+                            <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-facebook)"></span></span>
+                            <span class="post-card__label">Publishing…</span><span class="post-card__time">now</span>
+                          </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Publishing now to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+                        </div>
+                      </div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 24"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">24</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 24">+</button></div></div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 25"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">25</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 25">+</button></div></div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 26"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">26</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 26">+</button></div></div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 27"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">27</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 27">+</button></div></div>
+                      <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 28"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">28</span><button class="cal3-month-cell__add" type="button" aria-label="New post Jun 28">+</button></div></div>
+                    </div>
+                  </div>
+
+                  <!-- Drafts rail (open) attached under month grid -->
+                  <div class="cal3-tray" id="drafts-rail-month">
+                    <button class="cal3-tray__header" data-tray-toggle type="button" aria-expanded="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      <span class="cal3-tray__title">Drafts</span>
+                      <span class="cal3-tray__count">4</span>
+                      <span class="cal3-tray__hint">— drag onto the calendar, or tap Move on a draft</span>
+                      <span class="cal3-tray__toggle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg></span>
+                    </button>
+                    <div class="cal3-tray__scroll">
+                      <div class="draft-card" draggable="true" data-card-name="Weekly roundup draft">
+                        <div class="draft-card__thumb">🖼</div>
+          <button class="draft-card__move-btn" type="button" data-move-trigger aria-label="Select Weekly roundup draft to move"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+                        <div class="draft-card__meta">
+                          <div class="draft-card__name">Weekly roundup</div>
+                          <div class="draft-card__platform-row"><span class="post-card__platform-dot" style="background:var(--platform-instagram)"></span><span class="ui-field-hint">image</span></div>
+                        </div>
+                        <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:66%;background:var(--color-warning);"></div></div>
+                      </div>
+                      <div class="draft-card" draggable="true" data-card-name="Office hours promo">
+                        <div class="draft-card__thumb">🎬</div>
+          <button class="draft-card__move-btn" type="button" data-move-trigger aria-label="Select Office hours promo to move"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+                        <div class="draft-card__meta">
+                          <div class="draft-card__name">Office hours promo</div>
+                          <div class="draft-card__platform-row"><span class="post-card__platform-dot" style="background:var(--platform-tiktok-alt)"></span><span class="ui-field-hint">video</span></div>
+                        </div>
+                        <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:100%;background:var(--color-success);"></div></div>
+                      </div>
+                      <div class="draft-card" draggable="true" data-card-name="New feature teaser">
+                        <div class="draft-card__thumb">✨</div>
+          <button class="draft-card__move-btn" type="button" data-move-trigger aria-label="Select New feature teaser to move"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+                        <div class="draft-card__meta">
+                          <div class="draft-card__name">New feature teaser</div>
+                          <div class="draft-card__platform-row"><span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span><span class="ui-field-hint">image-to-video</span></div>
+                        </div>
+                        <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:33%;background:var(--color-danger);"></div></div>
+                      </div>
+                      <div class="draft-card" draggable="true" data-card-name="Untitled text draft">
+                        <div class="draft-card__thumb">📄</div>
+          <button class="draft-card__move-btn" type="button" data-move-trigger aria-label="Select Untitled text draft to move"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+                        <div class="draft-card__meta">
+                          <div class="draft-card__name">Untitled draft</div>
+                          <div class="draft-card__platform-row"><span class="ui-field-hint">no platform set</span></div>
+                        </div>
+                        <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:0%;background:var(--color-danger);"></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Fix 1 (2026-06-24, human-decided per MOBILE_UX_CRITIQUE.md top finding):
+                     Agenda/List panel wired as a sibling of the Month grid via the SAME
+                     data-view-switch / data-view-group / data-view-panel mechanism already
+                     used by the Month/List buttons in the header above (mockup.js, generic
+                     view-switcher handler) -- no parallel mechanism invented. On viewports
+                     narrower than ~600px this panel is the default on load (see
+                     mockup.js "Fix 1" for the load-vs-resize decision); Month remains one
+                     tap away via the same header toggle at any width. -->
+                <div class="agenda-view" data-view-panel="list" hidden>
+                  <div class="agenda-filterbar">
+                    <input class="ui-input agenda-filterbar__search" type="search" placeholder="Search posts&hellip;" aria-label="Search posts" />
+                    <select class="ui-select" style="width:auto;" aria-label="Filter by status">
+                      <option>All statuses</option>
+                      <option>Scheduled</option>
+                      <option>Draft</option>
+                      <option>Published</option>
+                      <option>Failed</option>
+                    </select>
+                    <select class="ui-select" style="width:auto;" aria-label="Filter by platform">
+                      <option>All platforms</option>
+                      <option>Instagram</option>
+                      <option>TikTok</option>
+                      <option>LinkedIn</option>
+                      <option>X</option>
+                    </select>
+                  </div>
+                  <div class="agenda-scroll">
+                    <div class="agenda-day-group">
+                      <p class="agenda-day-group__label">Today &mdash; Tue, Jun 23</p>
+                      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                        <span class="post-row__thumb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polygon points="16 3 21 3 21 8"/><line x1="11" y1="13" x2="21" y2="3"/></svg></span>
+                        <span class="post-row__body">
+                          <span class="post-row__title">Publishing now &mdash; Facebook update</span>
+                          <span class="post-row__meta"><span class="status-pill status-publishing"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>Publishing</span> &middot; Facebook &middot; now</span>
+                        </span>
+                      </button>
+                      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                        <span class="post-row__thumb">&#128196;</span>
+                        <span class="post-row__body">
+                          <span class="post-row__title">Q3 recap carousel</span>
+                          <span class="post-row__meta"><span class="status-pill status-scheduled"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/></svg>Scheduled</span> &middot; LinkedIn &middot; 9:00 AM</span>
+                        </span>
+                      </button>
+                    </div>
+                    <div class="agenda-day-group">
+                      <p class="agenda-day-group__label">Tomorrow &mdash; Wed, Jun 24</p>
+                      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                        <span class="post-row__thumb">&#127909;</span>
+                        <span class="post-row__body">
+                          <span class="post-row__title">Launch announcement (3 platforms)</span>
+                          <span class="post-row__meta">
+                            <span class="status-pill status-scheduled"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/></svg>Scheduled</span>
+                            <span class="post-row__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-instagram)"></span><span class="post-card__platform-dot" style="background:var(--platform-tiktok-alt)"></span><span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span></span>
+                            &middot; 2:00 PM
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                    <div class="agenda-day-group">
+                      <p class="agenda-day-group__label">Mon, Jun 22 &mdash; published</p>
+                      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                        <span class="post-row__thumb">&#128247;</span>
+                        <span class="post-row__body">
+                          <span class="post-row__title">Weekend recap post</span>
+                          <span class="post-row__meta">
+                            <span class="status-pill status-published"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Published<span class="mock-connection-note" title="Publishing in this build uses a mock connection, not a live platform API.">via mock connection</span></span>
+                            &middot; Instagram &middot; Jun 22, 6:00 PM
+                          </span>
+                        </span>
+                      </button>
+                      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                        <span class="post-row__thumb">&#128203;</span>
+                        <span class="post-row__body">
+                          <span class="post-row__title">Customer spotlight</span>
+                          <span class="post-row__meta"><span class="status-pill status-failed"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Failed</span> &middot; X &middot; retry or reschedule from the drawer</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         LIST / AGENDA VIEW
+         ================================================================= -->
+    <section class="gallery-section" id="list-view">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">View</p>
+        <h2 class="gallery-section__title">List / Agenda view</h2>
+        <p class="gallery-section__desc">
+          Flat, filterable, the accessible/mobile-first fallback (spec §3). Same data, same <code>PostCard</code> anatomy
+          as Month view, denser row layout. This is also what Agenda becomes the recommended view for on narrow phones
+          and for screen-reader users, since it avoids reasoning about a 42-cell grid.
+        </p>
+      </div>
+
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>List / Agenda view</span><span class="gallery-frame__hint">drag &#8600;</span></div>
+        <div class="agenda-view">
+          <div class="agenda-filterbar">
+            <input class="ui-input agenda-filterbar__search" type="search" placeholder="Search posts&hellip;" aria-label="Search posts" />
+            <select class="ui-select" style="width:auto;" aria-label="Filter by status">
+              <option>All statuses</option>
+              <option>Scheduled</option>
+              <option>Draft</option>
+              <option>Published</option>
+              <option>Failed</option>
+            </select>
+            <select class="ui-select" style="width:auto;" aria-label="Filter by platform">
+              <option>All platforms</option>
+              <option>Instagram</option>
+              <option>TikTok</option>
+              <option>LinkedIn</option>
+              <option>X</option>
+            </select>
+          </div>
+          <div class="agenda-scroll">
+            <div class="agenda-day-group">
+              <p class="agenda-day-group__label">Today &mdash; Tue, Jun 23</p>
+              <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                <span class="post-row__thumb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polygon points="16 3 21 3 21 8"/><line x1="11" y1="13" x2="21" y2="3"/></svg></span>
+                <span class="post-row__body">
+                  <span class="post-row__title">Publishing now &mdash; Facebook update</span>
+                  <span class="post-row__meta"><span class="status-pill status-publishing"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/></svg>Publishing</span> &middot; Facebook &middot; now</span>
+                </span>
+              </button>
+              <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                <span class="post-row__thumb">&#128196;</span>
+                <span class="post-row__body">
+                  <span class="post-row__title">Q3 recap carousel</span>
+                  <span class="post-row__meta"><span class="status-pill status-scheduled"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/></svg>Scheduled</span> &middot; LinkedIn &middot; 9:00 AM</span>
+                </span>
+              </button>
+            </div>
+            <div class="agenda-day-group">
+              <p class="agenda-day-group__label">Tomorrow &mdash; Wed, Jun 24</p>
+              <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                <span class="post-row__thumb">&#127909;</span>
+                <span class="post-row__body">
+                  <span class="post-row__title">Launch announcement (3 platforms)</span>
+                  <span class="post-row__meta">
+                    <span class="status-pill status-scheduled"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/></svg>Scheduled</span>
+                    <span class="post-row__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-instagram)"></span><span class="post-card__platform-dot" style="background:var(--platform-tiktok-alt)"></span><span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span></span>
+                    &middot; 2:00 PM
+                  </span>
+                </span>
+              </button>
+            </div>
+            <div class="agenda-day-group">
+              <p class="agenda-day-group__label">Mon, Jun 22 &mdash; published</p>
+              <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                <span class="post-row__thumb">&#128247;</span>
+                <span class="post-row__body">
+                  <span class="post-row__title">Weekend recap post</span>
+                  <span class="post-row__meta">
+                    <span class="status-pill status-published"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Published<span class="mock-connection-note" title="Publishing in this build uses a mock connection, not a live platform API.">via mock connection</span></span>
+                    &middot; Instagram &middot; Jun 22, 6:00 PM
+                  </span>
+                </span>
+              </button>
+              <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+                <span class="post-row__thumb">&#128203;</span>
+                <span class="post-row__body">
+                  <span class="post-row__title">Customer spotlight</span>
+                  <span class="post-row__meta"><span class="status-pill status-failed"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Failed</span> &middot; X &middot; retry or reschedule from the drawer</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         DRAFTS RAIL &mdash; open + collapsed
+         ================================================================= -->
+    <section class="gallery-section" id="drafts-rail">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Component</p>
+        <h2 class="gallery-section__title">Drafts rail &mdash; open and collapsed</h2>
+        <p class="gallery-section__desc">
+          Personal scope shows drafts (Org shows the approved-but-unplaced backlog &mdash; out of scope for this packet).
+          Draggable to a calendar date, and tap-to-select compatible &mdash; each draft card carries the same "Move" control
+          used everywhere else, so a user who never wants to drag never has to.
+        </p>
+      </div>
+
+      <div class="gallery-toggle-row">
+        <button class="gallery-toggle is-active" data-rail-state-toggle="open" type="button">Open</button>
+        <button class="gallery-toggle" data-rail-state-toggle="collapsed" type="button">Collapsed</button>
+      </div>
+
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Drafts rail</span><span class="gallery-frame__hint">drag &#8600;</span></div>
+        <div class="cal3-tray" id="drafts-rail-standalone">
+          <button class="cal3-tray__header" data-tray-toggle type="button" aria-expanded="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="cal3-tray__title">Drafts</span>
+            <span class="cal3-tray__count">4</span>
+            <span class="cal3-tray__hint">&mdash; drag onto the calendar, or use Move</span>
+            <span class="cal3-tray__toggle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg></span>
+          </button>
+          <div class="cal3-tray__scroll">
+            <div class="draft-card" draggable="true" data-card-name="Weekly roundup draft">
+              <div class="draft-card__thumb">&#128196;</div>
+          <button class="draft-card__move-btn" type="button" data-move-trigger aria-label="Select Weekly roundup draft to move"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+              <div class="draft-card__meta">
+                <div class="draft-card__name">Weekly roundup</div>
+                <div class="draft-card__platform-row"><span class="post-card__platform-dot" style="background:var(--platform-instagram)"></span><span class="ui-field-hint">image &middot; 66% ready</span></div>
+              </div>
+              <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:66%;background:var(--color-warning);"></div></div>
+            </div>
+            <div class="draft-card" draggable="true" data-card-name="Office hours promo">
+              <div class="draft-card__thumb">&#127909;</div>
+          <button class="draft-card__move-btn" type="button" data-move-trigger aria-label="Select Office hours promo to move"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+              <div class="draft-card__meta">
+                <div class="draft-card__name">Office hours promo</div>
+                <div class="draft-card__platform-row"><span class="post-card__platform-dot" style="background:var(--platform-tiktok-alt)"></span><span class="ui-field-hint">video &middot; ready</span></div>
+              </div>
+              <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:100%;background:var(--color-success);"></div></div>
+            </div>
+            <div class="draft-card" draggable="true" data-card-name="New feature teaser">
+              <div class="draft-card__thumb">&#10024;</div>
+          <button class="draft-card__move-btn" type="button" data-move-trigger aria-label="Select New feature teaser to move"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+              <div class="draft-card__meta">
+                <div class="draft-card__name">New feature teaser</div>
+                <div class="draft-card__platform-row"><span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span><span class="ui-field-hint">33% ready</span></div>
+              </div>
+              <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:33%;background:var(--color-danger);"></div></div>
+            </div>
+            <div class="draft-card" draggable="true" data-card-name="Untitled text draft">
+              <div class="draft-card__thumb">&#128196;</div>
+          <button class="draft-card__move-btn" type="button" data-move-trigger aria-label="Select Untitled text draft to move"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button>
+              <div class="draft-card__meta">
+                <div class="draft-card__name">Untitled draft</div>
+                <div class="draft-card__platform-row"><span class="ui-field-hint">no platform set</span></div>
+              </div>
+              <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:0%;background:var(--color-danger);"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="ui-field-hint" style="margin-top:var(--space-2);">Click "Open"/"Collapsed" above to toggle the same rail shown both ways &mdash; this is the literal collapsed state, not a separate mockup.</p>
+    </section>
+
+    <!-- =================================================================
+         RESCHEDULE MODE 1 — DRAG
+         ================================================================= -->
+    <section class="gallery-section" id="reschedule-drag">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Reschedule mode 1 of 3</p>
+        <h2 class="gallery-section__title">Drag</h2>
+        <p class="gallery-section__desc">
+          Desktop mouse drag, and touch drag via <code>@dnd-kit</code>'s <code>TouchSensor</code> (already configured
+          in the existing build with <code>{ delay: 250, tolerance: 8 }</code> &mdash; Research §2). This mockup uses
+          native HTML5 drag to demonstrate the same intent without re-implementing dnd-kit in static HTML. Try it:
+          drag "Q3 recap carousel" onto another day below.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Drag to reschedule &mdash; try dragging the card onto Jun 26 or 27</span></div>
+        <div style="padding: var(--space-5); display:flex; flex-direction:column; gap: var(--space-4);">
+          <div style="display:flex; gap: var(--space-3); flex-wrap:wrap;">
+            <div class="post-card-row" data-card-name="Q3 recap carousel"><button class="post-card" type="button" draggable="true" style="width:220px;">
+              <span class="post-card__status-dot status-scheduled"></span>
+              <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span></span>
+              <span class="post-card__label">Q3 recap carousel &mdash; drag me</span>
+              <span class="post-card__time">9:00a</span>
+            </button><button class="post-card-row__move-btn" type="button" data-move-trigger aria-label="Select Q3 recap carousel to move"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></button></div>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: var(--space-2);">
+            <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 25" style="min-height:72px;"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">25</span></div></div>
+            <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 26" style="min-height:72px;"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">26</span></div></div>
+            <div class="cal3-month-cell" data-drop-target data-move-destination data-day-label="Jun 27" style="min-height:72px;"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">27</span></div></div>
+          </div>
+          <p class="ui-field-hint">On touch devices, the equivalent is a press-and-hold drag (delay 250ms) via <code>TouchSensor</code> &mdash; mechanically functional, but per Research §2 this does <strong>not</strong> by itself satisfy WCAG 2.2 SC 2.5.7. Mode 3 below is the required non-drag alternative, not just a mobile nicety.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         RESCHEDULE MODE 2 — FULL DETAIL-PANEL EDIT
+         ================================================================= -->
+    <section class="gallery-section" id="reschedule-panel">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Reschedule mode 2 of 3</p>
+        <h2 class="gallery-section__title">Full detail-panel edit</h2>
+        <p class="gallery-section__desc">
+          Open the post, change date/time fields directly &mdash; already exists today in <code>PostPanel.jsx</code>
+          (native <code>&lt;input type="date"&gt;</code> / <code>&lt;input type="time"&gt;</code>, timezone-correct via
+          <code>zonedDateTimeToUTC()</code>), carries forward unchanged into <code>PostDetailDrawer.jsx</code>. This is
+          a real, always-available single-pointer path &mdash; heavier than drag, but it satisfies WCAG 2.5.7 on its own
+          merits and is also where caption/platform edits happen.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Open the full drawer to reschedule via date/time fields</span></div>
+        <div style="padding: var(--space-5); display:flex; flex-direction:column; gap: var(--space-3); align-items:flex-start;">
+          <button class="post-card" type="button" data-open="post-detail-drawer-demo" style="width:240px;">
+            <span class="post-card__status-dot status-scheduled"></span>
+            <span class="post-card__platform-stack"><span class="post-card__platform-dot" style="background:var(--platform-linkedin)"></span></span>
+            <span class="post-card__label">Q3 recap carousel</span>
+            <span class="post-card__time">9:00a</span>
+          </button>
+          <button class="ui-button ui-button-secondary sm" type="button" data-open="post-detail-drawer-demo">Open detail drawer &rarr;</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         RESCHEDULE MODE 3 — TAP-TO-SELECT -> TAP-DESTINATION (NEW)
+         ================================================================= -->
+    <section class="gallery-section" id="reschedule-tap">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Reschedule mode 3 of 3 &mdash; new, designed for this packet</p>
+        <h2 class="gallery-section__title">Tap-to-select &rarr; tap-destination</h2>
+        <p class="gallery-section__desc">
+          The genuinely separate, lighter-weight, non-drag single-pointer path Research §2 concluded is required
+          (WCAG 2.2 SC 2.5.7; Master Brief §4) &mdash; <code>TouchSensor</code> makes touch-drag work mechanically but
+          does not satisfy this on its own, and the full detail panel (mode 2) is heavier than this needs to be for a
+          simple date move. Works identically at <strong>every width</strong> &mdash; this is not a mobile-only fallback;
+          a desktop mouse user who simply prefers not to drag can use it too.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Click "Move" on a card, then click a highlighted destination day</span></div>
+
+        <div id="move-mode-banner" class="move-mode-banner" hidden>
+          <span class="move-mode-banner__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg></span>
+          <span class="move-mode-banner__text">Moving <strong data-move-source-name>this post</strong> &mdash; tap a highlighted day to schedule it there.</span>
+          <button class="ui-button ui-button-secondary sm" id="move-mode-cancel" type="button">Cancel</button>
+        </div>
+
+        <div style="padding: var(--space-5); display:flex; flex-direction:column; gap: var(--space-4);">
+          <div class="post-row" data-card-name="Tip Tuesday post" style="cursor:default;">
+            <span class="post-row__thumb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg></span>
+            <span class="post-row__body">
+              <span class="post-row__title">Tip Tuesday post</span>
+              <span class="post-row__meta"><span class="status-pill status-scheduled">Scheduled</span> &middot; LinkedIn &middot; currently Jun 16, 9:00 AM</span>
+            </span>
+            <button class="ui-button ui-button-secondary sm" type="button" data-move-trigger aria-label="Select Tip Tuesday post to move">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              Move
+            </button>
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: var(--space-2);">
+            <div class="cal3-month-cell" data-move-destination data-day-label="Jun 24" style="min-height:80px;"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">24</span></div><span class="ui-field-hint">Tue</span></div>
+            <div class="cal3-month-cell" data-move-destination data-day-label="Jun 25" style="min-height:80px;"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">25</span></div><span class="ui-field-hint">Wed</span></div>
+            <div class="cal3-month-cell" data-move-destination data-day-label="Jun 26" style="min-height:80px;"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">26</span></div><span class="ui-field-hint">Thu</span></div>
+            <div class="cal3-month-cell" data-move-destination data-day-label="Jun 27" style="min-height:80px;"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">27</span></div><span class="ui-field-hint">Fri</span></div>
+          </div>
+
+          <p class="ui-field-hint">
+            Before selection, destination cells look identical to any other day (no permanent visual noise). After tapping
+            "Move," every valid destination gains a dashed accent outline + tint (<code>.is-drop-candidate</code>) and the
+            source card gets a matching outline (<code>.is-selected-for-move</code>) &mdash; status communicated by shape +
+            color + the sticky banner's text together, never color alone. Escape, the Cancel button, or tapping the same
+            card again all exit the mode without moving anything.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         POST DETAIL DRAWER
+         ================================================================= -->
+    <section class="gallery-section" id="post-detail-drawer">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Detail &amp; create</p>
+        <h2 class="gallery-section__title">Post detail drawer</h2>
+        <p class="gallery-section__desc">
+          Per-platform caption tabs for grouped/fanned-out posts, asset preview, the platform/account reassignment
+          dropdown (kept per human decision, 2026-06-23), and the readiness checklist carried over conceptually from
+          <code>PostPanel.jsx</code>'s checklist (AS-IS Audit §3.4). Click below to open the same drawer used by every
+          card throughout this gallery.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Click to open the drawer (fan-out example: 3 platforms, 1 generation)</span></div>
+        <div style="padding: var(--space-5);">
+          <button class="ui-button ui-button-primary" type="button" data-open="post-detail-drawer-demo">Open post detail drawer</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         QUICK POST COMPOSER
+         ================================================================= -->
+    <section class="gallery-section" id="quick-post">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Detail &amp; create</p>
+        <h2 class="gallery-section__title">Quick Post composer</h2>
+        <p class="gallery-section__desc">
+          Deliberately minimal, calendar-native creation path (spec §6.3): optional Library asset, platform toggles
+          with one caption field per platform (pre-filled via <code>generate-post-metadata</code>, confirmed reusable
+          as a plain service call &mdash; Research §4), date/time picker (reuses the Schedule Modal), submit as
+          scheduled or save as draft.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Click to open Quick Post</span></div>
+        <div style="padding: var(--space-5);">
+          <button class="ui-button ui-button-accent" type="button" data-open="quickpost-modal">+ Quick Post</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         SCHEDULE MODAL
+         ================================================================= -->
+    <section class="gallery-section" id="schedule-modal">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Detail &amp; create</p>
+        <h2 class="gallery-section__title">Schedule modal</h2>
+        <p class="gallery-section__desc">
+          The single shared scheduling UI (spec §6) &mdash; date/time picker showing <strong>account timezone explicitly</strong>
+          (the existing <code>components/ScheduleModal.jsx</code> gets this wrong today, using naive browser-local
+          <code>Date</code> objects with no timezone parameter at all &mdash; AS-IS Audit §3.8; this mockup fixes it),
+          target account confirmation, and the conflict check from spec §5.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Click to open the Schedule modal</span></div>
+        <div style="padding: var(--space-5);">
+          <button class="ui-button ui-button-primary" type="button" data-open="schedule-modal-demo">Schedule this post</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         ⌘K COMMAND BAR
+         ================================================================= -->
+    <section class="gallery-section" id="command-bar">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Intelligence layer &mdash; kept per human decision, 2026-06-23</p>
+        <h2 class="gallery-section__title">&#8984;K command bar</h2>
+        <p class="gallery-section__desc">
+          Natural-language command palette carried forward from <code>CalendarCommandBar.jsx</code>. Every action
+          requires an explicit confirm/apply step before anything is written &mdash; AI proposes, user confirms
+          (spec §9), never an auto-committed write. Press <kbd>&#8984;K</kbd> / <kbd>Ctrl+K</kbd> anywhere on this
+          page, or click the button below.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Try &#8984;K / Ctrl+K, or the button</span></div>
+        <div style="padding: var(--space-5);">
+          <button class="ui-button ui-button-secondary" type="button" data-open="cmdbar-overlay">Open command bar <span class="cal3-kbd" style="margin-left:6px;">&#8984;K</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         CELL COMMAND PALETTE
+         ================================================================= -->
+    <section class="gallery-section" id="cell-palette">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Intelligence layer &mdash; kept per human decision, 2026-06-23</p>
+        <h2 class="gallery-section__title">Cell command palette</h2>
+        <p class="gallery-section__desc">
+          Popover on an empty cell click &mdash; "schedule a draft / new post / ask AI / generate week plan," carried
+          forward from <code>CellCommandPalette.jsx</code>. Click the empty day cell below.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Click the empty cell to open its palette</span></div>
+        <div style="padding: var(--space-5); position:relative; display:inline-block;">
+          <div class="cal3-month-cell" data-cell-trigger="cell-palette-demo" style="width:160px; min-height:96px; border:1px solid var(--color-border); border-radius: var(--radius-md); cursor:pointer;">
+            <div class="cal3-month-cell__head"><span class="cal3-month-cell__date">30</span></div>
+            <span class="ui-field-hint" style="padding: 4px;">Click anywhere in this empty cell</span>
+          </div>
+          <div class="cell-palette" id="cell-palette-demo" hidden style="top: 8px; left: 168px;">
+            <div class="cell-palette__header"><span class="cell-palette__time">Jun 30</span></div>
+            <div class="cell-palette__list">
+              <button class="cell-palette__item" type="button" data-open="quickpost-modal">
+                <span class="cell-palette__item-icon tone-neutral"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+                <span class="cell-palette__item-body"><span class="cell-palette__item-label">New post</span><span class="cell-palette__item-hint">Quick Post composer</span></span>
+              </button>
+              <button class="cell-palette__item" type="button">
+                <span class="cell-palette__item-icon tone-neutral"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></span>
+                <span class="cell-palette__item-body"><span class="cell-palette__item-label">Schedule a draft here</span><span class="cell-palette__item-hint">Pick from Drafts rail</span></span>
+              </button>
+              <button class="cell-palette__item" type="button">
+                <span class="cell-palette__item-icon tone-ai">&#10024;</span>
+                <span class="cell-palette__item-body"><span class="cell-palette__item-label">Ask AI</span><span class="cell-palette__item-hint">Suggest something for this day</span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         STATS STRIP (IntelligenceStrip)
+         ================================================================= -->
+    <section class="gallery-section" id="stats-strip">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">Intelligence layer &mdash; kept per human decision, 2026-06-23</p>
+        <h2 class="gallery-section__title">Stats strip</h2>
+        <p class="gallery-section__desc">
+          Carried forward from <code>IntelligenceStrip.jsx</code>. The tip text is plain local arithmetic, deliberately
+          <em>not</em> styled as an AI feature (no sparkle, no "analysing" state) &mdash; kept honestly distinct from the
+          real AI features elsewhere (caption audit, command bar), exactly as the original file's own comments require.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Stats strip, full width</span></div>
+        <div class="cal3-strip" role="complementary" aria-label="Week intelligence">
+          <div class="cal3-strip__item">
+            <div class="cal3-strip__icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg></div>
+            <span class="cal3-strip__label">Scheduled</span><span class="cal3-strip__value">9</span>
+          </div>
+          <div class="cal3-strip__item">
+            <div class="cal3-strip__icon tone-success"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <span class="cal3-strip__label">Published</span><span class="cal3-strip__value">14</span>
+          </div>
+          <div class="cal3-strip__item">
+            <div class="cal3-strip__icon tone-danger"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <span class="cal3-strip__label">Failed</span><span class="cal3-strip__value" style="color:var(--color-danger-text);">1</span>
+          </div>
+          <div class="cal3-strip__item">
+            <span class="cal3-strip__label">Most active</span><span class="cal3-strip__value">Tue</span>
+          </div>
+          <div class="cal3-strip__item">
+            <span class="cal3-strip__label">Platforms</span>
+            <span title="instagram">&#128247;</span><span title="linkedin">&#128188;</span>
+          </div>
+          <div class="cal3-strip__item">
+            <span class="cal3-strip__label">Health</span><span class="cal3-strip__badge cal3-strip__badge--ok">Healthy</span>
+          </div>
+          <div class="cal3-strip__tip"><span class="cal3-strip__tip-text">All posts land on Tue/Thu &mdash; spacing out Wed could improve reach.</span></div>
+        </div>
+        <p class="ui-field-hint" style="padding: var(--space-3) var(--space-4) 0;">On phones (&le;600px) the italic tip text is hidden to conserve width; counts remain visible and horizontally scrollable &mdash; a deliberate density decision, not a silent feature cut.</p>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         STATE — EMPTY (new account)
+         ================================================================= -->
+    <section class="gallery-section" id="state-empty">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">State</p>
+        <h2 class="gallery-section__title">Empty &mdash; new account</h2>
+        <p class="gallery-section__desc">
+          Month grid still renders (so the calendar itself never disappears), with a single centered CTA into Quick
+          Post, plus a link (not a redirect) to AI Studio (spec §10). Calendar stays the home surface.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Empty state</span></div>
+        <div class="cal3-month" style="position:relative; min-height:360px;">
+          <div class="cal3-month-header">
+            <div class="cal3-month-header__cell">Mon</div><div class="cal3-month-header__cell">Tue</div><div class="cal3-month-header__cell">Wed</div>
+            <div class="cal3-month-header__cell">Thu</div><div class="cal3-month-header__cell">Fri</div><div class="cal3-month-header__cell">Sat</div><div class="cal3-month-header__cell">Sun</div>
+          </div>
+          <div class="cal3-month-body" style="opacity:.45; pointer-events:none;">
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">1</span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">2</span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">3</span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">4</span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">5</span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">6</span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="cal3-month-cell__date">7</span></div></div>
+          </div>
+          <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding: var(--space-5);">
+            <section class="ui-empty-state" style="background:var(--color-bg-surface); border:1px solid var(--color-border); border-radius: var(--radius-2xl); box-shadow: var(--shadow-lg); max-width:380px;">
+              <div class="ui-empty-state-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg></div>
+              <h2>Nothing scheduled yet</h2>
+              <p>Create your first post and pick a date &mdash; no need to open AI Studio first, though you can if you want richer generation tools.</p>
+              <div class="ui-empty-state-actions">
+                <button class="ui-button ui-button-accent" type="button" data-open="quickpost-modal">+ Quick Post</button>
+              </div>
+              <a class="ui-empty-state-link" href="#" onclick="return false;" style="margin-top:4px;">or go create in AI Studio &rarr;</a>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         STATE — LOADING
+         ================================================================= -->
+    <section class="gallery-section" id="state-loading">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">State</p>
+        <h2 class="gallery-section__title">Loading</h2>
+        <p class="gallery-section__desc">
+          Skeleton cards in grid cells, matching <code>UserDashboard.jsx</code>'s skeleton shimmer convention
+          (<code>bd-skel</code> &mdash; linear-gradient shimmer, 1.4s ease-in-out loop) verbatim, applied to calendar
+          card shapes instead of dashboard rows.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Loading state</span></div>
+        <div class="cal3-month">
+          <div class="cal3-month-header">
+            <div class="cal3-month-header__cell">Mon</div><div class="cal3-month-header__cell">Tue</div><div class="cal3-month-header__cell">Wed</div>
+            <div class="cal3-month-header__cell">Thu</div><div class="cal3-month-header__cell">Fri</div><div class="cal3-month-header__cell">Sat</div><div class="cal3-month-header__cell">Sun</div>
+          </div>
+          <div class="cal3-month-body">
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="skel" style="width:20px;height:14px;"></span></div><div class="skel skel-post-card"></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="skel" style="width:20px;height:14px;"></span></div><div class="skel skel-post-card"></div><div class="skel skel-post-card"></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="skel" style="width:20px;height:14px;"></span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="skel" style="width:20px;height:14px;"></span></div><div class="skel skel-post-card"></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="skel" style="width:20px;height:14px;"></span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="skel" style="width:20px;height:14px;"></span></div></div>
+            <div class="cal3-month-cell"><div class="cal3-month-cell__head"><span class="skel" style="width:20px;height:14px;"></span></div><div class="skel skel-post-card"></div></div>
+          </div>
+        </div>
+        <p class="ui-field-hint" style="padding: var(--space-3) var(--space-4);">List/Agenda view loading uses the same row-shaped skeleton as <code>RowSkeleton</code> in <code>UserDashboard.jsx</code>:</p>
+        <div style="padding: 0 var(--space-4) var(--space-4);">
+          <div class="skel-row"><span class="skel skel-thumb"></span><span class="skel-lines"><span class="skel skel-line w-65"></span><span class="skel skel-line w-40"></span></span></div>
+          <div class="skel-row"><span class="skel skel-thumb"></span><span class="skel-lines"><span class="skel skel-line w-65"></span><span class="skel skel-line w-40"></span></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         STATE — DAY DETAIL FAILS TO LOAD
+         ================================================================= -->
+    <section class="gallery-section" id="state-day-error">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">State</p>
+        <h2 class="gallery-section__title">A single day's detail fails to load</h2>
+        <p class="gallery-section__desc">
+          Inline retry on that day's slide-over; the rest of the calendar is unaffected (spec §10) &mdash; matches the
+          Dashboard's per-widget retry pattern (<code>ModuleError</code> in <code>UserDashboard.jsx</code>).
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Slide-over with a failed day-detail fetch</span></div>
+        <div style="display:flex; justify-content:flex-end;">
+          <div class="slideover-panel" style="position:relative; height:340px; animation:none;">
+            <div class="slideover-panel__header">
+              <div>
+                <h3 class="slideover-panel__title">Jun 17</h3>
+                <p class="slideover-panel__sub">5 posts</p>
+              </div>
+              <button class="ui-icon-button ui-icon-button-ghost sm" type="button" aria-label="Close">&times;</button>
+            </div>
+            <div class="slideover-panel__body">
+              <div class="day-error-state" role="alert">
+                <span class="day-error-state__icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+                <p>Couldn't load posts for this day. Check your connection and try again.</p>
+                <button class="ui-button ui-button-secondary sm" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Retry</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="ui-field-hint" style="padding: var(--space-3) var(--space-4);">The month grid behind this slide-over keeps showing every other day normally &mdash; only Jun 17's detail fetch failed, nothing else is blanked.</p>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         STATE — DRAG CONFLICT
+         ================================================================= -->
+    <section class="gallery-section" id="state-conflict">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">State</p>
+        <h2 class="gallery-section__title">Drag conflict</h2>
+        <p class="gallery-section__desc">
+          Same account + same platform + same exact timestamp already occupied &rarr; non-blocking toast with
+          "schedule anyway," never a hard block (spec §5) &mdash; intentional double-posting to the same slot is a
+          real, if rare, use case.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Click to fire the conflict toast</span></div>
+        <div style="padding: var(--space-5);">
+          <button class="ui-button ui-button-secondary" type="button" data-fire-toast="toast-conflict-template">Simulate a drag conflict</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================
+         STATE — STALE WRITE (concurrency conflict)
+         ================================================================= -->
+    <section class="gallery-section" id="state-stale">
+      <div class="gallery-section__head">
+        <p class="gallery-section__kicker">State</p>
+        <h2 class="gallery-section__title">Stale write (concurrency conflict)</h2>
+        <p class="gallery-section__desc">
+          Every reschedule write includes the row's last-known <code>updated_at</code>; if stale (someone/something
+          else moved it first), the UI rolls back and re-fetches that single card &mdash; toast + automatic single-card
+          refresh (spec §5, §10). On personal accounts this typically means a second device/tab, not a teammate.
+        </p>
+      </div>
+      <div class="gallery-frame">
+        <div class="gallery-frame__bar"><span class="gallery-frame__dot"></span><span>Click to fire the stale-write toast</span></div>
+        <div style="padding: var(--space-5);">
+          <button class="ui-button ui-button-secondary" type="button" data-fire-toast="toast-stale-template">Simulate a stale write</button>
+        </div>
+      </div>
+    </section>
+
+</main>
+</div>
+
+<!-- =====================================================================
+     SHARED OVERLAYS referenced above (defined once, reused across sections
+     where data-open targets repeat the same demo IDs)
+     ===================================================================== -->
+<!-- =====================================================================
+     SHARED OVERLAYS — defined once, opened from data-open triggers anywhere
+     in the gallery above. Representative content only.
+     ===================================================================== -->
+
+<!-- Slide-over: Jun 17 "+N more" day detail list -->
+<div class="slideover-backdrop" id="slideover-jun17" data-backdrop-close hidden>
+  <aside class="slideover-panel" role="dialog" aria-modal="true" aria-label="Posts on June 17">
+    <div class="slideover-panel__header">
+      <div>
+        <h3 class="slideover-panel__title">Tue, Jun 17</h3>
+        <p class="slideover-panel__sub">5 posts</p>
+      </div>
+      <button class="ui-icon-button ui-icon-button-ghost sm" type="button" data-close="slideover-jun17" aria-label="Close">&times;</button>
+    </div>
+    <div class="slideover-panel__body">
+      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+        <span class="post-row__thumb">&#127749;</span>
+        <span class="post-row__body">
+          <span class="post-row__title">Morning quote graphic</span>
+          <span class="post-row__meta"><span class="status-pill status-scheduled">Scheduled</span> &middot; Instagram &middot; 7:00 AM</span>
+        </span>
+      </button>
+      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+        <span class="post-row__thumb">&#127909;</span>
+        <span class="post-row__body">
+          <span class="post-row__title">Product demo clip</span>
+          <span class="post-row__meta"><span class="status-pill status-scheduled">Scheduled</span> &middot; TikTok &middot; 12:00 PM</span>
+        </span>
+      </button>
+      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+        <span class="post-row__thumb">&#128203;</span>
+        <span class="post-row__body">
+          <span class="post-row__title">Standalone text post (no asset)</span>
+          <span class="post-row__meta"><span class="status-pill status-draft">Draft</span> &middot; no platform set yet</span>
+        </span>
+      </button>
+      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+        <span class="post-row__thumb">&#128247;</span>
+        <span class="post-row__body">
+          <span class="post-row__title">Studio shot &mdash; new arrivals</span>
+          <span class="post-row__meta"><span class="status-pill status-scheduled">Scheduled</span> &middot; Instagram &middot; 4:00 PM</span>
+        </span>
+      </button>
+      <button class="post-row" type="button" data-open="post-detail-drawer-demo">
+        <span class="post-row__thumb">&#128247;</span>
+        <span class="post-row__body">
+          <span class="post-row__title">Customer review repost</span>
+          <span class="post-row__meta"><span class="status-pill status-scheduled">Scheduled</span> &middot; Facebook &middot; 6:30 PM</span>
+        </span>
+      </button>
+    </div>
+  </aside>
+</div>
+
+<!-- Post Detail Drawer — fan-out example: 3 platforms sharing one generation_id -->
+<div class="drawer-backdrop" id="post-detail-drawer-demo" data-backdrop-close hidden>
+  <aside class="post-drawer" role="dialog" aria-modal="true" aria-label="Post details">
+    <div class="post-drawer__header">
+      <div class="post-drawer__title-group">
+        <h3 class="post-drawer__title">Launch announcement</h3>
+        <span class="status-pill status-scheduled">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+          Scheduled &mdash; Jun 10, 2:00 PM (America/New_York)
+        </span>
+      </div>
+      <button class="ui-icon-button ui-icon-button-ghost sm" type="button" data-close="post-detail-drawer-demo" aria-label="Close drawer">&times;</button>
+    </div>
+
+    <div class="post-drawer__body">
+      <div class="post-drawer__section">
+        <span class="post-drawer__section-label">Asset preview</span>
+        <div class="media-preview">&#127909; video-to-post.mp4</div>
+      </div>
+
+      <div class="post-drawer__section">
+        <span class="post-drawer__section-label">Platforms in this group (shared generation_id)</span>
+        <div class="platform-tabs" data-platform-tab-group>
+          <button class="platform-tab is-active" type="button" data-platform-tab="instagram"><span class="platform-tab__dot" style="background:var(--platform-instagram)"></span>Instagram</button>
+          <button class="platform-tab" type="button" data-platform-tab="tiktok"><span class="platform-tab__dot" style="background:var(--platform-tiktok-alt)"></span>TikTok</button>
+          <button class="platform-tab" type="button" data-platform-tab="linkedin"><span class="platform-tab__dot" style="background:var(--platform-linkedin)"></span>LinkedIn</button>
+        </div>
+
+        <div data-platform-tab-panel="instagram">
+          <label class="ui-field">
+            <span class="ui-field-label">Caption &mdash; Instagram</span>
+            <textarea class="ui-textarea" data-char-limit="2200" data-counter-target="counter-ig">We just shipped something we're really proud of &mdash; link in bio to see it live. &#128640;</textarea>
+          </label>
+          <div class="caption-counter" id="counter-ig">0 / 2200</div>
+        </div>
+        <div data-platform-tab-panel="tiktok" hidden>
+          <label class="ui-field">
+            <span class="ui-field-label">Caption &mdash; TikTok</span>
+            <textarea class="ui-textarea" data-char-limit="2200" data-counter-target="counter-tt">New thing just dropped &#128293; full demo on our page</textarea>
+          </label>
+          <div class="caption-counter" id="counter-tt">0 / 2200</div>
+        </div>
+        <div data-platform-tab-panel="linkedin" hidden>
+          <label class="ui-field">
+            <span class="ui-field-label">Caption &mdash; LinkedIn</span>
+            <textarea class="ui-textarea" data-char-limit="3000" data-counter-target="counter-li">Excited to announce our latest release. Built after months of customer feedback &mdash; details below.</textarea>
+          </label>
+          <div class="caption-counter" id="counter-li">0 / 3000</div>
+        </div>
+
+        <div class="hashtag-wrap">
+          <span class="hashtag-chip">#launch <button type="button" aria-label="Remove tag launch">&times;</button></span>
+          <span class="hashtag-chip">#productupdate <button type="button" aria-label="Remove tag productupdate">&times;</button></span>
+          <span class="hashtag-chip">#newfeature <button type="button" aria-label="Remove tag newfeature">&times;</button></span>
+        </div>
+      </div>
+
+      <div class="post-drawer__section">
+        <span class="post-drawer__section-label">Account &amp; platform (currently editing: Instagram tab)</span>
+        <div class="reassign-row">
+          <select class="ui-select" aria-label="Reassign connected account">
+            <option>Instagram &mdash; @brandosse.app (connected)</option>
+            <option>Instagram &mdash; @brandosse.creator (connected)</option>
+            <option>TikTok &mdash; @brandosse (connected)</option>
+          </select>
+        </div>
+        <p class="ui-field-hint">Reassigning here changes which connected account this platform's row publishes from &mdash; carried forward from <code>PostPanel.jsx</code>'s reassignment dropdown per human decision (2026-06-23).</p>
+      </div>
+
+      <div class="post-drawer__section">
+        <span class="post-drawer__section-label">Reschedule (mode 2 &mdash; full detail-panel edit)</span>
+        <div class="time-row">
+          <input class="ui-input" type="date" value="2026-06-10" aria-label="Scheduled date" style="max-width:160px;" />
+          <input class="ui-input" type="time" value="14:00" aria-label="Scheduled time" />
+          <span class="ui-field-hint">America/New_York</span>
+        </div>
+      </div>
+
+      <div class="post-drawer__section">
+        <span class="post-drawer__section-label">Readiness</span>
+        <div class="checklist">
+          <div class="check-item pass"><span class="check-icon pass">&#10003;</span><span>Caption present on all 3 platforms</span></div>
+          <div class="check-item pass"><span class="check-icon pass">&#10003;</span><span>Asset attached</span></div>
+          <div class="check-item warn"><span class="check-icon warn">!</span><span>TikTok caption is short for typical engagement</span></div>
+          <div class="check-item pass"><span class="check-icon pass">&#10003;</span><span>Connected account healthy for all 3 platforms</span></div>
+        </div>
+        <p class="scope-note">Pipeline approval history is an org-only section (not shown here &mdash; personal scope has no approval gate, per packet brief).</p>
+      </div>
+    </div>
+
+    <div class="post-drawer__footer">
+      <div class="post-drawer__footer-row">
+        <button class="ui-button ui-button-secondary" type="button" id="drawer-save-btn">Save changes</button>
+        <button class="ui-button ui-button-primary" type="button" data-open="schedule-modal-demo">Reschedule&hellip;</button>
+      </div>
+      <div class="post-drawer__footer-row">
+        <button class="ui-button ui-button-secondary" type="button">Duplicate</button>
+        <button class="ui-button ui-button-danger" type="button">Unschedule</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- Quick Post Composer -->
+<div class="modal-backdrop" id="quickpost-modal" data-backdrop-close hidden>
+  <div class="quickpost-modal" role="dialog" aria-modal="true" aria-label="Quick Post">
+    <div class="schedule-modal__header">
+      <h3 class="schedule-modal__title">Quick Post</h3>
+      <button class="ui-icon-button ui-icon-button-ghost sm" type="button" data-close="quickpost-modal" aria-label="Close">&times;</button>
+    </div>
+    <div class="quickpost-steps">
+
+      <div>
+        <p class="quickpost-step__label"><span class="quickpost-step__num">1</span>Library asset (optional)</p>
+        <button class="asset-picker-trigger" type="button" data-open="asset-picker-modal">
+          <span class="asset-picker-trigger__thumb">&#128196;</span>
+          <span class="asset-picker-trigger__text" id="asset-picker-trigger-label">No asset &mdash; click to pick from Library (optional)</span>
+          <button class="ui-icon-button ui-icon-button-ghost sm asset-picker-trigger__clear" id="asset-picker-clear" type="button" aria-label="Clear selected asset">&times;</button>
+        </button>
+      </div>
+
+      <div data-platform-toggle-group>
+        <p class="quickpost-step__label"><span class="quickpost-step__num">2</span>Platforms &amp; captions</p>
+        <div class="platform-toggle-row">
+          <button class="platform-toggle is-active" type="button" data-platform-toggle="instagram"><span class="platform-toggle__dot" style="background:var(--platform-instagram)"></span>Instagram</button>
+          <button class="platform-toggle" type="button" data-platform-toggle="tiktok"><span class="platform-toggle__dot" style="background:var(--platform-tiktok-alt)"></span>TikTok</button>
+          <button class="platform-toggle" type="button" data-platform-toggle="linkedin"><span class="platform-toggle__dot" style="background:var(--platform-linkedin)"></span>LinkedIn</button>
+          <button class="platform-toggle" type="button" data-platform-toggle="x"><span class="platform-toggle__dot" style="background:var(--platform-x)"></span>X</button>
+        </div>
+
+        <div class="per-platform-caption">
+          <div class="per-platform-caption__row" data-caption-row="instagram">
+            <div class="per-platform-caption__head"><span class="platform-toggle__dot" style="background:var(--platform-instagram)"></span>Instagram caption</div>
+            <span class="ai-prefill-note">&#10024; Pre-filled by AI &mdash; edit freely</span>
+            <textarea class="ui-textarea" data-char-limit="2200" data-counter-target="qp-counter-ig">Excited to share our latest update with you all today!</textarea>
+            <div class="caption-counter" id="qp-counter-ig">0 / 2200</div>
+          </div>
+          <!-- Fix 9 (2026-06-24 revision): pre-fill applies per platform toggled
+               on (CALENDAR_SPEC.md §6.3), not just Instagram — each row below now
+               carries its own AI-prefilled sample text in that platform's normal
+               register (TikTok casual/short, LinkedIn longer/professional, X within
+               its real character limit), with the same â¨ note as Instagram's row. -->
+          <div class="per-platform-caption__row" data-caption-row="tiktok" hidden>
+            <div class="per-platform-caption__head"><span class="platform-toggle__dot" style="background:var(--platform-tiktok-alt)"></span>TikTok caption</div>
+            <span class="ai-prefill-note">&#10024; Pre-filled by AI &mdash; edit freely</span>
+            <textarea class="ui-textarea" data-char-limit="2200" data-counter-target="qp-counter-tt">wait for it... &#128064; #brandosse #newdrop</textarea>
+            <div class="caption-counter" id="qp-counter-tt">0 / 2200</div>
+          </div>
+          <div class="per-platform-caption__row" data-caption-row="linkedin" hidden>
+            <div class="per-platform-caption__head"><span class="platform-toggle__dot" style="background:var(--platform-linkedin)"></span>LinkedIn caption</div>
+            <span class="ai-prefill-note">&#10024; Pre-filled by AI &mdash; edit freely</span>
+            <textarea class="ui-textarea" data-char-limit="3000" data-counter-target="qp-counter-li">We&#39;re excited to share an update on what our team has been building this quarter — read on for the details and what it means for our customers.</textarea>
+            <div class="caption-counter" id="qp-counter-li">0 / 3000</div>
+          </div>
+          <div class="per-platform-caption__row" data-caption-row="x" hidden>
+            <div class="per-platform-caption__head"><span class="platform-toggle__dot" style="background:var(--platform-x)"></span>X caption</div>
+            <span class="ai-prefill-note">&#10024; Pre-filled by AI &mdash; edit freely</span>
+            <textarea class="ui-textarea" data-char-limit="280" data-counter-target="qp-counter-x">Big update just dropped — here&#39;s what&#39;s new &#128640;</textarea>
+            <div class="caption-counter" id="qp-counter-x">0 / 280</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="quickpost-step__label"><span class="quickpost-step__num">3</span>When</p>
+        <div class="tz-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Times shown in your account timezone: <strong>America/New_York (UTC&minus;4)</strong>
+        </div>
+        <div class="time-row" style="margin-top: var(--space-3);">
+          <input class="ui-input" type="date" id="quickpost-date-input" aria-label="Date" style="max-width:160px;" />
+          <input class="ui-input" type="time" id="quickpost-time-input" aria-label="Time" />
+          <span class="ui-field-hint">or save as draft below</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fix 8 (2026-06-24 revision): Save as draft / Schedule post now fire a
+         confirmation toast via the same data-fire-toast + showToast() mechanism
+         already used for the drag-conflict/stale-write toasts above, instead of
+         closing the modal with zero feedback. Cancel intentionally does NOT fire
+         a toast (it is an explicit abandon action, not a save) and keeps plain
+         data-close only, so the presence/absence of a toast itself communicates
+         which action actually wrote something. See DECISIONS_LOG.md. -->
+    <div class="quickpost-footer">
+      <button class="ui-button ui-button-secondary" type="button" data-close="quickpost-modal" data-fire-toast="toast-draft-saved-template" data-quickpost-submit="draft">Save as draft</button>
+      <div class="quickpost-footer__primary">
+        <button class="ui-button ui-button-secondary" type="button" data-close="quickpost-modal">Cancel</button>
+        <button class="ui-button ui-button-primary" type="button" data-close="quickpost-modal" data-fire-toast="toast-post-scheduled-template" data-quickpost-submit="schedule">Schedule post</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Compact Asset Picker (Quick Post step 1) -->
+<div class="modal-backdrop" id="asset-picker-modal" data-backdrop-close hidden>
+  <div class="schedule-modal" style="width:min(480px,100%);" role="dialog" aria-modal="true" aria-label="Pick a Library asset">
+    <div class="schedule-modal__header">
+      <h3 class="schedule-modal__title">Pick an asset</h3>
+      <button class="ui-icon-button ui-icon-button-ghost sm" type="button" data-close="asset-picker-modal" aria-label="Close">&times;</button>
+    </div>
+    <div class="schedule-modal__body">
+      <input class="ui-input" type="search" placeholder="Search your Library&hellip;" aria-label="Search Library assets" />
+      <div class="asset-grid">
+        <div class="asset-tile" data-asset-name="Weekly roundup graphic">&#127749;</div>
+        <div class="asset-tile" data-asset-name="Office hours promo clip">&#127909;</div>
+        <div class="asset-tile" data-asset-name="Studio shot, new arrivals">&#128247;</div>
+        <div class="asset-tile" data-asset-name="Product demo clip">&#127909;</div>
+        <div class="asset-tile" data-asset-name="Customer review repost">&#128247;</div>
+        <div class="asset-tile" data-asset-name="Feature teaser render">&#10024;</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule Modal — timezone explicit, target account confirmation, conflict check -->
+<div class="modal-backdrop" id="schedule-modal-demo" data-backdrop-close hidden>
+  <div class="schedule-modal" role="dialog" aria-modal="true" aria-label="Schedule post">
+    <div class="schedule-modal__header">
+      <h3 class="schedule-modal__title">Schedule post</h3>
+      <button class="ui-icon-button ui-icon-button-ghost sm" type="button" data-close="schedule-modal-demo" aria-label="Close">&times;</button>
+    </div>
+    <div class="schedule-modal__body">
+
+      <div class="tz-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        All times below are in your <strong>account timezone: America/New_York (UTC&minus;4)</strong>, not your browser's local timezone.
+      </div>
+
+      <div>
+        <div class="mini-calendar__nav">
+          <span class="mini-calendar__label">June 2026</span>
+          <div style="display:flex; gap:4px;">
+            <button class="ui-icon-button ui-icon-button-secondary sm" type="button" aria-label="Previous month">&lsaquo;</button>
+            <button class="ui-icon-button ui-icon-button-secondary sm" type="button" aria-label="Next month">&rsaquo;</button>
+          </div>
+        </div>
+        <div class="mini-calendar">
+          <div class="mini-calendar__weekday">Su</div><div class="mini-calendar__weekday">Mo</div><div class="mini-calendar__weekday">Tu</div>
+          <div class="mini-calendar__weekday">We</div><div class="mini-calendar__weekday">Th</div><div class="mini-calendar__weekday">Fr</div><div class="mini-calendar__weekday">Sa</div>
+          <div class="mini-calendar__day is-empty"></div><div class="mini-calendar__day is-empty"></div>
+          <button class="mini-calendar__day" type="button" data-full-date="Tue, Jun 2">1</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Wed, Jun 3">2</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Thu, Jun 4">3</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Fri, Jun 5">4</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Sat, Jun 6">5</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Sun, Jun 7">6</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Mon, Jun 8">7</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Tue, Jun 9">8</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Wed, Jun 10">9</button>
+          <button class="mini-calendar__day is-today" type="button" data-full-date="Tue, Jun 23">10</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Fri, Jun 12">11</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Sat, Jun 13">12</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Sun, Jun 14">13</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Mon, Jun 15">14</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Tue, Jun 16">15</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Wed, Jun 17">16</button>
+          <button class="mini-calendar__day is-selected" type="button" data-full-date="Thu, Jun 18">17</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Fri, Jun 19">18</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Sat, Jun 20">19</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Sun, Jun 21">20</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Mon, Jun 22">21</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Tue, Jun 23">22</button>
+          <button class="mini-calendar__day" type="button" data-full-date="Wed, Jun 24">23</button>
+        </div>
+      </div>
+
+      <div class="time-row">
+        <input class="ui-input" type="time" value="14:00" aria-label="Scheduled time" />
+        <span id="schedule-summary-date" class="ui-field-hint">Thu, Jun 18</span>
+        <span class="ui-field-hint">America/New_York</span>
+      </div>
+
+      <div class="target-account-card">
+        <span class="target-account-card__avatar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/></svg></span>
+        <div class="target-account-card__body">
+          <div class="target-account-card__name">Instagram &mdash; @brandosse.app</div>
+          <div class="target-account-card__meta">Connected &middot; healthy &middot; this is where the post will publish</div>
+        </div>
+        <span class="ui-badge ui-badge-tone-success">Active</span>
+      </div>
+
+      <div class="conflict-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Another post is already scheduled to this account at this exact time. You can still schedule this one &mdash; it will not overwrite the other.</span>
+      </div>
+    </div>
+    <div class="schedule-modal__footer">
+      <button class="ui-button ui-button-secondary" type="button" data-close="schedule-modal-demo">Cancel</button>
+      <button class="ui-button ui-button-primary" type="button" data-close="schedule-modal-demo">Confirm schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⌘K Command Bar overlay -->
+<div class="cmdbar-overlay" id="cmdbar-overlay" data-backdrop-close hidden>
+  <div class="cmdbar" role="dialog" aria-modal="true" aria-label="Calendar command bar">
+    <div class="cmdbar__input-row">
+      <span class="cmdbar__ai-icon">&#10024;</span>
+      <input class="cmdbar__input" id="cmdbar-input" type="text" placeholder="Ask AI to plan, move, or summarize your week&hellip;" />
+    </div>
+    <div class="cmdbar__suggestions">
+      <p class="cmdbar__suggestion-label">Suggested</p>
+      <button class="cmdbar__suggestion-item" type="button">
+        <span class="cmdbar__suggestion-icon">&#10024;</span>
+        <span class="cmdbar__suggestion-text">Generate a week plan from my unused Library assets</span>
+        <span class="cmdbar__suggestion-hint">proposal only</span>
+      </button>
+      <button class="cmdbar__suggestion-item" type="button">
+        <span class="cmdbar__suggestion-icon">&#128197;</span>
+        <span class="cmdbar__suggestion-text">Move everything scheduled this Friday to next Monday</span>
+        <span class="cmdbar__suggestion-hint">requires confirm</span>
+      </button>
+      <button class="cmdbar__suggestion-item" type="button">
+        <span class="cmdbar__suggestion-icon">&#128202;</span>
+        <span class="cmdbar__suggestion-text">Summarize this month's publishing health</span>
+        <span class="cmdbar__suggestion-hint">read-only</span>
+      </button>
+    </div>
+    <div class="cmdbar__result" id="cmdbar-result" hidden>
+      <p class="cmdbar__result-reply-text"></p>
+      <div class="cmdbar__result-actions">
+        <button class="ui-button ui-button-primary sm" type="button">Apply</button>
+        <button class="ui-button ui-button-secondary sm" type="button" data-close="cmdbar-overlay">Dismiss</button>
+      </div>
+    </div>
+    <div class="cmdbar__footer">
+      <span class="cmdbar__footer-hint"><kbd>Esc</kbd> to close</span>
+      <span class="cmdbar__footer-hint"><kbd>Enter</kbd> to run</span>
+    </div>
+  </div>
+</div>
+
+<!-- Toast stack + templates (cloned into the stack on demand by mockup.js) -->
+<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+<template id="toast-conflict-template-tpl"></template>
+<div class="toast" id="toast-conflict-template" hidden>
+  <span class="toast__icon tone-warning"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+  <div class="toast__body">
+    <p class="toast__title">Time slot already taken</p>
+    <p class="toast__desc">Another post is scheduled to this account at the exact same time. Nothing was overwritten.</p>
+    <div class="toast__actions">
+      <button class="ui-button ui-button-secondary sm" type="button" data-toast-schedule-anyway>Schedule anyway</button>
+      <button class="ui-button ui-button-ghost sm" type="button" data-toast-close>Undo move</button>
+    </div>
+  </div>
+  <button class="ui-icon-button ui-icon-button-ghost sm toast__close" type="button" data-toast-close aria-label="Dismiss">&times;</button>
+</div>
+
+<div class="toast" id="toast-stale-template" hidden>
+  <span class="toast__icon tone-info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+  <div class="toast__body">
+    <p class="toast__title">This post changed elsewhere</p>
+    <p class="toast__desc">It was updated from another tab or device since you opened it. We refreshed this card to the latest version &mdash; your move was not applied.</p>
+  </div>
+  <button class="ui-icon-button ui-icon-button-ghost sm toast__close" type="button" data-toast-close aria-label="Dismiss">&times;</button>
+</div>
+
+<!-- Fix 8 (2026-06-24 revision): Quick Post submit confirmation toasts —
+     reuse the exact same .toast/.toast__icon/.toast__body markup contract as
+     the conflict/stale-write toasts above, new tone-success icon variant
+     only (see mockup.css, sourced from the existing success token pair). -->
+<div class="toast" id="toast-draft-saved-template" hidden>
+  <span class="toast__icon tone-success"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>
+  <div class="toast__body">
+    <p class="toast__title">Saved as draft</p>
+    <p class="toast__desc">Find it in the Drafts rail or the Library anytime &mdash; nothing was lost.</p>
+  </div>
+  <button class="ui-icon-button ui-icon-button-ghost sm toast__close" type="button" data-toast-close aria-label="Dismiss">&times;</button>
+</div>
+
+<div class="toast" id="toast-post-scheduled-template" hidden>
+  <span class="toast__icon tone-success"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>
+  <div class="toast__body">
+    <p class="toast__title">Post scheduled</p>
+    <p class="toast__desc">It now appears on the calendar at the time you set, in your account timezone.</p>
+  </div>
+  <button class="ui-icon-button ui-icon-button-ghost sm toast__close" type="button" data-toast-close aria-label="Dismiss">&times;</button>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>

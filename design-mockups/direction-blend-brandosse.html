@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brandosse — Midnight Aurora · Solar Paper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- Inter (body, both modes) + Space Grotesk (display, dark) + Playfair Display (display, light) + JetBrains Mono (data, both) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ════════════════════════════════════════════════════════════════
+       RESET
+    ════════════════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    button { border: none; background: none; cursor: pointer; font-family: inherit; }
+
+    /* ════════════════════════════════════════════════════════════════
+       SEMANTIC TOKEN CONTRACT
+       All colors live ONLY here. Components reference tokens only.
+    ════════════════════════════════════════════════════════════════ */
+
+    /* ── DARK  ·  Midnight Studio ── */
+    [data-theme="dark"] {
+      --canvas:              #0D0E14;
+      --surface:             #1C1B26;
+      --surface-elevated:    #22212E;
+      --surface-hover:       rgba(255,255,255,0.04);
+      --border:              rgba(255,255,255,0.07);
+      --border-bright:       rgba(255,255,255,0.13);
+      --glass-bg:            rgba(255,255,255,0.04);
+      --glass-border:        rgba(255,255,255,0.08);
+
+      --text-primary:        #E8E6F0;
+      --text-secondary:      #8A87A0;
+      --text-tertiary:       #524E6A;
+
+      --accent-primary:      #7C5CFC;      /* violet */
+      --accent-primary-dim:  rgba(124,92,252,0.18);
+      --accent-primary-glow: rgba(124,92,252,0.35);
+      --accent-primary-text: #A98EFD;
+      --accent-secondary:    #FF6B6B;      /* coral */
+      --accent-secondary-dim:rgba(255,107,107,0.18);
+
+      --positive:            #4ECBA4;
+      --positive-dim:        rgba(78,203,164,0.15);
+
+      --streak-color:        #F9B572;
+
+      --shadow-1: 0 1px 3px rgba(0,0,0,0.35);
+      --shadow-2: 0 4px 16px rgba(0,0,0,0.40);
+      --shadow-3: 0 8px 32px rgba(0,0,0,0.50), 0 1px 0 rgba(255,255,255,0.06) inset;
+
+      /* Typography: geometric display in dark */
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-body:    'Inter', system-ui, sans-serif;
+      --font-mono:    'JetBrains Mono', monospace;
+
+      /* Card style: glassmorphism */
+      --card-bg:      var(--glass-bg);
+      --card-border:  1px solid var(--glass-border);
+      --card-radius:  12px;
+      --card-padding: 18px;
+
+      /* Header / sidebar surfaces */
+      --header-bg:    rgba(13,14,20,0.90);
+      --sidebar-bg:   var(--surface);
+
+      /* Active nav */
+      --nav-active-border: var(--accent-primary);
+      --nav-active-bg:     var(--accent-primary-dim);
+      --nav-active-color:  var(--accent-primary-text);
+
+      /* Primary button */
+      --btn-bg:       var(--accent-primary);
+      --btn-bg-hover: #8D6FFD;
+      --btn-shadow:   0 4px 16px rgba(124,92,252,0.30);
+      --btn-shadow-h: 0 6px 22px rgba(124,92,252,0.45);
+
+      /* Search bar */
+      --search-bg:    var(--glass-bg);
+      --search-border:var(--glass-border);
+      --search-border-h: var(--border-bright);
+
+      /* Platform icon tints (dark) */
+      --ig-bg:  linear-gradient(135deg,#833AB4,#FD1D1D,#F77737);
+      --li-bg:  #0077B5;
+      --tt-bg:  #010101;
+      --x-bg:   #1A1A1A;
+
+      /* Toggle: show moon, hide sun */
+      --toggle-sun-display:  none;
+      --toggle-moon-display: flex;
+      --toggle-bg:           rgba(255,255,255,0.06);
+      --toggle-border:       var(--border-bright);
+
+      /* Scrollbar */
+      --scroll-thumb:        var(--border);
+
+      /* Notif dot border */
+      --notif-border:        var(--canvas);
+
+      /* Sparkline colors */
+      --spark-positive:   #FF6B6B;
+      --spark-scheduled:  #7C5CFC;
+      --spark-neutral:    #8A87A0;
+
+      /* Post status colors */
+      --status-live:      #FF6B6B;
+      --status-sched:     #7C5CFC;
+      --status-draft:     #524E6A;
+
+      /* Greeting sub color */
+      --greeting-sub:     var(--text-secondary);
+    }
+
+    /* ── LIGHT  ·  Solar Paper ── */
+    [data-theme="light"] {
+      --canvas:              #FAFAF7;
+      --surface:             #FFFFFF;
+      --surface-elevated:    #F0EFEA;
+      --surface-hover:       #F0EFEA;
+      --border:              rgba(20,18,16,0.08);
+      --border-bright:       rgba(20,18,16,0.20);
+      --glass-bg:            #FFFFFF;
+      --glass-border:        rgba(20,18,16,0.08);
+
+      --text-primary:        #141210;
+      --text-secondary:      rgba(20,18,16,0.60);
+      --text-tertiary:       rgba(20,18,16,0.40);
+
+      --accent-primary:      #FF4D2E;      /* coral is primary in light */
+      --accent-primary-dim:  rgba(255,77,46,0.10);
+      --accent-primary-glow: rgba(255,77,46,0.35);
+      --accent-primary-text: #C73011;
+      --accent-secondary:    #6B4EFF;      /* violet is secondary in light */
+      --accent-secondary-dim:rgba(107,78,255,0.10);
+
+      --positive:            #1A9E5F;
+      --positive-dim:        rgba(26,158,95,0.12);
+
+      --streak-color:        #D97706;
+
+      --shadow-1: 0 1px 3px rgba(20,18,16,0.06), 0 1px 2px rgba(20,18,16,0.04);
+      --shadow-2: 0 4px 12px rgba(20,18,16,0.08), 0 2px 4px rgba(20,18,16,0.04);
+      --shadow-3: 0 12px 32px rgba(20,18,16,0.12), 0 4px 8px rgba(20,18,16,0.06);
+
+      /* Typography: editorial serif display in light */
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body:    'Inter', system-ui, sans-serif;
+      --font-mono:    'JetBrains Mono', monospace;
+
+      /* Card style: white + warm shadow */
+      --card-bg:      #FFFFFF;
+      --card-border:  1px solid transparent;
+      --card-radius:  8px;
+      --card-padding: 20px;
+
+      /* Header / sidebar surfaces */
+      --header-bg:    #FFFFFF;
+      --sidebar-bg:   #FFFFFF;
+
+      /* Active nav: ink left-border */
+      --nav-active-border: var(--text-primary);
+      --nav-active-bg:     rgba(20,18,16,0.04);
+      --nav-active-color:  var(--text-primary);
+
+      /* Primary button */
+      --btn-bg:       var(--accent-primary);
+      --btn-bg-hover: #FF3A18;
+      --btn-shadow:   0 2px 8px rgba(255,77,46,0.30);
+      --btn-shadow-h: 0 4px 16px rgba(255,77,46,0.45);
+
+      /* Search bar */
+      --search-bg:    var(--canvas);
+      --search-border:rgba(20,18,16,0.12);
+      --search-border-h: rgba(20,18,16,0.40);
+
+      /* Platform icon tints (light – desaturated pastels) */
+      --ig-bg:  linear-gradient(135deg,#FFD6D6,#FFB3D1);
+      --li-bg:  #DDEEFF;
+      --tt-bg:  #E8E0FF;
+      --x-bg:   #E8E8E8;
+
+      /* Toggle: show sun, hide moon */
+      --toggle-sun-display:  flex;
+      --toggle-moon-display: none;
+      --toggle-bg:           rgba(20,18,16,0.05);
+      --toggle-border:       rgba(20,18,16,0.12);
+
+      /* Scrollbar */
+      --scroll-thumb:        rgba(20,18,16,0.12);
+
+      /* Notif dot border */
+      --notif-border:        var(--surface);
+
+      /* Sparkline colors */
+      --spark-positive:   #1A9E5F;
+      --spark-scheduled:  #6B4EFF;
+      --spark-neutral:    rgba(20,18,16,0.25);
+
+      /* Post status colors */
+      --status-live:      #1A9E5F;
+      --status-sched:     #6B4EFF;
+      --status-draft:     rgba(20,18,16,0.25);
+
+      /* Greeting sub color */
+      --greeting-sub:     var(--text-secondary);
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       THEME TRANSITION  (smooth 250ms crossfade on toggle)
+    ════════════════════════════════════════════════════════════════ */
+    html {
+      transition:
+        background-color 250ms ease,
+        color 250ms ease;
+    }
+    /* Scope transitions to visual properties only */
+    *,
+    *::before,
+    *::after {
+      transition-property: background-color, color, border-color, box-shadow, opacity, fill, stroke;
+      transition-duration: 250ms;
+      transition-timing-function: ease;
+    }
+    /* But don't slow down transforms/layout */
+    .kpi-card,
+    .card,
+    .engagement-card,
+    .btn-primary,
+    .icon-btn,
+    .nav-item,
+    .post-item,
+    .user-row,
+    .header-search {
+      /* override to include transform for hover interactions */
+      transition-property: background-color, color, border-color, box-shadow, opacity, transform;
+      transition-duration: 250ms, 250ms, 250ms, 250ms, 250ms, 200ms;
+      transition-timing-function: ease, ease, ease, ease, ease, cubic-bezier(0.34,1.26,0.64,1);
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       AURORA  (dark mode only — hidden in light)
+    ════════════════════════════════════════════════════════════════ */
+    @keyframes aurora-drift {
+      0%   { transform: translate(0%,0%) scale(1);     opacity: 0.55; }
+      25%  { transform: translate(3%,-4%) scale(1.04); opacity: 0.65; }
+      50%  { transform: translate(-2%,5%) scale(0.97); opacity: 0.50; }
+      75%  { transform: translate(4%,2%) scale(1.03);  opacity: 0.60; }
+      100% { transform: translate(0%,0%) scale(1);     opacity: 0.55; }
+    }
+    @keyframes aurora-shift {
+      0%   { opacity: 0.35; transform: translate(0,0) scale(1); }
+      33%  { opacity: 0.50; transform: translate(-5%,3%) scale(1.06); }
+      66%  { opacity: 0.30; transform: translate(4%,-3%) scale(0.96); }
+      100% { opacity: 0.35; transform: translate(0,0) scale(1); }
+    }
+
+    .aurora-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+      /* transition override — aurora visibility */
+      transition: opacity 400ms ease !important;
+    }
+    [data-theme="dark"]  .aurora-layer { opacity: 1; }
+    [data-theme="light"] .aurora-layer { opacity: 0; pointer-events: none; }
+
+    .aurora-blob-1 {
+      position: absolute;
+      width: 520px; height: 320px;
+      top: -80px; left: -60px;
+      background: radial-gradient(ellipse at center, rgba(124,92,252,0.28) 0%, transparent 70%);
+      animation: aurora-drift 12s ease-in-out infinite;
+      will-change: transform, opacity;
+    }
+    .aurora-blob-2 {
+      position: absolute;
+      width: 380px; height: 280px;
+      top: -40px; right: 80px;
+      background: radial-gradient(ellipse at center, rgba(255,107,107,0.20) 0%, transparent 65%);
+      animation: aurora-shift 14s ease-in-out infinite;
+      will-change: transform, opacity;
+    }
+    .aurora-blob-3 {
+      position: absolute;
+      width: 300px; height: 200px;
+      bottom: -50px; left: 40%;
+      background: radial-gradient(ellipse at center, rgba(80,40,180,0.18) 0%, transparent 70%);
+      animation: aurora-drift 16s ease-in-out infinite reverse;
+      will-change: transform, opacity;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       LOAD ANIMATIONS
+    ════════════════════════════════════════════════════════════════ */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 6px var(--accent-primary); }
+      50%       { box-shadow: 0 0 14px var(--accent-primary), 0 0 22px var(--accent-primary-dim); }
+    }
+    @keyframes pulse-scale {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.55; transform: scale(0.8); }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       BASE
+    ════════════════════════════════════════════════════════════════ */
+    html, body {
+      height: 100%;
+      background: var(--canvas);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       LAYOUT SHELL  (inverted-L: sidebar full height left, header top right)
+    ════════════════════════════════════════════════════════════════ */
+    :root {
+      --sidebar-w: 240px;
+      --header-h:  56px;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      grid-template-rows: var(--header-h) 1fr;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       SIDEBAR
+    ════════════════════════════════════════════════════════════════ */
+    .sidebar {
+      grid-column: 1;
+      grid-row: 1 / 3;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    .sidebar-logo {
+      padding: 18px 20px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .logo-mark {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    [data-theme="dark"] .logo-mark {
+      background: linear-gradient(135deg, #7C5CFC 0%, #A47CF8 100%);
+      box-shadow: 0 2px 12px rgba(124,92,252,0.45);
+    }
+    [data-theme="light"] .logo-mark {
+      background: #FF4D2E;
+      box-shadow: 0 2px 8px rgba(255,77,46,0.30);
+    }
+
+    .logo-wordmark {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: -0.3px;
+      color: var(--text-primary);
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 16px 0 0;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .sidebar-nav::-webkit-scrollbar { display: none; }
+
+    .nav-group { margin-bottom: 6px; }
+
+    .nav-group-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 8px 20px 4px;
+      font-family: var(--font-body);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13.5px;
+      font-weight: 500;
+      border-left: 2px solid transparent;
+    }
+    .nav-item:hover {
+      color: var(--text-primary);
+      background: var(--surface-hover);
+    }
+    .nav-item.active {
+      color: var(--nav-active-color);
+      background: var(--nav-active-bg);
+      border-left-color: var(--nav-active-border);
+      padding-left: 18px;
+    }
+    .nav-icon {
+      width: 16px; height: 16px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .nav-icon svg { width: 15px; height: 15px; }
+    /* Stroke color for nav icons: default = text-secondary token */
+    .nav-item .nav-icon svg path,
+    .nav-item .nav-icon svg rect,
+    .nav-item .nav-icon svg circle,
+    .nav-item .nav-icon svg line {
+      stroke: var(--text-secondary);
+    }
+    .nav-item.active .nav-icon svg path,
+    .nav-item.active .nav-icon svg rect,
+    .nav-item.active .nav-icon svg circle,
+    .nav-item.active .nav-icon svg line {
+      stroke: var(--nav-active-border);
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid var(--border);
+      padding: 14px 20px;
+      flex-shrink: 0;
+    }
+    .user-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .user-row:hover { background: var(--surface-hover); }
+    .user-avatar-sm {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600;
+      color: #fff; flex-shrink: 0;
+    }
+    [data-theme="dark"] .user-avatar-sm {
+      background: linear-gradient(135deg, #7C5CFC, #FF6B6B);
+    }
+    [data-theme="light"] .user-avatar-sm {
+      background: linear-gradient(135deg, #FF4D2E 0%, #FF8066 100%);
+    }
+    .user-info-sm { display: flex; flex-direction: column; min-width: 0; }
+    .user-name-sm { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    .user-role-sm { font-size: 11px; color: var(--text-tertiary); }
+
+    /* ════════════════════════════════════════════════════════════════
+       TOP HEADER
+    ════════════════════════════════════════════════════════════════ */
+    .top-header {
+      grid-column: 2;
+      grid-row: 1;
+      height: var(--header-h);
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 9;
+    }
+    [data-theme="dark"] .top-header {
+      backdrop-filter: blur(12px);
+    }
+
+    .header-workspace {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text-primary);
+      letter-spacing: -0.2px;
+      flex-shrink: 0;
+    }
+
+    .header-search {
+      flex: 1;
+      max-width: 380px;
+      margin: 0 auto;
+      background: var(--search-bg);
+      border: 1px solid var(--search-border);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      cursor: text;
+    }
+    .header-search:hover {
+      border-color: var(--search-border-h);
+      box-shadow: var(--shadow-1);
+    }
+    .search-icon { color: var(--text-tertiary); flex-shrink: 0; }
+    .search-text {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text-tertiary);
+      font-family: var(--font-body);
+    }
+    .search-kbd {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-tertiary);
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      width: 32px; height: 32px;
+      border-radius: 7px;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center; justify-content: center;
+      color: var(--text-secondary);
+      position: relative;
+    }
+    .icon-btn:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+    }
+    .notif-dot {
+      width: 7px; height: 7px;
+      background: var(--accent-secondary);
+      border-radius: 50%;
+      position: absolute;
+      top: 5px; right: 5px;
+      border: 1.5px solid var(--notif-border);
+    }
+    [data-theme="light"] .notif-dot {
+      background: var(--accent-primary);
+      border-color: var(--surface);
+    }
+
+    .user-avatar-header {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff;
+      cursor: pointer;
+    }
+    [data-theme="dark"] .user-avatar-header {
+      background: linear-gradient(135deg, #7C5CFC, #FF6B6B);
+      border: 2px solid rgba(124,92,252,0.5);
+    }
+    [data-theme="dark"] .user-avatar-header:hover {
+      border-color: #7C5CFC;
+    }
+    [data-theme="light"] .user-avatar-header {
+      background: linear-gradient(135deg, #FF4D2E 0%, #FF8066 100%);
+      box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(20,18,16,0.12);
+    }
+    [data-theme="light"] .user-avatar-header:hover {
+      box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #FF4D2E;
+    }
+
+    /* ── THEME TOGGLE BUTTON ── */
+    .theme-toggle {
+      width: 32px; height: 32px;
+      border-radius: 7px;
+      background: var(--toggle-bg);
+      border: 1px solid var(--toggle-border);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-secondary);
+      position: relative;
+    }
+    .theme-toggle:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+    }
+    .toggle-icon-sun  { display: var(--toggle-sun-display);  }
+    .toggle-icon-moon { display: var(--toggle-moon-display); }
+
+    /* ════════════════════════════════════════════════════════════════
+       MAIN CONTENT AREA
+    ════════════════════════════════════════════════════════════════ */
+    .content-area {
+      grid-column: 2;
+      grid-row: 2;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: var(--scroll-thumb) transparent;
+      background: var(--canvas);
+    }
+    .content-area::-webkit-scrollbar { width: 4px; }
+    .content-area::-webkit-scrollbar-track { background: transparent; }
+    .content-area::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; }
+
+    .content-inner {
+      padding: 0 28px 48px;
+      max-width: 1200px;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       GREETING ZONE
+    ════════════════════════════════════════════════════════════════ */
+    .greeting-zone {
+      position: relative;
+      padding: 32px 0 28px;
+      overflow: hidden;
+      margin: 0 -28px;
+      padding-left: 28px;
+      padding-right: 28px;
+      animation: fade-in 0.5s ease both;
+    }
+
+    .greeting-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .greeting-text {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 26px;
+      letter-spacing: -0.5px;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .greeting-sub {
+      font-size: 13px;
+      color: var(--greeting-sub);
+    }
+
+    .stat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 20px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    [data-theme="dark"] .stat-pill {
+      background: rgba(124,92,252,0.14);
+      border: 1px solid rgba(124,92,252,0.30);
+      color: #B8A8FE;
+    }
+    [data-theme="light"] .stat-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      box-shadow: var(--shadow-1);
+    }
+
+    .stat-pill-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+    }
+    [data-theme="dark"] .stat-pill-dot {
+      animation: pulse-dot 2s ease-in-out infinite;
+      box-shadow: 0 0 6px var(--accent-primary);
+    }
+    [data-theme="light"] .stat-pill-dot {
+      animation: pulse-scale 2.4s ease-in-out infinite;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       KPI CARDS
+    ════════════════════════════════════════════════════════════════ */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4,1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      border: var(--card-border);
+      border-radius: var(--card-radius);
+      padding: var(--card-padding);
+      padding-bottom: 16px;
+      position: relative;
+      cursor: default;
+      overflow: hidden;
+      opacity: 0;
+      animation: fade-up 0.45s cubic-bezier(0.34,1.26,0.64,1) forwards;
+      box-shadow: var(--shadow-2);
+    }
+    .kpi-card:nth-child(1) { animation-delay: 0.08s; }
+    .kpi-card:nth-child(2) { animation-delay: 0.16s; }
+    .kpi-card:nth-child(3) { animation-delay: 0.24s; }
+    .kpi-card:nth-child(4) { animation-delay: 0.32s; }
+
+    .kpi-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-3);
+    }
+    [data-theme="dark"] .kpi-card:hover {
+      border-color: var(--border-bright);
+    }
+
+    /* Shimmer highlight line (dark only) */
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+      opacity: 0;
+    }
+    [data-theme="dark"] .kpi-card:hover::before { opacity: 1; }
+
+    .kpi-label {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      font-family: var(--font-body);
+    }
+
+    .kpi-number {
+      font-family: var(--font-mono);
+      font-size: 36px;
+      font-weight: 500;
+      color: var(--text-primary);
+      letter-spacing: -1px;
+      line-height: 1;
+      margin-bottom: 10px;
+    }
+
+    .kpi-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-trend {
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .kpi-trend.up       { color: var(--accent-secondary); }
+    .kpi-trend.neutral  { color: var(--text-secondary); }
+    .kpi-trend.violet   { color: var(--accent-secondary); }
+    .kpi-trend.positive { color: var(--positive); }
+    .kpi-trend.streak   { color: var(--streak-color); }
+    [data-theme="light"] .kpi-trend.up { color: var(--positive); }
+
+    .sparkline { height: 28px; width: 60px; }
+
+    .streak-badge {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 600;
+      color: var(--streak-color);
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       DUAL COLUMN
+    ════════════════════════════════════════════════════════════════ */
+    .dual-col {
+      display: grid;
+      grid-template-columns: 1fr 0.65fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       PANELS / CARDS  (shared base)
+    ════════════════════════════════════════════════════════════════ */
+    .panel {
+      background: var(--card-bg);
+      border: var(--card-border);
+      border-radius: var(--card-radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-2);
+      opacity: 0;
+      animation: fade-up 0.45s cubic-bezier(0.34,1.2,0.64,1) 0.42s forwards;
+    }
+    .panel:hover { box-shadow: var(--shadow-3); }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-primary);
+      letter-spacing: -0.2px;
+    }
+    [data-theme="dark"] .panel-title { font-size: 14px; letter-spacing: -0.1px; }
+
+    .panel-action {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+    }
+    .panel-action:hover { color: var(--accent-primary); }
+
+    /* ── UPCOMING POSTS ── */
+    .post-list { padding: 4px 0; }
+
+    .post-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 18px;
+      cursor: default;
+    }
+    .post-item:hover { background: var(--surface-hover); }
+
+    .platform-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    [data-theme="dark"]  .platform-icon.instagram { background: linear-gradient(135deg,#833AB4,#FD1D1D,#F77737); }
+    [data-theme="dark"]  .platform-icon.linkedin  { background: #0077B5; }
+    [data-theme="dark"]  .platform-icon.tiktok    { background: #010101; border: 1px solid rgba(255,255,255,0.12); }
+    [data-theme="dark"]  .platform-icon.x-social  { background: #1A1A1A; border: 1px solid rgba(255,255,255,0.12); }
+    [data-theme="light"] .platform-icon.instagram { background: linear-gradient(135deg,#FFD6D6,#FFB3D1); }
+    [data-theme="light"] .platform-icon.linkedin  { background: #DDEEFF; }
+    [data-theme="light"] .platform-icon.tiktok    { background: #E8E0FF; }
+    [data-theme="light"] .platform-icon.x-social  { background: #E8E8E8; }
+
+    .post-thumb {
+      width: 38px; height: 38px;
+      border-radius: 6px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .post-thumb-inner {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    [data-theme="dark"] .post-thumb-inner {
+      background: linear-gradient(135deg, rgba(124,92,252,0.2), rgba(255,107,107,0.15));
+    }
+    [data-theme="light"] .post-thumb-inner {
+      background: var(--canvas);
+    }
+
+    .post-info { flex: 1; min-width: 0; }
+    .post-title {
+      font-size: 13px; font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+    .post-time {
+      font-size: 11.5px;
+      color: var(--text-tertiary);
+    }
+    .post-time.today { color: var(--accent-primary); font-weight: 500; }
+
+    .post-status {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-live   { background: var(--status-live); }
+    .status-sched  { background: var(--status-sched); }
+    .status-draft  { background: var(--status-draft); }
+    [data-theme="dark"] .status-live  { box-shadow: 0 0 6px rgba(255,107,107,0.5); }
+    [data-theme="dark"] .status-sched { box-shadow: 0 0 6px rgba(124,92,252,0.5); }
+
+    /* ── CREATE NEXT PANEL ── */
+    .create-panel {
+      opacity: 0;
+      animation: fade-up 0.45s cubic-bezier(0.34,1.2,0.64,1) 0.50s forwards;
+    }
+
+    .create-panel-body {
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    .ai-suggestion-card {
+      border-radius: 8px;
+      padding: 14px;
+    }
+    [data-theme="dark"] .ai-suggestion-card {
+      background: linear-gradient(135deg, rgba(124,92,252,0.12) 0%, rgba(255,107,107,0.08) 100%);
+      border: 1px solid rgba(124,92,252,0.22);
+    }
+    [data-theme="light"] .ai-suggestion-card {
+      background: var(--accent-secondary-dim);
+      border: 1px solid rgba(107,78,255,0.14);
+    }
+
+    .ai-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin-bottom: 8px;
+    }
+    [data-theme="dark"] .ai-badge { color: var(--accent-primary); }
+    [data-theme="light"] .ai-badge { color: var(--accent-secondary); }
+
+    .ai-suggestion-text {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .ai-suggestion-text strong { color: var(--text-primary); font-weight: 500; }
+
+    .btn-primary {
+      width: 100%;
+      padding: 11px 16px;
+      background: var(--btn-bg);
+      border-radius: 7px;
+      font-family: var(--font-body);
+      font-size: 14px; font-weight: 600;
+      color: #fff;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: var(--btn-shadow);
+    }
+    .btn-primary:hover {
+      background: var(--btn-bg-hover);
+      transform: translateY(-1px);
+      box-shadow: var(--btn-shadow-h);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .quick-gen-area {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .quick-gen-label {
+      font-size: 11px; font-weight: 500;
+      color: var(--text-tertiary);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .quick-gen-input {
+      width: 100%;
+      border-radius: 7px;
+      padding: 9px 12px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--text-primary);
+      outline: none;
+      resize: none;
+    }
+    [data-theme="dark"] .quick-gen-input {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+    }
+    [data-theme="dark"] .quick-gen-input:focus {
+      border-color: rgba(124,92,252,0.45);
+      background: rgba(124,92,252,0.05);
+    }
+    [data-theme="light"] .quick-gen-input {
+      background: var(--canvas);
+      border: 1px solid rgba(20,18,16,0.12);
+    }
+    [data-theme="light"] .quick-gen-input:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-dim);
+    }
+    .quick-gen-input::placeholder { color: var(--text-tertiary); }
+
+    /* ════════════════════════════════════════════════════════════════
+       ENGAGEMENT CHART
+    ════════════════════════════════════════════════════════════════ */
+    .chart-panel {
+      background: var(--card-bg);
+      border: var(--card-border);
+      border-radius: var(--card-radius);
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-2);
+      opacity: 0;
+      animation: fade-up 0.45s cubic-bezier(0.34,1.2,0.64,1) 0.58s forwards;
+    }
+    .chart-panel:hover { box-shadow: var(--shadow-3); }
+
+    .chart-body { padding: 16px 20px 20px; }
+
+    .chart-meta {
+      display: flex; align-items: center; gap: 20px;
+      margin-bottom: 16px; flex-wrap: wrap;
+    }
+
+    .chart-stat { display: flex; flex-direction: column; gap: 2px; }
+
+    .chart-stat-num {
+      font-family: var(--font-mono);
+      font-size: 22px; font-weight: 500;
+      color: var(--text-primary); letter-spacing: -0.5px;
+    }
+    .chart-stat-label { font-size: 11px; color: var(--text-tertiary); }
+
+    .chart-trend-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      border-radius: 12px; padding: 3px 8px;
+      font-size: 11.5px; font-weight: 600;
+    }
+    [data-theme="dark"] .chart-trend-pill {
+      background: rgba(255,107,107,0.12);
+      border: 1px solid rgba(255,107,107,0.22);
+      color: #FF6B6B;
+    }
+    [data-theme="light"] .chart-trend-pill {
+      background: rgba(255,77,46,0.10);
+      border: 1px solid rgba(255,77,46,0.20);
+      color: #FF4D2E;
+    }
+
+    .chart-legends {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--text-secondary);
+    }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    .area-chart-wrap { position: relative; height: 120px; }
+    .area-chart-wrap svg { width: 100%; height: 100%; overflow: visible; }
+
+    .day-labels {
+      display: flex; justify-content: space-between;
+      margin-top: 8px; padding: 0 4px;
+    }
+    .day-label { font-size: 10.5px; color: var(--text-tertiary); font-family: var(--font-body); }
+    .day-label.today-label { color: var(--accent-primary); font-weight: 600; }
+
+    .chart-legend-row {
+      display: flex; gap: 20px; margin-top: 12px; padding-left: 4px;
+    }
+    .legend-line-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text-secondary);
+    }
+    .legend-line {
+      display: inline-block; width: 14px; height: 3px; border-radius: 2px;
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       DIVIDER
+    ════════════════════════════════════════════════════════════════ */
+    .section-divider { height: 1px; background: var(--border); margin: 0 0 24px; }
+
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ════════════════ SIDEBAR ════════════════ -->
+  <aside class="sidebar">
+
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <!-- B lettermark -->
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="6" height="13" rx="1.5" fill="white" opacity="0.95"/>
+          <rect x="2" y="2" width="9.5" height="5.5" rx="2.5" fill="white" opacity="0.95"/>
+          <rect x="2" y="9" width="10.5" height="5.5" rx="2.5" fill="white" opacity="0.95"/>
+        </svg>
+      </div>
+      <span class="logo-wordmark">Brandosse</span>
+    </div>
+
+    <nav class="sidebar-nav">
+
+      <!-- Brand -->
+      <div class="nav-group">
+        <div class="nav-group-label">Brand</div>
+        <div class="nav-item">
+          <span class="nav-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M2 4h11M2 8h8M2 12h5" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          Brand Kit
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <rect x="1.5" y="1.5" width="5" height="5" rx="1.5" stroke-width="1.3"/>
+              <rect x="8.5" y="1.5" width="5" height="5" rx="1.5" stroke-width="1.3"/>
+              <rect x="1.5" y="8.5" width="5" height="5" rx="1.5" stroke-width="1.3"/>
+              <rect x="8.5" y="8.5" width="5" height="5" rx="1.5" stroke-width="1.3"/>
+            </svg>
+          </span>
+          Assets
+        </div>
+      </div>
+
+      <!-- Create -->
+      <div class="nav-group">
+        <div class="nav-group-label">Create</div>
+        <div class="nav-item active">
+          <span class="nav-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M7.5 1L9.18 5.48L14 5.63L10.27 8.61L11.63 13.3L7.5 10.7L3.37 13.3L4.73 8.61L1 5.63L5.82 5.48L7.5 1Z" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          Generator
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <rect x="1.5" y="1.5" width="12" height="12" rx="1.5" stroke-width="1.3"/>
+              <path d="M5 7.5h5M7.5 5v5" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          Canvas
+        </div>
+      </div>
+
+      <!-- Publish -->
+      <div class="nav-group">
+        <div class="nav-group-label">Publish</div>
+        <div class="nav-item">
+          <span class="nav-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <rect x="1.5" y="3" width="12" height="10.5" rx="1.5" stroke-width="1.3"/>
+              <path d="M1.5 6.5h12" stroke-width="1.2"/>
+              <path d="M5 1.5V4M10 1.5V4" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </span>
+          Calendar
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M2 3.5h11M2 7.5h9M2 11.5h7" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </span>
+          Queue
+        </div>
+      </div>
+
+      <!-- Clips -->
+      <div class="nav-group">
+        <div class="nav-group-label">Clips</div>
+        <div class="nav-item">
+          <span class="nav-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M3 2.5l9 5-9 5V2.5z" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          Repurposing
+        </div>
+      </div>
+
+      <!-- Analyze -->
+      <div class="nav-group">
+        <div class="nav-group-label">Analyze</div>
+        <div class="nav-item">
+          <span class="nav-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M2 11.5l3-4 3 2 3-5 2 2" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          Analytics
+        </div>
+      </div>
+
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <div class="user-avatar-sm">D</div>
+        <div class="user-info-sm">
+          <span class="user-name-sm">Dare</span>
+          <span class="user-role-sm">Pro Plan</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ════════════════ HEADER ════════════════ -->
+  <header class="top-header">
+
+    <span class="header-workspace">Brandosse</span>
+
+    <div class="header-search">
+      <svg class="search-icon" width="13" height="13" viewBox="0 0 13 13" fill="none">
+        <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8.5 8.5L11 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span class="search-text">Search or run a command</span>
+      <span class="search-kbd">⌘K</span>
+    </div>
+
+    <div class="header-actions">
+
+      <!-- Theme toggle -->
+      <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+        <!-- Sun icon (shown in light mode) -->
+        <svg class="toggle-icon-sun" width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7.5" cy="7.5" r="2.8" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M3 3l1 1M11 11l1 1M11 3l-1 1M4 11l-1 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <!-- Moon icon (shown in dark mode) -->
+        <svg class="toggle-icon-moon" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M11.5 8.5A5 5 0 0 1 5.5 2.5a5.5 5.5 0 1 0 6 6z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <!-- Notifications -->
+      <button class="icon-btn" title="Notifications">
+        <span class="notif-dot"></span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1.5a5 5 0 015 5v3l1 2H2l1-2V6.5a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M6.5 12.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+      </button>
+
+      <!-- Avatar -->
+      <div class="user-avatar-header">D</div>
+    </div>
+
+  </header>
+
+  <!-- ════════════════ CONTENT ════════════════ -->
+  <main class="content-area">
+    <div class="content-inner">
+
+      <!-- GREETING ZONE (aurora lives here, auto-hides in light) -->
+      <div class="greeting-zone">
+        <div class="aurora-layer" aria-hidden="true">
+          <div class="aurora-blob-1"></div>
+          <div class="aurora-blob-2"></div>
+          <div class="aurora-blob-3"></div>
+        </div>
+        <div class="greeting-content">
+          <div class="greeting-left">
+            <div class="greeting-text">Good evening, Dare&nbsp;👋</div>
+            <div class="greeting-sub">Tuesday, June 17, 2026 &nbsp;·&nbsp; Your content pipeline is on track.</div>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-pill-dot"></span>
+            Next scheduled post in&nbsp;<strong>3h 20m</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI ROW — 48 / 7 / 5 / 14 -->
+      <div class="kpi-row">
+
+        <!-- Posts Published: 48 -->
+        <div class="kpi-card">
+          <div class="kpi-label">Posts Published</div>
+          <div class="kpi-number">48</div>
+          <div class="kpi-footer">
+            <div class="kpi-trend up">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 8L6 4L10 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              12% this week
+            </div>
+            <svg class="sparkline" viewBox="0 0 60 28" fill="none">
+              <defs>
+                <linearGradient id="s1g" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--spark-positive)" stop-opacity="0.30"/>
+                  <stop offset="100%" stop-color="var(--spark-positive)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M2 22 L10 18 L18 20 L26 14 L34 16 L42 10 L50 8 L58 4" stroke="var(--spark-positive)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <path d="M2 22 L10 18 L18 20 L26 14 L34 16 L42 10 L50 8 L58 4 L58 28 L2 28 Z" fill="url(#s1g)"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Scheduled: 7 -->
+        <div class="kpi-card">
+          <div class="kpi-label">Scheduled</div>
+          <div class="kpi-number">7</div>
+          <div class="kpi-footer">
+            <div class="kpi-trend violet">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M6 4V6.5L7.5 7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+              In queue
+            </div>
+            <svg class="sparkline" viewBox="0 0 60 28" fill="none">
+              <defs>
+                <linearGradient id="s2g" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--spark-scheduled)" stop-opacity="0.28"/>
+                  <stop offset="100%" stop-color="var(--spark-scheduled)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M2 20 L10 20 L18 16 L26 18 L34 14 L42 14 L50 12 L58 10" stroke="var(--spark-scheduled)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <path d="M2 20 L10 20 L18 16 L26 18 L34 14 L42 14 L50 12 L58 10 L58 28 L2 28 Z" fill="url(#s2g)"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Clips Ready: 5 -->
+        <div class="kpi-card">
+          <div class="kpi-label">Clips Ready</div>
+          <div class="kpi-number">5</div>
+          <div class="kpi-footer">
+            <div class="kpi-trend neutral">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M4 6L6 8L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              To review
+            </div>
+            <svg class="sparkline" viewBox="0 0 60 28" fill="none">
+              <defs>
+                <linearGradient id="s3g" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--spark-neutral)" stop-opacity="0.20"/>
+                  <stop offset="100%" stop-color="var(--spark-neutral)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M2 18 L10 16 L18 18 L26 14 L34 16 L42 12 L50 14 L58 12" stroke="var(--spark-neutral)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <path d="M2 18 L10 16 L18 18 L26 14 L34 16 L42 12 L50 14 L58 12 L58 28 L2 28 Z" fill="url(#s3g)"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Streak: 14 -->
+        <div class="kpi-card">
+          <div class="kpi-label">Streak</div>
+          <div class="kpi-number" style="color: var(--streak-color);">14</div>
+          <div class="kpi-footer">
+            <div class="kpi-trend streak">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1.5C6 1.5 8.5 3.5 8.5 6C8.5 7.5 7.5 8.5 6 8.5C4.5 8.5 3.5 7.5 3.5 6C3.5 5 4 4 4.5 3.5C4.5 5 5 5.5 5.5 5.5C5.5 4 5.5 2.5 6 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                <path d="M4 9.5C4 9.5 4.5 10.5 6 10.5C7.5 10.5 8 9.5 8 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+              Days
+            </div>
+            <div class="streak-badge">🔥 Keep it up!</div>
+          </div>
+        </div>
+
+      </div>
+      <!-- end KPI row -->
+
+      <!-- DUAL COLUMN -->
+      <div class="dual-col">
+
+        <!-- Upcoming Posts -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Upcoming</span>
+            <span class="panel-action">View all →</span>
+          </div>
+          <div class="post-list">
+
+            <!-- 1: Instagram -->
+            <div class="post-item">
+              <div class="platform-icon instagram">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="2" width="12" height="12" rx="3.5" stroke="white" stroke-width="1.5"/>
+                  <circle cx="8" cy="8" r="3" stroke="white" stroke-width="1.4"/>
+                  <circle cx="11.5" cy="4.5" r="0.8" fill="white"/>
+                </svg>
+              </div>
+              <div class="post-thumb">
+                <div class="post-thumb-inner">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2 10L5 6L8 8L11 4" stroke="var(--accent-primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="post-info">
+                <div class="post-title">5 tips for morning routines</div>
+                <div class="post-time today">Today · 4:30 PM</div>
+              </div>
+              <div class="post-status status-live"></div>
+            </div>
+
+            <!-- 2: LinkedIn -->
+            <div class="post-item">
+              <div class="platform-icon linkedin">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="5.5" width="2.5" height="8" fill="white" opacity="0.9"/>
+                  <circle cx="3.25" cy="3.25" r="1.25" fill="white" opacity="0.9"/>
+                  <path d="M7 5.5v8M7 8.5C7 7 9 5.5 10 7.5v6" stroke="white" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="post-thumb">
+                <div class="post-thumb-inner">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M3 10V5M7 10V7M11 10V4" stroke="var(--accent-primary)" stroke-width="1.5" stroke-linecap="round" opacity="0.65"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="post-info">
+                <div class="post-title">Why brand consistency wins</div>
+                <div class="post-time today">Today · 6:00 PM</div>
+              </div>
+              <div class="post-status status-sched"></div>
+            </div>
+
+            <!-- 3: TikTok -->
+            <div class="post-item">
+              <div class="platform-icon tiktok">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M10 2C10 4 11.5 5 13 5.5V8C13 8 11 8 10 7v4.5A4 4 0 1 1 5 8c.15 0 .3 0 .5.02v2.8A1.5 1.5 0 1 0 8 12V2h2z" fill="white" opacity="0.9"/>
+                </svg>
+              </div>
+              <div class="post-thumb">
+                <div class="post-thumb-inner">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <polygon points="4,3 11,7 4,11" fill="var(--accent-secondary)" opacity="0.55"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="post-info">
+                <div class="post-title">Behind the scenes clip</div>
+                <div class="post-time">Tomorrow · 9:00 AM</div>
+              </div>
+              <div class="post-status status-draft"></div>
+            </div>
+
+            <!-- 4: X / Twitter -->
+            <div class="post-item">
+              <div class="platform-icon x-social">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M2.5 3L6.5 8.5L2.5 13H4L7.2 9.5L10 13H13L8.7 7.2L13 3H11.5L7.8 6.2L5.5 3H2.5Z" fill="white" opacity="0.9"/>
+                </svg>
+              </div>
+              <div class="post-thumb">
+                <div class="post-thumb-inner">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2 7h10M2 4h8M2 10h7" stroke="var(--accent-primary)" stroke-width="1.4" stroke-linecap="round" opacity="0.55"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="post-info">
+                <div class="post-title">Quick thought on AI tools</div>
+                <div class="post-time">Tomorrow · 12:00 PM</div>
+              </div>
+              <div class="post-status status-draft"></div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Create Next -->
+        <div class="panel create-panel">
+          <div class="panel-header">
+            <span class="panel-title">Create next</span>
+            <span class="panel-action">More ideas</span>
+          </div>
+          <div class="create-panel-body">
+
+            <div class="ai-suggestion-card">
+              <div class="ai-badge">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                  <path d="M5 1L6.18 3.82L9 4.11L7.09 6L7.63 9L5 7.5L2.37 9L2.91 6L1 4.11L3.82 3.82L5 1Z"/>
+                </svg>
+                AI Insight
+              </div>
+              <div class="ai-suggestion-text">
+                <strong>Your audience engages most on Tuesdays</strong> — want a carousel on productivity?
+              </div>
+            </div>
+
+            <button class="btn-primary">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1.5L8.27 4.73L11.5 5L9.5 7.5L10.18 10.5L7 9L3.82 10.5L4.5 7.5L2.5 5L5.73 4.73L7 1.5Z" stroke="white" stroke-width="1.3" stroke-linejoin="round" fill="rgba(255,255,255,0.2)"/>
+              </svg>
+              Generate
+            </button>
+
+            <div class="quick-gen-area">
+              <div class="quick-gen-label">Or describe what you need</div>
+              <textarea class="quick-gen-input" rows="2" placeholder="e.g. A LinkedIn post about launching my new service…"></textarea>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+      <!-- end dual col -->
+
+      <!-- ENGAGEMENT CHART -->
+      <div class="chart-panel">
+        <div class="panel-header">
+          <span class="panel-title">Engagement this week</span>
+          <span class="panel-action">Full report →</span>
+        </div>
+        <div class="chart-body">
+
+          <div class="chart-meta">
+            <div class="chart-stat">
+              <span class="chart-stat-num">2,847</span>
+              <span class="chart-stat-label">Total engagements</span>
+            </div>
+            <div class="chart-trend-pill">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 6L5 3L8 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              +23.4%
+            </div>
+            <div class="chart-legends">
+              <div class="legend-item">
+                <span class="legend-dot" id="legend-likes"></span>
+                Likes
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot" id="legend-shares"></span>
+                Shares
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot" id="legend-comments"></span>
+                Comments
+              </div>
+            </div>
+          </div>
+
+          <div class="area-chart-wrap">
+            <svg viewBox="0 0 700 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <!-- Violet area gradient (likes) -->
+                <linearGradient id="area-likes" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--accent-secondary)" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="var(--accent-secondary)" stop-opacity="0"/>
+                </linearGradient>
+                <!-- Coral area gradient (shares) -->
+                <linearGradient id="area-shares" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--accent-primary)" stop-opacity="0.22"/>
+                  <stop offset="100%" stop-color="var(--accent-primary)" stop-opacity="0"/>
+                </linearGradient>
+                <!-- Comments area gradient -->
+                <linearGradient id="area-comments-g" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--accent-secondary)" stop-opacity="0.12"/>
+                  <stop offset="100%" stop-color="var(--accent-secondary)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+
+              <!-- Horizontal grid lines: use CSS variable for opacity via class -->
+              <line x1="0" y1="0"   x2="700" y2="0"   stroke="currentColor" stroke-opacity="0.04" stroke-width="1"/>
+              <line x1="0" y1="40"  x2="700" y2="40"  stroke="currentColor" stroke-opacity="0.04" stroke-width="1"/>
+              <line x1="0" y1="80"  x2="700" y2="80"  stroke="currentColor" stroke-opacity="0.04" stroke-width="1"/>
+              <line x1="0" y1="120" x2="700" y2="120" stroke="currentColor" stroke-opacity="0.04" stroke-width="1"/>
+
+              <!-- Comments area (bottom layer) -->
+              <path d="M0 95 C50 90, 100 85, 150 88 C200 91, 250 80, 300 78 C350 76, 400 82, 450 75 C500 68, 550 72, 600 65 C650 58, 680 60, 700 55 L700 120 L0 120 Z"
+                    fill="url(#area-comments-g)"/>
+              <path d="M0 95 C50 90, 100 85, 150 88 C200 91, 250 80, 300 78 C350 76, 400 82, 450 75 C500 68, 550 72, 600 65 C650 58, 680 60, 700 55"
+                    stroke="var(--accent-secondary)" stroke-width="1.5" fill="none" stroke-dasharray="4 3" opacity="0.35"/>
+
+              <!-- Shares area (coral / accent-primary in light, coral in dark) -->
+              <path d="M0 80 C50 72, 100 68, 150 70 C200 72, 250 60, 300 55 C350 50, 400 58, 450 50 C500 42, 550 48, 600 38 C650 28, 680 32, 700 25 L700 120 L0 120 Z"
+                    fill="url(#area-shares)"/>
+              <path d="M0 80 C50 72, 100 68, 150 70 C200 72, 250 60, 300 55 C350 50, 400 58, 450 50 C500 42, 550 48, 600 38 C650 28, 680 32, 700 25"
+                    stroke="var(--accent-primary)" stroke-width="1.8" fill="none" opacity="0.80"/>
+
+              <!-- Likes area (violet / accent-secondary in light, violet in dark) — top layer -->
+              <path d="M0 65 C50 55, 100 50, 150 52 C200 54, 250 40, 300 35 C350 30, 400 38, 450 30 C500 22, 550 28, 600 18 C650 8, 680 12, 700 5 L700 120 L0 120 Z"
+                    fill="url(#area-likes)"/>
+              <path d="M0 65 C50 55, 100 50, 150 52 C200 54, 250 40, 300 35 C350 30, 400 38, 450 30 C500 22, 550 28, 600 18 C650 8, 680 12, 700 5"
+                    stroke="var(--accent-secondary)" stroke-width="2" fill="none"/>
+
+              <!-- Data point dots on likes line -->
+              <circle cx="0"   cy="65" r="3.5" fill="var(--accent-secondary)"/>
+              <circle cx="100" cy="50" r="3.5" fill="var(--accent-secondary)"/>
+              <circle cx="200" cy="54" r="3.5" fill="var(--accent-secondary)"/>
+              <circle cx="300" cy="35" r="3.5" fill="var(--accent-secondary)"/>
+              <circle cx="400" cy="38" r="3.5" fill="var(--accent-secondary)"/>
+              <circle cx="500" cy="22" r="3.5" fill="var(--accent-secondary)"/>
+              <circle cx="600" cy="18" r="3.5" fill="var(--accent-secondary)"/>
+              <circle cx="700" cy="5"  r="3.5" fill="var(--accent-secondary)"/>
+              <!-- Highlight ring on last point -->
+              <circle cx="700" cy="5"  r="7" fill="none" stroke="var(--accent-secondary)" stroke-width="2" opacity="0.35"/>
+            </svg>
+          </div>
+
+          <div class="day-labels">
+            <span class="day-label">Mon</span>
+            <span class="day-label">Tue</span>
+            <span class="day-label">Wed</span>
+            <span class="day-label">Thu</span>
+            <span class="day-label">Fri</span>
+            <span class="day-label">Sat</span>
+            <span class="day-label today-label">Sun</span>
+          </div>
+
+          <div class="chart-legend-row">
+            <div class="legend-line-item">
+              <span class="legend-line" style="background: var(--accent-secondary);"></span>
+              Likes
+            </div>
+            <div class="legend-line-item">
+              <span class="legend-line" style="background: var(--accent-primary);"></span>
+              Shares
+            </div>
+            <div class="legend-line-item">
+              <span class="legend-line" style="background: var(--accent-secondary); opacity: 0.4;"></span>
+              Comments
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <!-- end chart panel -->
+
+    </div>
+  </main>
+
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     THEME TOGGLE SCRIPT
+     Reads/writes localStorage key "brandosse-theme"
+     Default: dark
+════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn  = document.getElementById('themeToggle');
+  var STORAGE_KEY = 'brandosse-theme';
+
+  /* --- init on load: honour stored preference, else default = dark --- */
+  var stored = localStorage.getItem(STORAGE_KEY);
+  var current = (stored === 'light') ? 'light' : 'dark';
+  root.setAttribute('data-theme', current);
+
+  /* --- toggle handler --- */
+  btn.addEventListener('click', function () {
+    current = (current === 'dark') ? 'light' : 'dark';
+    root.setAttribute('data-theme', current);
+    localStorage.setItem(STORAGE_KEY, current);
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Brandosse — AI Studio Input Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --canvas:#0D0E14; --surface:#1C1B26; --elevated:#22212E; --hover:rgba(255,255,255,.05);
+    --border:rgba(255,255,255,.08); --border-bright:rgba(255,255,255,.14);
+    --text:#E8E6F0; --text-2:#9C99B0; --text-3:#615D78;
+    --violet:#7C5CFC; --violet-dim:rgba(124,92,252,.16); --violet-text:#B7A6FF;
+    --coral:#FF6B6B; --coral-dim:rgba(255,107,107,.16);
+    --teal:#4ECBA4; --amber:#F2C96D;
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-full:999px;
+    --glass:rgba(255,255,255,.04);
+    --font-d:"Space Grotesk",system-ui,sans-serif; --font-b:"Inter",system-ui,sans-serif; --font-m:"JetBrains Mono",monospace;
+    --shadow:0 18px 60px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font-b);background:var(--canvas);color:var(--text);-webkit-font-smoothing:antialiased;}
+  .app{display:grid;grid-template-columns:64px 1fr;height:100dvh;overflow:hidden;}
+  /* rail */
+  .rail{background:#121119;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:18px;padding:16px 0;}
+  .rail .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#C4B5FD,#7C5CFC,#4338CA);display:grid;place-items:center;color:#fff;font-weight:700;font-family:var(--font-d)}
+  .rail .ri{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--text-3);font-size:18px}
+  .rail .ri.active{background:var(--violet-dim);color:var(--violet-text)}
+  /* main */
+  .main{position:relative;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .aurora{position:absolute;inset:0 0 auto 0;height:340px;pointer-events:none;opacity:.5;
+    background:radial-gradient(420px 240px at 30% 0%,rgba(124,92,252,.35),transparent 60%),radial-gradient(380px 220px at 78% 8%,rgba(255,107,107,.20),transparent 60%);}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--border);position:relative;z-index:2}
+  .top h1{font-family:var(--font-d);font-size:15px;font-weight:600;color:var(--text-2)}
+  .top .session{display:flex;gap:8px;align-items:center}
+  .pill{border:1px solid var(--border);background:var(--glass);border-radius:var(--r-full);padding:6px 12px;font-size:12px;color:var(--text-2);display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+  /* canvas */
+  .canvas{flex:1;overflow-y:auto;padding:24px 22px 220px;position:relative;z-index:1}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;max-width:1100px;margin:0 auto}
+  .card{aspect-ratio:1;border-radius:var(--r-lg);overflow:hidden;position:relative;border:1px solid var(--border);background:var(--surface)}
+  .card img{width:100%;height:100%;object-fit:cover;display:block}
+  .card .ov{position:absolute;inset:auto 0 0 0;padding:12px;background:linear-gradient(transparent,rgba(0,0,0,.72));display:flex;gap:8px;opacity:0;transition:.18s;transform:translateY(6px)}
+  .card:hover .ov{opacity:1;transform:none}
+  .ov button{flex:1;border:0;border-radius:var(--r-sm);padding:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-b);background:rgba(255,255,255,.14);color:#fff;backdrop-filter:blur(6px)}
+  .ov button.primary{background:var(--violet);color:#fff}
+  .canvas-head{max-width:1100px;margin:0 auto 14px;display:flex;align-items:center;justify-content:space-between}
+  .canvas-head .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);font-weight:600}
+
+  /* ── COMPOSER (the redesigned input) ──────────────────────────── */
+  .composer-wrap{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:0 22px 22px;
+    background:linear-gradient(transparent,var(--canvas) 38%);}
+  .composer{max-width:920px;margin:0 auto;background:var(--surface);border:1px solid var(--border-bright);border-radius:var(--r-xl);box-shadow:var(--shadow);overflow:hidden}
+
+  /* row 1: mode segmented + brand + structured toggle */
+  .c-modes{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .seg{display:inline-flex;background:var(--canvas);border:1px solid var(--border);border-radius:var(--r-full);padding:3px}
+  .seg button{border:0;background:transparent;color:var(--text-2);font-family:var(--font-b);font-size:12.5px;font-weight:600;padding:7px 13px;border-radius:var(--r-full);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .seg button.on{background:var(--violet);color:#fff}
+  .spacer{flex:1}
+  .brand-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--glass);border-radius:var(--r-full);padding:5px 10px;font-size:12px;color:var(--text)}
+  .brand-chip .sw{display:flex;gap:-4px}
+  .brand-chip .dot{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--surface);margin-left:-4px}
+  .toggle{position:relative;width:34px;height:19px;border-radius:var(--r-full);background:var(--violet);cursor:pointer;flex-shrink:0}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:.18s}
+  .toggle.off{background:#3a3850}.toggle.off::after{left:17px;left:auto;transform:translateX(15px)}
+  .struct-toggle{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--text-2);cursor:pointer}
+
+  /* row 2: the input (freeform OR structured) */
+  .c-body{padding:14px 16px}
+  textarea.prompt{width:100%;background:transparent;border:0;color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.5;resize:none;min-height:46px;outline:none}
+  textarea.prompt::placeholder{color:var(--text-3)}
+  .structured{display:none;grid-template-columns:repeat(3,1fr);gap:10px}
+  .structured.show{display:grid}
+  .c-body.struct textarea.prompt{display:none}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--text-3);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .field input,.field select{background:var(--canvas);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 10px;color:var(--text);font-family:var(--font-b);font-size:13px;outline:none}
+  .field input:focus,.field select:focus{border-color:var(--violet)}
+  .field.wide{grid-column:span 3}
+
+  /* row 3: embedded feature strip (references / avoid) */
+  .c-extras{display:flex;align-items:center;gap:8px;padding:0 16px 12px;flex-wrap:wrap}
+  .ref{display:inline-flex;align-items:center;gap:8px}
+  .ref .thumb{width:38px;height:38px;border-radius:var(--r-sm);border:1px solid var(--border);object-fit:cover}
+  .add{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--border-bright);background:transparent;border-radius:var(--r-sm);padding:0 12px;height:38px;color:var(--text-2);font-size:12px;font-family:var(--font-b);cursor:pointer}
+  .avoid{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);background:var(--glass);border-radius:var(--r-full);padding:6px 12px;font-size:12px;color:var(--text-2);cursor:pointer}
+  .avoid.active{border-color:var(--coral);color:var(--coral)}
+  .avoid-field{display:none;flex:1;min-width:180px}
+  .avoid-field.show{display:block}
+  .avoid-field input{width:100%;background:var(--canvas);border:1px solid var(--coral-dim);border-radius:var(--r-full);padding:8px 13px;color:var(--text);font-size:12.5px;outline:none;font-family:var(--font-b)}
+
+  /* row 4: options (collapsible) + actions */
+  .c-foot{display:flex;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid var(--border);flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--glass);border-radius:var(--r-full);padding:7px 12px;font-size:12px;color:var(--text);cursor:pointer;font-family:var(--font-b)}
+  .chip .k{color:var(--text-3);font-size:11px}
+  .chip:hover{border-color:var(--border-bright)}
+  .options{display:none;align-items:center;gap:8px}
+  .options.show{display:inline-flex}
+  .more{color:var(--text-2)}
+  .cost{font-family:var(--font-m);font-size:12px;color:var(--text-2)}
+  .cost b{color:var(--text)}
+  .enhance{width:40px;height:40px;border-radius:var(--r-md);border:1px solid var(--border-bright);background:var(--glass);color:var(--violet-text);display:grid;place-items:center;cursor:pointer;font-size:16px}
+  .enhance:hover{background:var(--violet-dim)}
+  .generate{border:0;border-radius:var(--r-md);background:var(--violet);color:#fff;font-family:var(--font-d);font-weight:600;font-size:14px;padding:0 20px;height:40px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 20px rgba(124,92,252,.4)}
+
+  /* enhance-alternatives panel */
+  .enh{position:absolute;left:0;right:0;bottom:calc(100% + 10px);background:var(--elevated);border:1px solid var(--border-bright);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:14px;display:none}
+  .enh.show{display:block}
+  .enh h4{font-family:var(--font-d);font-size:13px;margin-bottom:10px;color:var(--text);display:flex;align-items:center;gap:7px}
+  .enh h4 .x{margin-left:auto;cursor:pointer;color:var(--text-3)}
+  .alt{border:1px solid var(--border);border-radius:var(--r-md);padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:.15s}
+  .alt:hover{border-color:var(--violet);background:var(--violet-dim)}
+  .alt .t{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+  .alt .p{font-size:13px;color:var(--text);line-height:1.45}
+  .composer{position:relative}
+
+  .note{max-width:920px;margin:10px auto 0;font-size:11px;color:var(--text-3);text-align:center}
+  @media(max-width:760px){
+    .app{grid-template-columns:1fr}.rail{display:none}
+    .structured{grid-template-columns:1fr}.field.wide{grid-column:span 1}
+    .composer-wrap{padding:0 10px 10px}.c-modes{gap:8px}
+    .options{display:none!important} /* on mobile the chips/options live in a bottom sheet (UiBottomSheet) opened by "Options" */
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail">
+    <div class="logo">B</div>
+    <div class="ri">▦</div><div class="ri active">✶</div><div class="ri">▷</div><div class="ri">▤</div><div class="ri">◷</div>
+  </nav>
+
+  <div class="main">
+    <div class="aurora"></div>
+    <header class="top">
+      <h1>AI Studio</h1>
+      <div class="session">
+        <span class="pill">⌕ Sessions</span>
+        <span class="pill">＋ New</span>
+      </div>
+    </header>
+
+    <div class="canvas">
+      <div class="canvas-head">
+        <span class="label">Latest results</span>
+        <span class="pill">↻ Regenerate all</span>
+      </div>
+      <div class="grid">
+        <div class="card"><img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&q=60" alt=""><div class="ov"><button class="primary">Use for post</button><button>Refine</button><button>⋯</button></div></div>
+        <div class="card"><img src="https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&q=60" alt=""><div class="ov"><button class="primary">Use for post</button><button>Refine</button><button>⋯</button></div></div>
+        <div class="card"><img src="https://images.unsplash.com/photo-1481833761820-0509d3217039?w=400&q=60" alt=""><div class="ov"><button class="primary">Use for post</button><button>Refine</button><button>⋯</button></div></div>
+        <div class="card"><img src="https://images.unsplash.com/photo-1572119865084-43c285814d63?w=400&q=60" alt=""><div class="ov"><button class="primary">Use for post</button><button>Refine</button><button>⋯</button></div></div>
+      </div>
+    </div>
+
+    <!-- ── COMPOSER ─────────────────────────────────────────── -->
+    <div class="composer-wrap">
+      <div class="composer">
+
+        <!-- enhance alternatives -->
+        <div class="enh" id="enh">
+          <h4>✦ Enhance — pick a stronger prompt <span class="x" onclick="document.getElementById('enh').classList.remove('show')">✕</span></h4>
+          <div class="alt" onclick="pick(this)"><div class="t">Cinematic</div><div class="p">A ceramic coffee mug on weathered oak, golden hour side-light, shallow depth of field, steam rising, editorial product photography, warm earthy palette.</div></div>
+          <div class="alt" onclick="pick(this)"><div class="t">Bright & social</div><div class="p">Top-down flat lay of a matte coffee mug on light oak with scattered beans, soft daylight, airy minimal styling, crisp and on-trend for Instagram.</div></div>
+          <div class="alt" onclick="pick(this)"><div class="t">Bold brand</div><div class="p">Hero shot of a coffee mug, deep violet + coral accents from the brand palette, dramatic studio lighting, premium and confident.</div></div>
+        </div>
+
+        <!-- row 1: modes + brand + structured -->
+        <div class="c-modes">
+          <div class="seg">
+            <button class="on">✶ Image</button>
+            <button>▥ Carousel</button>
+            <button>▷ Video</button>
+            <button>✎ Edit</button>
+            <button>◳ Flyer</button>
+          </div>
+          <div class="spacer"></div>
+          <span class="brand-chip" title="Brand voice + palette applied">
+            <span class="sw"><span class="dot" style="background:#7C5CFC"></span><span class="dot" style="background:#FF6B6B"></span><span class="dot" style="background:#4ECBA4"></span></span>
+            On-brand <span class="toggle" id="brandT" onclick="this.classList.toggle('off')"></span>
+          </span>
+          <span class="struct-toggle" onclick="toggleStruct()"><span class="toggle off" id="structT"></span> Structured</span>
+        </div>
+
+        <!-- row 2: input -->
+        <div class="c-body" id="cbody">
+          <textarea class="prompt" placeholder="Describe what you want to create…  (⌘+Enter to generate)">A ceramic coffee mug on an oak table</textarea>
+          <div class="structured" id="struct">
+            <div class="field wide"><label>Subject</label><input value="A ceramic coffee mug" /></div>
+            <div class="field"><label>Style / composition</label><select><option>Editorial flat-lay</option><option>Hero close-up</option><option>Lifestyle scene</option></select></div>
+            <div class="field"><label>Lighting</label><select><option>Golden hour</option><option>Soft studio</option><option>Dramatic</option></select></div>
+            <div class="field"><label>Mood</label><select><option>Warm</option><option>Minimal</option><option>Bold</option></select></div>
+            <div class="field"><label>On-image text (optional)</label><input placeholder="e.g. 20% OFF" /></div>
+            <div class="field"><label>Focus</label><select><option>Product</option><option>Person</option><option>Setting</option></select></div>
+          </div>
+        </div>
+
+        <!-- row 3: references + avoid -->
+        <div class="c-extras">
+          <div class="ref">
+            <img class="thumb" src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=120&q=50" alt="">
+            <button class="add">⊕ Reference · Upload / Library / URL</button>
+          </div>
+          <div class="spacer"></div>
+          <span class="avoid" id="avoidChip" onclick="toggleAvoid()">⊘ Avoid</span>
+          <span class="avoid-field" id="avoidField"><input placeholder="blurry, watermark, extra fingers, busy background…" /></span>
+        </div>
+
+        <!-- row 4: options + actions -->
+        <div class="c-foot">
+          <button class="chip more" onclick="document.getElementById('opt').classList.toggle('show')">⚙ Options</button>
+          <span class="options" id="opt">
+            <span class="chip">Model <span class="k">Ideogram v3</span></span>
+            <span class="chip">Ratio <span class="k">4:5</span></span>
+            <span class="chip">Quality <span class="k">2K</span></span>
+            <span class="chip">Batch <span class="k">×4</span></span>
+          </span>
+          <div class="spacer"></div>
+          <span class="cost">Uses <b>2 cr</b> · 28 left</span>
+          <button class="enhance" title="Enhance prompt" onclick="document.getElementById('enh').classList.add('show')">✦</button>
+          <button class="generate">✶ Generate</button>
+        </div>
+
+      </div>
+      <div class="note">Mobile: modes stay a scroll row · Options & advanced settings open in a bottom sheet · references + avoid collapse into the sheet. Light mode = Solar Paper tokens.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleStruct(){
+    document.getElementById('structT').classList.toggle('off');
+    document.getElementById('struct').classList.toggle('show');
+    document.getElementById('cbody').classList.toggle('struct');
+  }
+  function toggleAvoid(){
+    document.getElementById('avoidChip').classList.toggle('active');
+    document.getElementById('avoidField').classList.toggle('show');
+  }
+  function pick(el){
+    document.querySelector('textarea.prompt').value = el.querySelector('.p').textContent;
+    document.getElementById('enh').classList.remove('show');
+  }
+</script>
+</body>
+</html>

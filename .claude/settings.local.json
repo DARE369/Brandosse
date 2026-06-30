@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:\\\\Users\\\\Dare\\\\Desktop\\\\social-media-agent - Copy\" log --oneline -5)",
+      "Bash(git -C \"c:\\\\Users\\\\Dare\\\\Desktop\\\\social-media-agent - Copy\" status --short)",
+      "Read(//c/Users/Dare/.claude/projects/c--Users-Dare-Desktop-social-media-agent---Copy/**)",
+      "Bash(python3 -c \"import sys,json; [print\\(json.loads\\(l\\).get\\('message',{}\\).get\\('content',''\\)[:500] if isinstance\\(json.loads\\(l\\).get\\('message',{}\\).get\\('content',''\\),str\\) else str\\(json.loads\\(l\\).get\\('message',{}\\).get\\('content',[]\\)[0] if json.loads\\(l\\).get\\('message',{}\\).get\\('content'\\) else ''\\)[:500]\\) for l in sys.stdin if l.strip\\(\\)]\")",
+      "Bash(python3 -c ' *)",
+      "Bash(npx next *)"
+    ]
+  }
+}

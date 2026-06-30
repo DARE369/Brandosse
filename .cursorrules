@@ -1,0 +1,66 @@
+# SocialAI — Cursor / Codex Project Rules
+
+## Stack
+- Frontend: React 18, Vite, React Router v6
+- Backend: Supabase (Postgres + Auth + Realtime + Edge Functions)
+- Styling: CSS modules + custom CSS variables (no Tailwind)
+- AI: Grok API for generation, optimization, and quality scoring
+- State: React Query (TanStack) for server state, React Context for auth/theme
+
+## File Structure
+src/
+  admin/           — Admin workspace (routes, pages, components, styles)
+  components/      — Shared components (Navbar, Sidebar, StatusBadge, PlatformIcon)
+  Context/         — React contexts (AuthContext, ThemeContext, LogoutContext)
+  hooks/           — Custom hooks (useLogout, useRealtimeKPIs, etc.)
+  pages/           — User workspace pages
+  router/          — Router config (router.jsx)
+  services/        — Supabase client, authService, queryClient, mockService
+  styles/          — Global CSS (theme.css, variables.css, design-system.css)
+  utils/           — Auth routing, protectedRoute, helpers
+supabase/
+  functions/       — Edge functions (Deno)
+  migrations/      — SQL migrations
+
+## Critical Rules — Do Not Break These
+1. posts is the canonical publishing lifecycle table
+2. generations is the canonical AI creation table
+3. Completed generations trigger a draft post creation via DB trigger — do not remove this trigger
+4. Admin visibility uses RLS policies — never bypass auth.uid() checks
+5. Lifecycle statuses must stay aligned with src/constants/statuses.js
+6. audit_logs rows are IMMUTABLE — never UPDATE or DELETE them
+7. content_versions with is_original: true are never overwritten
+8. Admin routes are /app/admin/* only — never reuse user route paths
+9. theme.css is the root theme source — only [data-theme] selectors, no .dark or html.dark
+10. All destructive admin actions must write an audit_log entry
+
+## Theme System
+- ThemeContext sets data-theme="light" or data-theme="dark" on <html>
+- CSS uses [data-theme="dark"] and [data-theme="light"] selectors only
+- Do NOT use .dark, html.dark, or @media (prefers-color-scheme) for app theming
+- Token namespace: --bg-*, --text-*, --accent, --border, --shadow-*
+
+## Admin Role Logic
+- super_admin: access to all /app/admin/* routes and all data
+- org_admin: access to /app/admin/* routes, scoped to own organization only
+- user: access to /app/dashboard, /app/generate, /app/calendar, /app/library, /app/settings only
+- No role can access routes outside their scope — ProtectedRoute enforces this
+
+## Data Patterns
+- Never use window.alert(), window.confirm(), or window.prompt() anywhere
+- All user-facing confirmations use in-app modal components
+- Realtime updates patch individual records in React Query cache — never trigger full list refetch
+- Every admin action that mutates data must show a visible success/error state
+
+## Edge Functions
+- Location: supabase/functions/
+- Runtime: Deno
+- Every function validates admin JWT and checks role scope before executing
+- Every function writes to audit_logs on completion
+- Never hard-delete user data from client code — use soft delete + approval workflow
+
+## Component Conventions
+- Shared primitives: QualityScoreBadge, ActivityStatusBadge, StatusBadge, PlatformIcon
+- Use these instead of creating per-page status pill variations
+- Admin shell layout: AdminLayout > AdminNavbar (fixed) + AdminSidebar (fixed) + .admin-content (scrollable)
+- No component should define generic .card or .btn-primary — use shared design system classes

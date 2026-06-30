@@ -1,0 +1,417 @@
+/* ==========================================================================
+   Global Base + Shared Primitives
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-body, Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial);
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
+  line-height: var(--leading-normal, 1.55);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-inline-size: 100%;
+}
+
+a {
+  color: var(--color-text-link, var(--color-primary));
+  text-decoration: none;
+  transition: color var(--transition-fast, 150ms ease-out);
+}
+
+a:hover {
+  color: var(--color-text-link-hover, var(--color-primary-hover));
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-text-primary);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-text-secondary) 32%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-secondary) 32%, transparent);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-text-secondary) 48%, transparent);
+}
+
+h2 {
+  margin-bottom: 1rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+:where(button, [role="button"], input, select, textarea) {
+  transition:
+    background-color var(--transition-fast, 150ms ease-out),
+    border-color var(--transition-fast, 150ms ease-out),
+    color var(--transition-fast, 150ms ease-out),
+    box-shadow var(--transition-fast, 150ms ease-out),
+    transform var(--transition-fast, 150ms ease-out);
+}
+
+:where(button, [role="button"], a, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-main {
+  min-height: 100vh;
+  padding-top: var(--navbar-h, 64px);
+  padding-left: var(--sidebar-w, 240px);
+}
+
+.app-content {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) var(--space-8);
+}
+
+:where(#root) :where(.card, .panel, .surface-card) {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+:where(#root) :where(.card, .panel) {
+  padding: var(--space-5);
+}
+
+:where(#root) .surface-card {
+  padding: var(--space-4);
+}
+
+.surface-muted {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.rounded-lg {
+  border-radius: var(--radius-lg);
+}
+
+:where(#root) .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+}
+
+:where(#root) .badge-success {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+  color: var(--color-success-text);
+}
+
+:where(#root) .badge-warning {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  color: var(--color-warning-text);
+}
+
+:where(#root) .badge-danger {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+.form-input,
+.input,
+.select,
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  width: 100%;
+  border: 1px solid var(--border-input, var(--color-border));
+  border-radius: var(--radius-md);
+  background: var(--bg-input, var(--color-bg-surface));
+  color: var(--color-text-primary);
+  padding: 10px 12px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+:where(.form-input, .input, .select, input, textarea, select):focus-visible {
+  border-color: var(--color-border-focus);
+}
+
+:where(#root) :where(.btn-primary, .btn-secondary, .btn-danger, .btn-icon-only) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+:where(#root) .btn-primary {
+  background: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 58%, transparent);
+  color: var(--color-text-inverse);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--color-primary) 24%, transparent);
+}
+
+:where(#root) .btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: color-mix(in srgb, var(--color-primary-hover) 62%, transparent);
+  transform: translateY(-1px);
+}
+
+:where(#root) .btn-secondary {
+  background: var(--color-bg-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+:where(#root) .btn-secondary:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+:where(#root) .btn-danger {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+:where(#root) .btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger-bg) 82%, var(--color-danger) 18%);
+  border-color: color-mix(in srgb, var(--color-danger) 44%, var(--color-danger-border));
+}
+
+:where(#root) .btn-icon-only {
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+  background: var(--color-bg-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+:where(#root) .btn-icon-only:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.btn-sm {
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+
+html {
+  font-size: 14px;
+}
+
+body {
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 34%),
+    var(--color-bg-page);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+:where(.dashboard-shell, .calendar-v2-shell) {
+  --font-body: var(--font-body-personal);
+  --font-display: var(--font-display-personal);
+  --navbar-h: var(--nav-h);
+  --brand-primary: var(--color-primary);
+  --brand-primary-hover: var(--color-primary-hover);
+  --brand-primary-light: var(--color-primary-subtle);
+  --brand-secondary: var(--chart-2);
+  --brand-secondary-hover: color-mix(in srgb, var(--chart-2) 82%, var(--color-text-primary));
+  --brand-secondary-light: color-mix(in srgb, var(--chart-2) 16%, transparent);
+  --brand-accent: var(--chart-3);
+  --brand-accent-hover: color-mix(in srgb, var(--chart-3) 82%, var(--color-text-primary));
+  --brand-accent-light: color-mix(in srgb, var(--chart-3) 16%, transparent);
+  --app-bg: var(--color-bg-page);
+  --panel-bg: var(--color-bg-surface);
+  --element-bg: var(--color-bg-subtle);
+  --card-bg: var(--color-bg-elevated);
+  --border-color: var(--color-border);
+  --border-hover: var(--color-border-strong);
+  --text-main: var(--color-text-primary);
+  --text-muted: var(--color-text-secondary);
+  --text-inverse: var(--color-text-inverse);
+  --glass-bg: color-mix(in srgb, var(--color-bg-surface) 78%, transparent);
+  --glass-border: color-mix(in srgb, var(--color-border) 92%, transparent);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+}
+
+/* ==========================================================================
+   Stage 1 SaaS Consistency Guardrails
+   ========================================================================== */
+
+body {
+  background: var(--color-bg-page);
+}
+
+:where(.dashboard-shell, .calendar-v2-shell, .org-shell, .admin-shell) {
+  --navbar-h: var(--ui-nav-height);
+  --nav-h: var(--ui-nav-height);
+  --sidebar-w: var(--ui-sidebar-width);
+  --sidebar-w-collapsed: var(--ui-sidebar-collapsed-width);
+  background: var(--color-bg-page);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+}
+
+:where(.dashboard-shell, .calendar-v2-shell, .org-shell, .admin-shell)
+  :where(.card, .panel, .surface-card, .ui-card, .ui-panel) {
+  border-color: var(--color-border);
+  border-radius: var(--ui-card-radius);
+  background: var(--color-bg-surface);
+  box-shadow: var(--ui-card-shadow);
+}
+
+:where(.dashboard-shell, .calendar-v2-shell, .org-shell, .admin-shell)
+  :where(.btn-primary, .btn-secondary, .btn-danger, .btn-icon-only, .ui-button, .ui-icon-button) {
+  min-height: var(--ui-control-height-md);
+  border-radius: var(--radius-md);
+}
+
+:where(.dashboard-shell, .calendar-v2-shell, .org-shell, .admin-shell)
+  :where(input, select, textarea, .form-input, .input, .select, .ui-input, .ui-select) {
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input, var(--color-bg-surface));
+  color: var(--color-text-primary);
+}
+
+:where(.dashboard-shell, .calendar-v2-shell, .org-shell, .admin-shell)
+  :where(input, select, textarea, .form-input, .input, .select, .ui-input, .ui-select):focus-visible {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--ui-focus-ring);
+}
+
+:where(.dashboard-shell, .calendar-v2-shell, .org-shell, .admin-shell)
+  :where(table) {
+  color: var(--color-text-primary);
+}
+
+:where(.dashboard-shell, .calendar-v2-shell, .org-shell, .admin-shell)
+  :where(th) {
+  color: var(--color-text-secondary);
+}
+
+:where(.dashboard-shell, .calendar-v2-shell, .org-shell, .admin-shell)
+  :where(td) {
+  color: var(--color-text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+
+
+
+
+

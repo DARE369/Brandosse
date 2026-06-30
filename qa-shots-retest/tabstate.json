@@ -1,0 +1,28 @@
+{
+  "tabs": [
+    "×",
+    "📄No asset — click to pick from Library (optional)",
+    "Instagram",
+    "TikTok",
+    "LinkedIn",
+    "X",
+    "Save as draft",
+    "Cancel",
+    "Schedule post"
+  ],
+  "textareas": [
+    {
+      "value": "",
+      "placeholder": "Write a caption for Instagram…"
+    },
+    {
+      "value": "",
+      "placeholder": "Write a caption for TikTok…"
+    },
+    {
+      "value": "",
+      "placeholder": "Write a caption for LinkedIn…"
+    }
+  ],
+  "htmlSnippet": "<div class=\"schedule-modal__header\"><h3 class=\"schedule-modal__title\">Quick Post</h3><button type=\"button\" class=\"ui-icon-button ui-icon-button-ghost ui-icon-button-sm\" aria-label=\"Close\">×</button></div><div class=\"quickpost-steps\"><div><p class=\"quickpost-step__label\"><span class=\"quickpost-step__num\">1</span>Library asset (optional)</p><button type=\"button\" class=\"asset-picker-trigger\"><span class=\"asset-picker-trigger__thumb\">📄</span><span class=\"asset-picker-trigger__text\">No asset — click to pick from Library (optional)</span></button></div><div><p class=\"quickpost-step__label\"><span class=\"quickpost-step__num\">2</span>Platforms &amp; captions</p><div class=\"platform-toggle-row\"><button type=\"button\" class=\"platform-toggle is-active\"><span class=\"platform-toggle__dot\" style=\"background: var(--platform-instagram);\"></span>Instagram</button><button type=\"button\" class=\"platform-toggle is-active\"><span class=\"platform-toggle__dot\" style=\"background: var(--platform-tiktok-alt);\"></span>TikTok</button><button type=\"button\" class=\"platform-toggle is-active\"><span class=\"platform-toggle__dot\" style=\"background: var(--platform-linkedin);\"></span>LinkedIn</button><button type=\"button\" class=\"platform-toggle\"><span class=\"platform-toggle__dot\" style=\"background: var(--platform-x);\"></span>X</button></div><div class=\"per-platform-caption\"><div class=\"per-platform-caption__row\"><div class=\"per-platform-caption__head\"><span class=\"platform-toggle__dot\" style=\"background: var(--platform-instagram);\"></span>Instagram caption</div><textarea class=\"ui-textarea\" placeholder=\"Write a caption for Instagram…\" style=\"\"></textarea><div class=\"caption-counter\">0 / 2200</div></div><div class=\"per-platform-caption__row\"><div class=\"per-platform-caption__head\"><span class=\"platform-toggle__dot\" style=\"background: var(--platform-tiktok-alt);\"></span>TikTok caption</div><span class=\"ai-prefill-note\">✨ Pre-filling…</span><textarea class=\"ui-textarea\" placeholder=\"Write a caption for TikTok…\" style=\"\"></textarea><div class=\"caption-counter\">0 / 2200</div></div><div class=\"per-platform-caption__row\"><div class=\"per-platform-caption__head\"><span class=\"platform-toggle__dot\" style=\"background: var(--platform-linkedin);\"></span>LinkedIn caption</div><span class=\"ai-prefill-note\">✨ Pre-filling…</span><textarea class=\"ui-textarea\" placeholder=\"Write a caption for LinkedIn…\" style=\"\"></textarea><div class=\"caption-counter\">0 / 3000</div></div></div></div><div><p class=\"quickpost-step__label\"><span class=\"quickpost-step__num\">3</span>When</p><div class=\"tz-banner\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><polyline points=\"12 6 12 12 16 14\"></polyline></svg>Times shown in your account timezone: <strong>UTC</strong></div><div class=\"time-row\" style=\"margin-top: var(--space-3);\"><input class=\"ui-input\" aria-label=\"Date\" type=\"date\" value=\"2026-06-24\" style=\"max-width: 160px;\"><input class=\"ui-input\" aria-label=\"Time\" type=\"time\" value=\"09:00\" style=\"\"><span class=\"ui-field-hint\">or save as draft below</span></div></div></div><div class=\"quickpost-footer\"><button type=\"button\" class=\"ui-button ui-button-secondary\">Save as draft</button><div class=\"quickpost-footer__primary\"><button type=\"button\" class=\"ui-button ui-button-secondary\">Cancel</button><button type=\"button\" class=\"ui-button ui-button-primary\">Schedule post</button></div></div>"
+}

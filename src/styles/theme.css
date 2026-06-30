@@ -1,0 +1,203 @@
+/* =====================================================
+   theme.css — SocialAI Global Design Tokens
+   Import in main.jsx or index.css ONCE.
+   Applied via [data-theme] set on <html> by ThemeContext.
+   ===================================================== */
+
+/* ── Dark Mode (default) ── */
+:root,
+[data-theme="dark"] {
+  --bg-base:          var(--color-bg-page);
+  --bg-surface:       var(--color-bg-subtle);
+  --bg-card:          var(--color-bg-surface);
+  --bg-card-hover:    var(--color-bg-hover);
+  --bg-input:         var(--color-bg-subtle);
+  --bg-input-focus:   var(--color-bg-surface);
+
+  --border:           var(--color-border);
+  --border-input:     var(--color-border);
+  --border-focus:     var(--color-border-focus);
+
+  --accent:           var(--color-primary);
+  --accent-light:     var(--color-primary-text);
+  --accent-hover:     var(--color-primary-hover);
+  --accent-glow:      color-mix(in srgb, var(--color-primary) 20%, transparent);
+  --accent-subtle:    var(--color-primary-subtle);
+
+  --text-primary:     var(--color-text-primary);
+  --text-secondary:   var(--color-text-secondary);
+  --text-muted:       var(--color-text-tertiary);
+  --text-placeholder: var(--color-text-tertiary);
+
+  --danger:           var(--color-danger);
+  --danger-bg:        var(--color-danger-bg);
+  --danger-border:    var(--color-danger-border);
+
+  --success:          var(--color-success);
+  --success-bg:       var(--color-success-bg);
+
+  --shadow-sm:        0 1px 4px color-mix(in srgb, var(--color-bg-page) 28%, transparent);
+  --shadow-md:        0 8px 24px color-mix(in srgb, var(--color-bg-page) 38%, transparent);
+  --shadow-lg:        0 18px 48px color-mix(in srgb, var(--color-bg-page) 52%, transparent);
+
+  --toggle-track-bg:  color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  --toggle-border:    var(--color-border-strong);
+
+  --org-surface-base:       var(--org-bg);
+  --org-surface-workspace:  var(--org-surface);
+  --org-surface-card:       var(--org-panel);
+  --org-surface-card-hover: var(--org-panel-hover);
+  --org-surface-elevated:   var(--org-panel-elevated);
+  --org-surface-input:      var(--color-bg-subtle);
+
+  --pipeline-draft:         var(--color-bg-subtle);
+  --pipeline-pending:       var(--color-warning-bg);
+  --pipeline-in-review:     var(--color-info-bg);
+  --pipeline-revision:      var(--color-warning-bg);
+  --pipeline-approved:      var(--color-success-bg);
+  --pipeline-rejected:      var(--color-danger-bg);
+  --pipeline-published:     var(--color-info-bg);
+
+  --status-dot-pending:     var(--color-warning);
+  --status-dot-review:      var(--color-info);
+  --status-dot-revision:    var(--color-danger);
+  --status-dot-approved:    var(--color-success);
+  --status-dot-published:   var(--color-primary);
+
+  --credit-high:            var(--color-success);
+  --credit-medium:          var(--color-warning);
+  --credit-low:             var(--color-danger);
+
+  --channel-bg:             var(--color-bg-subtle);
+  --message-ai-bg:          var(--color-primary-subtle);
+  --message-ai-border:      color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+
+/* ── Light Mode ── */
+[data-theme="light"] {
+  --bg-base:          var(--color-bg-page);
+  --bg-surface:       var(--color-bg-subtle);
+  --bg-card:          var(--color-bg-surface);
+  --bg-card-hover:    var(--color-bg-hover);
+  --bg-input:         var(--color-bg-surface);
+  --bg-input-focus:   var(--color-bg-subtle);
+
+  --border:           var(--color-border);
+  --border-input:     var(--color-border);
+  --border-focus:     var(--color-border-focus);
+
+  --accent:           var(--color-primary);
+  --accent-light:     var(--color-primary-text);
+  --accent-hover:     var(--color-primary-hover);
+  --accent-glow:      color-mix(in srgb, var(--color-primary) 14%, transparent);
+  --accent-subtle:    var(--color-primary-subtle);
+
+  --text-primary:     var(--color-text-primary);
+  --text-secondary:   var(--color-text-secondary);
+  --text-muted:       var(--color-text-tertiary);
+  --text-placeholder: var(--color-text-tertiary);
+
+  --danger:           var(--color-danger);
+  --danger-bg:        var(--color-danger-bg);
+  --danger-border:    var(--color-danger-border);
+
+  --success:          var(--color-success);
+  --success-bg:       var(--color-success-bg);
+
+  --shadow-sm:        0 1px 4px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  --shadow-md:        0 12px 32px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+  --shadow-lg:        0 24px 48px color-mix(in srgb, var(--color-text-primary) 16%, transparent);
+
+  --toggle-track-bg:  color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+  --toggle-border:    var(--color-border);
+
+  --org-surface-base:       var(--org-bg);
+  --org-surface-workspace:  var(--org-surface);
+  --org-surface-card:       var(--org-panel);
+  --org-surface-card-hover: var(--org-panel-hover);
+  --org-surface-elevated:   var(--org-panel-elevated);
+  --org-surface-input:      var(--color-bg-surface);
+
+  --pipeline-draft:         var(--color-bg-subtle);
+  --pipeline-pending:       var(--color-warning-bg);
+  --pipeline-in-review:     var(--color-info-bg);
+  --pipeline-revision:      var(--color-warning-bg);
+  --pipeline-approved:      var(--color-success-bg);
+  --pipeline-rejected:      var(--color-danger-bg);
+  --pipeline-published:     var(--color-info-bg);
+
+  --status-dot-pending:     var(--color-warning);
+  --status-dot-review:      var(--color-info);
+  --status-dot-revision:    var(--color-danger);
+  --status-dot-approved:    var(--color-success);
+  --status-dot-published:   var(--color-primary);
+
+  --credit-high:            var(--color-success);
+  --credit-medium:          var(--color-warning);
+  --credit-low:             var(--color-danger);
+
+  --channel-bg:             var(--color-bg-subtle);
+  --message-ai-bg:          var(--color-primary-subtle);
+  --message-ai-border:      color-mix(in srgb, var(--color-primary) 16%, transparent);
+}
+
+/* ── Smooth theme transitions ── */
+*, *::before, *::after {
+  transition:
+    background-color 0.20s ease,
+    border-color     0.20s ease,
+    color            0.20s ease,
+    box-shadow       0.20s ease;
+}
+
+/* Disable on first load to prevent flash */
+.theme-no-transition *,
+.theme-no-transition *::before,
+.theme-no-transition *::after {
+  transition: none !important;
+}
+
+/* Prototype-aligned alias layer */
+:root,
+[data-theme="dark"],
+[data-theme="light"] {
+  --bg-base: var(--color-bg-page);
+  --bg-surface: var(--color-bg-surface);
+  --bg-card: var(--color-bg-elevated);
+  --bg-card-hover: var(--color-bg-hover);
+  --bg-input: var(--color-bg-subtle);
+  --bg-input-focus: var(--color-bg-surface);
+
+  --border: var(--color-border);
+  --border-input: var(--color-border);
+  --border-focus: var(--color-border-focus);
+
+  --accent: var(--color-primary);
+  --accent-light: var(--color-primary-text);
+  --accent-hover: var(--color-primary-hover);
+  --accent-glow: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  --accent-subtle: var(--color-primary-subtle);
+
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-tertiary);
+  --text-placeholder: var(--color-text-tertiary);
+
+  --danger: var(--color-danger);
+  --danger-bg: var(--color-danger-bg);
+  --danger-border: var(--color-danger-border);
+  --success: var(--color-success);
+  --success-bg: var(--color-success-bg);
+}
+
+[data-theme="dark"] {
+  --shadow-sm: 0 1px 4px color-mix(in srgb, var(--color-bg-page) 28%, transparent);
+  --shadow-md: 0 8px 24px color-mix(in srgb, var(--color-bg-page) 40%, transparent);
+  --shadow-lg: 0 18px 48px color-mix(in srgb, var(--color-bg-page) 52%, transparent);
+}
+
+[data-theme="light"] {
+  --shadow-sm: 0 1px 4px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+  --shadow-md: 0 12px 32px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+  --shadow-lg: 0 24px 48px color-mix(in srgb, var(--color-text-primary) 16%, transparent);
+}

@@ -1,0 +1,299 @@
+.admin-moderation {
+  min-height: 100vh;
+  padding: var(--ui-page-gutter, 2rem);
+  background: var(--admin-bg, var(--color-bg-page));
+  color: var(--admin-text-1, var(--color-text-primary));
+  font-family: var(--font-body, "Manrope", system-ui, sans-serif);
+}
+
+.admin-moderation .moderation-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4, 1rem);
+  margin-bottom: var(--space-6, 1.5rem);
+}
+
+.admin-moderation .moderation-header h1 {
+  margin: 0;
+  color: var(--admin-text-1, var(--color-text-primary));
+  font-family: var(--font-display, "Sora", "Manrope", sans-serif);
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  font-weight: var(--weight-bold, 700);
+  line-height: var(--leading-tight, 1.25);
+}
+
+.admin-moderation .upload-btn,
+.admin-moderation .moderation-table button,
+.admin-moderation .wizard-nav button,
+.admin-moderation .save,
+.admin-moderation .close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ui-control-height-md, 40px);
+  padding: 0 var(--space-4, 1rem);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: var(--weight-semibold, 600);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast, 150ms ease-out),
+    border-color var(--transition-fast, 150ms ease-out),
+    color var(--transition-fast, 150ms ease-out),
+    box-shadow var(--transition-fast, 150ms ease-out),
+    transform var(--transition-fast, 150ms ease-out);
+}
+
+.admin-moderation .upload-btn,
+.admin-moderation .wizard-nav button,
+.admin-moderation .save {
+  background: var(--admin-accent, var(--color-primary));
+  border-color: color-mix(in srgb, var(--admin-accent, var(--color-primary)) 72%, transparent);
+  color: var(--color-text-inverse);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--admin-accent, var(--color-primary)) 22%, transparent);
+}
+
+.admin-moderation .upload-btn:hover,
+.admin-moderation .wizard-nav button:hover,
+.admin-moderation .save:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.admin-moderation .moderation-table {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--admin-border, var(--color-border));
+  border-collapse: collapse;
+  border-radius: var(--ui-card-radius, 12px);
+  background: var(--admin-panel, var(--color-bg-surface));
+  box-shadow: var(--ui-card-shadow, var(--shadow-sm));
+}
+
+.admin-moderation .moderation-table th,
+.admin-moderation .moderation-table td {
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid var(--admin-border, var(--color-border));
+  text-align: left;
+}
+
+.admin-moderation .moderation-table th {
+  background: var(--admin-surface, var(--color-bg-subtle));
+  color: var(--admin-text-2, var(--color-text-secondary));
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: var(--weight-bold, 700);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-moderation .moderation-table td {
+  color: var(--admin-text-1, var(--color-text-primary));
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.admin-moderation .moderation-table tr {
+  transition: background-color var(--transition-fast, 150ms ease-out);
+}
+
+.admin-moderation .moderation-table tr:hover {
+  background: var(--admin-panel-hover, var(--color-bg-hover));
+}
+
+.admin-moderation .moderation-table td.status {
+  font-weight: var(--weight-bold, 700);
+  text-transform: capitalize;
+}
+
+.admin-moderation .moderation-table td.status.pending-review,
+.admin-moderation .moderation-table td.status.needs-modification {
+  color: var(--admin-warning, var(--color-warning));
+}
+
+.admin-moderation .moderation-table td.status.approved-draft {
+  color: var(--admin-success, var(--color-success));
+}
+
+.admin-moderation .moderation-table button.approve,
+.admin-moderation .wizard-nav button.confirm {
+  background: var(--admin-success, var(--color-success));
+  color: var(--color-text-inverse);
+}
+
+.admin-moderation .moderation-table button.edit {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  color: var(--color-warning-text);
+}
+
+.admin-moderation .moderation-table button.reject {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+.admin-moderation .modal-overlay,
+.admin-moderation .wizard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 1rem);
+  background: color-mix(in srgb, var(--admin-bg, var(--color-bg-page)) 68%, transparent);
+  backdrop-filter: blur(6px);
+  animation: adminModerationFadeIn var(--transition-base, 200ms ease-out);
+}
+
+.admin-moderation .edit-modal,
+.admin-moderation .upload-wizard {
+  width: min(100%, 960px);
+  display: flex;
+  gap: var(--space-5, 1.25rem);
+  padding: var(--space-6, 1.5rem);
+  border: 1px solid var(--admin-border, var(--color-border));
+  border-radius: var(--radius-xl, 16px);
+  background: var(--admin-panel, var(--color-bg-surface));
+  box-shadow: var(--admin-shadow-lg, var(--shadow-overlay));
+  animation: adminModerationScaleIn var(--transition-base, 200ms ease-out);
+}
+
+.admin-moderation .upload-wizard {
+  max-width: 700px;
+  flex-direction: column;
+  text-align: center;
+}
+
+.admin-moderation .edit-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.admin-moderation .edit-column h2,
+.admin-moderation .preview-pane h3,
+.admin-moderation .upload-wizard h2 {
+  margin: 0;
+  color: var(--admin-text-1, var(--color-text-primary));
+  font-family: var(--font-display, "Sora", "Manrope", sans-serif);
+  line-height: var(--leading-tight, 1.25);
+}
+
+.admin-moderation .edit-column label {
+  color: var(--admin-text-2, var(--color-text-secondary));
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: var(--weight-semibold, 600);
+}
+
+.admin-moderation textarea,
+.admin-moderation input[type="file"],
+.admin-moderation input[type="text"],
+.admin-moderation input[type="datetime-local"] {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--admin-border, var(--color-border));
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-input, var(--color-bg-surface));
+  color: var(--admin-text-1, var(--color-text-primary));
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  transition:
+    border-color var(--transition-fast, 150ms ease-out),
+    box-shadow var(--transition-fast, 150ms ease-out);
+}
+
+.admin-moderation textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.admin-moderation textarea:focus,
+.admin-moderation input:focus {
+  outline: none;
+  border-color: var(--admin-border-strong, var(--color-border-focus));
+  box-shadow: var(--ui-focus-ring);
+}
+
+.admin-moderation .close,
+.admin-moderation .wizard-nav button:first-child {
+  background: var(--admin-surface, var(--color-bg-subtle));
+  border-color: var(--admin-border, var(--color-border));
+  color: var(--admin-text-1, var(--color-text-primary));
+}
+
+.admin-moderation .preview-pane {
+  flex: 1;
+  padding: var(--space-4, 1rem);
+  border: 1px solid var(--admin-border, var(--color-border));
+  border-radius: var(--radius-lg, 12px);
+  background: var(--admin-surface, var(--color-bg-subtle));
+}
+
+.admin-moderation .preview-img {
+  width: 100%;
+  margin-bottom: var(--space-3, 0.75rem);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--admin-shadow-sm, var(--shadow-sm));
+  transition: transform var(--transition-base, 200ms ease-out);
+}
+
+.admin-moderation .preview-img:hover {
+  transform: scale(1.02);
+}
+
+.admin-moderation .caption {
+  margin-top: var(--space-2, 0.5rem);
+  color: var(--admin-text-1, var(--color-text-primary));
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.admin-moderation .hashtags {
+  display: block;
+  margin-top: var(--space-2, 0.5rem);
+  color: var(--admin-accent-light, var(--color-primary-text));
+  font-weight: var(--weight-semibold, 600);
+}
+
+.admin-moderation .wizard-nav {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3, 0.75rem);
+  margin-top: var(--space-5, 1.25rem);
+}
+
+@keyframes adminModerationFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes adminModerationScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-moderation .moderation-header,
+  .admin-moderation .edit-modal {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-moderation .moderation-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

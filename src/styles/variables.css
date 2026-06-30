@@ -1,0 +1,475 @@
+/* ============================================================================
+   PROFESSIONAL THEME VARIABLES - V2
+   Beautiful Color Scheme: Deep Indigo + Signal Teal + Momentum Amber
+   
+   🎨 BRAND COLOR PHILOSOPHY:
+   - Primary: canonical indigo token - Modern, Tech, Trust
+   - Secondary: canonical signal token - Insights, health, progress
+   - Accent: canonical momentum token - Scheduling, timing, attention
+   
+   💡 NOTE: Replace these hex codes with your actual brand colors later
+   Search for "BRAND-PRIMARY", "BRAND-SECONDARY", "BRAND-ACCENT" to update
+============================================================================ */
+
+:root {
+  /* ===========================
+     🎨 BRAND COLORS (ACCENT USAGE)
+     Replace these with your actual brand palette
+  =========================== */
+  
+  /* Primary Brand Color - Used for: Primary buttons, links, active states */
+  --brand-primary: var(--color-primary);
+  --brand-primary-hover: var(--color-primary-hover);
+  --brand-primary-light: var(--color-primary-subtle);
+  
+  /* Secondary Brand Color - Used for: Insights, health, progress */
+  --brand-secondary: var(--chart-2);
+  --brand-secondary-hover: color-mix(in srgb, var(--chart-2) 82%, var(--color-text-primary));
+  --brand-secondary-light: color-mix(in srgb, var(--chart-2) 14%, transparent);
+  
+  /* Accent Brand Color - Used for: Scheduling, attention, timing */
+  --brand-accent: var(--chart-3);
+  --brand-accent-hover: color-mix(in srgb, var(--chart-3) 82%, var(--color-text-primary));
+  --brand-accent-light: color-mix(in srgb, var(--chart-3) 14%, transparent);
+
+  /* ===========================
+     🌞 LIGHT MODE THEME (Default)
+  =========================== */
+  
+  /* Background Colors - Soft neutrals for professional look */
+  --app-bg: var(--color-bg-page);              /* Light slate background */
+  --panel-bg: var(--color-bg-surface);            /* Pure white panels */
+  --element-bg: var(--color-bg-subtle);          /* Light input backgrounds */
+  --card-bg: var(--color-bg-surface);             /* Card backgrounds */
+  
+  /* Border Colors - Subtle separation */
+  --border-color: var(--color-border);        /* Light gray borders */
+  --border-hover: var(--color-border-strong);        /* Slightly darker on hover */
+  
+  /* Text Colors - High contrast for readability */
+  --text-main: var(--color-text-primary);           /* Dark slate for primary text */
+  --text-muted: var(--color-text-secondary);          /* Muted gray for secondary text */
+  --text-inverse: var(--color-text-inverse);        /* White text for dark backgrounds */
+  
+  /* Functional Colors - Consistent across themes */
+  --success: var(--color-success);             /* Green for success */
+  --warning: var(--color-warning);             /* Amber for warnings */
+  --error: var(--color-danger);               /* Red for errors */
+  --info: var(--color-info);                /* Blue for info */
+  
+  /* Shadows - Subtle depth */
+  --shadow-xl: 0 20px 48px color-mix(in srgb, var(--color-text-primary) 14%, transparent);
+  
+  /* Glass Morphism Effects */
+  --glass-bg: color-mix(in srgb, var(--color-bg-surface) 70%, transparent);
+  --glass-border: color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+/* ===========================
+   🌙 DARK MODE THEME
+   Activated when <html class="dark">
+=========================== */
+.dark {
+  /* Background Colors - Rich darks with subtle contrast */
+  --app-bg: var(--color-bg-page);              /* Deep navy blue background */
+  --panel-bg: var(--color-bg-surface);            /* Slightly lighter panels */
+  --element-bg: var(--color-bg-subtle);          /* Input/element backgrounds */
+  --card-bg: var(--color-bg-surface);             /* Card backgrounds */
+  
+  /* Border Colors - Subtle in dark mode */
+  --border-color: var(--color-border);        /* Dark slate borders */
+  --border-hover: var(--color-border-strong);        /* Lighter on hover */
+  
+  /* Text Colors - Softer whites for less eye strain */
+  --text-main: var(--color-text-primary);           /* Light slate text */
+  --text-muted: var(--color-text-secondary);          /* Muted slate gray */
+  --text-inverse: var(--color-text-inverse);        /* Dark text for light backgrounds */
+  
+  /* Shadows - Deeper in dark mode */
+  --shadow-xl: 0 22px 56px color-mix(in srgb, var(--color-bg-page) 56%, transparent);
+  
+  /* Glass Morphism - Darker glass */
+  --glass-bg: color-mix(in srgb, var(--color-bg-surface) 70%, transparent);
+  --glass-border: var(--color-border);
+}
+
+/* ===========================
+   🎯 GLOBAL RESETS & BASE STYLES
+=========================== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+  font-family: var(--font-body, 'Manrope', 'Segoe UI', sans-serif);
+  background-color: var(--app-bg);
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===========================
+   🔧 UTILITY CLASSES
+=========================== */
+
+/* Primary Button - Uses brand primary color */
+:where(#root) .btn-primary {
+  background: var(--brand-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+:where(#root) .btn-primary:hover {
+  background: var(--brand-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+:where(#root) .btn-primary:active {
+  transform: translateY(0);
+}
+
+:where(#root) .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Secondary Button - Outline style */
+:where(#root) .btn-secondary {
+  background: transparent;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+:where(#root) .btn-secondary:hover {
+  background: var(--element-bg);
+  border-color: var(--border-hover);
+}
+
+/* Accent Button - Uses brand accent color */
+.btn-accent {
+  background: var(--brand-accent);
+  color: var(--color-text-inverse);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.btn-accent:hover {
+  background: var(--brand-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Text Links */
+.text-link {
+  color: var(--brand-primary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.text-link:hover {
+  color: var(--brand-primary-hover);
+  text-decoration: underline;
+}
+
+/* Card Styles */
+:where(#root) .card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+:where(#root) .card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-hover);
+}
+
+/* Badge Styles */
+:where(#root) .badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-primary {
+  background: var(--brand-primary-light);
+  color: var(--brand-primary);
+}
+
+.badge-secondary {
+  background: var(--brand-secondary-light);
+  color: var(--brand-secondary);
+}
+
+.badge-success {
+  background: var(--color-success-bg);
+  color: var(--success);
+}
+
+.badge-warning {
+  background: var(--color-warning-bg);
+  color: var(--warning);
+}
+
+.badge-error {
+  background: var(--color-danger-bg);
+  color: var(--error);
+}
+
+/* ===========================
+   🎬 ANIMATIONS
+=========================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ===========================
+   📱 RESPONSIVE BREAKPOINTS
+=========================== */
+@media (max-width: 768px) {
+  :root {
+    --shadow-xl: 0 16px 36px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+  }
+  
+  .btn-primary,
+  .btn-secondary,
+  .btn-accent {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ============================================================================
+   Brand Kit Design Tokens (dark-first)
+   ============================================================================ */
+:root {
+  /* Backgrounds */
+  --bk-bg-base: var(--color-bg-page);
+  --bk-bg-surface: var(--color-bg-subtle);
+  --bk-bg-card: var(--color-bg-surface);
+  --bk-bg-card-hover: var(--color-bg-hover);
+  --bk-bg-input: var(--color-bg-subtle);
+
+  /* Borders */
+  --bk-border: var(--color-border);
+  --bk-border-focus: color-mix(in srgb, var(--color-primary) 50%, transparent);
+  --bk-border-subtle: color-mix(in srgb, var(--color-border) 70%, transparent);
+
+  /* Text */
+  --bk-text-1: var(--color-text-primary);
+  --bk-text-2: var(--color-text-secondary);
+  --bk-text-3: var(--color-text-tertiary);
+  --bk-text-invert: var(--color-text-inverse);
+
+  /* Accent */
+  --bk-accent: var(--color-primary);
+  --bk-accent-light: var(--color-primary-text);
+  --bk-accent-glow: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  --bk-accent-glow-sm: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  --bk-accent-subtle: var(--color-primary-subtle);
+
+  /* Status */
+  --bk-warning: var(--color-warning);
+  --bk-warning-bg: var(--color-warning-bg);
+  --bk-warning-border: var(--color-warning-border);
+  --bk-success: var(--color-success);
+  --bk-success-bg: var(--color-success-bg);
+  --bk-danger: var(--color-danger);
+  --bk-danger-bg: var(--color-danger-bg);
+
+  /* Confidence */
+  --bk-confidence-low: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  --bk-confidence-border: color-mix(in srgb, var(--color-warning) 40%, transparent);
+
+  /* Typography */
+  --bk-font-body: "Manrope", system-ui, sans-serif;
+  --bk-font-display: "Sora", "Manrope", sans-serif;
+
+  /* Shape */
+  --bk-radius-sm: 8px;
+  --bk-radius-md: 10px;
+  --bk-radius-lg: 12px;
+  --bk-radius-xl: 16px;
+  --bk-radius-2xl: 20px;
+
+  /* Shadows and glow */
+  --bk-glow-accent: var(--ui-focus-ring);
+  --bk-glow-btn: var(--shadow-md);
+  --bk-shadow-card: var(--shadow-sm);
+
+  /* Motion */
+  --bk-transition: 0.18s ease;
+  --bk-transition-md: 0.22s ease;
+  --bk-transition-step: 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  --bk-transition-bar: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="light"] {
+  --bk-bg-base: var(--color-bg-page);
+  --bk-bg-surface: var(--color-bg-subtle);
+  --bk-bg-card: var(--color-bg-surface);
+  --bk-bg-card-hover: var(--color-bg-hover);
+  --bk-bg-input: var(--color-bg-surface);
+  --bk-border: var(--color-border);
+  --bk-border-focus: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  --bk-border-subtle: color-mix(in srgb, var(--color-border) 60%, transparent);
+  --bk-text-1: var(--color-text-primary);
+  --bk-text-2: var(--color-text-secondary);
+  --bk-text-3: var(--color-text-tertiary);
+  --bk-text-invert: var(--color-text-inverse);
+  --bk-shadow-card: var(--shadow-sm);
+}
+
+/* ============================================================================
+   Calendar + Library Token Compatibility Layer (2026-02)
+   Added without removing existing variables to avoid regressions.
+   ============================================================================ */
+:root {
+  --color-brand-primary: var(--color-text-primary);
+  --color-brand-accent: var(--brand-primary);
+  --color-brand-accent-alt: var(--brand-secondary);
+  --color-brand-glow: var(--brand-primary);
+
+  --color-neutral-0: var(--color-bg-surface);
+  --color-neutral-50: var(--color-bg-page);
+  --color-neutral-100: var(--color-bg-subtle);
+  --color-neutral-150: var(--color-border);
+  --color-neutral-200: var(--color-border-strong);
+  --color-neutral-300: var(--color-text-tertiary);
+  --color-neutral-400: var(--color-text-tertiary);
+  --color-neutral-500: var(--color-text-secondary);
+  --color-neutral-600: var(--color-text-secondary);
+  --color-neutral-700: var(--color-text-primary);
+  --color-neutral-800: var(--color-text-primary);
+  --color-neutral-900: var(--color-bg-subtle);
+
+  --surface-page: var(--color-neutral-50);
+  --surface-card: var(--color-neutral-0);
+  --surface-card-hover: var(--color-neutral-50);
+  --surface-overlay: color-mix(in srgb, var(--color-bg-page) 60%, transparent);
+  --surface-panel: var(--color-neutral-0);
+  --surface-rail: var(--color-neutral-0);
+  --surface-sidebar: var(--color-sidebar-bg);
+
+  --border-default: var(--color-neutral-150);
+  --border-strong: var(--color-neutral-200);
+  --border-focus: var(--color-brand-accent);
+
+  --status-draft-bg: var(--color-bg-subtle);
+  --status-draft-border: var(--color-text-tertiary);
+  --status-draft-text: var(--color-text-secondary);
+  --status-draft-dot: var(--color-text-tertiary);
+
+  --status-scheduled-bg: var(--color-info-bg);
+  --status-scheduled-border: var(--color-info);
+  --status-scheduled-text: var(--color-info-text);
+  --status-scheduled-dot: var(--color-info);
+
+  --status-publishing-bg: var(--color-warning-bg);
+  --status-publishing-border: var(--color-warning);
+  --status-publishing-text: var(--color-warning-text);
+  --status-publishing-dot: var(--color-warning);
+
+  --status-published-bg: var(--color-success-bg);
+  --status-published-border: var(--color-success);
+  --status-published-text: var(--color-success-text);
+  --status-published-dot: var(--color-success);
+
+  --status-failed-bg: var(--color-danger-bg);
+  --status-failed-border: var(--color-danger);
+  --status-failed-text: var(--color-danger-text);
+  --status-failed-dot: var(--color-danger);
+
+  --status-archived-bg: var(--color-bg-elevated);
+  --status-archived-border: var(--color-text-tertiary);
+  --status-archived-text: var(--color-text-tertiary);
+  --status-archived-dot: var(--color-text-tertiary);
+
+  --platform-youtube: #ff0000;
+  --platform-tiktok: #000000;
+  --platform-tiktok-alt: #69c9d0;
+  --platform-facebook: #1877f2;
+  --platform-x: #000000;
+  --platform-instagram: #e1306c;
+  --platform-linkedin: #0a66c2;
+
+  --color-ai-primary: var(--color-primary);
+  --color-ai-light: var(--color-primary-subtle);
+  --color-ai-glow: color-mix(in srgb, var(--color-primary) 15%, transparent);
+
+  --font-display: 'Sora', 'Manrope', 'Helvetica Neue', sans-serif;
+  --font-body: 'Manrope', 'Helvetica Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}

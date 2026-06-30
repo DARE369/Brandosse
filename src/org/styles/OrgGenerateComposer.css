@@ -1,0 +1,362 @@
+.org-generate-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+}
+
+.org-generate-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--org-bg) 76%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.org-generate-surface {
+  position: absolute;
+  inset: 18px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--org-accent) 14%, transparent) 0%, transparent 38%),
+    color-mix(in srgb, var(--org-bg) 94%, transparent);
+  box-shadow: 0 24px 80px color-mix(in srgb, var(--org-bg) 48%, transparent);
+  display: flex;
+  flex-direction: column;
+}
+
+.org-generate-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent));
+  background: color-mix(in srgb, var(--org-panel) 82%, transparent);
+}
+
+.org-generate-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.org-generate-kicker {
+  color: var(--org-text-2, var(--org-text-2));
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+
+.org-generate-copy h2 {
+  margin: 0;
+  font-family: var(--font-display, "Sora", "Manrope", sans-serif);
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
+}
+
+.org-generate-copy p {
+  margin: 0;
+  color: var(--org-text-2, var(--org-text-2));
+}
+
+.org-generate-intent-note {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--org-accent) 26%, var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent)));
+  background: color-mix(in srgb, var(--org-accent) 10%, transparent);
+}
+
+.org-generate-intent-note strong {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--org-accent-light);
+}
+
+.org-generate-intent-note span {
+  color: var(--org-text-1, var(--org-text-1));
+  line-height: 1.5;
+}
+
+.org-generate-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.org-generate-search {
+  position: relative;
+  width: min(360px, 34vw);
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent));
+  background: color-mix(in srgb, var(--org-panel) 90%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+}
+
+.org-generate-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--org-text-1, var(--org-text-1));
+  outline: none;
+}
+
+.org-generate-search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  border-radius: 18px;
+  border: 1px solid var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent));
+  background: color-mix(in srgb, var(--org-panel) 96%, transparent);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--org-bg) 36%, transparent);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 4;
+}
+
+.org-generate-search-result,
+.org-generate-search-empty {
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.org-generate-search-result {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.org-generate-search-result:hover {
+  background: var(--org-panel-hover, var(--org-panel-hover));
+  border-color: var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent));
+}
+
+.org-generate-search-result span,
+.org-generate-search-empty {
+  color: var(--org-text-2, var(--org-text-2));
+  font-size: 0.8rem;
+}
+
+.org-generate-surface .org-secondary-button,
+.org-generate-surface .org-close-button {
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent));
+  background: color-mix(in srgb, var(--org-panel) 90%, transparent);
+  color: var(--org-text-1, var(--org-text-1));
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.org-generate-surface .org-close-button {
+  width: 44px;
+  justify-content: center;
+  padding: 0;
+}
+
+.org-generate-workspace {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.org-generate-canvas-shell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--gen-bg);
+}
+
+.org-generate-meta-bar {
+  min-height: 48px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--gen-border);
+  color: var(--gen-text-2);
+  font-size: 0.8rem;
+  background: color-mix(in srgb, var(--gen-panel) 92%, transparent);
+}
+
+.org-generate-meta-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.org-generate-asset-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--gen-border);
+  background: color-mix(in srgb, var(--org-accent) 10%, transparent);
+  color: var(--gen-text-1);
+}
+
+@media (max-width: 1080px) {
+  .org-generate-surface {
+    inset: 10px;
+    border-radius: 18px;
+  }
+
+  .org-generate-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .org-generate-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .org-generate-search {
+    width: 100%;
+  }
+
+  .org-generate-meta-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 10px 18px;
+  }
+
+  .org-generate-meta-copy {
+    justify-content: flex-start;
+  }
+}
+
+/* ============================================================================
+   Stage 6 - Org Composer
+   Aligns the org generation overlay with the refreshed org shell.
+   ============================================================================ */
+.org-generate-backdrop {
+  background: color-mix(in srgb, var(--org-bg) 82%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.org-generate-surface {
+  inset: 16px;
+  border-color: color-mix(in srgb, var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent)) 80%, var(--org-accent) 14%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 3%, transparent), transparent 16%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--org-accent) 16%, transparent) 0%, transparent 34%),
+    color-mix(in srgb, var(--org-bg) 96%, transparent);
+  box-shadow:
+    0 30px 84px color-mix(in srgb, var(--org-bg) 50%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 4%, transparent);
+}
+
+.org-generate-header {
+  padding: 24px 26px 20px;
+  border-bottom-color: color-mix(in srgb, var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent)) 82%, var(--org-accent) 10%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2.8%, transparent), transparent 86%),
+    color-mix(in srgb, var(--org-panel) 84%, transparent);
+}
+
+.org-generate-intent-note,
+.org-generate-search,
+.org-generate-search-results,
+.org-generate-surface .org-secondary-button,
+.org-generate-surface .org-close-button,
+.org-generate-asset-pill {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent);
+}
+
+.org-generate-search,
+.org-generate-surface .org-secondary-button,
+.org-generate-surface .org-close-button {
+  border-color: color-mix(in srgb, var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent)) 82%, var(--org-accent) 10%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2.5%, transparent), transparent 78%),
+    color-mix(in srgb, var(--org-panel) 92%, transparent);
+}
+
+.org-generate-search:focus-within {
+  border-color: color-mix(in srgb, var(--org-accent) 26%, var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent)));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--org-accent) 12%, transparent);
+}
+
+.org-generate-search-results {
+  border-color: color-mix(in srgb, var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent)) 82%, var(--org-accent) 10%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 3%, transparent), transparent 18%),
+    color-mix(in srgb, var(--org-panel) 96%, transparent);
+  box-shadow: 0 22px 48px color-mix(in srgb, var(--org-bg) 30%, transparent);
+}
+
+.org-generate-search-result {
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.org-generate-search-result:hover {
+  transform: translateX(2px);
+}
+
+.org-generate-surface .org-secondary-button,
+.org-generate-surface .org-close-button {
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.org-generate-surface .org-secondary-button:hover,
+.org-generate-surface .org-close-button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--org-accent) 18%, var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent)));
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--org-bg) 16%, transparent);
+}
+
+.org-generate-meta-bar {
+  min-height: 52px;
+  border-bottom-color: color-mix(in srgb, var(--gen-border) 84%, var(--org-accent) 8%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 2.5%, transparent), transparent 84%),
+    color-mix(in srgb, var(--gen-panel) 94%, transparent);
+}
+
+.org-generate-asset-pill {
+  border-color: color-mix(in srgb, var(--org-accent) 18%, var(--gen-border));
+  background: color-mix(in srgb, var(--org-accent) 12%, transparent);
+}
+
+.org-generate-surface .org-secondary-button:focus-visible,
+.org-generate-surface .org-close-button:focus-visible,
+.org-generate-search-result:focus-visible,
+.org-generate-search input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--org-accent) 12%, transparent);
+}

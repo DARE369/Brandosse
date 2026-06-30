@@ -1,0 +1,39 @@
+{
+  "testA": {
+    "chipFound": true,
+    "chipInfo": {
+      "index": 0,
+      "cls": "cal3-post-cell cal3-post-cell--scheduled",
+      "text": "12:00 AM\nUntitled"
+    },
+    "targetCellBox": {
+      "x": 301,
+      "y": 879.5,
+      "width": 160.421875,
+      "height": 64
+    },
+    "successToastSeen": true,
+    "errorToastSeen": false,
+    "afterChipCount": 2
+  },
+  "testB": {
+    "chipFound": false,
+    "cmdkToastSeen": false
+  },
+  "testC": {
+    "draftCardFoundInAll": true,
+    "archiveToastSeen": true,
+    "archiveErrorToastSeen": false,
+    "disappearedFromAll": true,
+    "foundInArchivedSection": true,
+    "unarchiveButtonFound": true,
+    "unarchiveToastSeen": true,
+    "unarchiveErrorToastSeen": false,
+    "disappearedFromArchived": true,
+    "backInAllSection": true
+  },
+  "consoleErrors": [
+    "Error: cannot add `postgres_changes` callbacks for realtime:calendar_updates after `subscribe()`."
+  ],
+  "networkErrors": []
+}

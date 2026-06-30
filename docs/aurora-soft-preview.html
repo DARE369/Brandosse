@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Concept B — Aurora Soft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============ TIER 1 — PRIMITIVES ============ */
+  :root {
+    --plum-50:#F4EFF9; --plum-100:#E9E0F3; --plum-200:#D5C6E8; --plum-300:#B9A2D7; --plum-400:#977AC2;
+    --plum-500:#6E4FA3; --plum-600:#5C4090; --plum-700:#4A3375; --plum-800:#3A285C; --plum-900:#2A1E45;
+    --gold-300:#F0C58A; --gold-400:#E6B36E; --gold-500:#D99A4E; --gold-600:#C5852F; --gold-700:#A66D22;
+    --sand-0:#FFFFFF; --sand-25:#FAF6F1; --sand-50:#F4EEE6; --sand-100:#ECE4D8; --sand-150:#E3D8C9;
+    --sand-200:#D6C8B5; --sand-300:#BBA88F; --sand-400:#9C8E7B; --sand-500:#756A5B; --sand-600:#564E43;
+    --sand-700:#3A342C; --sand-800:#26221C; --sand-900:#1A1712; --sand-950:#120F0B;
+    --ok:#3F9C6D; --warn:#CE9A3A; --err:#CF6076; --info:#5B7BC2;
+    --font-display:"Fraunces","Manrope",Georgia,serif; --font-body:"Manrope",system-ui,sans-serif;
+    /* SOFT language: large radii, pill controls */
+    --r-sm:12px; --r-md:18px; --r-lg:24px; --r-pill:999px;
+  }
+  [data-theme="light"] {
+    --surface-page:var(--sand-25); --surface:var(--sand-0); --surface-subtle:var(--sand-50); --surface-hover:var(--plum-50);
+    --border:var(--sand-150); --border-strong:var(--sand-200);
+    --text:#241F2C; --text-secondary:var(--sand-500); --text-tertiary:var(--sand-400);
+    --action:var(--plum-500); --action-hover:var(--plum-600); --action-subtle:var(--plum-50); --on-action:#fff;
+    --accent:var(--gold-500); --accent-hover:var(--gold-600); --on-accent:#2A1E08;
+    --ok-bg:rgba(63,156,109,.12); --warn-bg:rgba(206,154,58,.14); --err-bg:rgba(207,96,118,.12); --info-bg:rgba(91,123,194,.12);
+    /* soft, diffuse shadows; borders nearly invisible */
+    --shadow-sm:0 2px 8px rgba(58,40,92,.06); --shadow-md:0 16px 40px rgba(58,40,92,.10); --shadow-lg:0 30px 64px rgba(58,40,92,.14);
+    --focus:0 0 0 4px color-mix(in srgb, var(--action) 22%, transparent);
+  }
+  [data-theme="dark"] {
+    --surface-page:#16131B; --surface:#1E1A24; --surface-subtle:#191520; --surface-hover:rgba(169,143,214,.14);
+    --border:rgba(255,255,255,.07); --border-strong:rgba(255,255,255,.13);
+    --text:#F4EFF6; --text-secondary:#B6ABC4; --text-tertiary:#8A7F9C;
+    --action:#A98FD6; --action-hover:#BCA6E2; --action-subtle:rgba(169,143,214,.16); --on-action:#1A1023;
+    --accent:#E6B36E; --accent-hover:#F0C58A; --on-accent:#241804;
+    --ok-bg:rgba(63,156,109,.18); --warn-bg:rgba(206,154,58,.18); --err-bg:rgba(207,96,118,.18); --info-bg:rgba(91,123,194,.18);
+    --shadow-sm:0 2px 8px rgba(0,0,0,.4); --shadow-md:0 16px 40px rgba(0,0,0,.5); --shadow-lg:0 30px 64px rgba(0,0,0,.6);
+    --focus:0 0 0 4px color-mix(in srgb, var(--action) 30%, transparent);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:var(--font-body); background:var(--surface-page); color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased; transition:background .25s,color .25s; }
+  h1,h2,h3 { font-family:var(--font-display); letter-spacing:-.005em; font-weight:600; }
+  .wrap { max-width:1100px; margin:0 auto; padding:36px 28px 88px; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; }
+  .eyebrow { color:var(--accent); font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:.14em; }
+  .title { font-size:38px; font-weight:600; margin:6px 0; }
+  .sub { color:var(--text-secondary); font-size:15px; max-width:640px; }
+  .toggle { display:inline-flex; gap:6px; background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--r-pill); padding:5px; }
+  .toggle button { font-family:var(--font-body); font-weight:600; font-size:13px; border:none; background:transparent; color:var(--text-secondary); padding:8px 16px; border-radius:var(--r-pill); cursor:pointer; }
+  .toggle button.active { background:var(--action); color:var(--on-action); }
+  .section { margin-top:44px; }
+  .section h2 { font-size:12px; text-transform:uppercase; letter-spacing:.14em; color:var(--text-tertiary); margin-bottom:16px; font-family:var(--font-body); font-weight:700; }
+  .ramp { display:flex; flex-wrap:wrap; gap:0; border-radius:var(--r-md); overflow:hidden; box-shadow:var(--shadow-sm); }
+  .swatch { flex:1 1 90px; min-width:90px; height:76px; display:flex; flex-direction:column; justify-content:flex-end; padding:9px; font-size:11px; font-weight:600; }
+  .swatch small { opacity:.85; font-weight:500; }
+  .roles { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+  .role { border:1px solid var(--border); border-radius:var(--r-md); padding:14px; background:var(--surface); box-shadow:var(--shadow-sm); }
+  .role .dot { width:100%; height:38px; border-radius:var(--r-sm); margin-bottom:10px; }
+  .role b { font-size:13px; } .role span { display:block; color:var(--text-tertiary); font-size:11px; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  @media (max-width:760px){ .cards{ grid-template-columns:1fr; } }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:26px; box-shadow:var(--shadow-sm); }
+  .card.elev { box-shadow:var(--shadow-md); }
+  /* SOFT buttons: pill, soft secondary (tinted, not outline) */
+  .btn { font-family:var(--font-body); font-weight:600; font-size:14px; border-radius:var(--r-pill); padding:0 22px; height:46px; display:inline-flex; align-items:center; gap:8px; cursor:pointer; border:1px solid transparent; transition:transform .14s, background .18s, box-shadow .18s; }
+  .btn:active { transform:translateY(1px); }
+  .btn-primary { background:var(--action); color:var(--on-action); }
+  .btn-primary:hover { background:var(--action-hover); box-shadow:var(--shadow-md); }
+  .btn-accent { background:var(--accent); color:var(--on-accent); }
+  .btn-accent:hover { background:var(--accent-hover); box-shadow:var(--shadow-md); }
+  .btn-secondary { background:var(--surface-subtle); color:var(--text); }
+  .btn-secondary:hover { background:var(--surface-hover); }
+  .btn-ghost { background:transparent; color:var(--action); }
+  .btn-ghost:hover { background:var(--action-subtle); }
+  .btn-row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+  .badge { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; padding:6px 13px; border-radius:var(--r-pill); }
+  .badge::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
+  .b-ok{ color:var(--ok); background:var(--ok-bg);} .b-warn{ color:var(--warn); background:var(--warn-bg);} .b-err{ color:var(--err); background:var(--err-bg);} .b-info{ color:var(--info); background:var(--info-bg);} .b-draft{ color:var(--text-secondary); background:var(--surface-subtle);}
+  .input { width:100%; font-family:var(--font-body); font-size:14px; color:var(--text); background:var(--surface-subtle); border:1px solid transparent; border-radius:var(--r-md); padding:13px 16px; }
+  .input:focus { outline:none; border-color:var(--action); box-shadow:var(--focus); background:var(--surface); }
+  .label { font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:7px; display:block; }
+  .studio { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-md); }
+  .studio-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; }
+  .studio-head b { font-family:var(--font-display); font-size:17px; font-weight:600; }
+  .studio-media { margin:0 14px; border-radius:var(--r-md); aspect-ratio:16/10; background:linear-gradient(135deg,var(--plum-500),var(--gold-500)); display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:.04em; }
+  .studio-body { padding:18px 22px 22px; }
+  .studio-body p { font-size:14px; margin-bottom:8px; }
+  .studio-tags { color:var(--action); font-size:13px; font-weight:600; margin-bottom:16px; }
+  .stat-row { display:flex; gap:14px; margin-top:10px; }
+  .stat { flex:1; background:var(--surface-subtle); border-radius:var(--r-md); padding:16px; }
+  .stat .n { font-family:var(--font-display); font-size:24px; font-weight:600; }
+  .stat .l { font-size:12px; color:var(--text-tertiary); }
+  .note { margin-top:10px; font-size:12px; color:var(--text-tertiary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div><div class="eyebrow">Concept B · Aurora Soft</div><div class="title">Airy &amp; premium-calm</div></div>
+    <div class="toggle"><button id="lightBtn" class="active" onclick="setTheme('light')">Light</button><button id="darkBtn" onclick="setTheme('dark')">Dark</button></div>
+  </div>
+  <p class="sub">Generous whitespace, pill buttons, large soft-shadowed cards, warm plum + gold on sand neutrals, and a refined serif display (Fraunces). Feels editorial, expensive, calm — think a high-end Notion/Later vibe.</p>
+
+  <div class="section"><h2>Brand — Plum (primary)</h2><div class="ramp" id="plumRamp"></div></div>
+  <div class="section"><h2>Accent — Gold</h2><div class="ramp" id="goldRamp"></div></div>
+  <div class="section"><h2>Neutrals — Warm Sand</h2><div class="ramp" id="sandRamp"></div></div>
+
+  <div class="section"><h2>Semantic roles</h2>
+    <div class="roles">
+      <div class="role"><div class="dot" style="background:var(--surface-page)"></div><b>surface-page</b><span>app background</span></div>
+      <div class="role"><div class="dot" style="background:var(--surface)"></div><b>surface</b><span>panels / cards</span></div>
+      <div class="role"><div class="dot" style="background:var(--surface-subtle)"></div><b>surface-subtle</b><span>inputs / wells</span></div>
+      <div class="role"><div class="dot" style="background:var(--action)"></div><b>action</b><span>primary / links</span></div>
+      <div class="role"><div class="dot" style="background:var(--accent)"></div><b>accent</b><span>key CTA</span></div>
+      <div class="role"><div class="dot" style="background:var(--ok)"></div><b>success</b><span>published</span></div>
+      <div class="role"><div class="dot" style="background:var(--warn)"></div><b>warning</b><span>publishing</span></div>
+      <div class="role"><div class="dot" style="background:var(--err)"></div><b>danger</b><span>failed</span></div>
+      <div class="role"><div class="dot" style="background:var(--info)"></div><b>info</b><span>scheduled</span></div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Components &amp; states</h2>
+    <div class="cards">
+      <div class="card">
+        <h3 style="font-size:18px;margin-bottom:16px;">Buttons</h3>
+        <div class="btn-row" style="margin-bottom:14px;"><button class="btn btn-primary">Primary action</button><button class="btn btn-accent">★ Key CTA</button></div>
+        <div class="btn-row"><button class="btn btn-secondary">Secondary</button><button class="btn btn-ghost">Ghost</button></div>
+        <h3 style="font-size:18px;margin:20px 0 12px;">Status badges</h3>
+        <div class="btn-row"><span class="badge b-draft">Draft</span><span class="badge b-info">Scheduled</span><span class="badge b-warn">Publishing</span><span class="badge b-ok">Published</span><span class="badge b-err">Failed</span></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:18px;margin-bottom:16px;">Form field</h3>
+        <label class="label">Caption</label>
+        <input class="input" value="Golden hour glow for the new drop ☀️" />
+        <div class="note">Focus the field to see the soft focus ring.</div>
+        <div class="stat-row">
+          <div class="stat"><div class="n">12</div><div class="l">Scheduled</div></div>
+          <div class="stat"><div class="n">48</div><div class="l">Published</div></div>
+          <div class="stat"><div class="n" style="color:var(--accent)">3</div><div class="l">Drafts</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Golden path — "post ready → Schedule"</h2>
+    <div class="cards">
+      <div class="studio">
+        <div class="studio-head"><b>AI Studio</b><span class="badge b-ok">Ready</span></div>
+        <div class="studio-media">YOUR GENERATED VISUAL</div>
+        <div class="studio-body">
+          <p>Soft morning light, clean product hero. On-brand and ready to go.</p>
+          <div class="studio-tags">#newdrop #skincare #goldenhour</div>
+          <div class="btn-row"><button class="btn btn-accent">Schedule post</button><button class="btn btn-secondary">Save draft</button></div>
+        </div>
+      </div>
+      <div class="card elev">
+        <h3 style="font-size:18px;margin-bottom:8px;">Why this works</h3>
+        <p style="font-size:14px;color:var(--text-secondary);margin-bottom:14px;">Roomy spacing and a serif display feel editorial and premium. The gold CTA reads warm and inviting against plum. Best when the brand is creative, lifestyle, or beauty-leaning.</p>
+        <div class="btn-row"><span class="badge b-info">Editorial</span><span class="badge b-ok">Calm &amp; roomy</span><span class="badge b-draft">Warm sand</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const ramps = {
+    plumRamp:[["50","#F4EFF9"],["100","#E9E0F3"],["200","#D5C6E8"],["300","#B9A2D7"],["400","#977AC2"],["500","#6E4FA3"],["600","#5C4090"],["700","#4A3375"],["800","#3A285C"],["900","#2A1E45"]],
+    goldRamp:[["300","#F0C58A"],["400","#E6B36E"],["500","#D99A4E"],["600","#C5852F"],["700","#A66D22"]],
+    sandRamp:[["0","#FFFFFF"],["25","#FAF6F1"],["50","#F4EEE6"],["100","#ECE4D8"],["150","#E3D8C9"],["200","#D6C8B5"],["300","#BBA88F"],["400","#9C8E7B"],["500","#756A5B"],["600","#564E43"],["700","#3A342C"],["800","#26221C"],["900","#1A1712"],["950","#120F0B"]]
+  };
+  function lum(hex){ const c=hex.replace('#',''); const r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16); return (0.299*r+0.587*g+0.114*b); }
+  for (const [id,arr] of Object.entries(ramps)){ document.getElementById(id).innerHTML=arr.map(([k,hex])=>{ const txt=lum(hex)>150?'#241F2C':'#fff'; return `<div class="swatch" style="background:${hex};color:${txt}">${k}<small>${hex}</small></div>`; }).join(''); }
+  function setTheme(t){ document.documentElement.setAttribute('data-theme',t); document.getElementById('lightBtn').classList.toggle('active',t==='light'); document.getElementById('darkBtn').classList.toggle('active',t==='dark'); }
+</script>
+</body>
+</html>

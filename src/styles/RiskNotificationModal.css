@@ -1,0 +1,179 @@
+.risk-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--admin-bg, var(--color-bg-page)) 72%, transparent);
+  z-index: 120;
+}
+
+.risk-modal-card {
+  width: min(600px, 100%);
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--admin-danger, var(--color-danger)) 34%, var(--admin-border, var(--color-border)));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--admin-panel, var(--color-bg-surface)) 98%, transparent), var(--admin-panel, var(--color-bg-surface)));
+  box-shadow: var(--admin-shadow-lg, var(--shadow-lg));
+}
+
+.risk-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--admin-border, var(--color-border)) 72%, transparent);
+}
+
+.risk-modal-header-copy h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 8px;
+  color: var(--admin-text-1, var(--color-text-primary));
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.risk-modal-header-copy p {
+  margin: 0;
+  color: var(--admin-text-2, var(--color-text-secondary));
+  line-height: 1.6;
+}
+
+.risk-modal-kicker {
+  color: var(--admin-danger, var(--color-danger));
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.risk-modal-icon {
+  color: var(--admin-danger, var(--color-danger));
+}
+
+.risk-modal-domain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 22px 0;
+}
+
+.risk-domain-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid color-mix(in srgb, var(--admin-border, var(--color-border)) 72%, transparent);
+}
+
+.risk-domain-row:first-child {
+  border-top: none;
+}
+
+.risk-domain-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.risk-domain-copy strong {
+  color: var(--admin-text-1, var(--color-text-primary));
+  font-size: 0.94rem;
+}
+
+.risk-domain-copy span {
+  color: var(--admin-text-2, var(--color-text-secondary));
+  font-size: 0.82rem;
+}
+
+.risk-domain-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.risk-badge.very_high {
+  background: color-mix(in srgb, var(--admin-danger, var(--color-danger)) 18%, transparent);
+  color: var(--admin-danger, var(--color-danger));
+}
+
+.risk-badge.high {
+  background: color-mix(in srgb, var(--admin-warning, var(--color-warning)) 18%, transparent);
+  color: var(--admin-warning, var(--color-warning));
+}
+
+.risk-badge.medium {
+  background: color-mix(in srgb, var(--admin-warning, var(--color-warning)) 14%, transparent);
+  color: color-mix(in srgb, var(--admin-warning, var(--color-warning)) 92%, var(--admin-text-1, var(--color-text-primary)));
+}
+
+.risk-badge.low {
+  background: color-mix(in srgb, var(--admin-accent, var(--color-primary)) 14%, transparent);
+  color: var(--admin-accent-light, var(--color-primary-text));
+}
+
+.risk-domain-link,
+.risk-modal-acknowledge-btn {
+  min-height: 40px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.risk-domain-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--admin-border, var(--color-border));
+  background: transparent;
+  color: var(--admin-text-1, var(--color-text-primary));
+}
+
+.risk-modal-footer {
+  padding: 18px 22px 22px;
+  border-top: 1px solid color-mix(in srgb, var(--admin-border, var(--color-border)) 72%, transparent);
+}
+
+.risk-modal-acknowledge-btn {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--admin-danger, var(--color-danger)) 42%, transparent);
+  background: color-mix(in srgb, var(--admin-danger, var(--color-danger)) 18%, var(--admin-panel-2, var(--color-bg-elevated)));
+  color: var(--admin-text-1, var(--color-text-primary));
+}
+
+@media (max-width: 720px) {
+  .risk-modal-backdrop {
+    padding: 14px;
+  }
+
+  .risk-domain-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .risk-domain-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

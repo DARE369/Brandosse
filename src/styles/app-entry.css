@@ -1,0 +1,45 @@
+@import "../index.css";
+@import "./tokens.css";
+@import "./theme.css";
+@import "./variables.css";
+@import "./global.css";
+@import "./design-system.css";
+@import "../components/Shared/ui/ui-primitives.css";
+@import "../components/Shared/ui/ui-mobile-primitives.css";
+@import "./responsive-contract.css";
+@import "./App.css";
+@import "./UserDashboard.css";
+@import "./AccountHealth.css";
+@import "./AuthLoadingOverlay.css";
+@import "./BrandKit.css";
+@import "./CalendarV2.css";
+@import "./ConnectedAccounts.css";
+@import "./generate.css";
+@import "./GeneratePromptBar.css";
+@import "./GenerateV2.css";
+@import "./HelpPage.css";
+@import "./HelpPanel.css";
+@import "./LibraryV2.css";
+@import "./MockPublish.css";
+@import "./Navbar.css";
+@import "./NotFoundPage.css";
+@import "./PostCard.css";
+@import "./RiskNotificationModal.css";
+@import "./Settings.css";
+@import "./Sidebar.css";
+@import "../components/Shared/ThemeToggle.css";
+@import "../components/Shared/WorkspaceSwitcherMenu.css";
+@import "../components/video-engine/videoEngine.css";
+@import "../pages/AnalyticsPage/PersonalAnalyticsPage.css";
+@import "../pages/Auth/Auth.css";
+@import "../pages/Auth/AuthCallback.css";
+@import "../pages/ClientReview/ClientReview.css";
+@import "../pages/ContextSelector/ContextSelector.css";
+@import "../pages/InvitationAccept/InvitationAcceptPage.css";
+@import "../pages/Landing/LandingPage.css";
+@import "../pages/VideoEngine/VideoEngineApp.css";
+@import "../pages/VideoEngine/VideoEngineLab.css";
+/* Admin + org stylesheets are imported in their route layouts
+   (app/app/admin/layout.jsx, app/app/org/[orgId]/layout.jsx) so they are
+   no longer shipped to every user. This also removes the admin `.sidebar-nav`
+   rule that was colliding with the personal mobile bottom-nav. */

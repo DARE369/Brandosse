@@ -1,0 +1,71 @@
+.auth-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(1100px circle at 20% 10%, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 46%),
+    radial-gradient(900px circle at 82% 88%, color-mix(in srgb, var(--color-warning) 12%, transparent), transparent 44%),
+    linear-gradient(160deg, var(--color-bg-page) 0%, var(--color-bg-page) 44%, var(--color-bg-subtle) 100%);
+  backdrop-filter: blur(1.5px);
+}
+
+.auth-loading-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 24px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--color-bg-surface) 90%, transparent);
+  box-shadow: 0 24px 52px color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+}
+
+.auth-loading-spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-top-color: var(--color-primary);
+  animation: auth-loading-spin 0.8s linear infinite;
+}
+
+.auth-loading-title {
+  margin: 6px 0 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.auth-loading-description {
+  margin: 0;
+  max-width: 330px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+@keyframes auth-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-loading-card {
+    padding: 24px 18px;
+    border-radius: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-loading-spinner {
+    animation: none;
+  }
+}

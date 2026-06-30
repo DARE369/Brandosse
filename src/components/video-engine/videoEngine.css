@@ -1,0 +1,985 @@
+/* ── Back / nav button ───────────────────────────────────── */
+.ve-back-btn {
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.84rem;
+  font-weight: 700;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.ve-back-btn:hover {
+  color: var(--color-text-primary);
+}
+
+/* ── Status nav row (back btn + retry side-by-side) ──────── */
+.ve-status-nav {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.ve-status-nav .ve-back-btn {
+  margin-bottom: 0;
+}
+
+.ve-retry-job-btn {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+/* ── Loading icon colour ─────────────────────────────────── */
+.ve-loading-icon {
+  color: var(--color-primary);
+  opacity: 0.7;
+}
+
+/* ── Retry button in error empty state ───────────────────── */
+.ve-retry-btn {
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 16px;
+}
+
+/* ── Elapsed timer inside active stage estimate ──────────── */
+.ve-elapsed {
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+/* ── Warning kicker (disconnected state) ─────────────────── */
+.ve-kicker-warn {
+  align-items: center;
+  color: var(--color-warning-text);
+  display: inline-flex;
+  gap: 5px;
+}
+
+/* ── Inline delete error on JobCard ─────────────────────── */
+.ve-job-delete-error {
+  color: var(--color-danger-text);
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+
+/* ── Error hint below error panel ────────────────────────── */
+.ve-error-hint {
+  color: var(--color-text-tertiary);
+  font-size: 0.82rem;
+  margin-top: 8px !important;
+}
+
+/* ── Credit meta rate row ────────────────────────────────── */
+.ve-meta-rate {
+  color: var(--color-text-tertiary);
+  font-size: 0.82rem;
+}
+
+.ve-page {
+  color: var(--color-text-primary);
+  margin: 0 auto;
+  max-width: 1100px;
+  padding: 32px 24px 56px;
+}
+
+.ve-submit-page,
+.ve-status-page,
+.ve-credits-page {
+  max-width: 840px;
+}
+
+.ve-page-header,
+.ve-list-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.ve-page-header h1,
+.ve-list-header h1 {
+  color: var(--color-text-primary);
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  letter-spacing: 0;
+  line-height: 1.1;
+  margin: 0 0 8px;
+}
+
+.ve-page-header p,
+.ve-list-header p {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 660px;
+}
+
+.ve-kicker {
+  color: var(--color-primary);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.ve-icon-shell,
+.ve-job-icon {
+  align-items: center;
+  background: var(--color-primary-subtle);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-radius: 8px;
+  color: var(--color-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.ve-submit-card,
+.ve-balance-card,
+.ve-package-card,
+.ve-job-card,
+.ve-clip-card,
+.ve-transactions,
+.ve-empty-state,
+.ve-error-panel {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.ve-submit-card {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+}
+
+.ve-field {
+  display: grid;
+  gap: 8px;
+}
+
+.ve-field span {
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.ve-field input {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  min-height: 52px;
+  outline: none;
+  padding: 0 14px;
+}
+
+.ve-field input:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.ve-submit-meta,
+.ve-meta-row,
+.ve-inline-status,
+.ve-status-badge,
+.ve-platform,
+.ve-clip-meta,
+.ve-job-meta,
+.ve-confirm-row {
+  align-items: center;
+  display: flex;
+}
+
+.ve-submit-meta {
+  background: var(--color-bg-subtle);
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.ve-meta-row,
+.ve-clip-meta,
+.ve-job-meta {
+  gap: 7px;
+}
+
+.ve-inline-status {
+  border-radius: 8px;
+  font-size: 0.88rem;
+  gap: 9px;
+  line-height: 1.45;
+  padding: 12px 14px;
+}
+
+.ve-inline-status button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  margin-left: 6px;
+  text-decoration: underline;
+}
+
+.ve-inline-success {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.ve-inline-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.ve-inline-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.ve-inline-info {
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
+}
+
+.ve-primary-btn,
+.ve-secondary-btn,
+.ve-icon-btn {
+  align-items: center;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 44px;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+.ve-primary-btn {
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  color: var(--color-text-inverse);
+  padding: 0 18px;
+}
+
+.ve-primary-btn:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.ve-secondary-btn {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  padding: 0 10px;
+}
+
+.ve-secondary-btn:hover:not(:disabled),
+.ve-icon-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.ve-primary-btn:disabled,
+.ve-secondary-btn:disabled,
+.ve-icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+  transform: none;
+}
+
+.ve-icon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-secondary);
+  width: 44px;
+}
+
+.ve-danger-btn:hover {
+  color: var(--color-danger);
+}
+
+.ve-btn-error {
+  border-color: var(--color-danger) !important;
+  color: var(--color-danger-text) !important;
+}
+
+.ve-spin {
+  animation: ve-spin 0.85s linear infinite;
+}
+
+@keyframes ve-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ve-active-estimate,
+.ve-partial-note {
+  color: var(--color-primary);
+  display: inline-block;
+  font-size: 0.86rem;
+  font-weight: 700;
+  margin-top: 10px;
+}
+
+.ve-pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ve-pipeline-stage {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  min-height: 76px;
+}
+
+.ve-pipeline-left {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.ve-stage-marker {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.ve-stage-complete {
+  background: var(--color-success);
+  color: var(--color-text-inverse);
+}
+
+.ve-stage-active {
+  background: var(--color-primary-subtle);
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+  position: relative;
+}
+
+.ve-stage-active::after {
+  animation: ve-ping 1.5s ease-out infinite;
+  border: 2px solid var(--color-primary);
+  border-radius: inherit;
+  content: "";
+  inset: -7px;
+  opacity: 0;
+  position: absolute;
+}
+
+@keyframes ve-ping {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.22);
+  }
+}
+
+.ve-stage-pending {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+}
+
+.ve-stage-failed {
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+}
+
+.ve-stage-line {
+  background: var(--color-border);
+  flex: 1;
+  margin: 6px 0;
+  width: 2px;
+}
+
+.ve-stage-line.filled {
+  background: var(--color-success);
+}
+
+.ve-pipeline-copy {
+  padding: 4px 0 18px 10px;
+}
+
+.ve-pipeline-copy strong,
+.ve-pipeline-copy span {
+  display: block;
+}
+
+.ve-pipeline-copy strong {
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+}
+
+.ve-pipeline-copy span {
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  margin-top: 3px;
+}
+
+.ve-error-panel {
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.ve-error-panel strong {
+  color: var(--color-danger-text);
+}
+
+.ve-error-panel p {
+  color: var(--color-text-secondary);
+  margin: 6px 0 0;
+}
+
+.ve-clip-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.ve-clip-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ve-clip-thumb {
+  aspect-ratio: 9 / 16;
+  background: var(--color-bg-subtle);
+  max-height: 260px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ve-clip-thumb img,
+.ve-video-frame video {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.ve-thumb-placeholder {
+  align-items: center;
+  color: var(--color-text-tertiary);
+  display: flex;
+  height: 100%;
+  justify-content: center;
+}
+
+.ve-score-chip {
+  background: color-mix(in srgb, var(--color-bg-page) 78%, transparent);
+  border-radius: 999px;
+  color: var(--color-text-inverse);
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 5px 8px;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+}
+
+.ve-clip-body {
+  display: grid;
+  flex: 1;
+  gap: 10px;
+  padding: 13px;
+}
+
+.ve-clip-body h3 {
+  color: var(--color-text-primary);
+  font-size: 0.96rem;
+  line-height: 1.3;
+  margin: 0 0 7px;
+}
+
+.ve-clip-meta {
+  color: var(--color-text-secondary);
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.ve-platform,
+.ve-status-badge,
+.ve-tx-badge,
+.ve-popular-badge {
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 7px 9px;
+}
+
+.ve-platform-tiktok {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.ve-platform-reels {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary-text);
+}
+
+.ve-platform-shorts {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.ve-platform-universal {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+}
+
+.ve-score-bar {
+  background: var(--color-bg-subtle);
+  border-radius: 999px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.ve-score-bar span {
+  background: var(--color-primary);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.ve-clip-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.ve-wide-action {
+  grid-column: 1 / -1;
+}
+
+.ve-clip-failed,
+.ve-clip-rendering {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: flex;
+  font-size: 0.84rem;
+  gap: 8px;
+}
+
+.ve-clip-failed {
+  color: var(--color-danger-text);
+}
+
+.ve-modal {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-bg-page) 82%, transparent);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 1000;
+}
+
+.ve-modal-panel {
+  max-width: 440px;
+  width: min(100%, 440px);
+}
+
+.ve-modal-header {
+  align-items: flex-start;
+  color: var(--color-text-inverse);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ve-modal-header h2 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.ve-video-frame {
+  aspect-ratio: 9 / 16;
+  background: var(--color-bg-page);
+  border-radius: 8px;
+  max-height: calc(100vh - 180px);
+  overflow: hidden;
+}
+
+.ve-video-state {
+  align-items: center;
+  color: var(--color-text-inverse);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.ve-modal-caption {
+  color: var(--color-text-inverse);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin: 12px 0 0;
+  opacity: 0.82;
+  text-align: center;
+}
+
+.ve-jobs-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ve-job-card {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  padding: 14px;
+}
+
+.ve-job-card:hover {
+  border-color: var(--color-border-strong);
+}
+
+.ve-job-main h3 {
+  color: var(--color-text-primary);
+  font-size: 0.96rem;
+  margin: 0 0 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ve-job-meta {
+  color: var(--color-text-secondary);
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.ve-job-meta span {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.ve-job-queued {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+}
+
+.ve-job-downloading,
+.ve-job-transcribing,
+.ve-job-analyzing,
+.ve-job-rendering {
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
+}
+
+.ve-job-complete {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.ve-job-failed {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.ve-live-dot {
+  animation: ve-pulse 1.2s ease-in-out infinite;
+  background: currentColor;
+  border-radius: 999px;
+  display: inline-block;
+  height: 7px;
+  margin-right: 6px;
+  width: 7px;
+}
+
+@keyframes ve-pulse {
+  50% {
+    opacity: 0.38;
+  }
+}
+
+.ve-confirm-row {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  gap: 8px;
+}
+
+.ve-confirm-row button {
+  background: transparent;
+  border: 0;
+  color: var(--color-primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.ve-balance-card {
+  padding: 24px;
+}
+
+.ve-balance-card span,
+.ve-balance-card p {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.ve-balance-card strong {
+  color: var(--color-text-primary);
+  display: block;
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  line-height: 1;
+  margin: 8px 0 2px;
+}
+
+.ve-package-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ve-package-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  position: relative;
+}
+
+.ve-package-card.popular {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.ve-popular-badge {
+  align-items: center;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  display: inline-flex;
+  gap: 5px;
+  justify-self: start;
+}
+
+.ve-package-card h3 {
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.ve-package-card strong {
+  color: var(--color-text-primary);
+  display: block;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.ve-package-card span,
+.ve-package-card p {
+  color: var(--color-text-secondary);
+}
+
+.ve-package-card p {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.ve-transactions {
+  padding: 18px;
+}
+
+.ve-transactions h2 {
+  color: var(--color-text-primary);
+  font-size: 1.1rem;
+  margin: 0 0 14px;
+}
+
+.ve-table-wrap {
+  overflow-x: auto;
+}
+
+.ve-table-wrap table {
+  border-collapse: collapse;
+  min-width: 640px;
+  width: 100%;
+}
+
+.ve-table-wrap th,
+.ve-table-wrap td {
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  padding: 12px 10px;
+  text-align: left;
+}
+
+.ve-table-wrap th {
+  color: var(--color-text-tertiary);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.ve-tx-purchase,
+.ve-tx-bonus {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.ve-tx-consumption {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.ve-tx-refund {
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
+}
+
+.ve-tx-adjustment {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+}
+
+.ve-tx-positive {
+  color: var(--color-success-text) !important;
+  font-weight: 800;
+}
+
+.ve-tx-negative {
+  color: var(--color-danger-text) !important;
+  font-weight: 800;
+}
+
+.ve-empty-state,
+.ve-page-loading {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  padding: 42px 22px;
+  text-align: center;
+}
+
+.ve-empty-large {
+  min-height: 340px;
+}
+
+.ve-empty-state strong {
+  color: var(--color-text-primary);
+}
+
+.ve-page-loading {
+  min-height: 280px;
+}
+
+@media (max-width: 900px) {
+  .ve-page {
+    padding-inline: 16px;
+  }
+
+  .ve-page-header,
+  .ve-list-header,
+  .ve-submit-meta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ve-package-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ve-job-card {
+    align-items: flex-start;
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .ve-status-badge,
+  .ve-job-actions {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* ── Download progress section ───────────────────────────── */
+.ve-progress-section {
+  background: var(--color-bg-subtle);
+  border-radius: 12px;
+  margin-top: 32px;
+  padding: 20px;
+}
+
+.ve-progress-label {
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.ve-progress-bar-container {
+  background: var(--color-bg-hover);
+  border-radius: 8px;
+  height: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.ve-progress-bar {
+  background: var(--color-primary);
+  height: 100%;
+  width: 100%;
+  transition: width 0.5s ease-in-out;
+}
+
+.ve-progress-indeterminate {
+  animation: ve-progress-shimmer 1.5s ease-in-out infinite;
+  opacity: 0.7;
+}
+
+@keyframes ve-progress-shimmer {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ve-progress-subtext {
+  color: var(--color-text-tertiary);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}

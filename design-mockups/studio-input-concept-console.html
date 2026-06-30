@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Brandosse — AI Studio · Console concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --canvas:#0D0E14;--surface:#1C1B26;--elevated:#22212E;--panel:#16151F;--hover:rgba(255,255,255,.05);
+    --border:rgba(255,255,255,.08);--border-bright:rgba(255,255,255,.14);
+    --text:#E8E6F0;--text-2:#9C99B0;--text-3:#615D78;
+    --violet:#7C5CFC;--violet-dim:rgba(124,92,252,.16);--violet-text:#B7A6FF;
+    --coral:#FF6B6B;--coral-dim:rgba(255,107,107,.16);--teal:#4ECBA4;--amber:#F2C96D;
+    --r-sm:8px;--r-md:12px;--r-lg:16px;--r-full:999px;--glass:rgba(255,255,255,.04);
+    --font-d:"Space Grotesk",system-ui,sans-serif;--font-b:"Inter",system-ui,sans-serif;--font-m:"JetBrains Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font-b);background:var(--canvas);color:var(--text);-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:60px 1fr 340px;height:100dvh;overflow:hidden}
+  /* rail */
+  .rail{background:#121119;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:16px;padding:14px 0}
+  .rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#C4B5FD,#7C5CFC,#4338CA);display:grid;place-items:center;color:#fff;font-family:var(--font-d);font-weight:700}
+  .rail .ri{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--text-3);font-size:17px}
+  .rail .ri.active{background:var(--violet-dim);color:var(--violet-text)}
+  /* center */
+  .center{display:flex;flex-direction:column;min-width:0;position:relative;overflow:hidden}
+  .aurora{position:absolute;inset:0 0 auto 0;height:300px;pointer-events:none;opacity:.45;background:radial-gradient(420px 220px at 25% 0%,rgba(124,92,252,.35),transparent 60%),radial-gradient(360px 200px at 80% 6%,rgba(255,107,107,.18),transparent 60%)}
+  .ctop{display:flex;align-items:center;justify-content:space-between;padding:13px 20px;border-bottom:1px solid var(--border);position:relative;z-index:2}
+  .ctop h1{font-family:var(--font-d);font-size:15px;color:var(--text-2)}
+  .pill{border:1px solid var(--border);background:var(--glass);border-radius:var(--r-full);padding:6px 12px;font-size:12px;color:var(--text-2);cursor:pointer}
+  .cbody{flex:1;overflow-y:auto;padding:18px 20px 24px;position:relative;z-index:1}
+  /* composer (prominent, top of center) */
+  .composer{background:var(--surface);border:1px solid var(--border-bright);border-radius:var(--r-lg);padding:14px;margin-bottom:18px;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+  .comp-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .comp-head .t{font-family:var(--font-d);font-weight:600;font-size:14px}
+  .comp-head .spacer{flex:1}
+  .struct-toggle{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--text-2);cursor:pointer}
+  .toggle{position:relative;width:34px;height:19px;border-radius:var(--r-full);background:var(--violet);cursor:pointer;flex-shrink:0}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:.18s}
+  .toggle.off{background:#3a3850}.toggle.off::after{transform:translateX(15px)}
+  textarea.prompt{width:100%;background:var(--canvas);border:1px solid var(--border);border-radius:var(--r-md);color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.5;resize:none;min-height:74px;padding:12px 14px;outline:none}
+  textarea.prompt:focus{border-color:var(--violet)}
+  textarea.prompt::placeholder{color:var(--text-3)}
+  .structured{display:none;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
+  .structured.show{display:grid}.structured.show + textarea{display:none}
+  .field{display:flex;flex-direction:column;gap:5px}.field.wide{grid-column:span 2}
+  .field label{font-size:11px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .field input,.field select{background:var(--canvas);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 10px;color:var(--text);font-size:13px;font-family:var(--font-b);outline:none}
+  /* prompt coach */
+  .coach{display:flex;align-items:center;gap:12px;margin-top:11px;padding:9px 12px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r-md)}
+  .meter{flex:1;height:6px;border-radius:var(--r-full);background:#2a2937;overflow:hidden}
+  .meter span{display:block;height:100%;width:62%;background:linear-gradient(90deg,var(--violet),var(--teal))}
+  .coach .lvl{font-family:var(--font-m);font-size:11px;color:var(--teal)}
+  .coach .tips{font-size:11.5px;color:var(--text-2)}
+  .coach .tips b{color:var(--violet-text)}
+  /* presets */
+  .presets{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+  .preset{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);background:var(--glass);border-radius:var(--r-full);padding:7px 13px;font-size:12px;color:var(--text);cursor:pointer}
+  .preset:hover{border-color:var(--violet);background:var(--violet-dim)}
+  /* results */
+  .rlabel{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin:4px 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+  .card{aspect-ratio:1;border-radius:var(--r-md);overflow:hidden;position:relative;border:1px solid var(--border);background:var(--surface)}
+  .card img{width:100%;height:100%;object-fit:cover}
+  .card .ov{position:absolute;inset:auto 0 0 0;padding:10px;background:linear-gradient(transparent,rgba(0,0,0,.72));display:flex;gap:6px;opacity:0;transition:.16s}
+  .card:hover .ov{opacity:1}
+  .ov button{flex:1;border:0;border-radius:6px;padding:6px;font-size:10.5px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.15);color:#fff}
+  .ov button.p{background:var(--violet)}
+  /* ── INSPECTOR (everything visible + guided) ───────────────── */
+  .inspector{background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;min-width:0}
+  .insp-head{padding:14px 16px;border-bottom:1px solid var(--border);font-family:var(--font-d);font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
+  .insp-body{flex:1;overflow-y:auto;padding:8px 0}
+  .sec{border-bottom:1px solid var(--border);padding:13px 16px}
+  .sec h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:10px}
+  .sec h3 .i{margin-left:auto;width:15px;height:15px;border-radius:50%;border:1px solid var(--border-bright);color:var(--text-3);font-size:9px;display:grid;place-items:center;cursor:help}
+  .help{font-size:11px;color:var(--text-3);margin-top:7px;line-height:1.4}
+  /* mode cards */
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .mode{border:1px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:9px;font-size:12px;color:var(--text-2);cursor:pointer;display:flex;align-items:center;gap:7px}
+  .mode.on{border-color:var(--violet);background:var(--violet-dim);color:var(--text)}
+  /* segmented + selects */
+  .seg{display:flex;background:var(--canvas);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px;gap:2px}
+  .seg button{flex:1;border:0;background:transparent;color:var(--text-2);font-size:12px;font-weight:600;padding:7px;border-radius:6px;cursor:pointer;font-family:var(--font-b)}
+  .seg button.on{background:var(--violet);color:#fff}
+  .sel{width:100%;background:var(--canvas);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 10px;color:var(--text);font-size:13px;font-family:var(--font-b);outline:none;margin-bottom:7px}
+  .sel:focus{border-color:var(--violet)}
+  .opt-desc{font-size:11px;color:var(--text-3);margin:-3px 0 7px}
+  /* brand */
+  .brandrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .sw{display:flex}.sw .dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--panel);margin-left:-5px}
+  /* refs */
+  .refs{display:flex;gap:8px;flex-wrap:wrap}
+  .refs img{width:48px;height:48px;border-radius:var(--r-sm);border:1px solid var(--border);object-fit:cover}
+  .refadd{width:48px;height:48px;border:1px dashed var(--border-bright);border-radius:var(--r-sm);display:grid;place-items:center;color:var(--text-3);cursor:pointer;font-size:18px}
+  .slider{width:100%;margin-top:9px;accent-color:var(--violet)}
+  /* avoid */
+  .avoidin{width:100%;background:var(--canvas);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 10px;color:var(--text);font-size:12.5px;outline:none;font-family:var(--font-b)}
+  .avoidin:focus{border-color:var(--coral)}
+  /* range with labels */
+  .rl{display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:4px}
+  /* footer */
+  .insp-foot{border-top:1px solid var(--border);padding:13px 16px;background:var(--panel)}
+  .cost{display:flex;justify-content:space-between;font-family:var(--font-m);font-size:12px;color:var(--text-2);margin-bottom:10px}
+  .cost b{color:var(--text)}
+  .actions{display:flex;gap:8px}
+  .enhance{width:42px;height:44px;border-radius:var(--r-md);border:1px solid var(--border-bright);background:var(--glass);color:var(--violet-text);font-size:17px;cursor:pointer}
+  .generate{flex:1;border:0;border-radius:var(--r-md);background:var(--violet);color:#fff;font-family:var(--font-d);font-weight:600;font-size:14px;height:44px;cursor:pointer;box-shadow:0 6px 22px rgba(124,92,252,.42);display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  .note{font-size:11px;color:var(--text-3);text-align:center;margin-top:14px}
+  @media(max-width:900px){.app{grid-template-columns:1fr}.rail,.inspector{display:none}.note{display:block}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail"><div class="logo">B</div><div class="ri">▦</div><div class="ri active">✶</div><div class="ri">▷</div><div class="ri">▤</div></nav>
+
+  <!-- CENTER: composer + results -->
+  <div class="center">
+    <div class="aurora"></div>
+    <header class="ctop"><h1>AI Studio · Console</h1><span class="pill">＋ New session</span></header>
+    <div class="cbody">
+
+      <div class="composer">
+        <div class="comp-head">
+          <span class="t">What do you want to create?</span>
+          <span class="spacer"></span>
+          <span class="struct-toggle" onclick="ts()"><span class="toggle off" id="st"></span> Guided fields</span>
+        </div>
+        <div class="structured" id="struct">
+          <div class="field wide"><label>Subject</label><input value="A ceramic coffee mug" /></div>
+          <div class="field"><label>Setting</label><input value="oak table, morning" /></div>
+          <div class="field"><label>Style</label><select><option>Editorial flat-lay</option><option>Hero close-up</option></select></div>
+        </div>
+        <textarea class="prompt" placeholder="Describe it in your words… or flip on Guided fields →">A ceramic coffee mug on an oak table, morning light</textarea>
+
+        <div class="coach">
+          <span class="lvl">Good</span>
+          <span class="meter"><span></span></span>
+          <span class="tips">Add <b>lighting</b> and a <b>mood</b> for sharper results — or hit ✦ Enhance.</span>
+        </div>
+
+        <div class="presets">
+          <span class="preset">⊞ Product hero</span>
+          <span class="preset">❝ Quote card</span>
+          <span class="preset">▷ Reel cover</span>
+          <span class="preset">◳ Sale flyer</span>
+          <span class="preset">＋ Save preset</span>
+        </div>
+      </div>
+
+      <div class="rlabel">Latest results · session "Coffee launch"</div>
+      <div class="grid">
+        <div class="card"><img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&q=60"><div class="ov"><button class="p">Use</button><button>Refine</button><button>⋯</button></div></div>
+        <div class="card"><img src="https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&q=60"><div class="ov"><button class="p">Use</button><button>Refine</button><button>⋯</button></div></div>
+        <div class="card"><img src="https://images.unsplash.com/photo-1481833761820-0509d3217039?w=400&q=60"><div class="ov"><button class="p">Use</button><button>Refine</button><button>⋯</button></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSPECTOR: every control, visible + explained -->
+  <aside class="inspector">
+    <div class="insp-head">⚙ Controls <span style="margin-left:auto;font-size:11px;color:var(--text-3);font-weight:500">everything you can tune</span></div>
+    <div class="insp-body">
+
+      <div class="sec">
+        <h3>Format <span class="i" title="What kind of asset and its shape">i</span></h3>
+        <div class="modes">
+          <div class="mode on">✶ Image</div><div class="mode">▥ Carousel</div>
+          <div class="mode">▷ Video</div><div class="mode">◳ Flyer</div>
+        </div>
+        <div style="margin-top:9px" class="seg"><button class="on">1:1</button><button>4:5</button><button>9:16</button><button>16:9</button></div>
+        <div class="help">4:5 fills the most feed space on Instagram.</div>
+      </div>
+
+      <div class="sec">
+        <h3>Model &amp; quality <span class="i" title="Which engine + resolution">i</span></h3>
+        <select class="sel"><option>Ideogram v3 — best for exact text &amp; logos</option><option>Recraft v3 — typography &amp; brand assets</option><option>FLUX — fast, artistic</option></select>
+        <div class="opt-desc">Pick Ideogram/Recraft when your image needs readable words.</div>
+        <div class="seg"><button>1K</button><button class="on">2K</button><button>4K</button></div>
+        <div class="help">Higher quality = sharper detail &amp; text, slightly more credits.</div>
+      </div>
+
+      <div class="sec">
+        <h3>Brand <span class="i" title="Apply your saved voice, palette & rules">i</span></h3>
+        <div class="brandrow">
+          <span style="display:flex;align-items:center;gap:9px"><span class="sw"><span class="dot" style="background:#7C5CFC"></span><span class="dot" style="background:#FF6B6B"></span><span class="dot" style="background:#4ECBA4"></span></span><span style="font-size:13px">On-brand</span></span>
+          <span class="toggle" onclick="this.classList.toggle('off')"></span>
+        </div>
+        <div class="help">Steers colors + style toward your Brand Kit and composites your real logo.</div>
+      </div>
+
+      <div class="sec">
+        <h3>References <span class="i" title="Guide the look with images">i</span></h3>
+        <div class="refs">
+          <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=120&q=50">
+          <div class="refadd">＋</div>
+        </div>
+        <input class="slider" type="range" value="60" />
+        <div class="rl"><span>Loose inspiration</span><span>Match closely</span></div>
+        <div class="help">Upload, pick from Library, or paste a URL.</div>
+      </div>
+
+      <div class="sec">
+        <h3>Avoid <span class="i" title="Tell it what NOT to include">i</span></h3>
+        <input class="avoidin" placeholder="blurry, watermark, extra fingers, clutter…" />
+        <div class="help">Cuts wasted generations — describe what to keep out.</div>
+      </div>
+
+      <div class="sec">
+        <h3>Advanced <span class="i" title="Fine controls">i</span></h3>
+        <div class="seg"><button class="on">×1</button><button>×2</button><button>×3</button><button>×4</button></div>
+        <div class="opt-desc" style="margin-top:7px">Variants — generate several to compare.</div>
+        <input class="slider" type="range" value="50" />
+        <div class="rl"><span>Subtle styling</span><span>Strong styling</span></div>
+      </div>
+
+    </div>
+    <div class="insp-foot">
+      <div class="cost"><span>This generation</span><span><b>2 credits</b> · 28 left</span></div>
+      <div class="actions">
+        <button class="enhance" title="Enhance prompt → pick from 3 options">✦</button>
+        <button class="generate">Generate</button>
+      </div>
+    </div>
+  </aside>
+</div>
+<div class="note" style="position:fixed;bottom:6px;left:0;right:0">Mobile: the inspector becomes a "Controls" bottom sheet (UiBottomSheet); the composer + results stack full-width. Light mode = Solar Paper tokens.</div>
+<script>
+  function ts(){document.getElementById('st').classList.toggle('off');const s=document.getElementById('struct');s.classList.toggle('show');document.querySelector('textarea.prompt').style.display=s.classList.contains('show')?'none':'block';}
+</script>
+</body>
+</html>

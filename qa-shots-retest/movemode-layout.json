@@ -1,0 +1,34 @@
+{
+  "bodyFlexDirection": "column",
+  "mainColRect": {
+    "x": 0,
+    "y": 292.125,
+    "width": 390,
+    "height": 551.875,
+    "top": 292.125,
+    "right": 390,
+    "bottom": 844,
+    "left": 0
+  },
+  "gridRect": {
+    "x": 0,
+    "y": 292.125,
+    "width": 390,
+    "height": 1480,
+    "top": 292.125,
+    "right": 390,
+    "bottom": 1772.125,
+    "left": 0
+  },
+  "dropCandidateRect": {
+    "x": 0,
+    "y": 320.125,
+    "width": 76,
+    "height": 242,
+    "top": 320.125,
+    "right": 76,
+    "bottom": 562.125,
+    "left": 0
+  },
+  "dropCandidateFound": true
+}

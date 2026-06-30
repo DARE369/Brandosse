@@ -1,0 +1,32 @@
+[
+  {
+    "target_user_id": "00000000-0000-0000-0000-000000000000",
+    "scope": "personal",
+    "platform": "instagram",
+    "display_name": "Nike Official",
+    "username": "nikeofficial",
+    "profile_type": "Business",
+    "follower_count": 285000,
+    "account_category": "Brand"
+  },
+  {
+    "target_user_id": "00000000-0000-0000-0000-000000000001",
+    "scope": "personal",
+    "platform": "threads",
+    "display_name": "Creator Lab",
+    "username": "creatorlab",
+    "profile_type": "Creator",
+    "follower_count": 32000
+  },
+  {
+    "target_user_id": "00000000-0000-0000-0000-000000000002",
+    "scope": "organization",
+    "organization_id": "11111111-1111-1111-1111-111111111111",
+    "platform": "linkedin",
+    "display_name": "Acme B2B",
+    "username": "acmeb2b",
+    "profile_type": "Business",
+    "follower_count": 12000,
+    "account_category": "Technology"
+  }
+]

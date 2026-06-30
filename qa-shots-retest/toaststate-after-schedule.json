@@ -1,0 +1,30 @@
+[
+  {
+    "outerHTML": "<div class=\"cal3-toast-stack\" aria-live=\"polite\"><div class=\"cal3-toast\"><span class=\"cal3-toast__icon tone-success\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M20 6L9 17l-5-5\"></path></svg></span><div class=\"cal3-toast__body\"><p class=\"cal3-toast__title\">Post scheduled</p><p class=\"cal3-toast__desc\">Find it in the Drafts rail, the calendar, or the Library anytime.</p></div><button type=\"button\" class=\"ui-icon-button ui-icon-button-ghost ui-icon-button-sm cal3-toast__close\" aria-label=\"Dismiss\">×</button></div></div>",
+    "classes": "cal3-toast-stack"
+  },
+  {
+    "outerHTML": "<div class=\"cal3-toast\"><span class=\"cal3-toast__icon tone-success\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M20 6L9 17l-5-5\"></path></svg></span><div class=\"cal3-toast__body\"><p class=\"cal3-toast__title\">Post scheduled</p><p class=\"cal3-toast__desc\">Find it in the Drafts rail, the calendar, or the Library anytime.</p></div><button type=\"button\" class=\"ui-icon-button ui-icon-button-ghost ui-icon-button-sm cal3-toast__close\" aria-label=\"Dismiss\">×</button></div>",
+    "classes": "cal3-toast"
+  },
+  {
+    "outerHTML": "<span class=\"cal3-toast__icon tone-success\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M20 6L9 17l-5-5\"></path></svg></span>",
+    "classes": "cal3-toast__icon tone-success"
+  },
+  {
+    "outerHTML": "<div class=\"cal3-toast__body\"><p class=\"cal3-toast__title\">Post scheduled</p><p class=\"cal3-toast__desc\">Find it in the Drafts rail, the calendar, or the Library anytime.</p></div>",
+    "classes": "cal3-toast__body"
+  },
+  {
+    "outerHTML": "<p class=\"cal3-toast__title\">Post scheduled</p>",
+    "classes": "cal3-toast__title"
+  },
+  {
+    "outerHTML": "<p class=\"cal3-toast__desc\">Find it in the Drafts rail, the calendar, or the Library anytime.</p>",
+    "classes": "cal3-toast__desc"
+  },
+  {
+    "outerHTML": "<button type=\"button\" class=\"ui-icon-button ui-icon-button-ghost ui-icon-button-sm cal3-toast__close\" aria-label=\"Dismiss\">×</button>",
+    "classes": "ui-icon-button ui-icon-button-ghost ui-icon-button-sm cal3-toast__close"
+  }
+]

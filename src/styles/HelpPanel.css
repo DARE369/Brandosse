@@ -1,0 +1,366 @@
+.help-panel-overlay {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--dash-bg, var(--color-bg-page)) 58%, color-mix(in srgb, var(--color-bg-page) 80%, transparent));
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: 180;
+}
+
+.help-panel-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.help-panel {
+  --help-panel-edge: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 18%, var(--dash-border, var(--color-border)));
+  --help-panel-surface: color-mix(in srgb, var(--dash-panel, var(--color-bg-surface)) 96%, transparent);
+  --help-panel-surface-strong: color-mix(in srgb, var(--dash-panel-2, var(--color-bg-elevated)) 94%, transparent);
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(420px, 100vw);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--dash-accent, var(--color-primary)) 18%, transparent) 0%, transparent 42%),
+    radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--dash-success, var(--color-success)) 8%, transparent) 0%, transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--dash-panel, var(--color-bg-surface)) 98%, transparent), color-mix(in srgb, var(--dash-panel-2, var(--color-bg-elevated)) 96%, transparent));
+  border-left: 1px solid var(--help-panel-edge);
+  box-shadow: 0 30px 90px rgba(2, 6, 23, 0.58);
+  transform: translateX(100%);
+  transition: transform 0.24s ease;
+  z-index: 190;
+}
+
+.help-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 1px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dash-accent, var(--color-primary)) 28%, transparent), transparent 26%, transparent 74%, color-mix(in srgb, var(--dash-accent, var(--color-primary)) 18%, transparent));
+  opacity: 0.72;
+}
+
+.help-panel.open {
+  transform: translateX(0);
+}
+
+.help-panel-header,
+.help-panel-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.help-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--dash-border, var(--color-border)) 88%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--public-dark-text) 3%, transparent), transparent);
+}
+
+.help-panel-header h2 {
+  margin: 6px 0 0;
+  color: var(--dash-text-1, var(--color-text-primary));
+  font-family: var(--dash-font-display, var(--font-display, "Sora", sans-serif));
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.help-panel-eyebrow {
+  color: color-mix(in srgb, var(--dash-accent-light, var(--color-primary-text)) 86%, var(--dash-text-2, var(--color-text-secondary)));
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.help-panel-close,
+.help-panel-link,
+.help-panel-primary,
+.help-panel-secondary {
+  transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease, color 150ms ease;
+}
+
+.help-panel-close {
+  width: 40px;
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--dash-border, var(--color-border)) 92%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--help-panel-surface-strong) 86%, transparent);
+  color: var(--dash-text-2, var(--color-text-secondary));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.help-panel-close:hover,
+.help-panel-close:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 28%, transparent);
+  background: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 12%, var(--help-panel-surface-strong));
+  color: var(--dash-text-1, var(--color-text-primary));
+  outline: none;
+}
+
+.help-panel-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.help-panel-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.help-panel-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 20%, var(--dash-border, var(--color-border)));
+}
+
+.help-panel-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 15px;
+  border: 1px solid color-mix(in srgb, var(--dash-border, var(--color-border)) 90%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--help-panel-surface) 92%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--public-dark-text) 3%, transparent);
+  color: var(--dash-text-2, var(--color-text-secondary));
+}
+
+.help-panel-search:focus-within {
+  border-color: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 42%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent, var(--color-primary)) 16%, transparent);
+}
+
+.help-panel-search input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--dash-text-1, var(--color-text-primary));
+  font: inherit;
+}
+
+.help-panel-search input::placeholder {
+  color: var(--dash-text-3, var(--color-text-tertiary));
+}
+
+.help-panel-faq-condensed,
+.help-panel-tickets-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.help-panel-section {
+  padding: 15px;
+  border: 1px solid color-mix(in srgb, var(--dash-border, var(--color-border)) 88%, transparent);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--public-dark-text) 4%, transparent), transparent 38%),
+    color-mix(in srgb, var(--help-panel-surface-strong) 96%, transparent);
+  box-shadow: var(--dash-shadow-sm, var(--shadow-sm));
+}
+
+.help-panel-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--dash-text-1, var(--color-text-primary));
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.help-panel-faq-item,
+.help-panel-ticket-item {
+  margin-top: 12px;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--dash-border, var(--color-border)) 74%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--dash-panel, var(--color-bg-surface)) 86%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.help-panel-faq-item strong,
+.help-panel-ticket-item strong {
+  color: var(--dash-text-1, var(--color-text-primary));
+  font-size: 0.84rem;
+}
+
+.help-panel-faq-item p,
+.help-panel-ticket-item span {
+  margin: 0;
+  color: var(--dash-text-2, var(--color-text-secondary));
+  font-size: 0.76rem;
+  line-height: 1.6;
+}
+
+.help-panel-link,
+.help-panel-primary,
+.help-panel-secondary {
+  min-height: 46px;
+  border-radius: 15px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.help-panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--dash-border, var(--color-border)) 88%, transparent);
+  background: color-mix(in srgb, var(--help-panel-surface) 86%, transparent);
+  color: var(--dash-text-1, var(--color-text-primary));
+  box-shadow: var(--dash-shadow-sm, var(--shadow-sm));
+}
+
+.help-panel-link:hover,
+.help-panel-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 26%, transparent);
+  color: color-mix(in srgb, var(--dash-accent-light, var(--color-primary-text)) 82%, var(--dash-text-1, var(--color-text-primary)));
+  outline: none;
+}
+
+.help-panel-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--dash-border, var(--color-border)) 90%, transparent), transparent);
+}
+
+.help-panel-ticket-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.help-panel-ticket-category,
+.help-panel-ticket-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.help-panel-ticket-category {
+  background: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 16%, transparent);
+  color: var(--dash-accent-light, var(--color-primary-text));
+}
+
+.help-panel-ticket-status.submitted {
+  background: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 16%, transparent);
+  color: var(--dash-accent-light, var(--color-primary-text));
+}
+
+.help-panel-ticket-status.under_review {
+  background: color-mix(in srgb, var(--dash-warning, var(--color-warning)) 18%, transparent);
+  color: var(--dash-warning, var(--color-warning));
+}
+
+.help-panel-ticket-status.resolved {
+  background: color-mix(in srgb, var(--dash-success, var(--color-success)) 18%, transparent);
+  color: var(--dash-success, var(--color-success));
+}
+
+.help-panel-ticket-status.closed {
+  background: color-mix(in srgb, var(--dash-text-3, var(--color-text-tertiary)) 20%, transparent);
+  color: var(--dash-text-2, var(--color-text-secondary));
+}
+
+.help-panel-empty {
+  padding: 15px;
+  border-radius: 16px;
+  border: 1px dashed color-mix(in srgb, var(--dash-border, var(--color-border)) 86%, transparent);
+  background: color-mix(in srgb, var(--help-panel-surface) 84%, transparent);
+  color: var(--dash-text-2, var(--color-text-secondary));
+  font-size: 0.8rem;
+}
+
+.help-panel-footer {
+  padding: 18px 20px 22px;
+  border-top: 1px solid color-mix(in srgb, var(--dash-border, var(--color-border)) 88%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--public-dark-text) 2%, transparent), color-mix(in srgb, var(--color-bg-page) 12%, transparent));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.help-panel-primary,
+.help-panel-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+}
+
+.help-panel-primary {
+  border-color: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 42%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--dash-accent, var(--color-primary)) 76%, var(--public-dark-text) 10%), color-mix(in srgb, var(--dash-accent-hover, var(--color-primary-hover)) 88%, var(--color-bg-page) 12%));
+  color: var(--public-dark-text);
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--dash-accent, var(--color-primary)) 28%, transparent);
+}
+
+.help-panel-secondary {
+  border-color: color-mix(in srgb, var(--dash-border, var(--color-border)) 88%, transparent);
+  background: color-mix(in srgb, var(--help-panel-surface) 86%, transparent);
+  color: var(--dash-text-1, var(--color-text-primary));
+}
+
+.help-panel-primary:hover,
+.help-panel-primary:focus-visible,
+.help-panel-secondary:hover,
+.help-panel-secondary:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.help-panel-primary:hover,
+.help-panel-primary:focus-visible {
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--dash-accent, var(--color-primary)) 34%, transparent);
+}
+
+.help-panel-secondary:hover,
+.help-panel-secondary:focus-visible {
+  border-color: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 22%, transparent);
+  background: color-mix(in srgb, var(--dash-accent, var(--color-primary)) 10%, var(--help-panel-surface));
+}
+
+@media (max-width: 640px) {
+  .help-panel {
+    width: 100vw;
+  }
+
+  .help-panel-header,
+  .help-panel-body,
+  .help-panel-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

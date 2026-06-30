@@ -1,0 +1,75 @@
+.workspace-switcher-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.workspace-switcher-heading {
+  padding: 2px 2px 8px;
+  color: var(--workspace-switcher-muted, var(--admin-text-2, var(--dash-text-2, var(--text-secondary))));
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workspace-switcher-item {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 14px;
+  border: 1px solid var(--workspace-switcher-border, var(--admin-border, var(--dash-border, var(--border))));
+  background: var(--workspace-switcher-bg, var(--admin-panel, var(--dash-panel)));
+  color: inherit;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.workspace-switcher-item:hover {
+  transform: translateY(-1px);
+  border-color: var(--workspace-switcher-border-strong, var(--admin-border-strong, var(--dash-border-hover)));
+  background: var(--workspace-switcher-hover, var(--admin-panel-hover, var(--dash-panel-hover)));
+}
+
+.workspace-switcher-item.active {
+  border-color: var(--workspace-switcher-border-strong, var(--admin-border-strong, var(--dash-border-hover)));
+  background: color-mix(in srgb, var(--workspace-switcher-accent, var(--admin-accent, var(--dash-accent))) 10%, transparent);
+}
+
+.workspace-switcher-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--workspace-switcher-accent, var(--admin-accent-light, var(--dash-accent-light)));
+  background: color-mix(in srgb, var(--workspace-switcher-accent, var(--admin-accent, var(--dash-accent))) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workspace-switcher-accent, var(--admin-accent, var(--dash-accent))) 24%, transparent);
+}
+
+.workspace-switcher-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.workspace-switcher-copy strong {
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+.workspace-switcher-copy span {
+  color: var(--workspace-switcher-muted, var(--admin-text-2, var(--dash-text-2, var(--text-secondary))));
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.workspace-switcher-active {
+  color: var(--workspace-switcher-accent, var(--admin-accent-light, var(--dash-accent-light)));
+}

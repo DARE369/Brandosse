@@ -1,0 +1,1917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Generate Studio — Design Review v2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #090912;
+  --surface:   #0f0f1e;
+  --panel:     #141426;
+  --panel-2:   #181832;
+  --field:     #1c1c38;
+  --border:    #22224a;
+  --border-2:  #2a2a55;
+  --primary:   #7c6af7;
+  --primary-s: #5e4de0;
+  --primary-w: rgba(124,106,247,0.1);
+  --primary-m: rgba(124,106,247,0.22);
+  --text:      #e4e4f4;
+  --text-2:    #a8a8c8;
+  --muted:     #585878;
+  --success:   #34d399;
+  --warning:   #fbbf24;
+  --danger:    #f43f5e;
+  --sky:       #38bdf8;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ═══════════════════════════
+   TOPBAR
+═══════════════════════════ */
+.topbar {
+  position: sticky; top: 0; z-index: 200;
+  height: 54px;
+  background: rgba(9,9,18,0.9);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 0;
+  padding: 0 20px 0 0;
+}
+.topbar__brand {
+  width: 56px; height: 54px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-right: 1px solid var(--border);
+}
+.topbar__logo {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(135deg, #9d8fff 0%, var(--primary) 50%, var(--primary-s) 100%);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 1px rgba(124,106,247,0.3), 0 4px 12px rgba(124,106,247,0.3);
+}
+.topbar__logo svg { color: #fff; }
+
+.topbar__breadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 16px; color: var(--muted); font-size: 13px;
+  border-right: 1px solid var(--border); height: 54px;
+}
+.topbar__breadcrumb span { color: var(--text-2); font-weight: 500; }
+.topbar__breadcrumb svg { color: var(--muted); }
+
+.topbar__nav {
+  display: flex; align-items: center; gap: 2px; padding: 0 12px;
+}
+.topbar__nav-btn {
+  height: 30px; padding: 0 11px; border-radius: 8px; border: none;
+  background: transparent; color: var(--muted); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+}
+.topbar__nav-btn:hover { background: var(--field); color: var(--text-2); }
+.topbar__nav-btn.active { background: var(--primary-w); color: var(--primary); }
+
+.topbar__spacer { flex: 1; }
+.topbar__right { display: flex; align-items: center; gap: 8px; }
+
+.credits-pill {
+  height: 28px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--field);
+  color: var(--text-2); font-size: 12px; font-weight: 500;
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  transition: all 0.15s;
+}
+.credits-pill:hover { border-color: var(--border-2); }
+.credits-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--success); box-shadow: 0 0 5px var(--success); }
+
+.topbar__notif {
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--field);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--muted); transition: all 0.15s; position: relative;
+}
+.topbar__notif:hover { color: var(--text-2); }
+.notif-badge {
+  position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--primary); border: 1.5px solid var(--bg);
+}
+
+.topbar__avatar {
+  width: 28px; height: 28px; border-radius: 8px; cursor: pointer; overflow: hidden;
+  background: linear-gradient(135deg, var(--primary) 0%, #f472b6 100%);
+  border: 1px solid var(--border-2);
+}
+
+/* ═══════════════════════════
+   SHELL
+═══════════════════════════ */
+.shell { display: flex; min-height: calc(100vh - 54px); }
+
+/* ═══════════════════════════
+   SIDEBAR
+═══════════════════════════ */
+.sidebar {
+  width: 56px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 0; gap: 4px;
+  position: sticky; top: 54px; height: calc(100vh - 54px); overflow: hidden;
+}
+.sidebar__item {
+  width: 38px; height: 38px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--muted); border: none; background: transparent;
+  transition: all 0.15s; position: relative;
+}
+.sidebar__item:hover { background: var(--field); color: var(--text-2); }
+.sidebar__item.active {
+  background: var(--primary-w);
+  color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary-m);
+}
+.sidebar__item.active::before {
+  content: ''; position: absolute; left: -1px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 20px; background: var(--primary); border-radius: 0 3px 3px 0;
+}
+.sidebar__div { width: 28px; height: 1px; background: var(--border); margin: 4px 0; }
+.sidebar__push { flex: 1; }
+
+/* ═══════════════════════════
+   CANVAS
+═══════════════════════════ */
+.canvas {
+  flex: 1; overflow-y: auto; position: relative;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(rgba(124,106,247,0.035) 1px, transparent 1px),
+    radial-gradient(rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 32px 32px, 8px 8px;
+}
+/* Ambient glow */
+.canvas::before {
+  content: ''; position: fixed; top: 54px; left: 56px; right: 0;
+  height: 300px; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 60% 40% at 60% 0%, rgba(124,106,247,0.07) 0%, transparent 70%);
+}
+
+.view { display: none; flex-direction: column; padding: 36px 36px 160px; max-width: 880px; margin: 0 auto; position: relative; z-index: 1; }
+.view.active { display: flex; }
+
+/* ═══════════════════════════
+   VIEW 1 — INTENT
+═══════════════════════════ */
+.intent-header { margin-bottom: 28px; }
+.intent-header__eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.intent-header__eyebrow::before {
+  content: ''; display: block; width: 16px; height: 2px; border-radius: 1px;
+  background: linear-gradient(90deg, var(--primary), transparent);
+}
+.intent-header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.2; }
+.intent-header p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+/* ── Goal cards grid (6-col system) ── */
+.goal-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.goal-card {
+  position: relative; overflow: hidden;
+  border-radius: 16px; padding: 20px;
+  border: 1.5px solid var(--border);
+  cursor: pointer; background: var(--panel);
+  transition: all 0.25s cubic-bezier(0.34,1.26,0.64,1);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.goal-card:nth-child(1),
+.goal-card:nth-child(2),
+.goal-card:nth-child(3) { grid-column: span 2; }
+.goal-card:nth-child(4),
+.goal-card:nth-child(5) { grid-column: span 3; }
+
+/* Background glow layer */
+.goal-card__bg {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 0.25s;
+  border-radius: 15px;
+}
+.goal-card[data-goal="promote"] .goal-card__bg { background: radial-gradient(ellipse 80% 60% at 10% 20%, rgba(124,106,247,0.22) 0%, transparent 70%); }
+.goal-card[data-goal="brand"]   .goal-card__bg { background: radial-gradient(ellipse 80% 60% at 10% 20%, rgba(251,191,36,0.2) 0%, transparent 70%); }
+.goal-card[data-goal="educate"] .goal-card__bg { background: radial-gradient(ellipse 80% 60% at 10% 20%, rgba(52,211,153,0.18) 0%, transparent 70%); }
+.goal-card[data-goal="engage"]  .goal-card__bg { background: radial-gradient(ellipse 80% 60% at 10% 20%, rgba(244,63,94,0.18) 0%, transparent 70%); }
+.goal-card[data-goal="explore"] .goal-card__bg { background: radial-gradient(ellipse 80% 60% at 10% 20%, rgba(56,189,248,0.18) 0%, transparent 70%); }
+
+.goal-card:hover { transform: translateY(-2px); border-color: var(--border-2); }
+.goal-card:hover .goal-card__bg { opacity: 0.6; }
+.goal-card.selected { border-color: transparent; }
+.goal-card.selected .goal-card__bg { opacity: 1; }
+
+/* Colored selected border via box-shadow */
+.goal-card[data-goal="promote"].selected { box-shadow: 0 0 0 1.5px rgba(124,106,247,0.6), 0 8px 32px rgba(124,106,247,0.15); }
+.goal-card[data-goal="brand"].selected   { box-shadow: 0 0 0 1.5px rgba(251,191,36,0.6), 0 8px 32px rgba(251,191,36,0.12); }
+.goal-card[data-goal="educate"].selected { box-shadow: 0 0 0 1.5px rgba(52,211,153,0.6), 0 8px 32px rgba(52,211,153,0.12); }
+.goal-card[data-goal="engage"].selected  { box-shadow: 0 0 0 1.5px rgba(244,63,94,0.6), 0 8px 32px rgba(244,63,94,0.12); }
+.goal-card[data-goal="explore"].selected { box-shadow: 0 0 0 1.5px rgba(56,189,248,0.6), 0 8px 32px rgba(56,189,248,0.12); }
+
+.goal-card__top { display: flex; align-items: flex-start; justify-content: space-between; position: relative; z-index: 1; }
+.goal-card__icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.goal-card[data-goal="promote"] .goal-card__icon { background: rgba(124,106,247,0.18); color: #a99bff; }
+.goal-card[data-goal="brand"]   .goal-card__icon { background: rgba(251,191,36,0.15);  color: #fbbf24; }
+.goal-card[data-goal="educate"] .goal-card__icon { background: rgba(52,211,153,0.15);  color: #34d399; }
+.goal-card[data-goal="engage"]  .goal-card__icon { background: rgba(244,63,94,0.15);   color: #fb7185; }
+.goal-card[data-goal="explore"] .goal-card__icon { background: rgba(56,189,248,0.15);  color: #38bdf8; }
+
+.goal-card__check {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0.5);
+  transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+.goal-card[data-goal="promote"] .goal-card__check { background: var(--primary); }
+.goal-card[data-goal="brand"].selected   .goal-card__check { background: #fbbf24; }
+.goal-card[data-goal="educate"].selected .goal-card__check { background: #34d399; }
+.goal-card[data-goal="engage"].selected  .goal-card__check { background: #f43f5e; }
+.goal-card[data-goal="explore"].selected .goal-card__check { background: #38bdf8; }
+.goal-card.selected .goal-card__check { opacity: 1; transform: scale(1); }
+
+.goal-card__body { position: relative; z-index: 1; }
+.goal-card__title { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
+.goal-card__sub   { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+
+/* ── Chip rows ── */
+.section-block { margin-bottom: 22px; }
+.section-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); margin-bottom: 10px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  height: 32px; padding: 0 13px; border-radius: 99px;
+  border: 1.5px solid var(--border); background: var(--panel);
+  color: var(--muted); font-size: 12px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; gap: 7px;
+  transition: all 0.15s; white-space: nowrap; position: relative;
+}
+.chip svg { width: 13px; height: 13px; flex-shrink: 0; }
+.chip:hover { border-color: var(--border-2); color: var(--text-2); background: var(--field); }
+.chip.active {
+  border-color: var(--primary);
+  background: var(--primary-w);
+  color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124,106,247,0.08);
+}
+
+/* ── Intent CTA ── */
+.intent-footer { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.btn-generate-main {
+  width: 100%; height: 50px; border-radius: var(--radius-md); border: none; cursor: pointer;
+  font-size: 14px; font-weight: 700; letter-spacing: -0.02em; color: #fff;
+  background: linear-gradient(135deg, #9d8fff 0%, var(--primary) 45%, var(--primary-s) 100%);
+  box-shadow: 0 0 0 1px rgba(124,106,247,0.25), 0 2px 16px rgba(124,106,247,0.4), 0 8px 32px rgba(124,106,247,0.2);
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  transition: all 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+  position: relative; overflow: hidden;
+}
+.btn-generate-main::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+  opacity: 0; transition: opacity 0.2s;
+}
+.btn-generate-main:hover::before { opacity: 1; }
+.btn-generate-main:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(124,106,247,0.35), 0 4px 20px rgba(124,106,247,0.5), 0 12px 40px rgba(124,106,247,0.25);
+}
+.intent-hint { text-align: center; font-size: 11px; color: var(--muted); }
+.intent-hint strong { color: var(--text-2); font-weight: 500; }
+
+/* ═══════════════════════════
+   VIEW 2 — GENERATING
+═══════════════════════════ */
+.gen-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+}
+.back-btn {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  border: 1px solid var(--border); background: var(--panel);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--muted); transition: all 0.15s;
+}
+.back-btn:hover { background: var(--field); color: var(--text-2); }
+.gen-header__meta h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.gen-header__meta p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* Progress */
+.gen-progress-wrap { margin-bottom: 28px; }
+.gen-progress-info {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+.gen-progress-label { font-size: 12px; color: var(--muted); }
+.gen-progress-pct   { font-size: 12px; font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
+.gen-progress-track { height: 3px; background: var(--field); border-radius: 99px; overflow: hidden; }
+.gen-progress-fill {
+  height: 100%; width: 0%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--primary), #c084fc, #f472b6);
+  background-size: 200% 100%; animation: progressMove 2s linear infinite;
+  transition: width 0.4s ease;
+}
+@keyframes progressMove { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+
+/* Shimmer grid */
+.shimmer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.shimmer-card {
+  border-radius: var(--radius-md); overflow: hidden;
+  border: 1px solid var(--border); background: var(--panel);
+}
+.shimmer-card:nth-child(1) { aspect-ratio: 4/5; }
+.shimmer-card:nth-child(2) { aspect-ratio: 1; }
+.shimmer-card:nth-child(3) { aspect-ratio: 9/16; }
+.shimmer-card:nth-child(4) { aspect-ratio: 16/9; grid-column: 1/3; }
+.shimmer-card:nth-child(5) { aspect-ratio: 4/3; }
+.shimmer-inner {
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, var(--panel) 0%, var(--field) 35%, rgba(124,106,247,0.07) 50%, var(--field) 65%, var(--panel) 100%);
+  background-size: 300% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+@keyframes shimmer { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+
+.gen-status-row { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+.gen-status-pulse {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0;
+  animation: pulseRing 2s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(124,106,247,0.6);
+}
+@keyframes pulseRing {
+  0%  { box-shadow: 0 0 0 0   rgba(124,106,247,0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(124,106,247,0); }
+  100%{ box-shadow: 0 0 0 0   rgba(124,106,247,0); }
+}
+.gen-status-msg { font-size: 13px; color: var(--muted); flex: 1; }
+.gen-status-msg span { color: var(--text-2); font-weight: 500; }
+.gen-cancel { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.gen-cancel:hover { background: var(--field); color: var(--text-2); }
+
+.gen-ready {
+  display: none; margin-top: 24px; padding: 18px 20px; border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(52,211,153,0.08) 0%, rgba(52,211,153,0.03) 100%);
+  border: 1px solid rgba(52,211,153,0.25);
+  flex-direction: column; gap: 14px;
+}
+.gen-ready.visible { display: flex; }
+.gen-ready__text { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 8px; }
+.gen-ready__text svg { color: var(--success); flex-shrink: 0; }
+.btn-view-results {
+  height: 42px; border-radius: var(--radius-sm); border: none; cursor: pointer;
+  background: var(--primary); color: #fff; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all 0.2s; box-shadow: 0 2px 12px rgba(124,106,247,0.4);
+}
+.btn-view-results:hover { background: var(--primary-s); transform: translateY(-1px); }
+
+/* ═══════════════════════════
+   VIEW 3 — RESULTS
+═══════════════════════════ */
+.results-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+}
+.results-bar__left { display: flex; align-items: center; gap: 10px; }
+.results-bar__title { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.results-badge {
+  height: 20px; padding: 0 7px; border-radius: 6px;
+  background: var(--primary-w); border: 1px solid var(--primary-m); color: var(--primary);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  display: flex; align-items: center;
+}
+.results-bar__right { display: flex; gap: 7px; }
+
+.btn-sm {
+  height: 32px; padding: 0 11px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--panel);
+  color: var(--muted); font-size: 12px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s;
+}
+.btn-sm:hover { border-color: var(--border-2); color: var(--text-2); }
+.btn-sm svg { width: 13px; height: 13px; }
+.btn-sm.primary { background: var(--primary); border-color: transparent; color: #fff; box-shadow: 0 2px 8px rgba(124,106,247,0.35); }
+.btn-sm.primary:hover { background: var(--primary-s); }
+
+/* Filter strip */
+.filter-strip {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.filter-btn {
+  height: 28px; padding: 0 11px; border-radius: 8px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--muted); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+}
+.filter-btn:hover { background: var(--field); color: var(--text-2); }
+.filter-btn.active { background: var(--field); border-color: var(--border-2); color: var(--text); }
+
+/* Selection banner */
+.selection-banner {
+  display: none; align-items: center; gap: 10px; margin-bottom: 14px;
+  padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--primary-w); border: 1px solid var(--primary-m);
+}
+.selection-banner.visible { display: flex; }
+.selection-banner__text { font-size: 12px; color: var(--primary); font-weight: 500; flex: 1; }
+.sel-clear { background: none; border: none; color: var(--primary); font-size: 12px; cursor: pointer; opacity: 0.7; }
+.sel-clear:hover { opacity: 1; }
+
+/* Results masonry grid */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+/* ── Result card ── */
+.result-card {
+  position: relative; border-radius: var(--radius-md); overflow: hidden;
+  border: 1.5px solid var(--border); background: var(--panel);
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94), border-color 0.2s, box-shadow 0.2s;
+}
+.result-card:nth-child(1) { aspect-ratio: 4/5; }
+.result-card:nth-child(2) { aspect-ratio: 1; }
+.result-card:nth-child(3) { aspect-ratio: 9/16; }
+.result-card:nth-child(4) { aspect-ratio: 16/9; grid-column: 1/3; }
+.result-card:nth-child(5) { aspect-ratio: 4/3; }
+.result-card:nth-child(6) { aspect-ratio: 4/5; }
+
+.result-card:hover { transform: translateY(-2px); border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,106,247,0.1), 0 8px 28px rgba(0,0,0,0.4); }
+.result-card.selected { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,106,247,0.15); }
+
+/* ── CSS art images ── */
+.card-img {
+  width: 100%; height: 100%; position: absolute; inset: 0;
+}
+
+/* img-1: product photography — violet dramatic lighting */
+.card-img.i1 {
+  background:
+    radial-gradient(ellipse 45% 55% at 50% 38%, rgba(200,190,255,0.12) 0%, transparent 60%),
+    radial-gradient(circle   at 20% 80%, rgba(100,85,232,0.35) 0%, transparent 45%),
+    radial-gradient(circle   at 80% 20%, rgba(168,139,250,0.2) 0%, transparent 40%),
+    linear-gradient(160deg, #050010 0%, #0f0525 30%, #1a0a42 60%, #0a0320 100%);
+}
+.card-img.i1::before {
+  content: ''; position: absolute; left: 50%; top: 38%; transform: translate(-50%,-50%);
+  width: 45%; height: 55%; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(180,170,255,0.09) 0%, transparent 70%);
+}
+.card-img.i1::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(5,0,16,0.6) 0%, transparent 50%);
+}
+
+/* img-2: lifestyle square — golden hour warm */
+.card-img.i2 {
+  background:
+    radial-gradient(ellipse 70% 50% at 25% 15%, rgba(255,200,80,0.22) 0%, transparent 55%),
+    radial-gradient(circle   at 80% 75%, rgba(220,80,30,0.18) 0%, transparent 45%),
+    radial-gradient(ellipse  at 50% 50%, rgba(180,100,20,0.08) 0%, transparent 70%),
+    linear-gradient(145deg, #0c0600 0%, #1e1000 25%, #3a1c00 55%, #1e0e00 100%);
+}
+.card-img.i2::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(12,6,0,0.5) 0%, transparent 50%); }
+
+/* img-3: editorial story — deep emerald */
+.card-img.i3 {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 25%, rgba(52,211,153,0.12) 0%, transparent 55%),
+    radial-gradient(circle   at 15% 70%, rgba(6,95,70,0.5) 0%, transparent 45%),
+    radial-gradient(circle   at 85% 30%, rgba(16,185,129,0.15) 0%, transparent 40%),
+    linear-gradient(180deg, #020a06 0%, #061612 30%, #0b2218 60%, #04120c 100%);
+}
+.card-img.i3::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(2,10,6,0.65) 0%, transparent 50%); }
+
+/* img-4: cinematic wide — violet → rose */
+.card-img.i4 {
+  background:
+    radial-gradient(ellipse 40% 80% at 30% 50%, rgba(139,92,246,0.25) 0%, transparent 60%),
+    radial-gradient(circle   at 75% 20%, rgba(244,63,94,0.18) 0%, transparent 45%),
+    radial-gradient(circle   at 60% 80%, rgba(167,139,250,0.12) 0%, transparent 50%),
+    linear-gradient(100deg, #080012 0%, #150830 40%, #200a40 65%, #10041c 100%);
+}
+.card-img.i4::before {
+  content: ''; position: absolute;
+  left: 15%; top: 30%; width: 35%; height: 40%; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(139,92,246,0.12) 0%, transparent 70%);
+}
+.card-img.i4::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to right, rgba(8,0,18,0.4) 0%, transparent 60%, rgba(8,0,18,0.2) 100%); }
+
+/* img-5: brand amber — editorial warmth */
+.card-img.i5 {
+  background:
+    radial-gradient(ellipse 60% 60% at 70% 35%, rgba(251,191,36,0.22) 0%, transparent 55%),
+    radial-gradient(circle   at 15% 65%, rgba(220,88,12,0.2) 0%, transparent 45%),
+    radial-gradient(ellipse  at 50% 90%, rgba(180,60,0,0.15) 0%, transparent 50%),
+    linear-gradient(140deg, #080400 0%, #1a0e00 30%, #2e1800 60%, #160a00 100%);
+}
+.card-img.i5::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(8,4,0,0.5) 0%, transparent 55%); }
+
+/* img-6: high fashion — monochrome with rose */
+.card-img.i6 {
+  background:
+    radial-gradient(ellipse 55% 65% at 50% 35%, rgba(255,255,255,0.05) 0%, transparent 55%),
+    radial-gradient(circle   at 80% 65%, rgba(190,18,60,0.28) 0%, transparent 45%),
+    radial-gradient(circle   at 20% 30%, rgba(100,0,40,0.2) 0%, transparent 40%),
+    linear-gradient(155deg, #040004 0%, #0d000d 30%, #180618 60%, #08000a 100%);
+}
+.card-img.i6::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(4,0,4,0.6) 0%, transparent 50%); }
+
+/* Hover overlay */
+.card-overlay {
+  position: absolute; inset: 0; z-index: 2;
+  background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 45%, transparent 100%);
+  opacity: 0; transition: opacity 0.2s;
+  display: flex; flex-direction: column; justify-content: space-between; padding: 10px;
+}
+.result-card:hover .card-overlay { opacity: 1; }
+
+.card-overlay__top { display: flex; justify-content: space-between; align-items: flex-start; }
+.card-select-toggle {
+  width: 20px; height: 20px; border-radius: 6px;
+  border: 1.5px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.3);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: all 0.15s;
+}
+.card-select-toggle:hover { border-color: rgba(255,255,255,0.8); background: rgba(0,0,0,0.5); }
+.result-card.selected .card-select-toggle { background: var(--primary); border-color: var(--primary); opacity: 1; }
+.result-card.selected .card-overlay { opacity: 1; }
+
+.card-quick-actions { display: flex; gap: 5px; }
+.qbtn {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background 0.15s;
+}
+.qbtn:hover { background: rgba(0,0,0,0.8); color: #fff; }
+.qbtn.cta { background: var(--primary); border-color: transparent; }
+.qbtn.cta:hover { background: var(--primary-s); }
+.qbtn svg { width: 13px; height: 13px; }
+
+.card-overlay__bottom { }
+.card-format-label { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 0.04em; text-transform: uppercase; }
+.card-format-ratio  { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.92); letter-spacing: -0.01em; }
+
+/* ═══════════════════════════
+   POST-PRODUCTION DRAWER
+═══════════════════════════ */
+.backdrop {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+}
+.backdrop.open { display: block; }
+
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 600;
+  width: 420px; max-width: 96vw;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94);
+  box-shadow: -20px 0 60px rgba(0,0,0,0.5);
+}
+.drawer.open { transform: translateX(0); }
+
+.drawer__head {
+  padding: 16px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.drawer__head__title { font-size: 14px; font-weight: 700; flex: 1; letter-spacing: -0.01em; }
+.drawer__head__badge {
+  height: 20px; padding: 0 7px; border-radius: 5px; font-size: 10px; font-weight: 600;
+  background: rgba(52,211,153,0.12); color: var(--success);
+  display: flex; align-items: center; gap: 4px;
+}
+.drawer__head__badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--success); }
+.drawer__close-btn {
+  width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--field); color: var(--muted); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+}
+.drawer__close-btn:hover { background: var(--border); color: var(--text); }
+
+.drawer__body { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+
+/* Asset hero */
+.d-asset {
+  border-radius: 12px; overflow: hidden; position: relative;
+  aspect-ratio: 4/3;
+  background:
+    radial-gradient(ellipse 45% 55% at 50% 38%, rgba(200,190,255,0.12) 0%, transparent 60%),
+    radial-gradient(circle at 20% 80%, rgba(100,85,232,0.35) 0%, transparent 45%),
+    linear-gradient(160deg, #050010 0%, #0f0525 30%, #1a0a42 60%, #0a0320 100%);
+}
+.d-asset__actions {
+  position: absolute; top: 10px; right: 10px; display: flex; gap: 6px;
+}
+.d-action {
+  height: 28px; padding: 0 10px; border-radius: 7px; border: none; cursor: pointer;
+  background: rgba(9,9,18,0.7); backdrop-filter: blur(8px);
+  color: rgba(255,255,255,0.8); font-size: 11px; font-weight: 500;
+  display: flex; align-items: center; gap: 5px; transition: all 0.15s;
+}
+.d-action:hover { background: rgba(9,9,18,0.9); color: #fff; }
+.d-action svg { width: 11px; height: 11px; }
+
+/* Variant strip */
+.d-variants { display: flex; gap: 7px; overflow-x: auto; }
+.d-variants::-webkit-scrollbar { height: 0; }
+.d-variant {
+  width: 52px; height: 52px; border-radius: 9px; flex-shrink: 0; cursor: pointer;
+  border: 1.5px solid transparent; transition: all 0.15s;
+}
+.d-variant:hover { border-color: var(--border-2); }
+.d-variant.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(124,106,247,0.2); }
+.d-variant.v1 { background: linear-gradient(135deg, #050010, #1a0a42, #6d28d9); }
+.d-variant.v2 { background: linear-gradient(135deg, #0c0600, #3a1c00, #d97706); }
+.d-variant.v3 { background: linear-gradient(135deg, #020a06, #0b2218, #065f46); }
+.d-variant.v4 { background: linear-gradient(135deg, #080012, #200a40, #9333ea); }
+
+/* Form section */
+.d-section { display: flex; flex-direction: column; gap: 14px; }
+.d-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--muted); margin-bottom: -6px;
+}
+.d-input {
+  background: var(--field); border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 10px 13px; color: var(--text); font-size: 13px; font-family: inherit;
+  width: 100%; resize: none; transition: all 0.15s; line-height: 1.5;
+}
+.d-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,106,247,0.12); }
+.d-input::placeholder { color: var(--muted); }
+.d-input-footer { display: flex; align-items: center; justify-content: space-between; }
+.d-char-count { font-size: 10px; color: var(--muted); }
+
+/* Hashtag pills */
+.d-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.d-tag {
+  height: 26px; padding: 0 9px; border-radius: 7px;
+  background: rgba(124,106,247,0.1); border: 1px solid rgba(124,106,247,0.2);
+  color: var(--primary); font-size: 11px; font-weight: 500;
+  display: flex; align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s;
+}
+.d-tag:hover { background: rgba(124,106,247,0.18); }
+.d-tag svg { width: 10px; height: 10px; opacity: 0.6; }
+.d-tag:hover svg { opacity: 1; }
+
+/* Discovery */
+.d-discovery {
+  border-radius: 12px; padding: 15px;
+  background: var(--panel-2); border: 1px solid var(--border);
+}
+.d-discovery__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.d-discovery__label { font-size: 12px; font-weight: 600; }
+.d-score-ring {
+  width: 48px; height: 48px; position: relative; flex-shrink: 0;
+}
+.d-score-ring svg { width: 48px; height: 48px; transform: rotate(-90deg); }
+.d-score-ring circle { fill: none; stroke-width: 4; }
+.d-score-track { stroke: var(--field); }
+.d-score-fill { stroke: var(--success); stroke-linecap: round; stroke-dasharray: 126; stroke-dashoffset: 19; transition: stroke-dashoffset 1s ease; }
+.d-score-number {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: var(--success);
+}
+.d-bars { display: flex; flex-direction: column; gap: 9px; }
+.d-bar { display: grid; grid-template-columns: 88px 1fr 28px; align-items: center; gap: 10px; }
+.d-bar__label { font-size: 11px; color: var(--muted); }
+.d-bar__track { height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.d-bar__fill { height: 100%; border-radius: 99px; }
+.d-bar__val { font-size: 11px; font-weight: 600; text-align: right; }
+.c-green  { background: var(--success); color: var(--success); }
+.c-blue   { background: #60a5fa; color: #60a5fa; }
+.c-violet { background: var(--primary); color: var(--primary); }
+.c-yellow { background: var(--warning); color: var(--warning); }
+
+/* Publish to */
+.d-platforms { display: flex; flex-wrap: wrap; gap: 6px; }
+.d-platform {
+  height: 30px; padding: 0 11px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--field);
+  color: var(--muted); font-size: 11px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s;
+}
+.d-platform:hover { border-color: var(--border-2); color: var(--text-2); }
+.d-platform.active { border-color: var(--primary); background: var(--primary-w); color: var(--primary); }
+.d-platform svg { width: 13px; height: 13px; }
+
+/* Social preview */
+.d-preview {
+  border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
+  background: #0e0e1a;
+}
+.d-preview__bar {
+  padding: 10px 13px; display: flex; align-items: center; gap: 9px;
+  border-bottom: 1px solid var(--border);
+}
+.d-preview__av {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #f472b6); flex-shrink: 0;
+}
+.d-preview__info { flex: 1; }
+.d-preview__handle { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1; }
+.d-preview__meta   { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.d-preview__follow {
+  height: 24px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-2); font-size: 11px; cursor: pointer;
+}
+.d-preview__img {
+  width: 100%; aspect-ratio: 4/3;
+  background:
+    radial-gradient(ellipse 45% 55% at 50% 38%, rgba(200,190,255,0.1) 0%, transparent 60%),
+    radial-gradient(circle at 20% 80%, rgba(100,85,232,0.3) 0%, transparent 45%),
+    linear-gradient(160deg, #050010 0%, #0f0525 30%, #1a0a42 60%, #0a0320 100%);
+}
+.d-preview__body { padding: 12px 13px 8px; }
+.d-preview__caption { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.d-preview__caption strong { color: var(--text); }
+.d-preview__tags { font-size: 12px; color: var(--primary); margin-top: 5px; line-height: 1.6; }
+.d-preview__reactions {
+  padding: 8px 13px 12px; display: flex; align-items: center; gap: 16px;
+}
+.d-react { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; cursor: pointer; }
+.d-react svg { width: 13px; height: 13px; }
+.d-react:hover { color: var(--text-2); }
+
+/* Drawer footer */
+.drawer__foot {
+  padding: 14px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
+  display: flex; gap: 8px; background: var(--panel);
+}
+.btn-schedule {
+  flex: 1; height: 42px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--field);
+  color: var(--text-2); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn-schedule:hover { border-color: var(--border-2); }
+.btn-schedule svg { width: 14px; height: 14px; color: var(--muted); }
+.btn-publish {
+  flex: 2; height: 42px; border-radius: 10px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: #fff; letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #9d8fff 0%, var(--primary) 50%, var(--primary-s) 100%);
+  box-shadow: 0 2px 12px rgba(124,106,247,0.4); position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;
+}
+.btn-publish::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%); }
+.btn-publish:hover { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(124,106,247,0.5); }
+.btn-publish svg { width: 14px; height: 14px; }
+
+/* ═══════════════════════════
+   PROMPT BAR
+═══════════════════════════ */
+.prompt-zone {
+  position: fixed; bottom: 0; left: 56px; right: 0; z-index: 300;
+  padding: 12px 36px 20px;
+  background: linear-gradient(to top, var(--bg) 65%, transparent);
+  display: flex; justify-content: center; pointer-events: none;
+}
+.pbar {
+  width: 100%; max-width: 800px; pointer-events: all;
+  background: rgba(15,15,30,0.95);
+  border: 1.5px solid rgba(124,106,247,0.2);
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 1px rgba(124,106,247,0.06),
+    0 4px 20px rgba(0,0,0,0.4),
+    0 16px 48px rgba(0,0,0,0.25),
+    inset 0 1px 0 rgba(124,106,247,0.07),
+    inset 0 -1px 0 rgba(0,0,0,0.2);
+  backdrop-filter: blur(24px);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.pbar:focus-within {
+  border-color: rgba(124,106,247,0.4);
+  box-shadow:
+    0 0 0 3px rgba(124,106,247,0.08),
+    0 4px 24px rgba(0,0,0,0.45),
+    0 16px 52px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(124,106,247,0.1);
+}
+
+/* Chips strip */
+.pbar__chips {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  padding: 11px 13px 8px; border-bottom: 1px solid var(--border);
+}
+.pchip {
+  height: 26px; padding: 0 9px; border-radius: 7px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-size: 11px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; gap: 4px;
+  transition: all 0.15s; position: relative; white-space: nowrap;
+}
+.pchip:hover { background: var(--field); color: var(--text-2); border-color: var(--border-2); }
+.pchip.active { border-color: rgba(124,106,247,0.4); background: var(--primary-w); color: var(--primary); }
+.pchip svg { width: 11px; height: 11px; }
+.pchip__chev { width: 9px; height: 9px; color: var(--muted); transition: transform 0.15s; }
+.pchip.open .pchip__chev { transform: rotate(180deg); }
+.pbar__chips__div { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+
+/* Chip popovers */
+.pchip__pop {
+  position: absolute; bottom: calc(100% + 7px); left: 0;
+  min-width: 150px; background: var(--panel-2);
+  border: 1px solid var(--border-2); border-radius: 11px;
+  padding: 5px; z-index: 900;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6), 0 16px 48px rgba(0,0,0,0.4);
+  display: none; flex-direction: column; gap: 2px;
+}
+.pchip__pop.open { display: flex; }
+.popt {
+  padding: 7px 9px; border-radius: 7px; cursor: pointer; font-size: 12px;
+  color: var(--muted); display: flex; align-items: center; justify-content: space-between;
+  transition: all 0.1s; gap: 10px;
+}
+.popt:hover { background: var(--field); color: var(--text-2); }
+.popt.sel { color: var(--primary); }
+.popt.sel svg { color: var(--primary); }
+.popt svg { width: 12px; height: 12px; flex-shrink: 0; opacity: 0; }
+.popt.sel svg { opacity: 1; }
+
+/* Textarea row */
+.pbar__input-row {
+  display: flex; align-items: flex-end; gap: 9px; padding: 9px 11px;
+}
+.pbar__ta {
+  flex: 1; background: transparent; border: none; resize: none;
+  color: var(--text); font-size: 13.5px; font-family: inherit; line-height: 1.55;
+  max-height: 110px; min-height: 38px;
+}
+.pbar__ta:focus { outline: none; }
+.pbar__ta::placeholder { color: var(--muted); }
+
+.pbar__btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.pbar__enhance {
+  height: 34px; padding: 0 11px; border-radius: 9px;
+  border: 1.5px solid rgba(124,106,247,0.28); background: var(--primary-w);
+  color: var(--primary); font-size: 11.5px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 5px; transition: all 0.15s;
+}
+.pbar__enhance:hover { background: rgba(124,106,247,0.18); border-color: rgba(124,106,247,0.5); }
+.pbar__enhance svg { width: 12px; height: 12px; }
+.pbar__gen {
+  height: 34px; padding: 0 15px; border-radius: 9px; border: none; cursor: pointer;
+  font-size: 12.5px; font-weight: 700; color: #fff; letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #a99bff 0%, var(--primary) 50%, var(--primary-s) 100%);
+  box-shadow: 0 0 0 1px rgba(124,106,247,0.25), 0 2px 10px rgba(124,106,247,0.4);
+  display: flex; align-items: center; gap: 6px; transition: all 0.2s; position: relative; overflow: hidden;
+}
+.pbar__gen::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 50%); }
+.pbar__gen:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(124,106,247,0.35), 0 4px 14px rgba(124,106,247,0.5);
+}
+.pbar__gen svg { width: 13px; height: 13px; }
+
+/* Footer meta */
+.pbar__meta {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 13px 10px;
+}
+.pbar__meta-left { display: flex; align-items: center; gap: 10px; }
+.pbar__meta-tag {
+  font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 4px;
+}
+.pbar__meta-tag svg { width: 10px; height: 10px; }
+.pbar__cost { font-size: 10px; color: var(--muted); }
+.pbar__cost strong { color: var(--primary); font-weight: 600; }
+
+/* ═══════════════════════════
+   LIGHTBOX
+═══════════════════════════ */
+.lightbox {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.94); backdrop-filter: blur(20px);
+  align-items: center; justify-content: center;
+}
+.lightbox.open { display: flex; }
+.lb-close {
+  position: absolute; top: 20px; right: 20px;
+  width: 38px; height: 38px; border-radius: 10px;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer; color: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.lb-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+.lb-close svg { width: 16px; height: 16px; }
+.lb-img {
+  max-width: 75vw; max-height: 80vh; border-radius: 16px; overflow: hidden;
+  aspect-ratio: 4/5;
+  background:
+    radial-gradient(ellipse 45% 55% at 50% 38%, rgba(200,190,255,0.12) 0%, transparent 60%),
+    radial-gradient(circle at 20% 80%, rgba(100,85,232,0.35) 0%, transparent 45%),
+    linear-gradient(160deg, #050010 0%, #0f0525 30%, #1a0a42 60%, #0a0320 100%);
+  box-shadow: 0 40px 120px rgba(0,0,0,0.8);
+}
+.lb-actions {
+  position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px;
+}
+.lb-action {
+  height: 38px; padding: 0 16px; border-radius: 10px;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.75); font-size: 12px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; gap: 7px; transition: all 0.15s;
+}
+.lb-action:hover { background: rgba(255,255,255,0.15); color: #fff; }
+.lb-action svg { width: 13px; height: 13px; }
+.lb-action.primary { background: var(--primary); border-color: transparent; color: #fff; }
+.lb-action.primary:hover { background: var(--primary-s); }
+
+/* ═══════════════════════════
+   DEMO NAV
+═══════════════════════════ */
+.demo-nav {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  z-index: 999;
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(14,14,28,0.97); backdrop-filter: blur(20px);
+  border: 1px solid var(--border-2); border-radius: 12px;
+  padding: 7px 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+}
+.demo-nav__label { font-size: 10px; color: var(--muted); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-right: 2px; }
+.dnav-btn {
+  height: 28px; padding: 0 11px; border-radius: 7px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+}
+.dnav-btn:hover { background: var(--field); color: var(--text-2); }
+.dnav-btn.active { background: var(--primary-w); border-color: rgba(124,106,247,0.4); color: var(--primary); }
+</style>
+</head>
+<body>
+
+<!-- ═══ TOPBAR ═══ -->
+<header class="topbar">
+  <div class="topbar__brand">
+    <div class="topbar__logo">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1.5L13.5 4.75V11.25L8 14.5L2.5 11.25V4.75L8 1.5Z" fill="white" fill-opacity="0.9"/>
+      </svg>
+    </div>
+  </div>
+  <div class="topbar__breadcrumb">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 18 15 12 9 6"/></svg>
+    <span>Generate</span>
+  </div>
+  <nav class="topbar__nav">
+    <button class="topbar__nav-btn">Overview</button>
+    <button class="topbar__nav-btn active">Generate</button>
+    <button class="topbar__nav-btn">Schedule</button>
+    <button class="topbar__nav-btn">Publish</button>
+    <button class="topbar__nav-btn">Analytics</button>
+  </nav>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__right">
+    <div class="credits-pill">
+      <div class="credits-dot"></div>
+      420 credits
+    </div>
+    <div class="topbar__notif">
+      <div class="notif-badge"></div>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+    </div>
+    <div class="topbar__avatar"></div>
+  </div>
+</header>
+
+<div class="shell">
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <button class="sidebar__item active">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    </button>
+    <button class="sidebar__item">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </button>
+    <button class="sidebar__item">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    </button>
+    <div class="sidebar__div"></div>
+    <button class="sidebar__item">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+    </button>
+    <div class="sidebar__push"></div>
+    <button class="sidebar__item">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    </button>
+  </aside>
+
+  <!-- ═══ CANVAS ═══ -->
+  <main class="canvas" id="canvas">
+
+    <!-- ─── VIEW: INTENT ─── -->
+    <section class="view active" id="view-intent">
+
+      <div class="intent-header">
+        <div class="intent-header__eyebrow">New Session</div>
+        <h1>What are you creating today?</h1>
+        <p>Set your goal and we'll tune every parameter to match your objective.</p>
+      </div>
+
+      <!-- Goal cards -->
+      <div class="goal-grid">
+        <!-- Promote a Product -->
+        <div class="goal-card selected" data-goal="promote" onclick="selectGoal(this)">
+          <div class="goal-card__bg"></div>
+          <div class="goal-card__top">
+            <div class="goal-card__icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+            </div>
+            <div class="goal-card__check">
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+            </div>
+          </div>
+          <div class="goal-card__body">
+            <div class="goal-card__title">Promote a Product</div>
+            <div class="goal-card__sub">Drive sales with compelling ads</div>
+          </div>
+        </div>
+
+        <!-- Brand Awareness -->
+        <div class="goal-card" data-goal="brand" onclick="selectGoal(this)">
+          <div class="goal-card__bg"></div>
+          <div class="goal-card__top">
+            <div class="goal-card__icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49M7.76 7.76a6 6 0 000 8.49M20.49 3.51a14 14 0 010 16.98M3.51 3.51a14 14 0 000 16.98"/></svg>
+            </div>
+            <div class="goal-card__check">
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+            </div>
+          </div>
+          <div class="goal-card__body">
+            <div class="goal-card__title">Brand Awareness</div>
+            <div class="goal-card__sub">Build recognition at scale</div>
+          </div>
+        </div>
+
+        <!-- Educate -->
+        <div class="goal-card" data-goal="educate" onclick="selectGoal(this)">
+          <div class="goal-card__bg"></div>
+          <div class="goal-card__top">
+            <div class="goal-card__icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+            </div>
+            <div class="goal-card__check">
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+            </div>
+          </div>
+          <div class="goal-card__body">
+            <div class="goal-card__title">Educate &amp; Teach</div>
+            <div class="goal-card__sub">Share knowledge that builds authority</div>
+          </div>
+        </div>
+
+        <!-- Engagement -->
+        <div class="goal-card" data-goal="engage" onclick="selectGoal(this)">
+          <div class="goal-card__bg"></div>
+          <div class="goal-card__top">
+            <div class="goal-card__icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <div class="goal-card__check">
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+            </div>
+          </div>
+          <div class="goal-card__body">
+            <div class="goal-card__title">Drive Engagement</div>
+            <div class="goal-card__sub">Spark saves, shares &amp; comments</div>
+          </div>
+        </div>
+
+        <!-- Explore -->
+        <div class="goal-card" data-goal="explore" onclick="selectGoal(this)">
+          <div class="goal-card__bg"></div>
+          <div class="goal-card__top">
+            <div class="goal-card__icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+            </div>
+            <div class="goal-card__check">
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+            </div>
+          </div>
+          <div class="goal-card__body">
+            <div class="goal-card__title">Just Explore</div>
+            <div class="goal-card__sub">Free-form creation, no constraints</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Platform -->
+      <div class="section-block">
+        <div class="section-label">Platform</div>
+        <div class="chips" id="platformChips">
+          <button class="chip active" onclick="toggleChip(this,'platform')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            Instagram
+          </button>
+          <button class="chip" onclick="toggleChip(this,'platform')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 12a4 4 0 104 4V4a5 5 0 005 5"/></svg>
+            TikTok
+          </button>
+          <button class="chip" onclick="toggleChip(this,'platform')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 3a10.9 10.9 0 01-3.14 1.53A4.48 4.48 0 0016 2.5a4.48 4.48 0 00-4.48 4.48v1A10.66 10.66 0 013 4S-1 13 8 17a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+            X / Twitter
+          </button>
+          <button class="chip" onclick="toggleChip(this,'platform')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+            LinkedIn
+          </button>
+          <button class="chip" onclick="toggleChip(this,'platform')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 001.46 6.42 29 29 0 001 12a29 29 0 00.46 5.58 2.78 2.78 0 001.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.96A29 29 0 0023 12a29 29 0 00-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"/></svg>
+            YouTube
+          </button>
+        </div>
+      </div>
+
+      <!-- Tone -->
+      <div class="section-block">
+        <div class="section-label">Tone</div>
+        <div class="chips" id="toneChips">
+          <button class="chip active" onclick="toggleChipSingle(this,'toneChips')">Professional</button>
+          <button class="chip" onclick="toggleChipSingle(this,'toneChips')">Playful</button>
+          <button class="chip" onclick="toggleChipSingle(this,'toneChips')">Bold &amp; Direct</button>
+          <button class="chip" onclick="toggleChipSingle(this,'toneChips')">Inspirational</button>
+          <button class="chip" onclick="toggleChipSingle(this,'toneChips')">Minimalist</button>
+          <button class="chip" onclick="toggleChipSingle(this,'toneChips')">Storytelling</button>
+        </div>
+      </div>
+
+      <div class="intent-footer">
+        <button class="btn-generate-main" onclick="startGenerate()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Generate Content
+        </button>
+        <div class="intent-hint">Or type a prompt below — <strong>Shift+Enter</strong> to generate instantly</div>
+      </div>
+    </section>
+
+    <!-- ─── VIEW: GENERATING ─── -->
+    <section class="view" id="view-generating">
+
+      <div class="gen-header">
+        <button class="back-btn" onclick="showView('intent')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="gen-header__meta">
+          <h2>Generating your content</h2>
+          <p>Product promotion · Instagram · Professional · 4 variants</p>
+        </div>
+      </div>
+
+      <div class="gen-progress-wrap">
+        <div class="gen-progress-info">
+          <span class="gen-progress-label" id="genLabel">Composing visuals</span>
+          <span class="gen-progress-pct" id="genPct">0%</span>
+        </div>
+        <div class="gen-progress-track">
+          <div class="gen-progress-fill" id="genFill"></div>
+        </div>
+      </div>
+
+      <div class="shimmer-grid">
+        <div class="shimmer-card"><div class="shimmer-inner"></div></div>
+        <div class="shimmer-card"><div class="shimmer-inner"></div></div>
+        <div class="shimmer-card"><div class="shimmer-inner"></div></div>
+        <div class="shimmer-card"><div class="shimmer-inner"></div></div>
+        <div class="shimmer-card"><div class="shimmer-inner"></div></div>
+      </div>
+
+      <div class="gen-status-row">
+        <div class="gen-status-pulse" id="genPulse"></div>
+        <span class="gen-status-msg" id="genMsg"><span>Claude Vision</span> is composing visuals — this usually takes 8–12 seconds</span>
+        <button class="gen-cancel" onclick="showView('intent')">Cancel</button>
+      </div>
+
+      <div class="gen-ready" id="genReady">
+        <div class="gen-ready__text">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+          6 variants generated successfully — ready to review
+        </div>
+        <button class="btn-view-results" onclick="showView('results')">
+          View Results
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ─── VIEW: RESULTS ─── -->
+    <section class="view" id="view-results">
+
+      <div class="results-bar">
+        <div class="results-bar__left">
+          <button class="back-btn" onclick="showView('intent')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="results-bar__title">Generated Results</span>
+          <div class="results-badge">6 variants</div>
+        </div>
+        <div class="results-bar__right">
+          <button class="btn-sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Regenerate
+          </button>
+          <button class="btn-sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export all
+          </button>
+          <button class="btn-sm primary" onclick="openDrawer()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            Post-produce
+          </button>
+        </div>
+      </div>
+
+      <div class="filter-strip">
+        <button class="filter-btn active" onclick="setFilter(this)">All</button>
+        <button class="filter-btn" onclick="setFilter(this)">Square 1:1</button>
+        <button class="filter-btn" onclick="setFilter(this)">Portrait 4:5</button>
+        <button class="filter-btn" onclick="setFilter(this)">Story 9:16</button>
+        <button class="filter-btn" onclick="setFilter(this)">Landscape 16:9</button>
+      </div>
+
+      <div class="selection-banner" id="selBanner">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c6af7" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg>
+        <span class="selection-banner__text" id="selText">2 variants selected</span>
+        <button class="btn-sm primary" onclick="openDrawer()" style="height:26px;font-size:11px;">Post-produce selected</button>
+        <button class="sel-clear" onclick="clearSelection()">Clear</button>
+      </div>
+
+      <div class="results-grid">
+
+        <div class="result-card" onclick="handleCardClick(this)">
+          <div class="card-img i1"></div>
+          <div class="card-overlay">
+            <div class="card-overlay__top">
+              <div class="card-select-toggle" onclick="event.stopPropagation(); toggleSelect(this.closest('.result-card'))">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+              </div>
+              <div class="card-quick-actions">
+                <button class="qbtn" onclick="event.stopPropagation(); openLightbox()" title="Fullscreen">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                </button>
+                <button class="qbtn" title="Download">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+                <button class="qbtn cta" onclick="event.stopPropagation(); openDrawer()" title="Post-produce">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="card-overlay__bottom">
+              <div class="card-format-label">Portrait</div>
+              <div class="card-format-ratio">4 : 5</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-card" onclick="handleCardClick(this)">
+          <div class="card-img i2"></div>
+          <div class="card-overlay">
+            <div class="card-overlay__top">
+              <div class="card-select-toggle" onclick="event.stopPropagation(); toggleSelect(this.closest('.result-card'))">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+              </div>
+              <div class="card-quick-actions">
+                <button class="qbtn" onclick="event.stopPropagation(); openLightbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+                <button class="qbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="qbtn cta" onclick="event.stopPropagation(); openDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></button>
+              </div>
+            </div>
+            <div class="card-overlay__bottom">
+              <div class="card-format-label">Square</div>
+              <div class="card-format-ratio">1 : 1</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-card" onclick="handleCardClick(this)">
+          <div class="card-img i3"></div>
+          <div class="card-overlay">
+            <div class="card-overlay__top">
+              <div class="card-select-toggle" onclick="event.stopPropagation(); toggleSelect(this.closest('.result-card'))">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+              </div>
+              <div class="card-quick-actions">
+                <button class="qbtn" onclick="event.stopPropagation(); openLightbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+                <button class="qbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="qbtn cta" onclick="event.stopPropagation(); openDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></button>
+              </div>
+            </div>
+            <div class="card-overlay__bottom">
+              <div class="card-format-label">Story</div>
+              <div class="card-format-ratio">9 : 16</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-card" onclick="handleCardClick(this)">
+          <div class="card-img i4"></div>
+          <div class="card-overlay">
+            <div class="card-overlay__top">
+              <div class="card-select-toggle" onclick="event.stopPropagation(); toggleSelect(this.closest('.result-card'))">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+              </div>
+              <div class="card-quick-actions">
+                <button class="qbtn" onclick="event.stopPropagation(); openLightbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+                <button class="qbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="qbtn cta" onclick="event.stopPropagation(); openDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></button>
+              </div>
+            </div>
+            <div class="card-overlay__bottom">
+              <div class="card-format-label">Landscape</div>
+              <div class="card-format-ratio">16 : 9</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-card" onclick="handleCardClick(this)">
+          <div class="card-img i5"></div>
+          <div class="card-overlay">
+            <div class="card-overlay__top">
+              <div class="card-select-toggle" onclick="event.stopPropagation(); toggleSelect(this.closest('.result-card'))">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+              </div>
+              <div class="card-quick-actions">
+                <button class="qbtn" onclick="event.stopPropagation(); openLightbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+                <button class="qbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="qbtn cta" onclick="event.stopPropagation(); openDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></button>
+              </div>
+            </div>
+            <div class="card-overlay__bottom">
+              <div class="card-format-label">Wide</div>
+              <div class="card-format-ratio">4 : 3</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-card" onclick="handleCardClick(this)">
+          <div class="card-img i6"></div>
+          <div class="card-overlay">
+            <div class="card-overlay__top">
+              <div class="card-select-toggle" onclick="event.stopPropagation(); toggleSelect(this.closest('.result-card'))">
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" stroke-width="2.5"><polyline points="2 6 5 9 10 3"/></svg>
+              </div>
+              <div class="card-quick-actions">
+                <button class="qbtn" onclick="event.stopPropagation(); openLightbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+                <button class="qbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="qbtn cta" onclick="event.stopPropagation(); openDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></button>
+              </div>
+            </div>
+            <div class="card-overlay__bottom">
+              <div class="card-format-label">Portrait</div>
+              <div class="card-format-ratio">4 : 5</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ═══ POST-PRODUCTION DRAWER ═══ -->
+<div class="backdrop" id="backdrop" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer__head">
+    <span class="drawer__head__title">Post Production</span>
+    <div class="drawer__head__badge">Score 87</div>
+    <div style="flex:1"></div>
+    <button class="drawer__close-btn" onclick="closeDrawer()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div class="drawer__body">
+
+    <!-- Asset hero -->
+    <div class="d-asset">
+      <div class="d-asset__actions">
+        <button class="d-action">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
+        <button class="d-action">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Share
+        </button>
+      </div>
+    </div>
+
+    <!-- Variants -->
+    <div class="d-variants">
+      <div class="d-variant v1 active"></div>
+      <div class="d-variant v2" onclick="switchVariant(this)"></div>
+      <div class="d-variant v3" onclick="switchVariant(this)"></div>
+      <div class="d-variant v4" onclick="switchVariant(this)"></div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-label">Title / Hook</div>
+      <input class="d-input" type="text" value="Unlock Your Creative Potential" />
+    </div>
+
+    <div class="d-section">
+      <div class="d-label">Caption</div>
+      <textarea class="d-input" id="captionTA" rows="4">The future of creation is here. Elevate your brand with AI-powered visuals that convert — no design degree required. Start creating today.</textarea>
+      <div class="d-input-footer">
+        <span class="d-char-count" id="captionCount">146 / 2200</span>
+        <button class="pbar__enhance" style="height:25px;font-size:10px;padding:0 9px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Rewrite
+        </button>
+      </div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-label">Hashtags</div>
+      <div class="d-tags">
+        <div class="d-tag">#AIContent <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></div>
+        <div class="d-tag">#BrandDesign <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></div>
+        <div class="d-tag">#ContentCreator <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></div>
+        <div class="d-tag">#SocialMedia <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></div>
+        <div class="d-tag">#Marketing <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></div>
+        <div class="d-tag">#Branding <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg></div>
+      </div>
+    </div>
+
+    <!-- Discovery Score -->
+    <div class="d-discovery">
+      <div class="d-discovery__header">
+        <span class="d-discovery__label">Discovery Score</span>
+        <div class="d-score-ring">
+          <svg viewBox="0 0 48 48">
+            <circle class="d-score-track" cx="24" cy="24" r="20"/>
+            <circle class="d-score-fill" cx="24" cy="24" r="20"/>
+          </svg>
+          <div class="d-score-number">87</div>
+        </div>
+      </div>
+      <div class="d-bars">
+        <div class="d-bar">
+          <span class="d-bar__label">Engagement</span>
+          <div class="d-bar__track"><div class="d-bar__fill c-green" style="width:91%"></div></div>
+          <span class="d-bar__val c-green">91</span>
+        </div>
+        <div class="d-bar">
+          <span class="d-bar__label">Reach</span>
+          <div class="d-bar__track"><div class="d-bar__fill c-blue" style="width:78%"></div></div>
+          <span class="d-bar__val c-blue">78</span>
+        </div>
+        <div class="d-bar">
+          <span class="d-bar__label">Brand Fit</span>
+          <div class="d-bar__track"><div class="d-bar__fill c-violet" style="width:85%"></div></div>
+          <span class="d-bar__val c-violet">85</span>
+        </div>
+        <div class="d-bar">
+          <span class="d-bar__label">Virality</span>
+          <div class="d-bar__track"><div class="d-bar__fill c-yellow" style="width:62%"></div></div>
+          <span class="d-bar__val c-yellow">62</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Publish to -->
+    <div class="d-section">
+      <div class="d-label">Publish To</div>
+      <div class="d-platforms">
+        <button class="d-platform active" onclick="this.classList.toggle('active')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+          Instagram
+        </button>
+        <button class="d-platform" onclick="this.classList.toggle('active')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 12a4 4 0 104 4V4a5 5 0 005 5"/></svg>
+          TikTok
+        </button>
+        <button class="d-platform" onclick="this.classList.toggle('active')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 3a10.9 10.9 0 01-3.14 1.53A4.48 4.48 0 0016 2.5a4.48 4.48 0 00-4.48 4.48v1A10.66 10.66 0 013 4S-1 13 8 17a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+          X / Twitter
+        </button>
+        <button class="d-platform" onclick="this.classList.toggle('active')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+          LinkedIn
+        </button>
+      </div>
+    </div>
+
+    <!-- Social Preview -->
+    <div class="d-section">
+      <div class="d-label">Preview</div>
+      <div class="d-preview">
+        <div class="d-preview__bar">
+          <div class="d-preview__av"></div>
+          <div class="d-preview__info">
+            <div class="d-preview__handle">@yourbrand</div>
+            <div class="d-preview__meta">Just now · Instagram · Sponsored</div>
+          </div>
+          <button class="d-preview__follow">Follow</button>
+        </div>
+        <div class="d-preview__img"></div>
+        <div class="d-preview__body">
+          <div class="d-preview__caption"><strong>The future of creation is here.</strong> Elevate your brand with AI-powered visuals that convert — no design degree required.</div>
+          <div class="d-preview__tags">#AIContent #BrandDesign #ContentCreator</div>
+        </div>
+        <div class="d-preview__reactions">
+          <div class="d-react">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+            2.4K
+          </div>
+          <div class="d-react">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            318
+          </div>
+          <div class="d-react">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+            1.2K
+          </div>
+          <div class="d-react" style="margin-left:auto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Save
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="drawer__foot">
+    <button class="btn-schedule">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Schedule
+    </button>
+    <button class="btn-publish">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/><path d="M9 18H5a2 2 0 01-2-2V8a2 2 0 012-2h4"/></svg>
+      Publish Now
+    </button>
+  </div>
+</aside>
+
+<!-- ═══ PROMPT BAR ═══ -->
+<div class="prompt-zone">
+  <div class="pbar">
+    <div class="pbar__chips">
+
+      <div class="pchip active" id="c-mode" onclick="togglePop('pop-mode',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+        Image
+        <svg class="pchip__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="pchip__pop" id="pop-mode">
+          <div class="popt sel" onclick="pickOpt(this,'c-mode')">Image <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-mode')">Video <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-mode')">Carousel <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-mode')">Caption only <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        </div>
+      </div>
+
+      <div class="pchip" id="c-model" onclick="togglePop('pop-model',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+        Claude Vision
+        <svg class="pchip__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="pchip__pop" id="pop-model">
+          <div class="popt sel" onclick="pickOpt(this,'c-model')">Claude Vision <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-model')">DALL-E 3 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-model')">Flux Pro <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-model')">Stable Diffusion <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        </div>
+      </div>
+
+      <div class="pbar__chips__div"></div>
+
+      <div class="pchip" id="c-ratio" onclick="togglePop('pop-ratio',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+        4:5
+        <svg class="pchip__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="pchip__pop" id="pop-ratio">
+          <div class="popt sel" onclick="pickOpt(this,'c-ratio')">4:5 — Portrait <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-ratio')">1:1 — Square <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-ratio')">9:16 — Story <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-ratio')">16:9 — Landscape <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        </div>
+      </div>
+
+      <div class="pchip" id="c-res" onclick="togglePop('pop-res',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        HD
+        <svg class="pchip__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="pchip__pop" id="pop-res">
+          <div class="popt" onclick="pickOpt(this,'c-res')">SD — 512px <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt sel" onclick="pickOpt(this,'c-res')">HD — 1024px <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-res')">4K — 2048px <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        </div>
+      </div>
+
+      <div class="pchip" id="c-batch" onclick="togglePop('pop-batch',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+        4 variants
+        <svg class="pchip__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="pchip__pop" id="pop-batch">
+          <div class="popt" onclick="pickOpt(this,'c-batch')">1 variant <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-batch')">2 variants <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt sel" onclick="pickOpt(this,'c-batch')">4 variants <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="popt" onclick="pickOpt(this,'c-batch')">8 variants <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="pbar__input-row">
+      <textarea class="pbar__ta" id="promptTA" rows="2" placeholder="Describe what you want to create — be specific about style, mood, subject, and composition..."></textarea>
+      <div class="pbar__btns">
+        <button class="pbar__enhance">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Enhance
+        </button>
+        <button class="pbar__gen" onclick="startGenerate()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Generate
+        </button>
+      </div>
+    </div>
+
+    <div class="pbar__meta">
+      <div class="pbar__meta-left">
+        <span class="pbar__meta-tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/></svg>
+          Instagram
+        </span>
+        <span class="pbar__meta-tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+          4:5
+        </span>
+        <span class="pbar__meta-tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+          4 variants
+        </span>
+      </div>
+      <span class="pbar__cost">Est. cost: <strong>12 credits</strong></span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LIGHTBOX ═══ -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lb-close" onclick="closeLightbox()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <div class="lb-img" onclick="event.stopPropagation()"></div>
+  <div class="lb-actions" onclick="event.stopPropagation()">
+    <button class="lb-action">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download
+    </button>
+    <button class="lb-action">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      Share
+    </button>
+    <button class="lb-action primary" onclick="closeLightbox(); openDrawer()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Post-produce
+    </button>
+  </div>
+</div>
+
+<!-- ═══ DEMO NAV ═══ -->
+<div class="demo-nav">
+  <span class="demo-nav__label">View</span>
+  <button class="dnav-btn active" onclick="showView('intent'); activeDnav(this)">Intent</button>
+  <button class="dnav-btn" onclick="startGenerate(); activeDnav(this)">Generating</button>
+  <button class="dnav-btn" onclick="showView('results'); activeDnav(this)">Results</button>
+  <button class="dnav-btn" onclick="showView('results'); openDrawer(); activeDnav(this)">Post-Production</button>
+</div>
+
+<script>
+// ── View management ──
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view-' + name);
+  if (el) el.classList.add('active');
+  closeAllPops();
+}
+
+function activeDnav(btn) {
+  document.querySelectorAll('.dnav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Generate flow with manual advance ──
+let genTimer = null;
+const genSteps = [
+  { pct: 12, label: 'Parsing your prompt' },
+  { pct: 28, label: 'Applying brand guidelines' },
+  { pct: 47, label: 'Composing visual structure' },
+  { pct: 63, label: 'Generating variants 1–4' },
+  { pct: 79, label: 'Generating variants 5–6' },
+  { pct: 91, label: 'Applying post-processing' },
+  { pct: 100, label: 'Done' },
+];
+
+function startGenerate() {
+  showView('generating');
+  // Reset
+  const fill = document.getElementById('genFill');
+  const pct  = document.getElementById('genPct');
+  const lbl  = document.getElementById('genLabel');
+  const ready = document.getElementById('genReady');
+  const pulse = document.getElementById('genPulse');
+  fill.style.width = '0%';
+  pct.textContent = '0%';
+  ready.classList.remove('visible');
+  pulse.style.animationPlayState = 'running';
+
+  let step = 0;
+  if (genTimer) clearInterval(genTimer);
+  genTimer = setInterval(() => {
+    if (step >= genSteps.length) {
+      clearInterval(genTimer);
+      ready.classList.add('visible');
+      pulse.style.animationPlayState = 'paused';
+      return;
+    }
+    const s = genSteps[step];
+    fill.style.width = s.pct + '%';
+    pct.textContent = s.pct + '%';
+    if (s.pct < 100) lbl.textContent = s.label;
+    step++;
+  }, 600);
+}
+
+// ── Goal cards ──
+function selectGoal(card) {
+  document.querySelectorAll('.goal-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+}
+
+// ── Platform chips (multi-select) ──
+function toggleChip(chip) {
+  chip.classList.toggle('active');
+}
+// ── Tone chips (single-select) ──
+function toggleChipSingle(chip, groupId) {
+  document.getElementById(groupId).querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+}
+
+// ── Popovers ──
+function togglePop(id, chip) {
+  const pop = document.getElementById(id);
+  const wasOpen = pop.classList.contains('open');
+  closeAllPops();
+  if (!wasOpen) {
+    pop.classList.add('open');
+    chip.classList.add('open');
+  }
+}
+function closeAllPops() {
+  document.querySelectorAll('.pchip__pop').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.pchip').forEach(c => c.classList.remove('open'));
+}
+function pickOpt(opt, chipId) {
+  const pop = opt.closest('.pchip__pop');
+  pop.querySelectorAll('.popt').forEach(o => o.classList.remove('sel'));
+  opt.classList.add('sel');
+  // Update chip label text
+  const raw = opt.textContent.trim().split('—')[0].trim();
+  const chip = document.getElementById(chipId);
+  const tw = chip.querySelector('svg + svg') || chip.lastChild;
+  // find text nodes
+  chip.childNodes.forEach(n => {
+    if (n.nodeType === 3 && n.textContent.trim().length > 0) n.textContent = ' ' + raw + ' ';
+  });
+  closeAllPops();
+  event.stopPropagation();
+}
+
+document.addEventListener('click', closeAllPops);
+document.querySelector('.pbar').addEventListener('click', e => e.stopPropagation());
+
+// ── Drawer ──
+function openDrawer() {
+  document.getElementById('backdrop').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('backdrop').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+
+// ── Selection ──
+let selectedCards = new Set();
+function handleCardClick(card) {
+  // Single click → open drawer
+  openDrawer();
+}
+function toggleSelect(card) {
+  if (selectedCards.has(card)) {
+    selectedCards.delete(card);
+    card.classList.remove('selected');
+  } else {
+    selectedCards.add(card);
+    card.classList.add('selected');
+  }
+  updateSelBanner();
+}
+function clearSelection() {
+  selectedCards.forEach(c => c.classList.remove('selected'));
+  selectedCards.clear();
+  updateSelBanner();
+}
+function updateSelBanner() {
+  const banner = document.getElementById('selBanner');
+  const txt = document.getElementById('selText');
+  if (selectedCards.size > 0) {
+    banner.classList.add('visible');
+    txt.textContent = selectedCards.size + ' variant' + (selectedCards.size > 1 ? 's' : '') + ' selected';
+  } else {
+    banner.classList.remove('visible');
+  }
+}
+
+// ── Filter ──
+function setFilter(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Variant switch ──
+function switchVariant(el) {
+  document.querySelectorAll('.d-variant').forEach(v => v.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── Lightbox ──
+function openLightbox() {
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+// ── Caption count ──
+const captionTA = document.getElementById('captionTA');
+const captionCount = document.getElementById('captionCount');
+if (captionTA) {
+  captionTA.addEventListener('input', () => {
+    captionCount.textContent = captionTA.value.length + ' / 2200';
+  });
+}
+
+// ── ESC ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeDrawer(); closeLightbox(); }
+});
+
+// ── Shift+Enter in prompt bar → generate ──
+const promptTA = document.getElementById('promptTA');
+if (promptTA) {
+  promptTA.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); startGenerate(); }
+  });
+}
+</script>
+</body>
+</html>

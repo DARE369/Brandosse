@@ -1,0 +1,109 @@
+/* src/pages/Auth/AuthCallback.css */
+.acb-root {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--bg-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body, "Manrope", system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+}
+
+.acb-glow {
+  position: fixed;
+  width: 560px; height: 560px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--public-accent) 13%, transparent) 0%, transparent 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  filter: blur(60px);
+}
+
+.acb-card {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px 32px;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  margin: 0 16px;
+}
+
+.acb-logo {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 1rem; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--text-primary); margin-bottom: 32px;
+}
+
+/* Loading */
+.acb-loading {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+
+.acb-spinner {
+  animation: acbSpin 0.9s linear infinite;
+  width: 44px; height: 44px;
+}
+@keyframes acbSpin { to { transform: rotate(360deg); } }
+
+.acb-status {
+  font-size: 0.97rem; font-weight: 600;
+  color: var(--text-primary); margin: 0;
+}
+
+.acb-hint {
+  font-size: 0.8rem; color: var(--text-muted); margin: 0;
+}
+
+/* Error */
+.acb-error {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+
+.acb-error-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--danger-bg); border: 1px solid var(--danger-border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--danger); margin-bottom: 4px;
+}
+
+.acb-error h2 {
+  font-size: 1.05rem; font-weight: 700;
+  color: var(--text-primary); margin: 0;
+}
+
+.acb-error p {
+  font-size: 0.85rem; color: var(--text-secondary);
+  line-height: 1.55; margin: 0; max-width: 260px;
+}
+
+.acb-retry {
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-top: 8px; padding: 11px 28px;
+  background: var(--accent); color: var(--public-dark-text);
+  border-radius: var(--radius-lg); font-size: 0.9rem; font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 18px var(--public-primary-border);
+  transition: background 0.18s, transform 0.14s;
+}
+.acb-retry:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+.acb-retry:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acb-spinner {
+    animation: none;
+  }
+
+  .acb-retry:hover {
+    transform: none;
+  }
+}

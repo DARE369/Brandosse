@@ -1,0 +1,710 @@
+.org-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.org-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.org-board-column {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--org-surface-card, var(--bg-card));
+  overflow: hidden;
+}
+
+.org-board-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  text-transform: capitalize;
+}
+
+.org-board-column-header span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.org-board-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.org-board-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--org-surface-elevated, var(--bg-surface));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.org-board-card.focused {
+  border-color: color-mix(in srgb, var(--org-accent) 52%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--org-accent) 22%, transparent);
+}
+
+.org-board-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.org-board-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.org-pipeline-admin-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+
+.org-pipeline-sidebar,
+.org-pipeline-builder,
+.org-pipeline-stage-editor {
+  min-height: 720px;
+}
+
+.org-pipeline-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.org-pipeline-config-item {
+  border: 1px solid var(--org-border, var(--border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--org-panel-elevated, var(--bg-surface)) 78%, transparent);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+}
+
+.org-pipeline-config-main {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+}
+
+.org-pipeline-config-main strong {
+  color: var(--org-text-1, var(--text-primary));
+}
+
+.org-pipeline-config-main span,
+.org-pipeline-config-main small {
+  color: var(--org-text-2, var(--text-secondary));
+}
+
+.org-pipeline-config-item.active {
+  border-color: color-mix(in srgb, var(--org-accent) 42%, var(--org-border, var(--border)));
+  background: color-mix(in srgb, var(--org-accent) 10%, transparent);
+}
+
+.org-pipeline-config-delete {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--org-text-2, var(--text-secondary));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.68;
+}
+
+.org-pipeline-config-delete:hover {
+  color: var(--color-danger-text);
+  border-color: color-mix(in srgb, var(--org-danger) 32%, var(--org-border, var(--border)));
+  background: color-mix(in srgb, var(--org-danger) 10%, transparent);
+  opacity: 1;
+}
+
+.org-pipeline-builder {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.org-pipeline-builder-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.org-pipeline-builder-copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.org-pipeline-title-input,
+.org-pipeline-description-input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--org-border, var(--border));
+  background: color-mix(in srgb, var(--org-panel-elevated, var(--bg-surface)) 82%, transparent);
+  color: var(--org-text-1, var(--text-primary));
+  padding: 12px 14px;
+}
+
+.org-pipeline-title-input {
+  min-height: 48px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.org-pipeline-description-input {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.org-pipeline-builder-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.org-pipeline-canvas-shell {
+  flex: 1;
+  border: 1px solid var(--org-border, var(--border));
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--org-accent) 10%, transparent) 0%, transparent 35%),
+    linear-gradient(transparent 31px, color-mix(in srgb, var(--org-border, var(--border)) 35%, transparent) 32px),
+    linear-gradient(90deg, transparent 31px, color-mix(in srgb, var(--org-border, var(--border)) 35%, transparent) 32px),
+    color-mix(in srgb, var(--org-panel, var(--bg-card)) 92%, transparent);
+  background-size: auto, 32px 32px, 32px 32px, auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 120px;
+  gap: 18px;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.org-pipeline-endpoint-lane {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.org-pipeline-endpoint {
+  width: 100%;
+  min-width: 108px;
+  height: 108px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--org-border, var(--border)) 80%, transparent);
+  background: color-mix(in srgb, var(--org-panel-elevated, var(--bg-surface)) 84%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--org-text-2, var(--text-secondary));
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.org-pipeline-endpoint.publish {
+  color: var(--org-accent-light);
+}
+
+.org-pipeline-stage-viewport {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 10px;
+}
+
+.org-pipeline-canvas {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 180px;
+  min-width: max-content;
+  padding-inline: 2px;
+}
+
+.org-pipeline-stage-stack {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.org-pipeline-node {
+  width: 240px;
+  flex: 0 0 240px;
+  min-height: 126px;
+  border-radius: 18px;
+  border: 1px solid var(--org-border, var(--border));
+  background: color-mix(in srgb, var(--org-panel-elevated, var(--bg-surface)) 88%, transparent);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  color: inherit;
+  box-shadow: var(--org-shadow-sm);
+}
+
+.org-pipeline-node:hover {
+  border-color: color-mix(in srgb, var(--org-accent) 28%, var(--org-border, var(--border)));
+  transform: translateY(-1px);
+}
+
+.org-pipeline-node.active {
+  border-color: color-mix(in srgb, var(--org-accent) 48%, var(--org-border, var(--border)));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--org-accent) 26%, transparent);
+}
+
+.org-pipeline-node-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.org-pipeline-node-order,
+.org-pipeline-node-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.org-pipeline-node-order {
+  color: var(--org-text-2, var(--text-secondary));
+  background: color-mix(in srgb, var(--org-panel, var(--bg-card)) 82%, transparent);
+}
+
+.org-pipeline-node-badge {
+  color: var(--org-accent-light);
+  background: color-mix(in srgb, var(--org-accent) 12%, transparent);
+}
+
+.org-pipeline-node span,
+.org-pipeline-node small {
+  color: var(--org-text-2, var(--text-secondary));
+}
+
+.org-pipeline-insert {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--org-accent) 36%, var(--org-border, var(--border)));
+  background: color-mix(in srgb, var(--org-accent) 8%, transparent);
+  color: var(--org-accent-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.org-pipeline-stage-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: visible;
+}
+
+.org-pipeline-canvas-empty {
+  min-height: 180px;
+  border-radius: 20px;
+  border: 1px dashed color-mix(in srgb, var(--org-accent) 26%, var(--org-border, var(--border)));
+  background: color-mix(in srgb, var(--org-panel-elevated, var(--bg-surface)) 74%, transparent);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px;
+}
+
+.org-pipeline-canvas-empty h3,
+.org-stage-editor-empty h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+}
+
+.org-pipeline-canvas-empty p,
+.org-stage-editor-empty p {
+  margin: 0;
+  color: var(--org-text-2, var(--text-secondary));
+  line-height: 1.6;
+}
+
+.org-pipeline-canvas-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.org-template-modal {
+  position: fixed;
+  inset: 60px max(40px, 10vw);
+  z-index: 102;
+  border-radius: 24px;
+  border: 1px solid var(--org-border, var(--border));
+  background: color-mix(in srgb, var(--org-panel, var(--bg-card)) 96%, transparent);
+  box-shadow: var(--org-shadow-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.org-template-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.org-modal-kicker {
+  color: var(--org-text-2, var(--text-secondary));
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+
+.org-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.org-template-card {
+  border: 1px solid var(--org-border, var(--border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--org-panel-elevated, var(--bg-surface)) 82%, transparent);
+  color: inherit;
+  text-align: left;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.org-template-card span,
+.org-template-card small {
+  color: var(--org-text-2, var(--text-secondary));
+}
+
+.org-text-button.danger {
+  color: var(--color-danger-text);
+}
+
+.org-empty-inline {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px dashed var(--org-border, var(--border));
+  color: var(--org-text-2, var(--text-secondary));
+  background: color-mix(in srgb, var(--org-panel-elevated, var(--bg-surface)) 74%, transparent);
+}
+
+.org-stage-editor-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px;
+}
+
+.org-calendar-wrapper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+}
+
+.org-calendar-embed {
+  min-height: 760px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--org-surface-card, var(--bg-card));
+}
+
+.org-calendar-wrapper .calendar-v2-shell > .app-navbar,
+.org-calendar-wrapper .calendar-v2-layout > .app-sidebar {
+  display: none;
+}
+
+.org-calendar-wrapper .calendar-v2-shell {
+  height: auto;
+  width: 100%;
+  background: transparent;
+}
+
+.org-calendar-wrapper .calendar-v2-layout {
+  height: auto;
+}
+
+.org-calendar-wrapper .calendar-main-area {
+  min-height: 760px;
+}
+
+.org-queue-panel {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--org-surface-card, var(--bg-card));
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.org-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.org-queue-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--org-surface-elevated, var(--bg-surface));
+  padding: 12px;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.org-queue-item span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1100px) {
+  .org-pipeline-admin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .org-pipeline-sidebar,
+  .org-pipeline-builder,
+  .org-pipeline-stage-editor {
+    min-height: 0;
+  }
+
+  .org-template-modal {
+    inset: 18px;
+  }
+
+  .org-pipeline-builder-header {
+    flex-direction: column;
+  }
+
+  .org-pipeline-builder-actions {
+    justify-content: flex-start;
+  }
+
+  .org-calendar-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .org-pipeline-canvas-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .org-pipeline-endpoint-lane {
+    justify-content: flex-start;
+  }
+
+  .org-pipeline-endpoint {
+    max-width: 200px;
+  }
+}
+
+/* ============================================================================
+   Stage 8 - Org Admin Pipeline Builder
+   Deepen the pipeline builder to match the admin shell and review suite.
+   ============================================================================ */
+.org-admin-pipeline-page {
+  --org-admin-pipeline-stage8-line: color-mix(in srgb, var(--org-accent) 18%, var(--org-border, color-mix(in srgb, var(--org-panel) 8%, transparent)));
+  --org-admin-pipeline-stage8-panel:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 3.5%, transparent), transparent 74%),
+    color-mix(in srgb, var(--org-panel-elevated) 92%, transparent);
+  --org-admin-pipeline-stage8-input:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 3%, transparent), transparent 84%),
+    color-mix(in srgb, var(--org-panel) 88%, transparent);
+}
+
+.org-admin-pipeline-page .org-pipeline-admin-layout {
+  gap: 22px;
+}
+
+.org-admin-pipeline-page .org-pipeline-sidebar,
+.org-admin-pipeline-page .org-pipeline-builder,
+.org-admin-pipeline-page .org-pipeline-stage-editor,
+.org-admin-pipeline-page .org-template-modal {
+  border-color: var(--org-admin-pipeline-stage8-line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 4%, transparent), transparent 74%),
+    color-mix(in srgb, var(--org-panel-elevated) 92%, transparent);
+  box-shadow:
+    0 24px 48px color-mix(in srgb, var(--org-bg) 24%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3.5%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.org-admin-pipeline-page .org-pipeline-config-item,
+.org-admin-pipeline-page .org-template-card,
+.org-admin-pipeline-page .org-pipeline-node,
+.org-admin-pipeline-page .org-pipeline-endpoint,
+.org-admin-pipeline-page .org-pipeline-canvas-empty,
+.org-admin-pipeline-page .org-stage-editor-empty {
+  border-color: color-mix(in srgb, var(--org-admin-pipeline-stage8-line) 84%, transparent);
+  background: var(--org-admin-pipeline-stage8-input);
+  box-shadow:
+    0 16px 30px color-mix(in srgb, var(--org-bg) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent);
+}
+
+.org-admin-pipeline-page .org-pipeline-config-item,
+.org-admin-pipeline-page .org-template-card,
+.org-admin-pipeline-page .org-pipeline-node {
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.org-admin-pipeline-page .org-pipeline-config-item:hover,
+.org-admin-pipeline-page .org-template-card:hover,
+.org-admin-pipeline-page .org-pipeline-node:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--org-accent) 28%, var(--org-admin-pipeline-stage8-line));
+  box-shadow:
+    0 22px 38px color-mix(in srgb, var(--org-bg) 22%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--org-accent) 8%, transparent);
+}
+
+.org-admin-pipeline-page .org-pipeline-config-item.active,
+.org-admin-pipeline-page .org-pipeline-node.active {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--org-accent) 16%, transparent), transparent 78%),
+    linear-gradient(180deg, color-mix(in srgb, var(--org-panel) 4%, transparent), transparent 74%),
+    color-mix(in srgb, var(--org-panel-hover) 90%, transparent);
+  border-color: color-mix(in srgb, var(--org-accent) 36%, var(--org-admin-pipeline-stage8-line));
+}
+
+.org-admin-pipeline-page .org-pipeline-builder {
+  padding: 20px;
+}
+
+.org-admin-pipeline-page .org-pipeline-builder-header,
+.org-admin-pipeline-page .org-template-modal-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--org-admin-pipeline-stage8-line) 72%, transparent);
+  padding-bottom: 18px;
+}
+
+.org-admin-pipeline-page .org-pipeline-title-input,
+.org-admin-pipeline-page .org-pipeline-description-input {
+  border-color: color-mix(in srgb, var(--org-admin-pipeline-stage8-line) 82%, transparent);
+  background: var(--org-admin-pipeline-stage8-input);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--org-panel) 2.5%, transparent);
+}
+
+.org-admin-pipeline-page .org-pipeline-title-input:focus,
+.org-admin-pipeline-page .org-pipeline-description-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--org-accent) 36%, var(--org-admin-pipeline-stage8-line));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--org-accent) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent);
+}
+
+.org-admin-pipeline-page .org-pipeline-canvas-shell {
+  border-color: var(--org-admin-pipeline-stage8-line);
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--org-accent) 12%, transparent) 0%, transparent 38%),
+    linear-gradient(transparent 31px, color-mix(in srgb, var(--org-admin-pipeline-stage8-line) 26%, transparent) 32px),
+    linear-gradient(90deg, transparent 31px, color-mix(in srgb, var(--org-admin-pipeline-stage8-line) 26%, transparent) 32px),
+    color-mix(in srgb, var(--org-panel) 90%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent),
+    0 22px 42px color-mix(in srgb, var(--org-bg) 20%, transparent);
+}
+
+.org-admin-pipeline-page .org-pipeline-endpoint {
+  min-height: 116px;
+}
+
+.org-admin-pipeline-page .org-pipeline-node {
+  min-height: 136px;
+}
+
+.org-admin-pipeline-page .org-pipeline-node-order,
+.org-admin-pipeline-page .org-pipeline-node-badge {
+  border: 1px solid color-mix(in srgb, var(--org-admin-pipeline-stage8-line) 72%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--org-panel) 2.5%, transparent);
+}
+
+.org-admin-pipeline-page .org-pipeline-insert {
+  border-color: color-mix(in srgb, var(--org-accent) 32%, var(--org-admin-pipeline-stage8-line));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--org-accent) 16%, transparent), transparent 78%),
+    color-mix(in srgb, var(--org-panel) 4%, transparent);
+  box-shadow:
+    0 16px 28px color-mix(in srgb, var(--org-bg) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 3%, transparent);
+}
+
+.org-admin-pipeline-page .org-pipeline-insert:hover {
+  transform: translateY(-1px);
+}
+
+.org-admin-pipeline-page .org-template-modal {
+  box-shadow:
+    0 32px 68px color-mix(in srgb, var(--org-bg) 32%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--org-panel) 4%, transparent);
+}
+
+.org-admin-pipeline-page .org-template-grid {
+  gap: 18px;
+}
+
+@media (max-width: 1100px) {
+  .org-admin-pipeline-page .org-pipeline-builder,
+  .org-admin-pipeline-page .org-template-modal {
+    padding: 18px;
+  }
+}
