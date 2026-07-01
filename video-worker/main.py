@@ -174,10 +174,12 @@ async def on_cancel_job(request: Request, x_worker_secret: str = Header(None)):
 # ─────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # Railway injects PORT; fall back to WORKER_PORT / default 8001
+    port = int(os.environ.get("PORT", config.port))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=config.port,
+        port=port,
         log_level=config.log_level.lower(),
         reload=False  # Never use reload in production
     )
