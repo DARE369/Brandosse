@@ -9,8 +9,6 @@ pydantic-settings>=2.4.0
 yt-dlp>=2024.12.13
 replicate>=0.34.1
 anthropic>=0.40.0
-faster-whisper==1.1.0
-tiktoken>=0.7.0
 opencv-python-headless>=4.10.0
 numpy>=2.0.0
 mediapipe==0.10.14

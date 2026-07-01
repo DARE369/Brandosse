@@ -15,6 +15,7 @@ class WorkerConfig(BaseSettings):
     supabase_service_key: str = Field(..., alias="WORKER_SUPABASE_SERVICE_KEY")
     
     # External APIs (optional at this stage, validated in later stages)
+    groq_api_key: str = Field(default="", alias="WORKER_GROQ_API_KEY")
     anthropic_api_key: str = Field(default="", alias="WORKER_ANTHROPIC_API_KEY")
     replicate_api_token: str = Field(default="", alias="WORKER_REPLICATE_API_TOKEN")
     use_mock_anthropic: bool = Field(default=True, alias="WORKER_USE_MOCK_ANTHROPIC")
