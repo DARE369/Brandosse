@@ -1,0 +1,32 @@
+name: Health check
+
+on:
+  schedule:
+    # Runs every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    # Also triggerable manually from GitHub Actions tab
+
+jobs:
+  check:
+    name: Ping services
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Vercel (frontend)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.NEXT_PUBLIC_APP_URL }}/login")
+          echo "Vercel /login → $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Vercel returned $STATUS — expected 200"
+            exit 1
+          fi
+
+      - name: Check Railway (video worker)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RAILWAY_WORKER_URL }}/health")
+          echo "Railway /health → $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Railway worker returned $STATUS — expected 200"
+            exit 1
+          fi

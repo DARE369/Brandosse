@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build:webpack
+        env:
+          # Public vars — safe to store as GitHub secrets (Settings → Secrets → Actions)
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+          # Server-only — placeholders are fine here; real values live in Vercel
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+          GROQ_API_KEY: ci-placeholder
+          ANTHROPIC_API_KEY: ci-placeholder
+          FAL_API_KEY: ci-placeholder
+          OAUTH_STATE_SECRET: ci-placeholder-32-chars-xxxxxxxxxx
+          CRON_SECRET: ci-placeholder
+          VIDEO_WORKER_WEBHOOK_SECRET: ci-placeholder
+          WORKER_WEBHOOK_URL: http://localhost:8001
