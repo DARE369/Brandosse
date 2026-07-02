@@ -35,6 +35,9 @@ YTDLP_BASE_OPTIONS = {
     'no_warnings': False,
     'extract_flat': False,
     'merge_output_format': 'mp4',
+    # Use iOS player client — bypasses YouTube's bot detection on server IPs
+    # without requiring cookies. Falls back to web if iOS is unavailable.
+    'extractor_args': {'youtube': {'player_client': ['ios', 'web']}},
 }
 
 
@@ -47,7 +50,17 @@ def calculate_credits(duration_secs: int) -> int:
     return max(minutes * CREDITS_PER_MINUTE, MIN_CREDITS_REQUIRED)
 
 
-def _get_video_metadata(url: str, platform: str, job_id: str) -> dict:
+def _write_cookies_file(temp_dir: str) -> str | None:
+    """Write WORKER_YOUTUBE_COOKIES env var to a temp file for yt-dlp."""
+    if not config.youtube_cookies:
+        return None
+    cookies_path = os.path.join(temp_dir, "yt_cookies.txt")
+    with open(cookies_path, "w") as f:
+        f.write(config.youtube_cookies)
+    return cookies_path
+
+
+def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str | None = None) -> dict:
     """
     Fetch video metadata without downloading the file.
     Returns dict with keys: title, duration_secs.
@@ -58,6 +71,8 @@ def _get_video_metadata(url: str, platform: str, job_id: str) -> dict:
         **YTDLP_BASE_OPTIONS,
         'skip_download': True,
     }
+    if cookies_path:
+        opts['cookiefile'] = cookies_path
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -114,7 +129,7 @@ def _get_video_metadata(url: str, platform: str, job_id: str) -> dict:
         raise DownloadError(f"Failed to retrieve video: {str(e)[:200]}", job_id)
 
 
-def _download_with_ytdlp(url: str, output_path_template: str, job_id: str) -> str:
+def _download_with_ytdlp(url: str, output_path_template: str, job_id: str, cookies_path: str | None = None) -> str:
     """
     Download a video using yt-dlp.
     Returns the actual final file path after download.
@@ -140,6 +155,8 @@ def _download_with_ytdlp(url: str, output_path_template: str, job_id: str) -> st
         'outtmpl': output_path_template,
         'progress_hooks': [progress_hook],
     }
+    if cookies_path:
+        opts['cookiefile'] = cookies_path
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -212,8 +229,10 @@ async def run_download(job: dict, temp_dir: str) -> dict:
         raise DownloadError(f"Invalid URL: {validation_error}", job_id)
 
     try:
+        cookies_path = _write_cookies_file(temp_dir)
+
         if platform in ['youtube', 'twitter']:
-            metadata = await asyncio.to_thread(_get_video_metadata, source_url, platform, job_id)
+            metadata = await asyncio.to_thread(_get_video_metadata, source_url, platform, job_id, cookies_path)
             title = metadata["title"]
             duration_secs = metadata["duration_secs"]
             video_path = None
@@ -281,6 +300,7 @@ async def run_download(job: dict, temp_dir: str) -> dict:
                 source_url,
                 output_template,
                 job_id,
+                cookies_path,
             )
 
             log.info(

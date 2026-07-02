@@ -21,6 +21,10 @@ class WorkerConfig(BaseSettings):
     use_mock_anthropic: bool = Field(default=True, alias="WORKER_USE_MOCK_ANTHROPIC")
     use_mock_replicate: bool = Field(default=True, alias="WORKER_USE_MOCK_REPLICATE")
     
+    # YouTube cookies (Netscape format) — paste content of cookies.txt exported
+    # from a logged-in browser. Prevents bot detection on server IPs.
+    youtube_cookies: str = Field(default="", alias="WORKER_YOUTUBE_COOKIES")
+
     # Security
     webhook_secret: str = Field(..., alias="WORKER_WEBHOOK_SECRET")
     
