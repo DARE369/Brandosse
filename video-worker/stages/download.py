@@ -21,12 +21,9 @@ CREDITS_PER_MINUTE = 1
 MIN_CREDITS_REQUIRED = 5
 
 YTDLP_BASE_OPTIONS = {
-    'format': (
-        'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]'
-        '/bestvideo[height<=1080]+bestaudio'
-        '/best[height<=1080]'
-        '/best'
-    ),
+    # iOS player serves combined mp4 streams — don't restrict by ext so the
+    # selector works across both iOS and web player clients.
+    'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
     'no_playlist': True,
     'socket_timeout': 30,
     'retries': 3,
