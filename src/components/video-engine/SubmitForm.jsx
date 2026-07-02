@@ -6,6 +6,14 @@ import { useWorkerHealth } from "../../hooks/video-engine/useWorkerHealth";
 import { submitVideoJob } from "../../services/videoEngineApi";
 import ClipSettingsPanel from "./ClipSettingsPanel";
 
+function getUrlParam() {
+  try {
+    return new URLSearchParams(window.location.search).get("url") || "";
+  } catch {
+    return "";
+  }
+}
+
 function detectPlatform(url) {
   const trimmed = url.trim();
   if (!trimmed) return null;
@@ -85,7 +93,7 @@ function prefsReducer(state, action) {
 export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
   const { navigate } = useAppNavigation();
   const workerStatus = useWorkerHealth();
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(getUrlParam);
   const [debouncedUrl, setDebouncedUrl] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);

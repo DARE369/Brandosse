@@ -109,7 +109,7 @@ export default function JobStatusPipeline({ status, errorMessage, errorStage, so
           <button
             type="button"
             className="ve-secondary-btn ve-retry-job-btn"
-            onClick={() => navigate("/app/video/new")}
+            onClick={() => navigate(`/app/video/new${sourceUrl ? `?url=${encodeURIComponent(sourceUrl)}` : ''}`)}
           >
             <RefreshCw size={15} aria-hidden="true" />
             Try again
