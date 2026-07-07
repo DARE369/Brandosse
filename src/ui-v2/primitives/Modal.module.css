@@ -1,0 +1,42 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--uiv2-scrim);
+  backdrop-filter: blur(2px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.panel {
+  background: var(--uiv2-bg-surface);
+  border: 1px solid var(--uiv2-border-strong);
+  border-radius: var(--uiv2-radius-xl);
+  width: 100%;
+  padding: 22px;
+  animation: uiv2-modal-in 0.16s ease;
+  box-shadow: var(--uiv2-shadow-modal-current);
+}
+.sizeSm { max-width: 380px; }
+.sizeMd { max-width: 420px; }
+.sizeLg { max-width: 560px; }
+
+.title {
+  font-family: var(--uiv2-font-display);
+  font-weight: var(--uiv2-weight-semibold);
+  font-size: var(--uiv2-text-lg);
+  margin-bottom: 4px;
+  color: var(--uiv2-text-primary);
+}
+.desc {
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+  margin-bottom: 18px;
+}
+.actions {
+  display: flex;
+  gap: 9px;
+  margin-top: 20px;
+}
+.actions > * { flex: 1; }

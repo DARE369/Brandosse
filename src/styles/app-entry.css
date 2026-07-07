@@ -8,7 +8,6 @@
 @import "../components/Shared/ui/ui-mobile-primitives.css";
 @import "./responsive-contract.css";
 @import "./App.css";
-@import "./UserDashboard.css";
 @import "./AccountHealth.css";
 @import "./AuthLoadingOverlay.css";
 @import "./BrandKit.css";

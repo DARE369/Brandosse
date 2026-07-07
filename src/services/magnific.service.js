@@ -112,6 +112,7 @@ export async function generateImages({
   resolution = '2k',
   sessionId = null,
   providerOptions = {},
+  category = 'image',
   onProgress,
 }) {
   const cleanedPrompt = cleanPrompt(prompt);
@@ -135,6 +136,7 @@ export async function generateImages({
       image_model: imageModel || undefined,
       resolution,
       providerOptions,
+      category,
     });
 
     const publicUrl = data.publicUrl || data.public_url || data.url;
@@ -189,7 +191,7 @@ export async function editImage({
     width: dimensions.width,
     height: dimensions.height,
     storagePath: data.storagePath || null,
-    generationCost: 16,
+    generationCost: data.credits_used ?? 3,
     ...provider,
   };
 }

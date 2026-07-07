@@ -13,6 +13,7 @@ import { createAdminClient, createAuthClient, requireUser } from "../_shared/sup
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 
 const GENERATED_BUCKET = "generated_assets";
+const CREDITS_PER_EDIT = 3;
 
 type EditImageBody = {
   prompt?: string;
@@ -44,6 +45,16 @@ serve(async (req) => {
 
     if (!sourceImageUrl) {
       return jsonResponse({ error: "Missing sourceImageUrl for edit mode" }, 400);
+    }
+
+    const supabaseAdmin = createAdminClient();
+
+    // ── Credit check (authoritative source: user_credits) ────────────────────
+    const { data: creditRow } = await supabaseAdmin
+      .from("user_credits").select("balance").eq("user_id", user.id).maybeSingle();
+    const currentCredits = creditRow?.balance ?? 0;
+    if (currentCredits < CREDITS_PER_EDIT) {
+      return jsonResponse({ error: "Insufficient credits" }, 402);
     }
 
     const mergedPrompt = mergeBrandKitIntoPrompt(prompt, body.brandKit);
@@ -78,7 +89,6 @@ serve(async (req) => {
       throw new Error("Media provider returned no edited image URL");
     }
 
-    const supabaseAdmin = createAdminClient();
     await ensureBucketExists(supabaseAdmin, GENERATED_BUCKET, true);
 
     const storagePath = buildGeneratedAssetPath(user.id, "images", providerUrl, "image/jpeg");
@@ -88,6 +98,13 @@ serve(async (req) => {
       objectPath: storagePath,
       sourceUrl: providerUrl,
       fallbackContentType: "image/jpeg",
+    });
+
+    await supabaseAdmin.rpc("deduct_credits", {
+      p_user_id:     user.id,
+      p_amount:      CREDITS_PER_EDIT,
+      p_category:    "edit",
+      p_description: "Image edit",
     });
 
     return jsonResponse({
@@ -101,6 +118,8 @@ serve(async (req) => {
       providerEndpoint: "/v1/ai/text-to-image/seedream-v4-5-edit",
       generationTimeMs: Date.now() - startedAt,
       prompt: mergedPrompt,
+      credits_used:      CREDITS_PER_EDIT,
+      credits_remaining: currentCredits - CREDITS_PER_EDIT,
     });
   } catch (error) {
     console.error("[editImage] error", error);

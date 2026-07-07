@@ -209,6 +209,7 @@ def refund_credits(user_id: str, job_id: str, amount: int, description: str) -> 
             "amount": amount,
             "balance_after": new_balance,
             "transaction_type": "refund",
+            "category": "video",
             "description": description
         }).execute()
         
@@ -373,6 +374,7 @@ def deduct_credits(user_id: str, job_id: str, amount: int) -> tuple[bool, int]:
             "amount": -amount,
             "balance_after": new_balance,
             "transaction_type": "consumption",
+            "category": "video",
             "description": "Video processing job",
         }).execute()
 

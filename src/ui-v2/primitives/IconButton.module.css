@@ -1,0 +1,29 @@
+.iconBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--uiv2-radius-md);
+  background: transparent;
+  border: 1px solid var(--uiv2-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--uiv2-text-secondary);
+  flex-shrink: 0;
+  transition: border-color var(--uiv2-duration-fast) var(--uiv2-ease),
+    color var(--uiv2-duration-fast) var(--uiv2-ease);
+  position: relative;
+}
+.iconBtn:hover {
+  border-color: var(--uiv2-border-hover);
+  color: var(--uiv2-text-primary);
+}
+.dot {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--uiv2-accent-solid);
+}

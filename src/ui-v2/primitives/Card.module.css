@@ -1,0 +1,9 @@
+.card {
+  background: var(--uiv2-bg-surface);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-lg);
+}
+.padSm { padding: 14px 16px; }
+.padMd { padding: 16px 18px; }
+.padLg { padding: 20px 22px; }
+.padNone { padding: 0; }

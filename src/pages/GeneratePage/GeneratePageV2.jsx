@@ -5,10 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Toaster } from 'react-hot-toast';
 import useSessionStore from '../../stores/SessionStore';
 import { supabase } from '../../services/supabaseClient';
-import UserNavbar from '../../components/User/UserNavbar';
-import UserSidebar from '../../components/User/UserSidebar';
-import BrandosseGenerateStudio from '../../components/GenerateStudio/BrandosseGenerateStudio';
-import VideoProcessingModal, { VideoStatusBar } from '../../components/Generate/VideoProcessingModal';
+import StudioPage from '../Studio/StudioPage';
 import BrandKitOnboardingModal from '../../components/BrandKit/BrandKitOnboardingModal';
 import useBrandKitStore from '../../stores/BrandKitStore';
 import { useAuth } from '../../Context/AuthContext';
@@ -577,52 +574,14 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
   }, [generationIndex, normalizedSearchQuery]);
 
   return (
-    <div className="dashboard-shell">
+    <>
       <Toaster
         position="top-center"
         gutter={8}
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: 'var(--gen-panel)',
-            color: 'var(--gen-text-1)',
-            border: '1px solid var(--gen-border)',
-            borderRadius: '10px',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            boxShadow: 'var(--gen-shadow-md)',
-          },
-          success: {
-            iconTheme: { primary: 'var(--color-success)', secondary: 'var(--public-dark-text)' },
-          },
-          error: {
-            iconTheme: { primary: 'var(--color-danger)', secondary: 'var(--public-dark-text)' },
-          },
-        }}
+        toastOptions={{ duration: 4000 }}
       />
 
-      <UserNavbar
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        searchResults={searchResults}
-        searchLoading={searchLoading && normalizedSearchQuery.length > 0}
-        onSearchSelect={(generation) => {
-          setSearchQuery('');
-          navigate(buildGenerationRoute(generation));
-        }}
-      />
-      <UserSidebar />
-
-      <div className="generate-workspace">
-        <BrandosseGenerateStudio
-          postPanelOpen={postPanelOpen}
-          onClosePostPanel={handleClosePostPanel}
-          onCreateSession={() => {
-            clearActiveSession();
-            navigate('/app/generate');
-          }}
-        />
-      </div>
+      <StudioPage />
 
       {showOnboarding && (
         <BrandKitOnboardingModal
@@ -630,35 +589,6 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
           onClose={() => setShowOnboarding(false)}
         />
       )}
-
-      {videoJobState.status && (
-        videoJobState.isMinimized ? (
-          <VideoStatusBar
-            status={videoJobState.status}
-            progress={videoJobState.progress}
-            onExpand={() => setVideoJobMinimized(false)}
-            onDismiss={dismissVideoJob}
-          />
-        ) : (
-          <VideoProcessingModal
-            jobId={videoJobState.jobId}
-            prompt={videoJobState.prompt}
-            status={videoJobState.status}
-            progress={videoJobState.progress}
-            videoUrl={videoJobState.videoUrl}
-            onMinimize={() => setVideoJobMinimized(true)}
-            onDismiss={dismissVideoJob}
-            onRetry={async () => {
-              try {
-                await startVideoGeneration(videoJobState.prompt);
-              } catch (_err) {
-                // Error state is already handled in the store.
-              }
-            }}
-            onViewInCanvas={handleViewCompletedVideo}
-          />
-        )
-      )}
-    </div>
+    </>
   );
 }

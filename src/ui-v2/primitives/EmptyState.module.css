@@ -1,0 +1,29 @@
+.wrap {
+  text-align: center;
+  padding: 44px 20px;
+  border-radius: var(--uiv2-radius-xl);
+  background: var(--uiv2-bg-surface);
+  border: 1px solid var(--uiv2-border);
+}
+.dashed {
+  border: 1.5px dashed var(--uiv2-border-strong);
+}
+.title {
+  font-size: var(--uiv2-text-md);
+  font-weight: var(--uiv2-weight-semibold);
+  color: var(--uiv2-text-primary);
+  margin-bottom: 5px;
+}
+.desc {
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+  max-width: 46ch;
+  margin: 0 auto;
+}
+.actions {
+  display: flex;
+  gap: 9px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}

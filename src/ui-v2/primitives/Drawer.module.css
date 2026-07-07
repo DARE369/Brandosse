@@ -1,0 +1,46 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--uiv2-scrim-soft);
+  z-index: 90;
+}
+.panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: min(400px, 94vw);
+  background: var(--uiv2-bg-inset);
+  border-left: 1px solid var(--uiv2-border);
+  z-index: 95;
+  padding: 22px;
+  overflow-y: auto;
+  animation: uiv2-fade-in 0.16s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--uiv2-scrollbar-thumb) transparent;
+}
+.panel::-webkit-scrollbar { width: 7px; }
+.panel::-webkit-scrollbar-thumb { background: var(--uiv2-scrollbar-thumb); border-radius: 8px; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.title {
+  font-family: var(--uiv2-font-display);
+  font-weight: var(--uiv2-weight-semibold);
+  font-size: var(--uiv2-text-lg);
+  color: var(--uiv2-text-primary);
+}
+.closeBtn {
+  background: none;
+  border: none;
+  color: var(--uiv2-text-secondary);
+  cursor: pointer;
+  padding: 3px;
+}
+.closeBtn:hover { color: var(--uiv2-text-primary); }

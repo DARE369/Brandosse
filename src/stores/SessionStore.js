@@ -757,10 +757,12 @@ const useSessionStore = create((set, get) => ({
   generationLineage: null,
 
   // -- SESSION MANAGEMENT ----------------------------------------------------
+  sessionsLoading: false,
   fetchSessions: async () => {
     try {
+      set({ sessionsLoading: true });
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { set({ sessionsLoading: false }); return; }
 
       const { data, error } = await applySessionScope(
         supabase
@@ -772,10 +774,10 @@ const useSessionStore = create((set, get) => ({
         .limit(50);
 
       if (error) throw error;
-      set({ sessions: data || [] });
+      set({ sessions: data || [], sessionsLoading: false });
     } catch (err) {
       console.error('fetchSessions:', err);
-      set({ error: err.message });
+      set({ error: err.message, sessionsLoading: false });
     }
   },
 
@@ -825,9 +827,15 @@ const useSessionStore = create((set, get) => ({
         ? options.metadata
         : {};
 
+      // Explicit options.projectId (used by the session-history drawer's
+      // per-project "+ New session") wins; falls back to activeProject for
+      // any older caller that still relies on it. `null` means General.
       const activeProject = get().activeProject;
+      const resolvedProjectId = Object.prototype.hasOwnProperty.call(options, 'projectId')
+        ? options.projectId
+        : (activeProject?.id || null);
       const insertPayload = withSessionScope({ user_id: user.id, title, metadata });
-      if (activeProject?.id) insertPayload.project_id = activeProject.id;
+      if (resolvedProjectId) insertPayload.project_id = resolvedProjectId;
 
       const { data, error } = await supabase
         .from('sessions')
@@ -885,6 +893,7 @@ const useSessionStore = create((set, get) => ({
         .from('studio_projects')
         .select('*')
         .eq('user_id', user.id)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
       if (error) throw error;
       set({ projects: data || [], projectsLoading: false });
@@ -898,19 +907,79 @@ const useSessionStore = create((set, get) => ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      // Append at the end of the current manual order.
+      const nextSortOrder = get().projects.length;
       const { data, error } = await supabase
         .from('studio_projects')
-        .insert([{ user_id: user.id, name, color }])
+        .insert([{ user_id: user.id, name, color, sort_order: nextSortOrder }])
         .select()
         .single();
       if (error) throw error;
       set((state) => ({
-        projects: [data, ...state.projects],
+        projects: [...state.projects, data],
         activeProject: data,
       }));
       return data;
     } catch (err) {
       console.error('createProject:', err);
+      throw err;
+    }
+  },
+
+  renameProject: async (projectId, name) => {
+    const trimmed = String(name || '').trim();
+    if (!projectId || !trimmed) return;
+    try {
+      const { error } = await supabase
+        .from('studio_projects')
+        .update({ name: trimmed })
+        .eq('id', projectId);
+      if (error) throw error;
+      set((state) => ({
+        projects: state.projects.map((p) => (p.id === projectId ? { ...p, name: trimmed } : p)),
+      }));
+    } catch (err) {
+      console.error('renameProject:', err);
+      throw err;
+    }
+  },
+
+  // Deleting a project does NOT delete its sessions — sessions.project_id has
+  // ON DELETE SET NULL, so they fall back into "General" automatically.
+  deleteProject: async (projectId) => {
+    if (!projectId) return;
+    try {
+      const { error } = await supabase
+        .from('studio_projects')
+        .delete()
+        .eq('id', projectId);
+      if (error) throw error;
+      set((state) => ({
+        projects: state.projects.filter((p) => p.id !== projectId),
+        activeProject: state.activeProject?.id === projectId ? null : state.activeProject,
+        sessions: state.sessions.map((s) => (s.project_id === projectId ? { ...s, project_id: null } : s)),
+      }));
+    } catch (err) {
+      console.error('deleteProject:', err);
+      throw err;
+    }
+  },
+
+  // orderedIds: full list of this user's project ids in the new display order.
+  reorderProjects: async (orderedIds) => {
+    const prevProjects = get().projects;
+    const byId = new Map(prevProjects.map((p) => [p.id, p]));
+    const nextProjects = orderedIds.map((id, index) => ({ ...byId.get(id), sort_order: index })).filter((p) => p.id);
+    set({ projects: nextProjects }); // optimistic
+    try {
+      await Promise.all(
+        nextProjects.map((p, index) =>
+          supabase.from('studio_projects').update({ sort_order: index }).eq('id', p.id)
+        )
+      );
+    } catch (err) {
+      console.error('reorderProjects:', err);
+      set({ projects: prevProjects }); // revert on failure
       throw err;
     }
   },
@@ -1099,6 +1168,7 @@ const useSessionStore = create((set, get) => ({
           model: settings.model || 'realism',
           imageModel: settings.imageModel || 'ideogram',
           resolution: settings.resolution || '2k',
+          category: 'image',
         });
 
         const first = images?.[0];
@@ -1238,6 +1308,7 @@ const useSessionStore = create((set, get) => ({
           model: settings.model || 'realism',
           imageModel: settings.imageModel || 'ideogram',
           resolution: settings.resolution || '2k',
+          category: 'carousel',
         });
 
         const first = images?.[0];

@@ -1,0 +1,21 @@
+.overlay {
+  position: fixed; inset: 0; background: rgba(6,7,8,0.92); z-index: 150;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.closeBtn, .navBtn {
+  position: absolute; background: rgba(255,255,255,0.1); border: none; color: #F5F5F4;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.closeBtn { top: 20px; right: 20px; width: 36px; height: 36px; border-radius: 8px; }
+.navBtn { top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; }
+.navPrev { left: 20px; }
+.navNext { right: 20px; }
+.body { display: flex; flex-direction: column; align-items: center; gap: 16px; max-width: min(88vw, 640px); }
+.mediaWrap {
+  width: 100%; max-height: 66vh; border-radius: 12px; background: #1E2023;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  box-shadow: 0 30px 70px rgba(0,0,0,0.5);
+}
+.media { max-width: 100%; max-height: 66vh; object-fit: contain; }
+.actions { display: flex; align-items: center; gap: 14px; }
+.position { font-family: var(--uiv2-font-mono); font-size: 12px; color: #C4C6CB; }

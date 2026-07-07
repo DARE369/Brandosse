@@ -38,6 +38,11 @@ type GenerateImageBody = {
   logo_url?: string;
   logo_position?: LogoPosition;
   logo_scale?: number;
+  /** Which real product surface this image is for — used only to tag the
+   * credit ledger row (see credit_transactions.category). Defaults to
+   * "image" for the plain single/batch generator; the carousel pipeline
+   * passes "carousel" since each slide goes through this same function. */
+  category?: "image" | "carousel";
 };
 
 function buildBrandContext(brandKit: Record<string, unknown> | undefined): string {
@@ -219,8 +224,10 @@ Rules:
     }
 
     await adminClient.rpc("deduct_credits", {
-      p_user_id: user.id,
-      p_amount:  CREDITS_PER_IMAGE,
+      p_user_id:     user.id,
+      p_amount:      CREDITS_PER_IMAGE,
+      p_category:    body.category === "carousel" ? "carousel" : "image",
+      p_description: body.category === "carousel" ? "Carousel slide image" : "Image generation",
     });
 
     return jsonResponse({

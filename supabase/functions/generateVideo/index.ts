@@ -166,8 +166,10 @@ Rules:
     }
 
     await adminClient.rpc("deduct_credits", {
-      p_user_id: user.id,
-      p_amount:  creditsNeeded,
+      p_user_id:     user.id,
+      p_amount:      creditsNeeded,
+      p_category:    "video",
+      p_description: `Video generation (${quality})`,
     });
 
     return jsonResponse({

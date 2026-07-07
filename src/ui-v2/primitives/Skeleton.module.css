@@ -1,0 +1,12 @@
+.skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--uiv2-bg-elevated) 0px,
+    var(--uiv2-bg-inset) 200px,
+    var(--uiv2-bg-elevated) 400px
+  );
+  background-size: 800px 100%;
+  animation: uiv2-shimmer 1.4s linear infinite;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+}

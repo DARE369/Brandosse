@@ -1,0 +1,19 @@
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 24px;
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border-strong);
+  color: var(--uiv2-text-primary);
+  padding: 11px 18px;
+  border-radius: var(--uiv2-radius-lg);
+  font-size: var(--uiv2-text-sm);
+  font-weight: var(--uiv2-weight-medium);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  z-index: 200;
+  box-shadow: var(--uiv2-shadow-modal-current);
+  animation: uiv2-fade-in 0.16s ease;
+}

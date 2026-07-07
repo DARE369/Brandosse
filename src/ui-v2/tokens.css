@@ -1,0 +1,198 @@
+/* =============================================================================
+   src/ui-v2/tokens.css — DESIGN SYSTEM v2 TOKENS (generated from the 2026-07-05
+   mockup spec: Studio.dc.html, Personal Dashboard.dc.html, Library.dc.html,
+   Calendar.dc.html). This is the ONLY token source for src/ui-v2/**.
+
+   Do not import, extend, or reference src/styles/tokens.css (old "Midnight
+   Aurora" system) from anywhere under src/ui-v2/. See src/ui-v2/README.md.
+
+   Scoping: applied via [data-uiv2-theme="dark"|"light"] on a wrapper element
+   (see ThemeProvider.jsx) rather than :root/html, so a v2 screen can mount
+   inside an app shell that hasn't migrated yet without leaking variables.
+   ============================================================================= */
+
+:root {
+  /* ---- Type ---- */
+  --uiv2-font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --uiv2-font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --uiv2-font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --uiv2-text-2xs: 0.65625rem; /* 10.5px */
+  --uiv2-text-xs: 0.71875rem;  /* 11.5px */
+  --uiv2-text-sm: 0.8125rem;   /* 13px */
+  --uiv2-text-base: 0.875rem;  /* 14px */
+  --uiv2-text-md: 0.9375rem;   /* 15px */
+  --uiv2-text-lg: 1.0625rem;   /* 17px */
+  --uiv2-text-xl: 1.25rem;     /* 20px */
+  --uiv2-text-2xl: 1.375rem;   /* 22px */
+  --uiv2-text-3xl: 1.875rem;   /* 30px */
+  --uiv2-text-4xl: 2.375rem;   /* 38px */
+
+  --uiv2-weight-normal: 400;
+  --uiv2-weight-medium: 500;
+  --uiv2-weight-semibold: 600;
+  --uiv2-weight-bold: 700;
+
+  --uiv2-leading-tight: 1.25;
+  --uiv2-leading-snug: 1.4;
+  --uiv2-leading-normal: 1.5;
+
+  /* ---- Space (4px base) ---- */
+  --uiv2-space-1: 4px;
+  --uiv2-space-2: 8px;
+  --uiv2-space-3: 12px;
+  --uiv2-space-4: 16px;
+  --uiv2-space-5: 20px;
+  --uiv2-space-6: 24px;
+  --uiv2-space-8: 32px;
+  --uiv2-space-10: 40px;
+
+  /* ---- Radius ---- */
+  --uiv2-radius-xs: 4px;
+  --uiv2-radius-sm: 6px;
+  --uiv2-radius-md: 8px;
+  --uiv2-radius-lg: 10px;
+  --uiv2-radius-xl: 12px;
+  --uiv2-radius-pill: 999px;
+
+  /* ---- Motion ---- */
+  --uiv2-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --uiv2-duration-fast: 120ms;
+  --uiv2-duration-base: 160ms;
+  --uiv2-duration-slow: 240ms;
+
+  /* ---- Accent (same solid color in both themes; text variant differs for AA contrast) ---- */
+  --uiv2-accent-solid: #FF5C38;
+  --uiv2-accent-solid-hover: color-mix(in srgb, #FF5C38 92%, white);
+  --uiv2-accent-on-solid-dark: #17181B; /* text placed on accent-solid in dark theme */
+  --uiv2-accent-on-solid-light: #FFFFFF; /* text placed on accent-solid in light theme */
+
+  /* ---- Status (dark / light pairs, resolved per theme below) ---- */
+  --uiv2-success-d: #30A46C; --uiv2-success-l: #1F8F5D;
+  --uiv2-warning-d: #FFB224; --uiv2-warning-l: #9A6400;
+  --uiv2-danger-d: #E5484D;  --uiv2-danger-l: #C22A30;
+  --uiv2-info-d: #3E7BD6;    --uiv2-info-l: #2A5FBD;
+
+  /* ---- Shadow ---- */
+  --uiv2-shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.15);
+  --uiv2-shadow-modal-dark: 0 14px 32px rgba(0, 0, 0, 0.45);
+  --uiv2-shadow-popover: 0 12px 28px rgba(0, 0, 0, 0.14);
+  --uiv2-shadow-popover-dark: 0 14px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* =============================================================================
+   THEME: dark ("Midnight" — default for this system, matches all 4 mockups)
+   ============================================================================= */
+[data-uiv2-theme="dark"] {
+  --uiv2-bg-canvas: #0E0F11;
+  --uiv2-bg-surface: #17181B;
+  --uiv2-bg-elevated: #1E2023;
+  --uiv2-bg-inset: #131417;
+  --uiv2-border: #26282C;
+  --uiv2-border-strong: #2E3136;
+  --uiv2-border-hover: #3C4046;
+
+  --uiv2-text-primary: #F5F5F4;
+  --uiv2-text-secondary: #8B8D93;
+  --uiv2-text-tertiary: #5A5C61;
+
+  --uiv2-accent-text: #FF5C38;
+  --uiv2-accent-wash: rgba(255, 92, 56, 0.1);
+  --uiv2-accent-wash-strong: rgba(255, 92, 56, 0.12);
+  --uiv2-accent-border: rgba(255, 92, 56, 0.35);
+  --uiv2-accent-on-solid: var(--uiv2-accent-on-solid-dark);
+
+  --uiv2-success: var(--uiv2-success-d);
+  --uiv2-warning: var(--uiv2-warning-d);
+  --uiv2-danger: var(--uiv2-danger-d);
+  --uiv2-info: var(--uiv2-info-d);
+
+  --uiv2-danger-wash: rgba(229, 72, 77, 0.08);
+  --uiv2-danger-border: rgba(229, 72, 77, 0.3);
+  --uiv2-warning-wash: rgba(255, 178, 36, 0.1);
+  --uiv2-warning-border: rgba(255, 178, 36, 0.3);
+  --uiv2-info-wash: rgba(62, 123, 214, 0.1);
+  --uiv2-info-border: rgba(62, 123, 214, 0.3);
+
+  --uiv2-scrollbar-thumb: #3C4046;
+  --uiv2-shadow-modal-current: var(--uiv2-shadow-modal-dark);
+  --uiv2-shadow-popover-current: var(--uiv2-shadow-popover-dark);
+  --uiv2-scrim: rgba(0, 0, 0, 0.55);
+  --uiv2-scrim-soft: rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
+
+/* =============================================================================
+   THEME: light ("Paper")
+   ============================================================================= */
+[data-uiv2-theme="light"] {
+  --uiv2-bg-canvas: #F7F6F2;
+  --uiv2-bg-surface: #FFFFFF;
+  --uiv2-bg-elevated: #F4F3EE;
+  --uiv2-bg-inset: #F4F3EE;
+  --uiv2-border: #E4E2DC;
+  --uiv2-border-strong: #C9C6BC;
+  --uiv2-border-hover: #C9C6BC;
+
+  --uiv2-text-primary: #17181B;
+  --uiv2-text-secondary: #6E7075;
+  --uiv2-text-tertiary: #9A9C9F;
+
+  --uiv2-accent-text: #E14E2F;
+  --uiv2-accent-wash: rgba(255, 92, 56, 0.08);
+  --uiv2-accent-wash-strong: rgba(255, 92, 56, 0.08);
+  --uiv2-accent-border: rgba(255, 92, 56, 0.3);
+  --uiv2-accent-on-solid: var(--uiv2-accent-on-solid-light);
+
+  --uiv2-success: var(--uiv2-success-l);
+  --uiv2-warning: var(--uiv2-warning-l);
+  --uiv2-danger: var(--uiv2-danger-l);
+  --uiv2-info: var(--uiv2-info-l);
+
+  --uiv2-danger-wash: rgba(194, 42, 48, 0.06);
+  --uiv2-danger-border: rgba(194, 42, 48, 0.28);
+  --uiv2-warning-wash: rgba(154, 100, 0, 0.08);
+  --uiv2-warning-border: rgba(154, 100, 0, 0.28);
+  --uiv2-info-wash: rgba(42, 95, 189, 0.07);
+  --uiv2-info-border: rgba(42, 95, 189, 0.25);
+
+  --uiv2-scrollbar-thumb: #C9C6BC;
+  --uiv2-shadow-modal-current: var(--uiv2-shadow-modal);
+  --uiv2-shadow-popover-current: var(--uiv2-shadow-popover);
+  --uiv2-scrim: rgba(23, 24, 27, 0.35);
+  --uiv2-scrim-soft: rgba(23, 24, 27, 0.25);
+
+  color-scheme: light;
+}
+
+[data-uiv2-theme] input::placeholder,
+[data-uiv2-theme] textarea::placeholder {
+  color: var(--uiv2-text-tertiary);
+  opacity: 1;
+}
+
+/* ---- Shared keyframes used across primitives ---- */
+@keyframes uiv2-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes uiv2-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes uiv2-shimmer {
+  0% { background-position: -500px 0; }
+  100% { background-position: 500px 0; }
+}
+@keyframes uiv2-pulse-ring {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-uiv2-theme] *, [data-uiv2-theme] *::before, [data-uiv2-theme] *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -29,3 +29,10 @@ video-worker/__pycache__/
 video-worker/.env
 video-worker/logs/
 /tmp/video-engine/
+
+# local QA artifacts / scratch scripts — not app code
+next-env.d.ts
+supabase/.temp/
+/qa-shots/
+/qa-shots-overflow/
+scripts/*-tmp.cjs
