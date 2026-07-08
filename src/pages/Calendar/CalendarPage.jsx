@@ -1,28 +1,45 @@
-'use client';
-// PersonalCalendarPage — THIN wrapper (CALENDAR_SPEC.md §1's explicit rule:
-// "the page components contain no business logic"). Resolves personal scope
-// (the signed-in user's own id) and renders the shared src/calendar/ engine.
-// Any behavior difference between personal and org calendars is expressed as
-// a prop/permission check inside the shared engine components themselves —
-// nothing forked at the page level.
+"use client";
+
+// src/pages/Calendar/CalendarPage.jsx
+// ui-v2 rebuild of the Personal Content Calendar (see
+// docs/calendar-library-rebuild/ui-v2-migration/calendar-mockup.html, the
+// APPROVED mockup, and AS_IS_AUDIT.md's "Refactor, not Reuse, not Remove"
+// classification for this screen). This file replaces
+// src/pages/ContentCalendar/PersonalCalendarPage.jsx as the real, routed
+// Personal Calendar page (app/app/calendar/page.jsx now renders this
+// component) — same pattern StudioPage.jsx/PersonalDashboardPage.jsx already
+// established: real AppHeader/MobileNavDrawer/UiV2ThemeProvider shell,
+// CSS Modules for anything page-shell-specific.
 //
-// This file replaces CalendarPageV3.jsx as the real, routed Personal
-// Calendar page (app/app/calendar/page.jsx now renders this component).
+// EVERY piece of business logic below is carried over verbatim from
+// PersonalCalendarPage.jsx (same hooks, same handlers, same data layer —
+// src/calendar/hooks/**, src/calendar/services/calendarService.js,
+// src/calendar/stores/calendarUiStore.js are all untouched per the Master
+// Brief's "do not touch working data layers" rule and this task's explicit
+// "do not change the data-layer behavior" instruction). Only the
+// presentation changed:
+//   - UserNavbar/UserSidebar/.dashboard-shell -> AppHeader/MobileNavDrawer/
+//     UiV2ThemeProvider (the established ui-v2 page-shell pattern).
+//   - src/styles/CalendarEngine.css -> src/calendar/calendar-engine-v2.css,
+//     a class-name-for-class-name reskin of the same stylesheet onto
+//     src/ui-v2/tokens.css (see that file's own header comment and
+//     DECISIONS_LOG.md for why the 12 files under src/calendar/components/**
+//     themselves were left untouched rather than rewritten).
 //
 // Below ~600px viewport width this page defaults to CalendarListView instead
-// of CalendarGrid (the approved mockup's Fix 1 / MOBILE_UX_CRITIQUE.md
-// finding) — live on resize, but an explicit user pick of Month persists
-// through subsequent resizes (DECISIONS_LOG.md, "Phase 2 (post-critique
-// fixes, round 2)").
+// of CalendarGrid (CalendarListView.jsx's own documented mobile default,
+// carried over unchanged from PersonalCalendarPage.jsx) — live on resize,
+// but an explicit user pick of Month persists through subsequent resizes.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, LayoutGrid, ListTodo } from 'lucide-react';
 
-import UserNavbar from '../../components/User/UserNavbar';
-import UserSidebar from '../../components/User/UserSidebar';
 import { supabase } from '../../services/supabaseClient';
 import { fetchUserSettings } from '../../services/userSettingsService';
 import useBrandKitStore from '../../stores/BrandKitStore';
+import { useAuth } from '../../Context/AuthContext';
+import { useAppNavigation } from '../../Context/AppNavigationContext';
+import { useCreditBalance } from '../../hooks/useCreditBalance';
 
 import {
   DEFAULT_TIMEZONE,
@@ -48,16 +65,51 @@ import UnscheduledRail from '../../calendar/components/UnscheduledRail';
 import PostDetailDrawer from '../../calendar/components/PostDetailDrawer';
 import ScheduleModal from '../../calendar/components/ScheduleModal';
 import QuickPostComposer from '../../calendar/components/QuickPostComposer';
-import CalendarCommandBar from '../../calendar/components/CalendarCommandBar';
+import CalendarCommandBar, { CalendarCommandBarInline } from '../../calendar/components/CalendarCommandBar';
 import CellCommandPalette from '../../calendar/components/CellCommandPalette';
 import IntelligenceStrip from '../../calendar/components/IntelligenceStrip';
 import ToastStack, { TOAST_ICONS, useToastStack } from '../../calendar/components/ToastStack';
 
-import '../../styles/CalendarEngine.css';
+import {
+  UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, Avatar, IconButton, MobileNavDrawer,
+} from '../../ui-v2';
+import '../../calendar/calendar-engine-v2.css';
+import styles from './CalendarPage.module.css';
 
 const MOBILE_VIEW_BREAKPOINT = 600;
 
-export default function PersonalCalendarPage() {
+const NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', href: '/app/dashboard' },
+  { key: 'studio', label: 'Studio', href: '/app/generate' },
+  { key: 'library', label: 'Library', href: '/app/library' },
+  { key: 'calendar', label: 'Calendar', href: '/app/calendar' },
+  { key: 'brand-kit', label: 'Brand Kit', href: '/app/settings/brand-kit' },
+];
+
+function ThemeToggleButton() {
+  const { isDark, toggleTheme } = useUiV2Theme();
+  return (
+    <IconButton title={isDark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={toggleTheme}>
+      {isDark ? (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" strokeLinecap="round" />
+          <circle cx="12" cy="12" r="4.5" />
+        </svg>
+      ) : (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
+        </svg>
+      )}
+    </IconButton>
+  );
+}
+
+function CalendarBody({ brandKit }) {
+  const { navigate } = useAppNavigation();
+  const { user, profile } = useAuth();
+  const credits = useCreditBalance(user?.id ?? null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   const [userId, setUserId] = useState(null);
   const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
 
@@ -74,10 +126,10 @@ export default function PersonalCalendarPage() {
   // ── Resolve personal scope + timezone on mount ────────────────────────────
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!mounted || !user?.id) return;
-      setUserId(user.id);
-      fetchUserSettings(user.id).then((settings) => {
+    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
+      if (!mounted || !authUser?.id) return;
+      setUserId(authUser.id);
+      fetchUserSettings(authUser.id).then((settings) => {
         if (!mounted) return;
         setTimezone(settings.timezone || DEFAULT_TIMEZONE);
       }).catch(() => {});
@@ -93,8 +145,6 @@ export default function PersonalCalendarPage() {
   const todayKey = useMemo(() => getZonedTodayKey(timezone), [timezone]);
   const tomorrowKey = useMemo(() => addDaysToDateKey(todayKey, 1), [todayKey]);
   const effectiveMonthStartKey = monthStartKey || monthStartKeyFor(todayKey);
-
-  const { brandKit } = useBrandKitStore();
 
   // ── Mobile-default view switching (live on resize, pick-respecting) ──────
   const [hasUserPickedView, setHasUserPickedView] = useState(false);
@@ -151,45 +201,10 @@ export default function PersonalCalendarPage() {
   const [cellPalette, setCellPalette] = useState(null); // { dayKey, label }
 
   // ── Schedule hand-off from the Library (LIBRARY_SPEC.md §7) ───────────────
-  // Additive, optional: Library's "Schedule" action navigates here with
-  // ?quickPost=1&prefillAssetId=<id>. useMutableSearchParams is the existing,
-  // already-proven idiom this codebase uses for exactly this kind of
-  // cross-page deep-link (src/org/pages/OrgAssetLibrary.jsx's own
-  // ?assetId=/?search= handling is the direct precedent). Absent params =
-  // today's exact behavior (libraryAssets stays empty, no prefill). See
-  // DECISIONS_LOG.md 2026-06-25T10:35:00 for why this replaced an earlier,
-  // wrong-for-this-stack "location.state" draft of the same idea.
   const [searchParams, setSearchParams] = useMutableSearchParams();
   const [prefillAsset, setPrefillAsset] = useState(null);
 
   useEffect(() => {
-    // Phase 4 QA fix (schedule hand-off composer race — see
-    // DECISIONS_LOG.md, QA_PERSONA_REVIEW_build.md Flow 3). Root cause:
-    // this effect used to gate `setQuickPostOpen(true)` BEHIND the async
-    // `fetchAssetForHandoff` await, inside the same IIFE whose own
-    // `mounted` flag is closed over and could be raced by the synchronous
-    // `setSearchParams(...)` call right below it (a real router.replace())
-    // doing its own re-render pass before the async work resolved — live-
-    // reproduced as a several-second delay before the composer became
-    // queryable in the DOM, worst-cased by dev-mode Fast Refresh activity.
-    // Fix: capture both params into local consts FIRST (so nothing later
-    // depends on `searchParams` — a value tied to the *current* URL —
-    // still reflecting the hand-off params once they're about to be
-    // stripped), then call `setQuickPostOpen(true)` SYNCHRONOUSLY, in the
-    // same tick as the effect itself, before either the async asset fetch
-    // or the param-cleanup's router.replace() run. The composer now always
-    // opens immediately, with no asset selected yet; `prefillAsset` is
-    // then populated asynchronously into the now-already-open composer
-    // the moment the fetch resolves. QuickPostComposer.jsx needed a
-    // companion fix for this to actually work — see its own comment —
-    // since it previously only ever read `prefillAsset` once, via a
-    // `useState` initializer, and had no way to pick up a value arriving
-    // after its own first render. This removes the dependency on the
-    // IIFE's `mounted` flag entirely for
-    // the open action — only the (optional, best-effort) asset-prefill
-    // still checks `mounted`, exactly as before, since setting state on
-    // an unmounted component after a slow fetch is the actual problem a
-    // `mounted` guard exists for, not opening the composer itself.
     const prefillAssetId = searchParams.get('prefillAssetId');
     const shouldOpenQuickPost = searchParams.get('quickPost') === '1';
     if (!shouldOpenQuickPost) return;
@@ -204,15 +219,10 @@ export default function PersonalCalendarPage() {
           if (mounted && asset) setPrefillAsset(toQuickPostAssetShape(asset));
         })
         .catch((err) => {
-          console.error('[PersonalCalendarPage] Could not load hand-off asset:', err);
+          console.error('[CalendarPage] Could not load hand-off asset:', err);
         });
     }
 
-    // Clear the query params once consumed so a refresh/back-nav doesn't
-    // re-trigger the hand-off or re-open Quick Post unexpectedly. This now
-    // runs after the composer is already guaranteed open, so even if this
-    // triggers a re-render/navigation pass, there is no open-state left
-    // to lose — setQuickPostOpen(true) already committed above.
     setSearchParams((params) => {
       params.delete('quickPost');
       params.delete('prefillAssetId');
@@ -237,20 +247,10 @@ export default function PersonalCalendarPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [exitMoveMode]);
 
-  // Note: optimal-slot AI suggestions (getSlotSuggestions) are NOT wired into
-  // this page — the approved mockup's Month/List views and cell palette don't
-  // render an "AI recommended slot" callout anywhere (that's WeekGrid's
-  // hour-cell-specific affordance, and Week view is explicitly Phase 2 per
-  // CALENDAR_SPEC.md §11, out of this packet's scope). Calling the edge
-  // function with no UI consumer would be speculative dead code.
-
   // ── Lookup helpers ─────────────────────────────────────────────────────────
   const findGroupByKey = useCallback((groupKey) => allGroups.find((g) => g.groupKey === groupKey) || null, [allGroups]);
   const isLockedGroup = useCallback((group) => group.posts.every((p) => isLockedForReschedule(p.status)), []);
 
-  // ── The single commit path every reschedule mode (drag / move-mode /
-  //    drawer-via-ScheduleModal) funnels through — calls useScheduleAction()
-  //    for every post in the group, handling conflict/stale-write per spec §5.
   const commitReschedule = useCallback(async (group, scheduledAtISO) => {
     const results = await Promise.all(group.posts.map((post) => {
       const action = post.status === 'draft' ? schedulePost : reschedulePost;
@@ -301,23 +301,8 @@ export default function PersonalCalendarPage() {
     refetchDrafts();
   }, [scheduleAnyway, refetch, refetchDrafts]);
 
-  // ── Reschedule mode 1: drag-and-drop. CalendarGrid's day cells handle the
-  //    native HTML5 drop event and call onCommitMove(groupKey, dayKey) — the
-  //    same native-HTML5-drag mechanism the approved mockup demonstrates
-  //    (mockup.js's dragstart/dragover/drop handlers), which is sufficient to
-  //    satisfy desktop pointer drag end-to-end. Touch-drag parity is carried
-  //    by HTML5 DnD's own touch support in modern mobile browsers; the
-  //    REQUIRED non-drag accessibility path (RESEARCH.md §2.2, WCAG 2.2 SC
-  //    2.5.7) is reschedule mode 3 (tap-to-select -> tap-destination) below,
-  //    not a re-implementation of @dnd-kit's PointerSensor/TouchSensor for
-  //    this grid — @dnd-kit remains a real, available dependency but this
-  //    packet's Month-grid drag path matches the approved mockup's own
-  //    chosen mechanism exactly, per the "build exactly what the mockup
-  //    shows" instruction. (Drag-active visual state — `.is-dragging` — is
-  //    tracked locally inside CalendarGrid.jsx/UnscheduledRail.jsx, not here,
-  //    since this page wrapper holds no business/UI-rendering logic itself.)
   const handleCommitMove = useCallback(async (groupKeyOrDraftToken, dayKey) => {
-    const hour = 9; // default time-of-day for a day-level (non-hour-aware) Month-view drop
+    const hour = 9;
     const scheduledAtISO = new Date(`${dayKey}T${String(hour).padStart(2, '0')}:00:00.000Z`).toISOString();
 
     if (groupKeyOrDraftToken?.startsWith?.('draft:')) {
@@ -334,7 +319,6 @@ export default function PersonalCalendarPage() {
     await commitReschedule(group, scheduledAtISO);
   }, [drafts, draftGroups, findGroupByKey, commitReschedule]);
 
-  // ── Reschedule mode 3: tap-to-select -> tap-destination ───────────────────
   const handleMoveTrigger = useCallback((groupOrDraft) => {
     const groupKey = groupOrDraft.groupKey || `post:${groupOrDraft.id}`;
     if (moveMode.active && moveMode.groupKey === groupKey) {
@@ -344,8 +328,6 @@ export default function PersonalCalendarPage() {
     enterMoveMode(groupKey);
   }, [moveMode, enterMoveMode, exitMoveMode]);
 
-  // moveMode in the store only stores postId per its current shape; widen
-  // locally to also remember the groupKey for the commit path above.
   const moveModeWithGroupKey = useMemo(() => ({ active: moveMode.active, groupKey: moveMode.postId }), [moveMode]);
 
   const handleMoveCommit = useCallback(async (groupKey, dayKey) => {
@@ -353,7 +335,6 @@ export default function PersonalCalendarPage() {
     await handleCommitMove(groupKey, dayKey);
   }, [exitMoveMode, handleCommitMove]);
 
-  // ── Reschedule mode 2: full detail-panel edit -> opens ScheduleModal ──────
   const handleOpenScheduleModal = useCallback((post) => setScheduleModalPost(post), []);
 
   const handleConfirmScheduleModal = useCallback(async (dateKey, timeStr) => {
@@ -367,14 +348,6 @@ export default function PersonalCalendarPage() {
     if (ok) setScheduleModalPost(null);
   }, [scheduleModalPost, timezone, findGroupByKey, allGroups, commitReschedule]);
 
-  // ── Drawer actions ─────────────────────────────────────────────────────────
-  // PostDetailDrawer's "Save changes" edits caption/hashtags/account
-  // reassignment (and, incidentally, scheduled_at if the user also touched
-  // the inline date/time fields) all in one write — this is a content edit,
-  // not a schedule/reschedule/unschedule *action* in the spec §5/§6 sense
-  // (no conflict check or lock-on-reschedule semantics apply to a caption
-  // edit), so it goes straight through calendarService.updatePost() rather
-  // than through useScheduleAction()'s schedule-specific helpers.
   const handleSavePost = useCallback(async (post, updates) => {
     try {
       await updatePost(scope, post.id, updates, post.status);
@@ -422,23 +395,6 @@ export default function PersonalCalendarPage() {
       refetchDrafts();
       toast.success('Duplicated to a new draft');
     } catch (err) {
-      // QA_PERSONA_REVIEW_build.md (2026-06-25 re-test, finding #4): when
-      // the source post's asset (generation_id) already has a sibling
-      // draft for this account, the duplicate's insert hits the real,
-      // intentional idx_posts_unique_draft_per_generation_account unique
-      // index (RESEARCH.md §3.1 — one draft per (user_id, generation_id,
-      // account) while status='draft' and generation_id IS NOT NULL) and
-      // Postgres returns a 409 / code 23505. That used to surface here as
-      // a raw, unreadable DB error via toast.error(err.message). Catch
-      // that specific violation and show an accurate, calm message
-      // instead — reusing the same page-level ToastStack/tone-danger
-      // mechanism Quick Post's failure case already uses, rather than
-      // react-hot-toast's plain `toast.error`, so this hard-failure case
-      // reads consistently with the other "real save failure" surface in
-      // this file. Not silently working around the constraint (e.g. not
-      // auto-deduping or stripping generation_id) — the constraint is
-      // real and intentional; this only changes how the failure is
-      // reported.
       const isDuplicateDraftConflict = err?.code === '23505'
         || /idx_posts_unique_draft_per_generation_account/.test(err?.message || err?.details || '');
       if (isDuplicateDraftConflict) {
@@ -454,7 +410,6 @@ export default function PersonalCalendarPage() {
     }
   }, [scope, toastStack]);
 
-  // ── Create-draft-for-day (the cal3-month-cell__add "+" button) ────────────
   const handleCreateDraftForDay = useCallback(async (dayKey) => {
     try {
       const scheduledAt = new Date(`${dayKey}T12:00:00.000Z`).toISOString();
@@ -466,16 +421,6 @@ export default function PersonalCalendarPage() {
     }
   }, [scope]);
 
-  // ── Quick Post submit ──────────────────────────────────────────────────────
-  // Owns the confirmation/error toast itself (pushed onto the page-level
-  // ToastStack, the same shared "must outlive the triggering component"
-  // mechanism commitReschedule already uses for the conflict/stale-write
-  // toasts) rather than letting QuickPostComposer manage its own toast --
-  // ToastStack lives outside `{quickPostOpen && (...)}` so it survives the
-  // composer unmounting the instant this resolves. Returns true/false so
-  // the composer knows whether to close (success) or stay open with the
-  // user's typed captions intact (failure) -- see DECISIONS_LOG.md
-  // 2026-06-24 "Bug 1".
   const handleQuickPostSubmit = useCallback(async (payload) => {
     try {
       await createQuickPost(scope, {
@@ -495,7 +440,7 @@ export default function PersonalCalendarPage() {
       });
       return true;
     } catch (err) {
-      console.error('[PersonalCalendarPage] Quick Post submit failed:', err);
+      console.error('[CalendarPage] Quick Post submit failed:', err);
       toastStack.push({
         tone: 'danger',
         icon: TOAST_ICONS.danger,
@@ -506,10 +451,9 @@ export default function PersonalCalendarPage() {
     }
   }, [scope, refetch, refetchDrafts, toastStack]);
 
-  // ── Cell command palette actions ──────────────────────────────────────────
   const handleCellPaletteAction = useCallback((actionId) => {
     if (!cellPalette) return;
-    const { dayKey, label } = cellPalette;
+    const { label } = cellPalette;
     setCellPalette(null);
 
     if (actionId === 'new_post') {
@@ -527,7 +471,6 @@ export default function PersonalCalendarPage() {
     }
   }, [cellPalette]);
 
-  // ── ⌘K command bar apply ───────────────────────────────────────────────────
   const handleCommandApply = useCallback(async (action) => {
     if (!action) { setCmdBarOpen(false); return; }
 
@@ -573,105 +516,141 @@ export default function PersonalCalendarPage() {
     posts, drafts, selectedPostId,
   }), [effectiveMonthStartKey, posts, drafts, selectedPostId]);
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
   const goPrev = useCallback(() => { setMonthStartKey(addMonthsToDateKey(effectiveMonthStartKey, -1)); }, [effectiveMonthStartKey, setMonthStartKey]);
   const goNext = useCallback(() => { setMonthStartKey(addMonthsToDateKey(effectiveMonthStartKey, 1)); }, [effectiveMonthStartKey, setMonthStartKey]);
 
   const monthLabel = formatDateKey(effectiveMonthStartKey, { month: 'long', year: 'numeric' });
   const isEmpty = !isLoading && posts.length === 0 && drafts.length === 0;
 
+  const userInitials = ((profile?.full_name ? profile.full_name[0] : 'U') + (profile?.full_name?.split(' ')[1]?.[0] ?? '')).toUpperCase();
+  const creditPct = credits.lifetimePurchased > 0 ? Math.max(0, Math.min(100, Math.round((credits.balance / credits.lifetimePurchased) * 100))) : 100;
+
   return (
-    <div className="dashboard-shell">
-      <Toaster position="bottom-right" toastOptions={{ style: { fontSize: 13, background: 'var(--color-bg-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' } }} />
-      <UserNavbar />
-      <UserSidebar />
+    <>
+      <Toaster position="bottom-right" toastOptions={{ style: { fontSize: 13, background: 'var(--uiv2-bg-elevated)', color: 'var(--uiv2-text-primary)', border: '1px solid var(--uiv2-border)' } }} />
 
-        <main className="cal3-shell">
-          <header className="cal3-header">
-            <div className="cal3-header__nav">
-              <button type="button" className="cal3-icon-btn" onClick={goPrev} aria-label="Previous month">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
-              </button>
-              <button type="button" className="cal3-icon-btn" onClick={goNext} aria-label="Next month">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
-              </button>
-            </div>
-            <div className="cal3-header__title">
-              <span className="cal3-header__month-label">{monthLabel}</span>
-              <span className="cal3-header__today-badge">Today: {formatDateKey(todayKey, { month: 'short', day: 'numeric' })}</span>
-            </div>
-            <div className="cal3-header__actions">
-              <div className="cal3-view-switcher">
-                <button type="button" className={`cal3-view-switcher__btn${viewMode === 'month' ? ' is-active' : ''}`} onClick={() => handleViewSwitch('month')}>Month</button>
-                <button type="button" className={`cal3-view-switcher__btn${viewMode === 'list' ? ' is-active' : ''}`} onClick={() => handleViewSwitch('list')}>List</button>
+      <AppHeader
+        navItems={NAV_ITEMS}
+        activeKey="calendar"
+        onNavClick={(item) => navigate(item.href)}
+        onBurgerClick={() => setMobileNavOpen(true)}
+        right={
+          <>
+            {credits.ready ? (
+              <CreditPill pct={`${creditPct}%`} label={`${credits.balance.toLocaleString()} cr`} />
+            ) : null}
+            <ThemeToggleButton />
+            <Avatar initials={userInitials || 'U'} onClick={() => navigate('/app/profile')} />
+          </>
+        }
+      />
+
+      <MobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        navItems={NAV_ITEMS}
+        activeKey="calendar"
+        onNavClick={(item) => navigate(item.href)}
+      />
+
+      <main className={styles.main}>
+        <div className={styles.canvas}>
+          <div className="cal3-shell">
+            <header className="cal3-header">
+              <div className="cal3-header__nav">
+                <button type="button" className="cal3-icon-btn" onClick={goPrev} aria-label="Previous month">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+                </button>
+                <button type="button" className="cal3-icon-btn" onClick={goNext} aria-label="Next month">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+                </button>
               </div>
-              <button type="button" className="cal3-btn-ghost" onClick={() => { setCmdBarPreset(''); setCmdBarOpen(true); }}>
-                <Sparkles size={13} aria-hidden="true" /> Ask AI <span className="cal3-kbd">⌘K</span>
-              </button>
-              <button type="button" className="ui-button ui-button-accent ui-button-md" onClick={() => setQuickPostOpen(true)}>+ Quick Post</button>
-            </div>
-          </header>
-
-          <IntelligenceStrip posts={posts} weekStart={`${effectiveMonthStartKey}T00:00:00.000Z`} />
-
-          <div className="cal3-body">
-            {moveMode.active && (
-              <div className="move-mode-banner">
-                <span className="move-mode-banner__icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 9l-3 3 3 3" /><path d="M9 5l3-3 3 3" /><path d="M15 19l3 3 3-3" /><path d="M19 9l3 3-3 3" /><line x1="2" y1="12" x2="22" y2="12" /><line x1="12" y1="2" x2="12" y2="22" /></svg>
-                </span>
-                <span className="move-mode-banner__text">
-                  Moving <strong>{(findGroupByKey(moveMode.postId)?.posts[0]?.title) || 'this post'}</strong> — tap a highlighted day to schedule it there.
-                </span>
-                <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={exitMoveMode}>Cancel</button>
+              <div className="cal3-header__title">
+                <span className="cal3-header__month-label">{monthLabel}</span>
+                <span className="cal3-header__today-badge">Today: {formatDateKey(todayKey, { month: 'short', day: 'numeric' })}</span>
               </div>
-            )}
-
-            <div className="cal3-main-col">
-              {viewMode === 'list' ? (
-                <CalendarListView
-                  groups={allGroups}
-                  isLoading={isLoading}
-                  timezone={timezone}
-                  todayKey={todayKey}
-                  tomorrowKey={tomorrowKey}
-                  formatDateKey={formatDateKey}
-                  formatInTimeZone={formatInTimeZone}
-                  onOpenGroup={(group) => setSelectedPostId(group.posts[0].id)}
-                />
-              ) : (
-                <CalendarGrid
-                  monthStartKey={effectiveMonthStartKey}
-                  groups={groups}
-                  isLoading={isLoading}
-                  isEmpty={isEmpty}
-                  timezone={timezone}
-                  todayKey={todayKey}
-                  formatDateKey={formatDateKey}
-                  formatInTimeZone={formatInTimeZone}
-                  moveMode={moveModeWithGroupKey}
-                  isLockedGroup={isLockedGroup}
-                  onOpenGroup={(group) => setSelectedPostId(group.posts[0].id)}
-                  onMoveTrigger={handleMoveTrigger}
-                  onCommitMove={handleMoveCommit}
-                  onCreateDraftForDay={handleCreateDraftForDay}
-                  onCellClick={({ dayKey, label }) => setCellPalette({ dayKey, label })}
-                  onQuickPost={() => setQuickPostOpen(true)}
-                />
-              )}
-
-              {isError && !isLoading && (
-                <div className="day-error-state" role="alert">
-                  <span className="day-error-state__icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-                  </span>
-                  <p>Couldn&apos;t load posts. Check your connection and try again.</p>
-                  <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={() => refetch()}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
-                    Retry
+              <div className="cal3-header__actions">
+                <div className="cal3-view-switcher">
+                  <button type="button" className={`cal3-view-switcher__btn${viewMode === 'month' ? ' is-active' : ''}`} onClick={() => handleViewSwitch('month')}>
+                    <LayoutGrid size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />Month
+                  </button>
+                  <button type="button" className={`cal3-view-switcher__btn${viewMode === 'list' ? ' is-active' : ''}`} onClick={() => handleViewSwitch('list')}>
+                    <ListTodo size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />List
                   </button>
                 </div>
+                <button type="button" className="cal3-btn-ghost" onClick={() => { setCmdBarPreset(''); setCmdBarOpen(true); }}>
+                  <Sparkles size={13} aria-hidden="true" /> Ask AI <span className="cal3-kbd">⌘K</span>
+                </button>
+                <button type="button" className="ui-button ui-button-accent ui-button-md" onClick={() => setQuickPostOpen(true)}>+ Quick Post</button>
+              </div>
+            </header>
+
+            <IntelligenceStrip posts={posts} weekStart={`${effectiveMonthStartKey}T00:00:00.000Z`} />
+
+            <CalendarCommandBarInline
+              onOpen={() => { setCmdBarPreset(''); setCmdBarOpen(true); }}
+              onOpenWithPreset={(text) => { setCmdBarPreset(text); setCmdBarOpen(true); }}
+            />
+
+            <div className="cal3-body">
+              {moveMode.active && (
+                <div className="move-mode-banner">
+                  <span className="move-mode-banner__icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 9l-3 3 3 3" /><path d="M9 5l3-3 3 3" /><path d="M15 19l3 3 3-3" /><path d="M19 9l3 3-3 3" /><line x1="2" y1="12" x2="22" y2="12" /><line x1="12" y1="2" x2="12" y2="22" /></svg>
+                  </span>
+                  <span className="move-mode-banner__text">
+                    Moving <strong>{(findGroupByKey(moveMode.postId)?.posts[0]?.title) || 'this post'}</strong> — tap a highlighted day to schedule it there.
+                  </span>
+                  <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={exitMoveMode}>Cancel</button>
+                </div>
               )}
+
+              <div className="cal3-main-col">
+                {viewMode === 'list' ? (
+                  <CalendarListView
+                    groups={allGroups}
+                    isLoading={isLoading}
+                    timezone={timezone}
+                    todayKey={todayKey}
+                    tomorrowKey={tomorrowKey}
+                    formatDateKey={formatDateKey}
+                    formatInTimeZone={formatInTimeZone}
+                    onOpenGroup={(group) => setSelectedPostId(group.posts[0].id)}
+                  />
+                ) : (
+                  <CalendarGrid
+                    monthStartKey={effectiveMonthStartKey}
+                    groups={groups}
+                    isLoading={isLoading}
+                    isEmpty={isEmpty}
+                    timezone={timezone}
+                    todayKey={todayKey}
+                    formatDateKey={formatDateKey}
+                    formatInTimeZone={formatInTimeZone}
+                    moveMode={moveModeWithGroupKey}
+                    isLockedGroup={isLockedGroup}
+                    onOpenGroup={(group) => setSelectedPostId(group.posts[0].id)}
+                    onMoveTrigger={handleMoveTrigger}
+                    onCommitMove={handleMoveCommit}
+                    onCreateDraftForDay={handleCreateDraftForDay}
+                    onCellClick={({ dayKey, label }) => setCellPalette({ dayKey, label })}
+                    onQuickPost={() => setQuickPostOpen(true)}
+                  />
+                )}
+
+                {isError && !isLoading && (
+                  <div className="day-error-state" role="alert">
+                    <span className="day-error-state__icon">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                    </span>
+                    <p>Couldn&apos;t load posts. Check your connection and try again.</p>
+                    <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={() => refetch()}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <UnscheduledRail
                 workspaceType="personal"
@@ -682,66 +661,76 @@ export default function PersonalCalendarPage() {
                 onMoveTrigger={handleMoveTrigger}
               />
             </div>
-          </div>
 
-          {cellPalette && (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 29 }} onClick={() => setCellPalette(null)}>
-              <CellCommandPalette
-                day={cellPalette.dayKey}
-                style={{ position: 'fixed', top: '40%', left: '50%', transform: 'translate(-50%, -50%)' }}
-                onAction={handleCellPaletteAction}
-                onClose={() => setCellPalette(null)}
+            {cellPalette && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 29 }} onClick={() => setCellPalette(null)}>
+                <CellCommandPalette
+                  day={cellPalette.dayKey}
+                  style={{ position: 'fixed', top: '40%', left: '50%', transform: 'translate(-50%, -50%)' }}
+                  onAction={handleCellPaletteAction}
+                  onClose={() => setCellPalette(null)}
+                />
+              </div>
+            )}
+
+            {cmdBarOpen && (
+              <CalendarCommandBar
+                context={cmdBarContext}
+                preset={cmdBarPreset}
+                onClose={() => setCmdBarOpen(false)}
+                onApplyAction={handleCommandApply}
               />
-            </div>
-          )}
+            )}
 
-          {cmdBarOpen && (
-            <CalendarCommandBar
-              context={cmdBarContext}
-              preset={cmdBarPreset}
-              onClose={() => setCmdBarOpen(false)}
-              onApplyAction={handleCommandApply}
-            />
-          )}
+            {selectedGroup && (
+              <PostDetailDrawer
+                group={selectedGroup}
+                timezone={timezone}
+                brandKit={brandKit}
+                onClose={() => setSelectedPostId(null)}
+                onSavePost={handleSavePost}
+                onDeletePost={handleDeletePost}
+                onReschedule={handleOpenScheduleModal}
+                onUnschedule={handleUnschedulePost}
+                onDuplicate={handleDuplicatePost}
+              />
+            )}
 
-          {selectedGroup && (
-            <PostDetailDrawer
-              group={selectedGroup}
-              timezone={timezone}
-              brandKit={brandKit}
-              onClose={() => setSelectedPostId(null)}
-              onSavePost={handleSavePost}
-              onDeletePost={handleDeletePost}
-              onReschedule={handleOpenScheduleModal}
-              onUnschedule={handleUnschedulePost}
-              onDuplicate={handleDuplicatePost}
-            />
-          )}
+            {scheduleModalPost && (
+              <ScheduleModal
+                open
+                post={scheduleModalPost}
+                timezone={timezone}
+                isSubmitting={isSubmitting}
+                onClose={() => setScheduleModalPost(null)}
+                onConfirm={handleConfirmScheduleModal}
+              />
+            )}
 
-          {scheduleModalPost && (
-            <ScheduleModal
-              open
-              post={scheduleModalPost}
-              timezone={timezone}
-              isSubmitting={isSubmitting}
-              onClose={() => setScheduleModalPost(null)}
-              onConfirm={handleConfirmScheduleModal}
-            />
-          )}
+            {quickPostOpen && (
+              <QuickPostComposer
+                open
+                timezone={timezone}
+                libraryAssets={prefillAsset ? [prefillAsset] : []}
+                prefillAsset={prefillAsset}
+                onClose={() => { setQuickPostOpen(false); setPrefillAsset(null); }}
+                onSubmit={handleQuickPostSubmit}
+              />
+            )}
 
-          {quickPostOpen && (
-            <QuickPostComposer
-              open
-              timezone={timezone}
-              libraryAssets={prefillAsset ? [prefillAsset] : []}
-              prefillAsset={prefillAsset}
-              onClose={() => { setQuickPostOpen(false); setPrefillAsset(null); }}
-              onSubmit={handleQuickPostSubmit}
-            />
-          )}
-
-          <ToastStack toasts={toastStack.toasts} onDismiss={toastStack.dismiss} onScheduleAnyway={handleScheduleAnyway} />
+            <ToastStack toasts={toastStack.toasts} onDismiss={toastStack.dismiss} onScheduleAnyway={handleScheduleAnyway} />
+          </div>
+        </div>
       </main>
-    </div>
+    </>
+  );
+}
+
+export default function CalendarPage() {
+  const brandKit = useBrandKitStore((s) => s.brandKit);
+  return (
+    <UiV2ThemeProvider className={styles.shell}>
+      <CalendarBody brandKit={brandKit} />
+    </UiV2ThemeProvider>
   );
 }

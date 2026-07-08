@@ -1,9 +1,9 @@
-import PersonalCalendarPage from "@/pages/ContentCalendar/PersonalCalendarPage";
+import CalendarPage from "@/pages/Calendar/CalendarPage";
 
 export const metadata = {
   title: "Calendar | Brandosse Command Center",
 };
 
-export default function CalendarPage() {
-  return <PersonalCalendarPage />;
+export default function CalendarRoute() {
+  return <CalendarPage />;
 }

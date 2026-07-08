@@ -79,6 +79,51 @@ const ACTION_LABEL = {
   audit:          { Icon: Sparkles,  label: 'Open in panel' },
 };
 
+// ── Inline command bar ──────────────────────────────────────────────────────
+// Always-visible bar rendered directly below the Intelligence Strip (mockup:
+// `.card.cmdbar` — `.cmdbar__input-row` + `.cmdbar__chips`/`.cmdbar-scroll`).
+// This is the primary entry point to Ask AI now; the read-only input opens
+// the full ⌘K overlay (below) on click/focus, same as the mockup's
+// `onfocus="openCmdOverlay()"` behavior on its readonly inline input. The
+// chips are real quick-actions (first 5 of SUGGESTED_COMMANDS) that pre-fill
+// the overlay's query with that command's real text — not decorative, per
+// AS_IS_AUDIT.md's requirement that no real AI-action handler get dropped.
+// The ⌘K keyboard shortcut (wired in CalendarPage.jsx) and the header's
+// "Ask AI ⌘K" button both still open the exact same overlay, so this inline
+// bar is an ADDITIONAL entry point, not a replacement for those.
+export function CalendarCommandBarInline({ onOpen, onOpenWithPreset }) {
+  return (
+    <div className="cal3-cmdbar-inline">
+      <button
+        type="button"
+        className="cal3-cmdbar-inline__input-row"
+        onClick={() => onOpen?.()}
+        aria-label="Open AI command bar"
+      >
+        <span className="cal3-cmdbar__ai-icon"><Sparkles size={16} aria-hidden="true" /></span>
+        <span className="cal3-cmdbar-inline__placeholder">
+          Ask: plan my week, suggest best times, reschedule anything that failed…
+        </span>
+        <span className="cal3-kbd">⌘K</span>
+      </button>
+
+      <div className="cal3-cmdbar-inline__chips">
+        {SUGGESTED_COMMANDS.map((cmd) => (
+          <button
+            key={cmd.text}
+            type="button"
+            className="cal3-cmdbar-inline__chip"
+            onClick={() => onOpenWithPreset?.(cmd.text)}
+          >
+            <cmd.Icon size={12} aria-hidden="true" />
+            {cmd.text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function CalendarCommandBar({ context, preset = '', onClose, onApplyAction }) {
   const [query,   setQuery]   = useState(preset || '');

@@ -1,0 +1,71 @@
+/* Upload modal internals — ported from the APPROVED library-mockup.html
+   .dropzone/.uploadQueue/.queueItem/.duplicateWarning classes 1:1. */
+
+.dropzone {
+  border: 1.5px dashed var(--uiv2-border-strong);
+  border-radius: var(--uiv2-radius-lg);
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--uiv2-text-secondary);
+  transition: border-color var(--uiv2-duration-fast) var(--uiv2-ease), background var(--uiv2-duration-fast) var(--uiv2-ease);
+}
+.dropzone:hover, .dropzoneDragging {
+  border-color: var(--uiv2-accent-solid);
+  background: var(--uiv2-accent-wash);
+  color: var(--uiv2-text-primary);
+}
+.dzIcon { color: var(--uiv2-accent-text); margin-bottom: 10px; }
+.dzTitle { font-weight: 600; font-size: var(--uiv2-text-sm); color: var(--uiv2-text-primary); margin-bottom: 4px; }
+.dzHint { font-size: 11.5px; color: var(--uiv2-text-tertiary); }
+
+.uploadQueue { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.queueItem { display: flex; align-items: center; gap: 10px; }
+.queueThumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--uiv2-text-secondary);
+  flex-shrink: 0;
+}
+.queueBody { flex: 1; min-width: 0; }
+.queueNameRow { display: flex; justify-content: space-between; gap: 8px; font-size: var(--uiv2-text-xs); margin-bottom: 5px; }
+.queueName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.queuePct { font-family: var(--uiv2-font-mono); color: var(--uiv2-text-secondary); flex-shrink: 0; }
+.queueTrack { height: 4px; border-radius: 3px; background: var(--uiv2-border); overflow: hidden; }
+.queueFill { height: 100%; background: var(--uiv2-accent-solid); transition: width 0.2s linear; }
+.queueItemFailed .queueFill { background: var(--uiv2-danger); }
+.queueStatusIcon {}
+.toneSuccess { color: var(--uiv2-success); }
+.toneDanger { color: var(--uiv2-danger); }
+.queueErrorText { font-size: 11px; color: var(--uiv2-danger); margin: 4px 0 0; }
+
+.duplicateWarning {
+  display: flex;
+  gap: 10px;
+  background: var(--uiv2-warning-wash);
+  border: 1px solid var(--uiv2-warning-border);
+  border-radius: var(--uiv2-radius-md);
+  padding: 12px;
+  margin: 8px 0 0 46px;
+}
+.dwIcon { color: var(--uiv2-warning); flex-shrink: 0; }
+.duplicateWarning strong { font-size: var(--uiv2-text-sm); }
+.duplicateWarning p { margin: 4px 0 0; font-size: 12px; color: var(--uiv2-text-secondary); }
+.dwActions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+.aiShimmerRow { display: flex; flex-direction: column; gap: 4px; padding-left: 46px; }
+.shimmerLine {
+  height: 8px;
+  border-radius: 4px;
+  background-image: linear-gradient(90deg, var(--uiv2-bg-elevated) 0px, var(--uiv2-bg-inset) 120px, var(--uiv2-bg-elevated) 240px);
+  background-size: 480px 100%;
+  animation: uiv2-shimmer 1.4s linear infinite;
+}
+.shimmerLineW1 { width: 40%; }
+.shimmerLineW2 { width: 28%; }

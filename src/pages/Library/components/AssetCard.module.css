@@ -1,0 +1,171 @@
+/* Grid-view asset card — ported from the APPROVED
+   docs/calendar-library-rebuild/ui-v2-migration/library-mockup.html
+   .assetCard/.assetMedia/.mediaBadge/.statusPill/.selectHit/.selectCheck/
+   .assetBody/.assetTitle/.tagRow/.tagChip/.metaRow/.sourceRow/.assetActions
+   classes 1:1. */
+
+.assetCard {
+  background: var(--uiv2-bg-surface);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition: border-color var(--uiv2-duration-fast) var(--uiv2-ease);
+  position: relative;
+  text-align: left;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+}
+.assetCard:hover, .assetCard:focus-visible { border-color: var(--uiv2-border-hover); }
+.assetCardSelected {
+  border-color: var(--uiv2-accent-solid);
+  box-shadow: 0 0 0 1px var(--uiv2-accent-solid);
+}
+
+.assetMedia {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: var(--uiv2-bg-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--uiv2-text-tertiary);
+}
+.assetMedia img, .assetMedia video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mediaBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-family: var(--uiv2-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: rgba(14, 15, 17, 0.72);
+  color: #F5F5F4;
+  backdrop-filter: blur(3px);
+}
+
+/* Status pill = real Badge tone classes (success/neutral/warning), only
+   positioning/backdrop-blur added for the on-media placement — no invented
+   hex colors (DESIGN_SYSTEM_COMPLIANCE.md fix, carried over verbatim). */
+.statusPill {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  backdrop-filter: blur(3px);
+}
+
+/* MOBILE_PARITY.md MUST-FIX (and its follow-up regression fix logged
+   2026-07-07T14:45:00Z): real ~44x44 touch target wraps the 22x22 visual
+   checkbox, and pointer-events is gated the same way opacity is — otherwise
+   the enlarged hit target silently eats taps outside bulk/hover mode. */
+.selectHit {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+  z-index: 2;
+}
+.assetCard:hover .selectHit,
+.selectHitVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.selectCheck {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(245, 245, 244, 0.55);
+  background: rgba(14, 15, 17, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  pointer-events: none;
+}
+.selectCheckChecked {
+  background: var(--uiv2-accent-solid);
+  border-color: var(--uiv2-accent-solid);
+}
+
+.assetBody {
+  padding: 10px 11px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.assetTitle {
+  font-size: var(--uiv2-text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+.sourceRow { font-size: 11px; color: var(--uiv2-text-secondary); }
+.tagRow { display: flex; flex-wrap: wrap; gap: 4px; }
+.tagChip {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: var(--uiv2-radius-pill);
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border);
+  color: var(--uiv2-text-secondary);
+}
+.tagChipAi {
+  color: var(--uiv2-accent-text);
+  border-color: var(--uiv2-accent-border);
+  background: var(--uiv2-accent-wash);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--uiv2-font-mono);
+  font-size: 10.5px;
+  color: var(--uiv2-text-tertiary);
+}
+
+.assetActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px 11px;
+}
+.assetActions > :first-child { flex: 1; }
+
+.aiShimmerRow { display: flex; flex-direction: column; gap: 4px; }
+.shimmerLine {
+  height: 8px;
+  border-radius: 4px;
+  background-image: linear-gradient(90deg, var(--uiv2-bg-elevated) 0px, var(--uiv2-bg-inset) 120px, var(--uiv2-bg-elevated) 240px);
+  background-size: 480px 100%;
+  animation: uiv2-shimmer 1.4s linear infinite;
+}
+.shimmerLineW1 { width: 70%; }
+.shimmerLineW2 { width: 45%; }

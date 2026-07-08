@@ -84,6 +84,16 @@ function DraftCard({ draft, onOpen, onMoveTrigger, onDragStart, onDragEnd, isDra
         <div className="draft-card__thumb"><ThumbIcon size={22} aria-hidden="true" /></div>
       )}
 
+      <div className="draft-card__meta">
+        <div className="draft-card__name">{cardName}</div>
+        <div className="draft-card__platform-row">
+          {draft.platform && <span className="post-card__platform-dot" style={{ background: platformVar(draft.platform) }} title={draft.platform} />}
+          <span className="ui-field-hint" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 9 }}>
+            {mediaType || 'post'}
+          </span>
+        </div>
+      </div>
+
       <button
         type="button"
         className="draft-card__move-btn"
@@ -96,16 +106,6 @@ function DraftCard({ draft, onOpen, onMoveTrigger, onDragStart, onDragEnd, isDra
           <line x1="2" y1="12" x2="22" y2="12" /><line x1="12" y1="2" x2="12" y2="22" />
         </svg>
       </button>
-
-      <div className="draft-card__meta">
-        <div className="draft-card__name">{cardName}</div>
-        <div className="draft-card__platform-row">
-          {draft.platform && <span className="post-card__platform-dot" style={{ background: platformVar(draft.platform) }} title={draft.platform} />}
-          <span className="ui-field-hint" style={{ textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 9 }}>
-            {mediaType || 'post'}
-          </span>
-        </div>
-      </div>
 
       <div className="draft-card__readiness">
         <div
@@ -120,20 +120,24 @@ function DraftCard({ draft, onOpen, onMoveTrigger, onDragStart, onDragEnd, isDra
   );
 }
 
-const TRAY_MIN_H  = 100;
-const TRAY_MAX_H  = 520;
-const TRAY_DEFAULT_H = 148;
-const STORAGE_KEY = 'cal3-tray-height';
+// Sidebar's scrollable list gets a resizable max-height (drag handle below
+// the header) — same interaction as the old horizontal tray, just resizing
+// vertical list height instead of tray height now that this renders as a
+// right-docked column (mockup's `.rail`/`.rail__scroll`, not `.cal3-tray`).
+const RAIL_MIN_H  = 160;
+const RAIL_MAX_H  = 720;
+const RAIL_DEFAULT_H = 360;
+const STORAGE_KEY = 'cal3-rail-height';
 
 function getSavedHeight() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const n = parseInt(raw, 10);
-      if (n >= TRAY_MIN_H && n <= TRAY_MAX_H) return n;
+      if (n >= RAIL_MIN_H && n <= RAIL_MAX_H) return n;
     }
   } catch { /* localStorage unavailable */ }
-  return TRAY_DEFAULT_H;
+  return RAIL_DEFAULT_H;
 }
 
 export default function UnscheduledRail({
@@ -160,14 +164,14 @@ export default function UnscheduledRail({
     setResizing(true);
 
     function onMove(ev) {
-      const delta = dragRef.current.startY - ev.clientY; // up = positive = taller
-      const next  = Math.max(TRAY_MIN_H, Math.min(TRAY_MAX_H, dragRef.current.startHeight + delta));
+      const delta = ev.clientY - dragRef.current.startY; // down = positive = taller (vertical list grows downward)
+      const next  = Math.max(RAIL_MIN_H, Math.min(RAIL_MAX_H, dragRef.current.startHeight + delta));
       setRailHeight(next);
     }
 
     function onUp(ev) {
-      const delta = dragRef.current.startY - ev.clientY;
-      const next  = Math.max(TRAY_MIN_H, Math.min(TRAY_MAX_H, dragRef.current.startHeight + delta));
+      const delta = ev.clientY - dragRef.current.startY;
+      const next  = Math.max(RAIL_MIN_H, Math.min(RAIL_MAX_H, dragRef.current.startHeight + delta));
       setRailHeight(next);
       try { localStorage.setItem(STORAGE_KEY, String(next)); } catch { /* ignore */ }
       setResizing(false);
@@ -182,42 +186,47 @@ export default function UnscheduledRail({
     window.addEventListener('pointercancel',  onUp);
   }
 
-  const trayStyle = collapsed
-    ? {}
-    : { height: `${railHeight}px`, maxHeight: `${railHeight}px` };
+  const scrollStyle = collapsed ? {} : { maxHeight: `${railHeight}px` };
 
   return (
+    // Right-docked vertical sidebar (mockup: `.card.rail`, id="draftsRail")
+    // — NOT a horizontal bottom tray. Desktop/tablet: fixed-width column,
+    // second cell of the body grid (see CalendarPage.jsx's cal3-body-grid).
+    // Mobile (<640px, see calendar-engine-v2.css): collapses back to a
+    // horizontal strip via `order: -1` + row-direction scroll, matching the
+    // mockup's documented mobile behavior exactly.
     <div
-      className={`cal3-tray${collapsed ? ' is-collapsed' : ''}${resizing ? ' is-resizing' : ''}`}
-      style={trayStyle}
+      id="draftsRail"
+      className={`cal3-rail${collapsed ? ' is-collapsed' : ''}${resizing ? ' is-resizing' : ''}`}
     >
-      {/* Drag handle — only shown when expanded */}
-      {!collapsed && (
-        <div
-          className="cal3-tray__resize-handle"
-          onPointerDown={handleResizeStart}
-          aria-label="Drag to resize drafts panel"
-          role="separator"
-          aria-orientation="horizontal"
-        />
-      )}
-
-      <button className="cal3-tray__header" data-tray-toggle type="button" aria-expanded={!collapsed} onClick={onToggle}>
+      <button className="cal3-rail__header" data-tray-toggle type="button" aria-expanded={!collapsed} onClick={onToggle}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
         </svg>
-        <span className="cal3-tray__title">Drafts</span>
-        {drafts.length > 0 && <span className="cal3-tray__count">{drafts.length}</span>}
-        <span className="cal3-tray__hint">— drag onto the calendar, or use Move</span>
-        <span className="cal3-tray__toggle">
+        <span className="cal3-rail__title">Drafts</span>
+        {drafts.length > 0 && <span className="cal3-rail__count">{drafts.length}</span>}
+        <span className="cal3-rail__hint">drag onto the calendar, or use Move</span>
+        <span className="cal3-rail__toggle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15" /></svg>
         </span>
       </button>
 
+      {/* Drag handle — only shown when expanded */}
       {!collapsed && (
-        <div className="cal3-tray__scroll" ref={scrollRef}>
+        <div
+          className="cal3-rail__resize"
+          onPointerDown={handleResizeStart}
+          aria-label="Drag to resize drafts panel"
+          role="separator"
+          aria-orientation="horizontal"
+          title="Drag to resize"
+        />
+      )}
+
+      {!collapsed && (
+        <div className="cal3-rail__scroll" ref={scrollRef} style={scrollStyle}>
           {drafts.length === 0 ? (
-            <div className="cal3-tray__empty">
+            <div className="cal3-rail__empty">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
               </svg>

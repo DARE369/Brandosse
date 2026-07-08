@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Library — ui-v2 mockup</title>
+<style>
+/* =============================================================================
+   TOKENS — copied verbatim from src/ui-v2/tokens.css (do not fork/modify;
+   this mockup is generated FROM the existing token source, not the reverse).
+   ============================================================================= */
+:root {
+  --uiv2-font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --uiv2-font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --uiv2-font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --uiv2-text-2xs: 0.65625rem;
+  --uiv2-text-xs: 0.71875rem;
+  --uiv2-text-sm: 0.8125rem;
+  --uiv2-text-base: 0.875rem;
+  --uiv2-text-md: 0.9375rem;
+  --uiv2-text-lg: 1.0625rem;
+  --uiv2-text-xl: 1.25rem;
+  --uiv2-text-2xl: 1.375rem;
+  --uiv2-text-3xl: 1.875rem;
+  --uiv2-text-4xl: 2.375rem;
+
+  --uiv2-weight-normal: 400;
+  --uiv2-weight-medium: 500;
+  --uiv2-weight-semibold: 600;
+  --uiv2-weight-bold: 700;
+
+  --uiv2-leading-tight: 1.25;
+  --uiv2-leading-snug: 1.4;
+  --uiv2-leading-normal: 1.5;
+
+  --uiv2-space-1: 4px;
+  --uiv2-space-2: 8px;
+  --uiv2-space-3: 12px;
+  --uiv2-space-4: 16px;
+  --uiv2-space-5: 20px;
+  --uiv2-space-6: 24px;
+  --uiv2-space-8: 32px;
+  --uiv2-space-10: 40px;
+
+  --uiv2-radius-xs: 4px;
+  --uiv2-radius-sm: 6px;
+  --uiv2-radius-md: 8px;
+  --uiv2-radius-lg: 10px;
+  --uiv2-radius-xl: 12px;
+  --uiv2-radius-pill: 999px;
+
+  --uiv2-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --uiv2-duration-fast: 120ms;
+  --uiv2-duration-base: 160ms;
+  --uiv2-duration-slow: 240ms;
+
+  --uiv2-accent-solid: #FF5C38;
+  --uiv2-accent-solid-hover: color-mix(in srgb, #FF5C38 92%, white);
+  --uiv2-accent-on-solid-dark: #17181B;
+  --uiv2-accent-on-solid-light: #FFFFFF;
+
+  --uiv2-success-d: #30A46C; --uiv2-success-l: #1F8F5D;
+  --uiv2-warning-d: #FFB224; --uiv2-warning-l: #9A6400;
+  --uiv2-danger-d: #E5484D;  --uiv2-danger-l: #C22A30;
+  --uiv2-info-d: #3E7BD6;    --uiv2-info-l: #2A5FBD;
+
+  --uiv2-shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.15);
+  --uiv2-shadow-modal-dark: 0 14px 32px rgba(0, 0, 0, 0.45);
+  --uiv2-shadow-popover: 0 12px 28px rgba(0, 0, 0, 0.14);
+  --uiv2-shadow-popover-dark: 0 14px 32px rgba(0, 0, 0, 0.45);
+}
+
+[data-uiv2-theme="dark"] {
+  --uiv2-bg-canvas: #0E0F11;
+  --uiv2-bg-surface: #17181B;
+  --uiv2-bg-elevated: #1E2023;
+  --uiv2-bg-inset: #131417;
+  --uiv2-border: #26282C;
+  --uiv2-border-strong: #2E3136;
+  --uiv2-border-hover: #3C4046;
+
+  --uiv2-text-primary: #F5F5F4;
+  --uiv2-text-secondary: #8B8D93;
+  --uiv2-text-tertiary: #5A5C61;
+
+  --uiv2-accent-text: #FF5C38;
+  --uiv2-accent-wash: rgba(255, 92, 56, 0.1);
+  --uiv2-accent-wash-strong: rgba(255, 92, 56, 0.12);
+  --uiv2-accent-border: rgba(255, 92, 56, 0.35);
+  --uiv2-accent-on-solid: var(--uiv2-accent-on-solid-dark);
+
+  --uiv2-success: var(--uiv2-success-d);
+  --uiv2-warning: var(--uiv2-warning-d);
+  --uiv2-danger: var(--uiv2-danger-d);
+  --uiv2-info: var(--uiv2-info-d);
+
+  --uiv2-danger-wash: rgba(229, 72, 77, 0.08);
+  --uiv2-danger-border: rgba(229, 72, 77, 0.3);
+  --uiv2-warning-wash: rgba(255, 178, 36, 0.1);
+  --uiv2-warning-border: rgba(255, 178, 36, 0.3);
+  --uiv2-info-wash: rgba(62, 123, 214, 0.1);
+  --uiv2-info-border: rgba(62, 123, 214, 0.3);
+
+  --uiv2-scrollbar-thumb: #3C4046;
+  --uiv2-shadow-modal-current: var(--uiv2-shadow-modal-dark);
+  --uiv2-shadow-popover-current: var(--uiv2-shadow-popover-dark);
+  --uiv2-scrim: rgba(0, 0, 0, 0.55);
+  --uiv2-scrim-soft: rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+[data-uiv2-theme="light"] {
+  --uiv2-bg-canvas: #F7F6F2;
+  --uiv2-bg-surface: #FFFFFF;
+  --uiv2-bg-elevated: #F4F3EE;
+  --uiv2-bg-inset: #F4F3EE;
+  --uiv2-border: #E4E2DC;
+  --uiv2-border-strong: #C9C6BC;
+  --uiv2-border-hover: #C9C6BC;
+
+  --uiv2-text-primary: #17181B;
+  --uiv2-text-secondary: #6E7075;
+  --uiv2-text-tertiary: #9A9C9F;
+
+  --uiv2-accent-text: #E14E2F;
+  --uiv2-accent-wash: rgba(255, 92, 56, 0.08);
+  --uiv2-accent-wash-strong: rgba(255, 92, 56, 0.08);
+  --uiv2-accent-border: rgba(255, 92, 56, 0.3);
+  --uiv2-accent-on-solid: var(--uiv2-accent-on-solid-light);
+
+  --uiv2-success: var(--uiv2-success-l);
+  --uiv2-warning: var(--uiv2-warning-l);
+  --uiv2-danger: var(--uiv2-danger-l);
+  --uiv2-info: var(--uiv2-info-l);
+
+  --uiv2-danger-wash: rgba(194, 42, 48, 0.06);
+  --uiv2-danger-border: rgba(194, 42, 48, 0.28);
+  --uiv2-warning-wash: rgba(154, 100, 0, 0.08);
+  --uiv2-warning-border: rgba(154, 100, 0, 0.28);
+  --uiv2-info-wash: rgba(42, 95, 189, 0.07);
+  --uiv2-info-border: rgba(42, 95, 189, 0.25);
+
+  --uiv2-scrollbar-thumb: #C9C6BC;
+  --uiv2-shadow-modal-current: var(--uiv2-shadow-modal);
+  --uiv2-shadow-popover-current: var(--uiv2-shadow-popover);
+  --uiv2-scrim: rgba(23, 24, 27, 0.35);
+  --uiv2-scrim-soft: rgba(23, 24, 27, 0.25);
+  color-scheme: light;
+}
+
+[data-uiv2-theme] input::placeholder,
+[data-uiv2-theme] textarea::placeholder { color: var(--uiv2-text-tertiary); opacity: 1; }
+
+@keyframes uiv2-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes uiv2-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes uiv2-shimmer { 0% { background-position: -500px 0; } 100% { background-position: 500px 0; } }
+@keyframes uiv2-pulse-ring { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+/* =============================================================================
+   PRIMITIVE-EQUIVALENT CLASSES — mirrors src/ui-v2/primitives/*.module.css
+   1:1 (same property values), just flattened to plain classes since this is
+   a static mockup file, not a React build. A frontend-builder should read
+   these as "use the real <Card>/<Badge>/<Button>/... primitives here",
+   not as new components to invent.
+   ============================================================================= */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--uiv2-bg-canvas);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+  line-height: var(--uiv2-leading-normal);
+  min-height: 100vh;
+}
+button, input, select, textarea { font-family: inherit; color: inherit; }
+a { color: inherit; }
+
+.card { background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-lg); padding: 16px 18px; }
+.card--none { padding: 0; }
+
+.badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--uiv2-font-mono); font-size: var(--uiv2-text-2xs); font-weight: var(--uiv2-weight-semibold); padding: 3px 9px; border-radius: var(--uiv2-radius-pill); border: 1px solid transparent; white-space: nowrap; }
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.badge--neutral { background: var(--uiv2-bg-elevated); color: var(--uiv2-text-secondary); border-color: var(--uiv2-border); }
+.badge--success { background: color-mix(in srgb, var(--uiv2-success) 15%, transparent); color: var(--uiv2-success); }
+.badge--warning { background: var(--uiv2-warning-wash); color: var(--uiv2-warning); border-color: var(--uiv2-warning-border); }
+.badge--danger { background: var(--uiv2-danger-wash); color: var(--uiv2-danger); border-color: var(--uiv2-danger-border); }
+.badge--info { background: var(--uiv2-info-wash); color: var(--uiv2-info); border-color: var(--uiv2-info-border); }
+.badge--accent { background: var(--uiv2-accent-wash); color: var(--uiv2-accent-text); border-color: var(--uiv2-accent-border); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--uiv2-space-2); font-family: var(--uiv2-font-body); font-weight: var(--uiv2-weight-semibold); border-radius: var(--uiv2-radius-md); border: 1px solid transparent; cursor: pointer; white-space: nowrap; transition: filter var(--uiv2-duration-fast) var(--uiv2-ease), border-color var(--uiv2-duration-fast) var(--uiv2-ease), background-color var(--uiv2-duration-fast) var(--uiv2-ease), color var(--uiv2-duration-fast) var(--uiv2-ease); }
+.btn:disabled { cursor: not-allowed; }
+.btn--md { padding: 9px 15px; font-size: var(--uiv2-text-sm); }
+.btn--sm { padding: 6px 12px; font-size: var(--uiv2-text-xs); }
+.btn--solid { background: var(--uiv2-accent-solid); color: var(--uiv2-accent-on-solid); }
+.btn--solid:hover:not(:disabled) { filter: brightness(1.06); }
+.btn--subtle { background: var(--uiv2-bg-elevated); color: var(--uiv2-text-primary); border-color: var(--uiv2-border-strong); }
+.btn--subtle:hover:not(:disabled) { border-color: var(--uiv2-border-hover); }
+.btn--ghost { background: transparent; color: var(--uiv2-text-secondary); border-color: var(--uiv2-border); }
+.btn--ghost:hover:not(:disabled) { border-color: var(--uiv2-border-hover); color: var(--uiv2-text-primary); }
+.btn--danger { background: transparent; color: var(--uiv2-danger); border-color: var(--uiv2-danger-border); }
+.btn--danger:hover:not(:disabled) { background: var(--uiv2-danger-wash); }
+.btn--dangerSolid { background: var(--uiv2-danger); color: var(--uiv2-accent-on-solid); }
+.btn--dangerSolid:hover:not(:disabled) { filter: brightness(1.06); }
+
+.iconBtn { width: 30px; height: 30px; border-radius: var(--uiv2-radius-md); background: transparent; border: 1px solid var(--uiv2-border); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--uiv2-text-secondary); flex-shrink: 0; transition: border-color var(--uiv2-duration-fast) var(--uiv2-ease), color var(--uiv2-duration-fast) var(--uiv2-ease); position: relative; }
+.iconBtn:hover { border-color: var(--uiv2-border-hover); color: var(--uiv2-text-primary); }
+.iconBtn.is-active { border-color: var(--uiv2-accent-solid); color: var(--uiv2-accent-text); background: var(--uiv2-accent-wash); }
+
+.skeleton { background-image: linear-gradient(90deg, var(--uiv2-bg-elevated) 0px, var(--uiv2-bg-inset) 200px, var(--uiv2-bg-elevated) 400px); background-size: 800px 100%; animation: uiv2-shimmer 1.4s linear infinite; border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md); }
+
+.emptyState { text-align: center; padding: 44px 20px; border-radius: var(--uiv2-radius-xl); background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border); }
+.emptyState--dashed { border: 1.5px dashed var(--uiv2-border-strong); background: transparent; }
+.emptyState .es-icon { color: var(--uiv2-text-tertiary); margin-bottom: 12px; }
+.emptyState .es-title { font-size: var(--uiv2-text-md); font-weight: var(--uiv2-weight-semibold); color: var(--uiv2-text-primary); margin-bottom: 5px; }
+.emptyState .es-desc { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); max-width: 46ch; margin: 0 auto; }
+.emptyState .es-actions { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+
+.modalOverlay { position: fixed; inset: 0; background: var(--uiv2-scrim); backdrop-filter: blur(2px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modalPanel { background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border-strong); border-radius: var(--uiv2-radius-xl); width: 100%; padding: 22px; animation: uiv2-modal-in 0.16s ease; box-shadow: var(--uiv2-shadow-modal-current); max-height: 88vh; overflow-y: auto; }
+.modalPanel--sm { max-width: 380px; }
+.modalPanel--md { max-width: 420px; }
+.modalPanel--lg { max-width: 560px; }
+.modalTitle { font-family: var(--uiv2-font-display); font-weight: var(--uiv2-weight-semibold); font-size: var(--uiv2-text-lg); margin-bottom: 4px; color: var(--uiv2-text-primary); }
+.modalDesc { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); margin-bottom: 18px; }
+.modalActions { display: flex; gap: 9px; margin-top: 20px; }
+.modalActions > * { flex: 1; }
+
+.drawerBackdrop { position: fixed; inset: 0; background: var(--uiv2-scrim-soft); z-index: 90; }
+.drawerPanel { position: fixed; top: 0; bottom: 0; right: 0; width: min(460px, 94vw); background: var(--uiv2-bg-inset); border-left: 1px solid var(--uiv2-border); z-index: 95; padding: 22px; overflow-y: auto; animation: uiv2-fade-in 0.16s ease; display: flex; flex-direction: column; gap: 16px; scrollbar-width: thin; scrollbar-color: var(--uiv2-scrollbar-thumb) transparent; }
+.drawerHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.drawerTitle { font-family: var(--uiv2-font-display); font-weight: var(--uiv2-weight-semibold); font-size: var(--uiv2-text-lg); color: var(--uiv2-text-primary); display: flex; align-items: center; gap: 8px; min-width: 0; }
+.drawerTitle span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawerCloseBtn { background: none; border: none; color: var(--uiv2-text-secondary); cursor: pointer; padding: 3px; flex-shrink: 0; }
+.drawerCloseBtn:hover { color: var(--uiv2-text-primary); }
+
+.sectionKicker { font-family: var(--uiv2-font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--uiv2-text-secondary); margin-bottom: 10px; }
+
+/* =============================================================================
+   MOCKUP-ONLY CONTROL BAR — clearly not part of the shipped product; a
+   frontend-builder ignores this block entirely. Lets a reviewer flip
+   between every required page-state without separate files.
+   ============================================================================= */
+.mockupBar {
+  position: sticky; top: 0; z-index: 200;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: repeating-linear-gradient(135deg, #1a1a1a, #1a1a1a 10px, #232323 10px, #232323 20px);
+  border-bottom: 2px solid var(--uiv2-accent-solid);
+  font-family: var(--uiv2-font-mono);
+  font-size: 11px;
+  color: #fff;
+}
+.mockupBar strong { color: var(--uiv2-accent-solid); }
+.mockupBar select, .mockupBar button {
+  font-family: var(--uiv2-font-mono); font-size: 11px; background: #111; color: #fff;
+  border: 1px solid #444; border-radius: 5px; padding: 5px 8px; cursor: pointer;
+}
+.mockupBar button.is-active { border-color: var(--uiv2-accent-solid); color: var(--uiv2-accent-solid); }
+
+/* =============================================================================
+   APP HEADER — mirrors src/ui-v2/shell/AppHeader.module.css
+   ============================================================================= */
+/* top: 0 matches the real AppHeader.module.css .header exactly (production
+   sticks flush to the viewport top). This mockup file additionally renders
+   a MOCKUP-ONLY dev control bar above it (see .mockupBar), which is ALSO
+   `position: sticky; top: 0`. Two elements both pinned to top:0 overlap on
+   scroll -- confirmed a real problem once the frame-simulator's
+   container-query fix made it possible to actually scroll a narrow
+   preview (the dev bar's text/buttons visually merged with/covered the
+   real header). Fixed with JS (`stackDevBarOverHeader` near the bottom of
+   the file) that measures .mockupBar's real rendered height -- which
+   changes as its many buttons wrap across more lines at narrower widths
+   -- and sets this rule's `top` as an inline style override. The `top: 0`
+   written here stays correct as a literal copy of production's value;
+   the override is mockup-only and applied in JS, never in this CSS. */
+/* MOBILE-OPTIMIZATION FIX (2026-07-07): #frame is a real CSS containment
+   context now, not just a div whose max-width the "frame:" dev buttons
+   below happened to shrink. Every responsive rule that governs page-shell
+   content is written as `@container frame (...)` rather than `@media (...)`
+   -- @media only ever responds to the true browser viewport, so narrowing
+   this wrapper div did NOT used to re-trigger these rules at all (the
+   header/rail/grid stayed in their full-desktop state no matter what the
+   "Tablet 768"/"Mobile 375" buttons showed). Container queries respond to
+   #frame's own inline-size instead, so the simulator buttons now genuinely
+   preview mobile/tablet layout. Real browser-window resize still works
+   identically to before, since #frame's inline-size tracks the viewport
+   when the frame buttons are on "Full". */
+#frame { container-type: inline-size; container-name: frame; }
+
+.header { flex-shrink: 0; display: flex; align-items: center; gap: 18px; padding: 0 20px; height: 52px; border-bottom: 1px solid var(--uiv2-border); background: var(--uiv2-bg-canvas); position: sticky; top: 0; z-index: 30; min-width: 0; }
+@container frame (max-width: 480px) { .header { gap: 8px; padding: 0 12px; } }
+.brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.brandMark { width: 22px; height: 22px; border-radius: 6px; background: var(--uiv2-accent-solid); display: inline-flex; align-items: center; justify-content: center; font-family: var(--uiv2-font-display); font-weight: 700; font-size: 13px; color: var(--uiv2-accent-on-solid); }
+.wordmark { font-family: var(--uiv2-font-display); font-weight: 600; font-size: 16px; letter-spacing: -0.02em; color: var(--uiv2-text-primary); }
+.navLinks { display: flex; gap: 4px; }
+.burger { display: none; width: 32px; height: 32px; border-radius: 6px; background: transparent; border: 1px solid var(--uiv2-border); align-items: center; justify-content: center; cursor: pointer; color: var(--uiv2-text-primary); flex-shrink: 0; }
+@container frame (max-width: 900px) { .navLinks { display: none; } .burger { display: flex; } }
+.navLink { font-size: 13px; padding: 6px 12px; border-radius: 6px; cursor: pointer; color: var(--uiv2-text-secondary); text-decoration: none; white-space: nowrap; background: transparent; border: none; }
+.navLinkActive { font-weight: 600; color: var(--uiv2-text-primary); background: var(--uiv2-bg-elevated); }
+.headerRight { margin-left: auto; display: flex; align-items: center; gap: 10px; min-width: 0; flex-shrink: 1; }
+@container frame (max-width: 480px) { .headerRight { gap: 6px; } }
+.creditPill { display: flex; align-items: center; gap: 8px; border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-pill); padding: 6px 12px; flex-shrink: 0; }
+@container frame (max-width: 480px) { .creditPill { padding: 5px 8px; gap: 0; } }
+.creditTrack { width: 36px; height: 3px; background: var(--uiv2-border); border-radius: var(--uiv2-radius-pill); overflow: hidden; display: inline-block; }
+@container frame (max-width: 480px) { .creditTrack { display: none; } }
+.creditFill { display: block; height: 100%; background: var(--uiv2-accent-solid); }
+.creditLabel { font-family: var(--uiv2-font-mono); font-size: var(--uiv2-text-2xs); white-space: nowrap; color: var(--uiv2-text-primary); }
+.avatar { width: 28px; height: 28px; border-radius: 999px; background: var(--uiv2-border-strong); border: none; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: var(--uiv2-text-primary); cursor: pointer; flex-shrink: 0; }
+
+/* Mobile nav drawer (burger target) -- DESIGN_SYSTEM_COMPLIANCE.md fix:
+   this is now literally the real Drawer shape (see .drawerBackdrop/
+   .drawerPanel/.drawerHeader/.drawerTitle/.drawerCloseBtn below, the same
+   classes the asset detail drawer uses), not a bespoke left-side panel.
+   MobileNavDrawer.jsx is `<Drawer title="Menu" width="min(280px, 84vw)">`
+   under the hood -- right-side, bg-inset, border-left, title bar + close
+   button -- so the HTML below reuses .drawerPanel/.drawerBackdrop directly
+   with that width override instead of duplicating Drawer's CSS again.
+   Only the nav-link styling is markup this component adds on top, and it
+   matches MobileNavDrawer.module.css's .list/.link/.linkActive exactly. */
+.mobileNavList { display: flex; flex-direction: column; gap: 4px; }
+.mobileNavLink { text-align: left; padding: 11px 12px; border-radius: 7px; border: none; background: transparent; color: var(--uiv2-text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }
+.mobileNavLink:hover { background: var(--uiv2-bg-elevated); }
+.mobileNavLink.is-active { font-weight: 600; color: var(--uiv2-text-primary); background: var(--uiv2-bg-elevated); }
+
+/* =============================================================================
+   PAGE SHELL / HEADER ROW
+   ============================================================================= */
+.main { padding: 20px 20px 64px; }
+@container frame (max-width: 640px) { .main { padding: 14px 12px 48px; } }
+.canvas { max-width: 1400px; margin: 0 auto; }
+
+.pageHeadRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.pageTitle { font-family: var(--uiv2-font-display); font-weight: 700; font-size: var(--uiv2-text-3xl); letter-spacing: -0.02em; }
+.pageDesc { color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-sm); margin-top: 4px; }
+.pageActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.viewToggle { display: flex; border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md); overflow: hidden; }
+.viewToggle .iconBtn { border: none; border-radius: 0; width: 34px; height: 34px; }
+.viewToggle .iconBtn + .iconBtn { border-left: 1px solid var(--uiv2-border); }
+
+/* =============================================================================
+   FILTER ROW + LEFT RAIL
+   ============================================================================= */
+.filterRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.mobileRailToggle { display: none; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--uiv2-radius-md); border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-elevated); cursor: pointer; font-size: var(--uiv2-text-sm); color: var(--uiv2-text-primary); }
+.mobileRailToggle .count { font-family: var(--uiv2-font-mono); font-size: 10.5px; color: var(--uiv2-text-secondary); }
+@container frame (max-width: 860px) { .mobileRailToggle { display: inline-flex; } }
+
+.searchBox { display: flex; align-items: center; gap: 9px; background: var(--uiv2-bg-inset); border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md); padding: 8px 12px; flex: 1 1 220px; min-width: 160px; max-width: 360px; color: var(--uiv2-text-secondary); }
+.searchBox input { border: none; outline: none; background: transparent; font-size: var(--uiv2-text-sm); color: var(--uiv2-text-primary); width: 100%; }
+
+.selectChip { border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-elevated); border-radius: var(--uiv2-radius-md); padding: 7px 10px; font-size: var(--uiv2-text-xs); color: var(--uiv2-text-primary); }
+
+.filterChip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--uiv2-radius-pill); border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-elevated); color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-xs); font-weight: 600; cursor: pointer; }
+.filterChip.is-active { border-color: var(--uiv2-accent-solid); background: var(--uiv2-accent-wash); color: var(--uiv2-accent-text); }
+
+.rememberCheck { display: flex; align-items: center; gap: 6px; font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); }
+
+.layoutGrid { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 20px; align-items: start; }
+
+.leftRail { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 100px; }
+/* MOBILE-OPTIMIZATION FIX (2026-07-07): this @container override must come
+   AFTER the unconditional `.leftRail { display: flex; ... }` rule above --
+   same-specificity rules resolve by source order, so when this block used
+   to appear BEFORE the base rule, the base rule always won regardless of
+   container width, and .leftRail (the desktop filter sidebar) never
+   actually hid on mobile -- confirmed live: at a real 375px container
+   width, getComputedStyle(#leftRailDesktop).display was still "flex", the
+   sidebar rendered full-height inline above the asset grid, and the
+   correctly-implemented, correctly-closed mobile bottom sheet
+   (#sheetPanel, .mobileRailToggle) was rendering redundantly underneath
+   it. Same class of bug as the burger-menu cascade fix already applied to
+   src/ui-v2/shell/AppHeader.module.css earlier this session. */
+@container frame (max-width: 860px) { .layoutGrid { grid-template-columns: 1fr; } .leftRail { display: none; } }
+.railLabel { font-family: var(--uiv2-font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--uiv2-text-tertiary); margin: 14px 0 6px; }
+.railLabel:first-child { margin-top: 0; }
+.railItem { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: var(--uiv2-radius-md); border: none; background: transparent; color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-sm); cursor: pointer; text-align: left; }
+.railItem:hover { background: var(--uiv2-bg-elevated); }
+.railItem.is-active { background: var(--uiv2-accent-wash); color: var(--uiv2-accent-text); font-weight: 600; }
+.railItem .count { font-family: var(--uiv2-font-mono); font-size: 10.5px; color: var(--uiv2-text-tertiary); }
+.railItem.is-active .count { color: var(--uiv2-accent-text); }
+
+/* Mobile filter bottom sheet (rail content re-used inside it) */
+.bottomSheetBackdrop { position: fixed; inset: 0; background: var(--uiv2-scrim-soft); z-index: 90; display: none; }
+.bottomSheetBackdrop.is-open { display: block; }
+.bottomSheetPanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 80vh; overflow-y: auto; background: var(--uiv2-bg-surface); border-top: 1px solid var(--uiv2-border-strong); border-radius: 16px 16px 0 0; z-index: 95; padding: 18px; transform: translateY(100%); transition: transform 0.2s var(--uiv2-ease); }
+.bottomSheetPanel.is-open { transform: translateY(0); }
+.bottomSheetHandle { width: 36px; height: 4px; border-radius: 3px; background: var(--uiv2-border-strong); margin: 0 auto 14px; }
+
+/* =============================================================================
+   ASSET GRID + CARD
+   ============================================================================= */
+.assetGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+@container frame (max-width: 480px) { .assetGrid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
+
+.assetCard { background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-lg); overflow: hidden; cursor: pointer; display: flex; flex-direction: column; transition: border-color var(--uiv2-duration-fast) var(--uiv2-ease); position: relative; }
+.assetCard:hover, .assetCard:focus-visible { border-color: var(--uiv2-border-hover); }
+.assetCard.is-selected { border-color: var(--uiv2-accent-solid); box-shadow: 0 0 0 1px var(--uiv2-accent-solid); }
+
+.assetMedia { position: relative; aspect-ratio: 1 / 1; background: var(--uiv2-bg-inset); display: flex; align-items: center; justify-content: center; color: var(--uiv2-text-tertiary); }
+.assetMedia img, .assetMedia video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.mediaBadge { position: absolute; top: 8px; left: 8px; font-family: var(--uiv2-font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 5px; background: rgba(14,15,17,0.72); color: #F5F5F4; backdrop-filter: blur(3px); }
+/* Status pill = the real Badge tone classes (.badge--success/--neutral/--warning
+   below, unchanged from src/ui-v2/primitives/Badge.module.css's own color
+   logic) with only positioning/backdrop-blur added here for the on-media
+   placement. No new hex/opacity values — DESIGN_SYSTEM_COMPLIANCE.md fix. */
+.statusPill { position: absolute; top: 8px; right: 8px; backdrop-filter: blur(3px); }
+
+/* MOBILE_PARITY.md MUST-FIX: real ~44x44 touch target (.selectHit) wraps
+   the 22x22 *visual* checkbox (.selectCheck) rather than the visual box
+   itself being the only tappable area -- matches the platform-standard
+   minimum hit-area size so a mistap near the corner still registers as a
+   select, instead of falling through to the card's own "open drawer"
+   click handler underneath it. */
+.selectHit { position: absolute; bottom: 0; left: 0; width: 44px; height: 44px; display: flex; align-items: flex-end; justify-content: flex-start; padding: 8px; background: transparent; border: none; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 2; }
+.assetCard:hover .selectHit, .bulk-mode .selectHit { opacity: 1; pointer-events: auto; }
+.selectCheck { width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid rgba(245,245,244,0.55); background: rgba(14,15,17,0.45); display: flex; align-items: center; justify-content: center; color: #fff; pointer-events: none; }
+.selectCheck.is-checked { background: var(--uiv2-accent-solid); border-color: var(--uiv2-accent-solid); }
+
+.assetBody { padding: 10px 11px 11px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.assetTitle { font-size: var(--uiv2-text-sm); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tagRow { display: flex; flex-wrap: wrap; gap: 4px; }
+.tagChip { font-size: 10px; padding: 2px 7px; border-radius: var(--uiv2-radius-pill); background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border); color: var(--uiv2-text-secondary); }
+.tagChip.is-ai { color: var(--uiv2-accent-text); border-color: var(--uiv2-accent-border); background: var(--uiv2-accent-wash); display: inline-flex; align-items: center; gap: 3px; }
+.metaRow { display: flex; justify-content: space-between; font-family: var(--uiv2-font-mono); font-size: 10.5px; color: var(--uiv2-text-tertiary); }
+.sourceRow { font-size: 11px; color: var(--uiv2-text-secondary); }
+
+.assetActions { display: flex; align-items: center; gap: 6px; padding: 0 11px 11px; }
+.assetActions .btn { flex: 1; }
+
+.aiShimmerRow { display: flex; flex-direction: column; gap: 4px; }
+.shimmerLine { height: 8px; border-radius: 4px; background-image: linear-gradient(90deg, var(--uiv2-bg-elevated) 0px, var(--uiv2-bg-inset) 120px, var(--uiv2-bg-elevated) 240px); background-size: 480px 100%; animation: uiv2-shimmer 1.4s linear infinite; }
+.shimmerLine.w1 { width: 70%; }
+.shimmerLine.w2 { width: 45%; }
+
+/* Loading skeleton card */
+.skeletonCard { border-radius: var(--uiv2-radius-lg); overflow: hidden; border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-surface); }
+.skeletonCard .assetMedia.skeleton { border-radius: 0; border: none; }
+
+/* =============================================================================
+   BULK ACTION BAR
+   ============================================================================= */
+.bulkBar { position: sticky; bottom: 14px; margin-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border-strong); border-radius: var(--uiv2-radius-lg); padding: 12px 16px; box-shadow: var(--uiv2-shadow-popover-current); }
+.bulkBarMsg { font-size: var(--uiv2-text-sm); font-weight: 600; }
+.bulkBarActions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* =============================================================================
+   UPLOAD DROPZONE + QUEUE
+   ============================================================================= */
+.dropzone { border: 1.5px dashed var(--uiv2-border-strong); border-radius: var(--uiv2-radius-lg); padding: 32px 20px; text-align: center; cursor: pointer; color: var(--uiv2-text-secondary); transition: border-color var(--uiv2-duration-fast) var(--uiv2-ease), background var(--uiv2-duration-fast) var(--uiv2-ease); }
+.dropzone:hover, .dropzone.is-dragging { border-color: var(--uiv2-accent-solid); background: var(--uiv2-accent-wash); color: var(--uiv2-text-primary); }
+.dropzone .dz-icon { color: var(--uiv2-accent-text); margin-bottom: 10px; }
+.dropzone .dz-title { font-weight: 600; font-size: var(--uiv2-text-sm); color: var(--uiv2-text-primary); margin-bottom: 4px; }
+.dropzone .dz-hint { font-size: 11.5px; color: var(--uiv2-text-tertiary); }
+
+.uploadQueue { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.queueItem { display: flex; align-items: center; gap: 10px; }
+.queueThumb { width: 36px; height: 36px; border-radius: 7px; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border); display: flex; align-items: center; justify-content: center; color: var(--uiv2-text-secondary); flex-shrink: 0; }
+.queueBody { flex: 1; min-width: 0; }
+.queueNameRow { display: flex; justify-content: space-between; gap: 8px; font-size: var(--uiv2-text-xs); margin-bottom: 5px; }
+.queueName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.queuePct { font-family: var(--uiv2-font-mono); color: var(--uiv2-text-secondary); flex-shrink: 0; }
+.queueTrack { height: 4px; border-radius: 3px; background: var(--uiv2-border); overflow: hidden; }
+.queueFill { height: 100%; background: var(--uiv2-accent-solid); transition: width 0.2s linear; }
+.queueItem.is-failed .queueFill { background: var(--uiv2-danger); }
+.queueStatusIcon.tone-success { color: var(--uiv2-success); }
+.queueStatusIcon.tone-danger { color: var(--uiv2-danger); }
+.queueErrorText { font-size: 11px; color: var(--uiv2-danger); margin: 4px 0 0; }
+
+.duplicateWarning { display: flex; gap: 10px; background: var(--uiv2-warning-wash); border: 1px solid var(--uiv2-warning-border); border-radius: var(--uiv2-radius-md); padding: 12px; margin: 8px 0 0 46px; }
+.duplicateWarning .dw-icon { color: var(--uiv2-warning); flex-shrink: 0; }
+.duplicateWarning strong { font-size: var(--uiv2-text-sm); }
+.duplicateWarning p { margin: 4px 0 0; font-size: 12px; color: var(--uiv2-text-secondary); }
+.duplicateWarning .dw-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* =============================================================================
+   ASSET DETAIL DRAWER — internals
+   ============================================================================= */
+.drawerSection { display: flex; flex-direction: column; gap: 10px; }
+.drawerPreview { border-radius: var(--uiv2-radius-md); overflow: hidden; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border); aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; color: var(--uiv2-text-tertiary); }
+.drawerPreview img, .drawerPreview video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.fieldLabel { font-size: 12px; color: var(--uiv2-text-secondary); display: block; margin-bottom: 5px; }
+.fieldHint { font-size: 11px; color: var(--uiv2-text-tertiary); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.fieldInput, .fieldTextarea { width: 100%; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-sm); padding: 8px 10px; color: var(--uiv2-text-primary); font-size: var(--uiv2-text-sm); font-family: inherit; outline: none; }
+.fieldInput:focus, .fieldTextarea:focus { border-color: var(--uiv2-accent-solid); }
+.fieldTextarea { resize: vertical; min-height: 60px; }
+
+.usedInEmpty { font-size: 12.5px; color: var(--uiv2-text-secondary); }
+.usedInList { display: flex; flex-direction: column; gap: 8px; }
+.usedInItem { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md); background: var(--uiv2-bg-surface); cursor: pointer; width: 100%; text-align: left; }
+.usedInItem:hover { border-color: var(--uiv2-border-hover); }
+.usedInThumb { width: 30px; height: 30px; border-radius: 6px; background: var(--uiv2-bg-elevated); display: flex; align-items: center; justify-content: center; color: var(--uiv2-text-secondary); flex-shrink: 0; }
+.usedInBody { flex: 1; min-width: 0; }
+.usedInTitle { font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usedInMeta { font-size: 11px; color: var(--uiv2-text-secondary); }
+
+.versionChain { display: flex; flex-direction: column; }
+.versionItem { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md); }
+.versionItem.is-current { border-color: var(--uiv2-accent-border); background: var(--uiv2-accent-wash); }
+.versionItem.is-superseded { opacity: 0.75; }
+.versionThumb { width: 30px; height: 30px; border-radius: 6px; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border); flex-shrink: 0; }
+.versionBody { flex: 1; min-width: 0; }
+.versionLabel { font-size: 12.5px; font-weight: 500; }
+.versionMeta { font-size: 11px; color: var(--uiv2-text-secondary); }
+.versionConnector { width: 1px; height: 14px; background: var(--uiv2-border-strong); margin-left: 25px; }
+
+.drawerFooterRow { display: flex; gap: 8px; }
+.drawerFooterRow .btn { flex: 1; }
+
+/* =============================================================================
+   TRASH VIEW / MODAL — reuses versionItem shape
+   ============================================================================= */
+.trashBanner { display: flex; gap: 10px; align-items: flex-start; background: var(--uiv2-info-wash); border: 1px solid var(--uiv2-info-border); border-radius: var(--uiv2-radius-md); padding: 12px 14px; margin-bottom: 16px; font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); }
+.trashBanner strong { color: var(--uiv2-text-primary); }
+
+/* Utility */
+.hidden { display: none !important; }
+.flexRow { display: flex; align-items: center; gap: 8px; }
+.grow { flex: 1; min-width: 0; }
+</style>
+</head>
+<body data-uiv2-theme="dark">
+
+<!-- ================= MOCKUP CONTROL BAR (not part of shipped product) ================= -->
+<div class="mockupBar">
+  <strong>LIBRARY — ui-v2 MOCKUP</strong>
+  <span>view:</span>
+  <button data-view-btn="grid" class="is-active">Grid (populated)</button>
+  <button data-view-btn="list">List (populated)</button>
+  <button data-view-btn="loading">Grid (loading)</button>
+  <button data-view-btn="empty-first">Empty (first-time)</button>
+  <button data-view-btn="empty-filtered">Empty (no matches)</button>
+  <button data-view-btn="trash">Trash</button>
+  <span style="margin-left:10px;">overlay:</span>
+  <button data-overlay-btn="upload">Upload modal</button>
+  <button data-overlay-btn="upload-dup">Upload + duplicate</button>
+  <button data-overlay-btn="drawer">Asset drawer</button>
+  <button data-overlay-btn="delete">Delete confirm</button>
+  <button id="overlayClear">Close overlay</button>
+  <span style="margin-left:10px;">theme:</span>
+  <button id="themeToggleMock">Toggle dark/light</button>
+  <span style="margin-left:10px;">frame:</span>
+  <button data-frame-btn="full" class="is-active">Full</button>
+  <button data-frame-btn="768">Tablet 768</button>
+  <button data-frame-btn="375">Mobile 375</button>
+</div>
+
+<div id="frame">
+
+<!-- ================= APP HEADER ================= -->
+<header class="header">
+  <div class="brand">
+    <span class="brandMark">B</span>
+    <span class="wordmark">Brandosse</span>
+  </div>
+  <button class="burger" id="burgerBtn" aria-label="Open navigation">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/></svg>
+  </button>
+  <nav class="navLinks">
+    <a class="navLink" href="#">Dashboard</a>
+    <a class="navLink" href="#">Studio</a>
+    <a class="navLink navLinkActive" href="#">Library</a>
+    <a class="navLink" href="#">Calendar</a>
+    <a class="navLink" href="#">Brand Kit</a>
+  </nav>
+  <div class="headerRight">
+    <div class="creditPill">
+      <span class="creditTrack"><span class="creditFill" style="width:62%"></span></span>
+      <span class="creditLabel">1,240 cr</span>
+    </div>
+    <button class="iconBtn" id="themeToggleReal" title="Toggle theme">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke-linecap="round"/><circle cx="12" cy="12" r="4.5"/></svg>
+    </button>
+    <span class="avatar">ME</span>
+  </div>
+</header>
+
+<!-- Real Drawer shape (title bar + close button, right-side, bg-inset) --
+     matches src/ui-v2/shell/MobileNavDrawer.jsx's actual
+     `<Drawer title="Menu" width="min(280px, 84vw)">` composition exactly,
+     reusing the same .drawerBackdrop/.drawerPanel/.drawerHeader classes the
+     asset detail drawer below uses, not a separate hand-rolled panel. -->
+<div class="drawerBackdrop hidden" id="mobileNavBackdrop"></div>
+<aside class="drawerPanel hidden" id="mobileNavPanel" style="width:min(280px, 84vw);">
+  <div class="drawerHeader">
+    <span class="drawerTitle"><span>Menu</span></span>
+    <button class="drawerCloseBtn" id="mobileNavCloseBtn" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <nav class="mobileNavList">
+    <button class="mobileNavLink">Dashboard</button>
+    <button class="mobileNavLink">Studio</button>
+    <button class="mobileNavLink is-active">Library</button>
+    <button class="mobileNavLink">Calendar</button>
+    <button class="mobileNavLink">Brand Kit</button>
+  </nav>
+</aside>
+
+<!-- ================= MAIN ================= -->
+<main class="main">
+  <div class="canvas">
+
+    <div class="pageHeadRow">
+      <div>
+        <div class="pageTitle" id="pageTitleText">Library</div>
+        <div class="pageDesc" id="pageDescText">Every upload, generation, and post-linked asset in one place.</div>
+      </div>
+      <div class="pageActions" id="pageActions">
+        <button class="btn btn--subtle btn--md" id="selectModeBtn">Select</button>
+        <button class="btn btn--subtle btn--md">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Refresh
+        </button>
+        <button class="btn btn--solid btn--md" data-overlay-btn="upload">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Upload
+        </button>
+        <div class="viewToggle">
+          <button class="iconBtn is-active" data-viewmode-btn="grid" title="Grid view">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </button>
+          <button class="iconBtn" data-viewmode-btn="list" title="Table view">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ FILTER ROW ============ -->
+    <div class="filterRow" id="filterRow">
+      <button class="mobileRailToggle" id="mobileRailToggleBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>All <span class="count">128</span></span>
+      </button>
+
+      <label class="searchBox">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>
+        <input type="text" placeholder="Search title, description, tags…" />
+      </label>
+
+      <select class="selectChip" aria-label="Filter by type">
+        <option>All types</option>
+        <option>Image</option>
+        <option>Video</option>
+        <option>Document</option>
+      </select>
+
+      <button class="filterChip" id="unusedChip">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8" stroke-linecap="round"/></svg>
+        Unused only
+      </button>
+
+      <select class="selectChip" aria-label="Filter by tag">
+        <option>All tags</option>
+        <option>brand</option>
+        <option>launch-q3</option>
+        <option>ugc</option>
+      </select>
+
+      <label class="rememberCheck">
+        <input type="checkbox" /> Keep filters
+      </label>
+
+      <button class="btn btn--ghost btn--sm">Reset filters</button>
+    </div>
+
+    <!-- ============ LAYOUT: RAIL + CONTENT ============ -->
+    <div class="layoutGrid">
+      <aside class="leftRail" id="leftRailDesktop"></aside>
+
+      <section id="contentArea">
+
+        <!-- ===== VIEW: grid populated ===== -->
+        <div data-panel="grid">
+          <div class="assetGrid" id="assetGridPopulated"></div>
+          <div class="bulkBar hidden" id="bulkBar">
+            <span class="bulkBarMsg" id="bulkBarMsg">3 selected</span>
+            <div class="bulkBarActions">
+              <button class="btn btn--subtle btn--sm">Clear</button>
+              <button class="btn btn--subtle btn--sm">Archive</button>
+              <button class="btn btn--dangerSolid btn--sm">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== VIEW: list (table) populated ===== -->
+        <div data-panel="list" class="hidden">
+          <div class="card card--none" style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px; min-width:720px;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--uiv2-border); text-align:left; color:var(--uiv2-text-secondary); font-size:11.5px;">
+                  <th style="padding:10px 12px; width:30px;"><input type="checkbox" /></th>
+                  <th style="padding:10px 12px;">Name</th>
+                  <th style="padding:10px 12px;">Source</th>
+                  <th style="padding:10px 12px;">Type</th>
+                  <th style="padding:10px 12px;">Size</th>
+                  <th style="padding:10px 12px;">Used in</th>
+                  <th style="padding:10px 12px;">Added</th>
+                  <th style="padding:10px 12px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== VIEW: loading ===== -->
+        <div data-panel="loading" class="hidden">
+          <div class="assetGrid" id="loadingGrid"></div>
+        </div>
+
+        <!-- ===== VIEW: empty first-time ===== -->
+        <div data-panel="empty-first" class="hidden">
+          <div class="emptyState">
+            <div class="es-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+            <div class="es-title">Nothing in your Library yet</div>
+            <div class="es-desc">Upload your first asset — logos, brand photography, anything you'll want to post later.</div>
+            <div class="es-actions">
+              <button class="btn btn--solid btn--md" data-overlay-btn="upload">Upload your first asset</button>
+              <button class="btn btn--ghost btn--md">or generate something in AI Studio</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== VIEW: empty filtered ===== -->
+        <div data-panel="empty-filtered" class="hidden">
+          <div class="emptyState emptyState--dashed">
+            <div class="es-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+            <div class="es-title">No assets found</div>
+            <div class="es-desc">Try changing filters or upload new content.</div>
+          </div>
+        </div>
+
+        <!-- ===== VIEW: trash ===== -->
+        <div data-panel="trash" class="hidden">
+          <div class="trashBanner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            <span><strong>Deleted assets stay here for 30 days</strong> before they're gone for good. Restoring returns an asset to the main Library immediately.</span>
+          </div>
+          <div class="versionChain" id="trashList"></div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+</main>
+
+</div><!-- /#frame -->
+
+<!-- ================= MOBILE FILTER BOTTOM SHEET ================= -->
+<div class="bottomSheetBackdrop" id="sheetBackdrop"></div>
+<div class="bottomSheetPanel" id="sheetPanel">
+  <div class="bottomSheetHandle"></div>
+  <div class="drawerHeader" style="margin-bottom:12px;">
+    <span class="drawerTitle"><span>Filter Library</span></span>
+    <button class="drawerCloseBtn" id="sheetCloseBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div id="leftRailMobile"></div>
+</div>
+
+<!-- ================= UPLOAD MODAL ================= -->
+<div class="modalOverlay hidden" id="uploadOverlay">
+  <div class="modalPanel modalPanel--lg">
+    <div class="drawerHeader" style="margin-bottom:4px;">
+      <div class="modalTitle" style="margin-bottom:0;">Upload assets</div>
+      <button class="drawerCloseBtn" data-close="uploadOverlay">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modalDesc">Images, video, PDFs. Up to 50MB each — multiple files at once.</div>
+
+    <div class="dropzone" id="dropzoneDemo">
+      <div class="dz-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="dz-title">Drop files here or click to upload</div>
+      <div class="dz-hint">Images, video, PDFs · up to 50MB each · multiple files at once</div>
+    </div>
+
+    <div class="uploadQueue" id="uploadQueueDefault">
+      <div class="queueItem">
+        <span class="queueThumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span>
+        <div class="queueBody">
+          <div class="queueNameRow"><span class="queueName">summer-launch-hero.jpg</span><span class="queuePct">Uploading — 64%</span></div>
+          <div class="queueTrack"><div class="queueFill" style="width:64%"></div></div>
+        </div>
+      </div>
+      <div class="queueItem">
+        <span class="queueThumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span>
+        <div class="queueBody">
+          <div class="queueNameRow"><span class="queueName">reel-final-v3.mp4</span><span class="queuePct">100%</span></div>
+          <div class="queueTrack"><div class="queueFill" style="width:100%"></div></div>
+          <div class="aiShimmerRow" style="margin-top:6px; padding-left:0;">
+            <span class="shimmerLine w1"></span>
+            <span class="shimmerLine w2"></span>
+          </div>
+        </div>
+        <span class="queueStatusIcon tone-success"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </div>
+      <div class="queueItem is-failed">
+        <span class="queueThumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span>
+        <div class="queueBody">
+          <div class="queueNameRow"><span class="queueName">brand-guidelines.pdf</span><span class="queuePct">Failed</span></div>
+          <div class="queueTrack"><div class="queueFill" style="width:100%"></div></div>
+          <p class="queueErrorText">Upload failed — try again.</p>
+        </div>
+        <span class="queueStatusIcon tone-danger"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg></span>
+      </div>
+    </div>
+
+    <div class="modalActions" style="margin-top:18px;">
+      <button class="btn btn--subtle btn--md" data-close="uploadOverlay">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= UPLOAD MODAL — DUPLICATE-DETECTION STATE ================= -->
+<div class="modalOverlay hidden" id="uploadDupOverlay">
+  <div class="modalPanel modalPanel--lg">
+    <div class="drawerHeader" style="margin-bottom:4px;">
+      <div class="modalTitle" style="margin-bottom:0;">Upload assets</div>
+      <button class="drawerCloseBtn" data-close="uploadDupOverlay">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modalDesc">Images, video, PDFs. Up to 50MB each — multiple files at once.</div>
+
+    <div class="dropzone">
+      <div class="dz-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="dz-title">Drop files here or click to upload</div>
+      <div class="dz-hint">Images, video, PDFs · up to 50MB each · multiple files at once</div>
+    </div>
+
+    <div class="uploadQueue">
+      <div>
+        <div class="queueItem is-done">
+          <span class="queueThumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span>
+          <div class="queueBody">
+            <div class="queueNameRow"><span class="queueName">summer-launch-hero-FINAL.jpg</span><span class="queuePct">100%</span></div>
+            <div class="queueTrack"><div class="queueFill" style="width:100%"></div></div>
+          </div>
+          <span class="queueStatusIcon tone-success"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </div>
+        <div class="duplicateWarning">
+          <span class="dw-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+          <div>
+            <strong>This looks like a duplicate of "summer-launch-hero.jpg"</strong>
+            <p>Some duplicates are intentional re-uploads of an edited version.</p>
+            <div class="dw-actions">
+              <button class="btn btn--subtle btn--sm">This is a new version</button>
+              <button class="btn btn--ghost btn--sm">It's a separate asset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modalActions" style="margin-top:18px;">
+      <button class="btn btn--subtle btn--md" data-close="uploadDupOverlay">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SOFT-DELETE CONFIRM MODAL ================= -->
+<div class="modalOverlay hidden" id="deleteOverlay">
+  <div class="modalPanel modalPanel--sm">
+    <div class="modalTitle">Delete this asset?</div>
+    <div class="modalDesc">Moves "summer-launch-hero.jpg" to Trash — recoverable for 30 days. Still referenced in any post's history if it's been used.</div>
+    <div class="modalActions">
+      <button class="btn btn--subtle btn--md" data-close="deleteOverlay">Cancel</button>
+      <button class="btn btn--dangerSolid btn--md" data-close="deleteOverlay">Move to Trash</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ASSET DETAIL DRAWER ================= -->
+<div class="drawerBackdrop hidden" id="drawerBackdrop"></div>
+<aside class="drawerPanel hidden" id="assetDrawer">
+  <div class="drawerHeader">
+    <span class="drawerTitle">
+      <span>summer-launch-hero.jpg</span>
+      <span class="badge badge--neutral">Upload</span>
+    </span>
+    <button class="drawerCloseBtn" id="drawerCloseBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <div class="drawerSection">
+    <span class="sectionKicker">Preview</span>
+    <div class="drawerPreview">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+    </div>
+  </div>
+
+  <div class="drawerSection">
+    <span class="sectionKicker">Metadata (editable)</span>
+    <div class="field">
+      <span class="fieldLabel">Title</span>
+      <input class="fieldInput" type="text" value="Summer launch hero" />
+    </div>
+    <div class="field">
+      <span class="fieldLabel">Description</span>
+      <textarea class="fieldTextarea">Main hero shot for the Q3 summer campaign — used across IG and the landing page.</textarea>
+    </div>
+    <div class="field">
+      <span class="fieldLabel">Alt text <span class="fieldHint">(AI-suggested, human-editable)</span></span>
+      <input class="fieldInput" type="text" value="Model wearing summer collection standing on a beach at golden hour" />
+    </div>
+    <div class="field">
+      <span class="fieldLabel">Tags <span class="fieldHint">(comma-separated)</span></span>
+      <input class="fieldInput" type="text" value="summer, launch, hero" />
+    </div>
+    <div class="field">
+      <span class="fieldLabel">Current tags</span>
+      <div class="tagRow">
+        <span class="tagChip">summer</span>
+        <span class="tagChip">launch</span>
+        <span class="tagChip">hero</span>
+        <span class="tagChip is-ai"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z"/></svg> beach</span>
+        <span class="tagChip is-ai"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z"/></svg> golden-hour</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawerSection">
+    <span class="sectionKicker">Used in <span class="fieldHint" style="text-transform:none; letter-spacing:0; font-family:inherit;">(deep-links into Calendar's post detail)</span></span>
+    <div class="usedInList">
+      <button type="button" class="usedInItem">
+        <span class="usedInThumb"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>
+        <span class="usedInBody">
+          <span class="usedInTitle">Summer launch — IG carousel</span>
+          <span class="usedInMeta">scheduled · Jul 12, 9:00 AM</span>
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="usedInItem">
+        <span class="usedInThumb"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>
+        <span class="usedInBody">
+          <span class="usedInTitle">Beach hero — TikTok teaser</span>
+          <span class="usedInMeta">published · Jul 3, 4:30 PM</span>
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="drawerSection">
+    <span class="sectionKicker">Version history</span>
+    <div class="versionChain">
+      <div class="versionItem is-current">
+        <span class="versionThumb"></span>
+        <div class="versionBody">
+          <span class="versionLabel">summer-launch-hero.jpg <span class="badge badge--accent">Current</span></span>
+          <span class="versionMeta">Jul 5, 2:14 PM</span>
+        </div>
+        <button class="btn btn--subtle btn--sm">View</button>
+      </div>
+      <div class="versionConnector"></div>
+      <div class="versionItem is-superseded">
+        <span class="versionThumb"></span>
+        <div class="versionBody">
+          <span class="versionLabel">summer-launch-hero-draft.jpg <span class="fieldHint">(superseded)</span></span>
+          <span class="versionMeta">Jul 2, 11:02 AM</span>
+        </div>
+        <button class="btn btn--ghost btn--sm">View</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawerSection">
+    <span class="sectionKicker">Technical</span>
+    <p class="fieldHint">JPG · 4.1 MB · 2400×3000 · uploaded Jul 5, 2:14 PM · checksum recorded</p>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:8px; margin-top:auto; padding-top:8px; border-top:1px solid var(--uiv2-border);">
+    <div class="drawerFooterRow">
+      <button class="btn btn--subtle btn--sm">Save changes</button>
+      <button class="btn btn--solid btn--sm">Schedule&hellip;</button>
+    </div>
+    <div class="drawerFooterRow">
+      <button class="btn btn--subtle btn--sm">Duplicate</button>
+      <button class="btn btn--dangerSolid btn--sm" data-overlay-btn="delete">Delete</button>
+    </div>
+  </div>
+</aside>
+
+<script>
+/* ===========================================================================
+   Static mockup interactivity only — view/overlay/theme/frame switching.
+   No app logic, no network calls, no real state.
+   =========================================================================== */
+
+// ---- sample data (representative content only) --------------------------
+const RAIL_SOURCE = [
+  { label: 'All', count: 128, active: true },
+  { label: 'Uploads', count: 74 },
+  { label: 'Generations', count: 41 },
+  { label: 'Post-linked', count: 13 },
+];
+const RAIL_STATUS = [
+  { label: 'Unused', count: 22 },
+  { label: 'Archived', count: 9 },
+];
+
+const ASSETS = [
+  { title: 'Summer launch hero', type: 'IMG', source: 'Upload', status: 'inuse', meta: 'JPG · 4.1 MB', right: 'used ×2', tags: ['summer','launch'], ai: ['beach'] },
+  { title: 'Reel final v3', type: 'VID', source: 'Generation', status: 'inuse', meta: 'MP4 · 0:18', right: 'used ×1', tags: [], ai: ['motion'] },
+  { title: 'Brand guidelines', type: 'DOC', source: 'Upload', status: 'unused', meta: 'PDF · 2.2 MB', right: '5d ago', tags: ['brand'], ai: [] },
+  { title: 'Q3 carousel — slide set', type: 'CAR', source: 'Generation', status: 'unused', meta: 'CAROUSEL · 6 slides', right: '2d ago', tags: [], ai: ['ugc'] },
+  { title: 'Product shot — front', type: 'IMG', source: 'Upload', status: 'inuse', meta: 'PNG · 1.8 MB', right: 'used ×4', tags: ['product'], ai: [] },
+  { title: 'Teaser — vertical cut', type: 'VID', source: 'Post-linked', status: 'inuse', meta: 'MP4 · 0:09', right: 'used ×1', tags: [], ai: ['teaser'] },
+  { title: 'Logo mark — dark', type: 'IMG', source: 'Upload', status: 'archived', meta: 'SVG · 12 KB', right: '3mo ago', tags: ['logo'], ai: [], archived: true },
+  { title: 'Behind the scenes', type: 'IMG', source: 'Generation', status: 'unused', meta: 'JPG · 3.0 MB', right: 'just now', tags: [], ai: ['candid'], pendingAi: true },
+];
+
+const TRASH_ASSETS = [
+  { title: 'old-hero-draft.jpg', deleted: 'Deleted Jun 28, 3:40 PM' },
+  { title: 'ugc-clip-unused.mp4', deleted: 'Deleted Jun 22, 10:05 AM' },
+];
+
+function iconFor(type) {
+  if (type === 'VID') return '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>';
+  if (type === 'DOC') return '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>';
+  if (type === 'CAR') return '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="M8 3h12a2 2 0 012 2v12"/></svg>';
+  return '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
+}
+
+function statusPill(asset) {
+  // Reuses the real Badge tone classes (badge--success/neutral/warning) —
+  // see the .statusPill CSS comment above. tone mapping: in-use -> success,
+  // unused -> neutral, archived -> warning (same tones Badge already uses
+  // elsewhere in the app for equivalent meanings).
+  if (asset.archived) return '<span class="badge badge--warning statusPill">Archived</span>';
+  if (asset.status === 'unused') return '<span class="badge badge--neutral statusPill">Unused</span>';
+  return '<span class="badge badge--success statusPill">In use</span>';
+}
+
+function renderCard(asset) {
+  const tagsHtml = asset.pendingAi
+    ? '<div class="aiShimmerRow"><span class="shimmerLine w1"></span><span class="shimmerLine w2"></span></div>'
+    : (asset.tags.length || asset.ai.length)
+      ? `<div class="tagRow">${asset.tags.slice(0,3).map(t => `<span class="tagChip">${t}</span>`).join('')}${asset.ai.slice(0,2).map(t => `<span class="tagChip is-ai"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z"/></svg>${t}</span>`).join('')}</div>`
+      : '';
+  return `
+    <article class="assetCard" data-drawer-open="1" tabindex="0" role="button">
+      <div class="assetMedia">
+        <span class="mediaBadge">${asset.type}</span>
+        ${statusPill(asset)}
+        ${iconFor(asset.type)}
+        <button type="button" class="selectHit" data-select-check="1" aria-label="Select ${asset.title}">
+          <span class="selectCheck" data-select-visual="1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+        </button>
+      </div>
+      <div class="assetBody">
+        <h4 class="assetTitle">${asset.title}</h4>
+        <div class="sourceRow">${asset.source}</div>
+        ${tagsHtml}
+        <div class="metaRow"><span>${asset.meta}</span><span>${asset.right}</span></div>
+      </div>
+      <div class="assetActions">
+        <button type="button" class="btn btn--solid btn--sm">Schedule</button>
+        <button type="button" class="iconBtn" aria-label="More actions">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+      </div>
+    </article>`;
+}
+
+function renderRail(idPrefix) {
+  const sourceItems = RAIL_SOURCE.map(i => `
+    <button type="button" class="railItem${i.active ? ' is-active' : ''}">
+      <span>${i.label}</span><span class="count">${i.count}</span>
+    </button>`).join('');
+  const statusItems = RAIL_STATUS.map(i => `
+    <button type="button" class="railItem">
+      <span>${i.label}</span><span class="count">${i.count}</span>
+    </button>`).join('');
+  return `
+    <div class="railLabel">Source</div>
+    ${sourceItems}
+    <div class="railLabel">Status</div>
+    ${statusItems}
+    <button type="button" class="railItem" data-view-btn="trash" style="margin-top:6px;">
+      <span>Trash</span>
+    </button>`;
+}
+
+function renderTableRow(asset) {
+  return `
+    <tr style="border-bottom:1px solid var(--uiv2-border);">
+      <td style="padding:10px 12px;"><input type="checkbox" /></td>
+      <td style="padding:10px 12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="queueThumb" style="width:30px;height:30px;">${iconFor(asset.type)}</span>
+          <span>
+            <div style="font-weight:600;">${asset.title}</div>
+            <div style="font-size:11px; color:var(--uiv2-text-secondary);">${asset.tags.concat(asset.ai).join(', ')}</div>
+          </span>
+        </div>
+      </td>
+      <td style="padding:10px 12px;"><span class="badge badge--neutral">${asset.source}</span></td>
+      <td style="padding:10px 12px;">${asset.type}</td>
+      <td style="padding:10px 12px;">${asset.meta.split('·')[1] ? asset.meta.split('·')[1].trim() : ''}</td>
+      <td style="padding:10px 12px; color:var(--uiv2-text-secondary);">${asset.right}</td>
+      <td style="padding:10px 12px; color:var(--uiv2-text-secondary);">Jul 5, 2:14 PM</td>
+      <td style="padding:10px 12px;">
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn--subtle btn--sm">View</button>
+          <button class="btn btn--subtle btn--sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function renderTrashRow(asset) {
+  return `
+    <div class="versionItem">
+      <span class="versionThumb"></span>
+      <div class="versionBody">
+        <span class="versionLabel">${asset.title}</span>
+        <span class="versionMeta">${asset.deleted}</span>
+      </div>
+      <button class="btn btn--subtle btn--sm">Restore</button>
+    </div>`;
+}
+
+document.getElementById('assetGridPopulated').innerHTML = ASSETS.map(renderCard).join('');
+document.getElementById('tableBody').innerHTML = ASSETS.map(renderTableRow).join('');
+document.getElementById('trashList').innerHTML = TRASH_ASSETS.map(renderTrashRow).join('');
+document.getElementById('leftRailDesktop').innerHTML = renderRail('desktop');
+document.getElementById('leftRailMobile').innerHTML = renderRail('mobile');
+
+// Loading skeleton grid (8 shimmering cards, same grid shape as populated)
+document.getElementById('loadingGrid').innerHTML = Array.from({ length: 8 }).map(() => `
+  <div class="skeletonCard">
+    <div class="assetMedia skeleton" style="aspect-ratio:1/1;"></div>
+    <div style="padding:10px 11px 11px; display:flex; flex-direction:column; gap:8px;">
+      <div class="skeleton" style="height:12px; width:70%; border-radius:4px;"></div>
+      <div class="skeleton" style="height:9px; width:40%; border-radius:4px;"></div>
+    </div>
+  </div>`).join('');
+
+// ---- view switching -------------------------------------------------------
+const viewButtons = document.querySelectorAll('[data-view-btn]');
+function setView(view) {
+  document.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== view));
+  viewButtons.forEach(b => b.classList.toggle('is-active', b.dataset.viewBtn === view));
+
+  const titleEl = document.getElementById('pageTitleText');
+  const descEl = document.getElementById('pageDescText');
+  const actionsEl = document.getElementById('pageActions');
+  const filterRowEl = document.getElementById('filterRow');
+  if (view === 'trash') {
+    titleEl.textContent = 'Trash';
+    descEl.textContent = 'Deleted assets, recoverable for 30 days.';
+    actionsEl.style.display = 'none';
+    filterRowEl.style.display = 'none';
+  } else {
+    titleEl.textContent = 'Library';
+    descEl.textContent = 'Every upload, generation, and post-linked asset in one place.';
+    actionsEl.style.display = '';
+    filterRowEl.style.display = '';
+  }
+}
+viewButtons.forEach(btn => btn.addEventListener('click', () => setView(btn.dataset.viewBtn)));
+
+document.querySelectorAll('[data-viewmode-btn]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-viewmode-btn]').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    setView(btn.dataset.viewmodeBtn === 'grid' ? 'grid' : 'list');
+  });
+});
+
+// ---- overlay switching ------------------------------------------------
+const overlayIds = { upload: 'uploadOverlay', 'upload-dup': 'uploadDupOverlay', drawer: null, delete: 'deleteOverlay' };
+function closeAllOverlays() {
+  ['uploadOverlay', 'uploadDupOverlay', 'deleteOverlay'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('assetDrawer').classList.add('hidden');
+  document.getElementById('drawerBackdrop').classList.add('hidden');
+}
+document.querySelectorAll('[data-overlay-btn]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllOverlays();
+    const key = btn.dataset.overlayBtn;
+    if (key === 'drawer') {
+      document.getElementById('assetDrawer').classList.remove('hidden');
+      document.getElementById('drawerBackdrop').classList.remove('hidden');
+    } else {
+      document.getElementById(overlayIds[key]).classList.remove('hidden');
+    }
+  });
+});
+document.getElementById('overlayClear').addEventListener('click', closeAllOverlays);
+document.querySelectorAll('[data-close]').forEach(btn => {
+  btn.addEventListener('click', () => document.getElementById(btn.dataset.close).classList.add('hidden'));
+});
+document.getElementById('drawerCloseBtn').addEventListener('click', closeAllOverlays);
+document.getElementById('drawerBackdrop').addEventListener('click', closeAllOverlays);
+
+// clicking a card opens the drawer (demo only — same overlay for every card)
+document.getElementById('assetGridPopulated').addEventListener('click', (e) => {
+  if (e.target.closest('button')) return;
+  document.getElementById('assetDrawer').classList.remove('hidden');
+  document.getElementById('drawerBackdrop').classList.remove('hidden');
+});
+
+// ---- bulk select mode (grid view only, demo) ---------------------------
+let bulkMode = false;
+const selectedCards = new Set();
+document.getElementById('selectModeBtn').addEventListener('click', function () {
+  bulkMode = !bulkMode;
+  this.textContent = bulkMode ? 'Done selecting' : 'Select';
+  this.classList.toggle('btn--solid', bulkMode);
+  this.classList.toggle('btn--subtle', !bulkMode);
+  document.getElementById('assetGridPopulated').classList.toggle('bulk-mode', bulkMode);
+  if (!bulkMode) {
+    selectedCards.clear();
+    document.querySelectorAll('.assetCard').forEach(c => c.classList.remove('is-selected'));
+    document.querySelectorAll('[data-select-visual]').forEach(c => c.classList.remove('is-checked'));
+    document.getElementById('bulkBar').classList.add('hidden');
+  }
+});
+// MOBILE_PARITY.md MUST-FIX: listener now targets the 44x44 .selectHit
+// button (data-select-check), not the 22x22 visual box directly -- the
+// visual box (data-select-visual) only receives the is-checked class.
+document.getElementById('assetGridPopulated').addEventListener('click', (e) => {
+  const hit = e.target.closest('[data-select-check]');
+  if (!hit || !bulkMode) return;
+  e.stopPropagation();
+  const card = hit.closest('.assetCard');
+  const visual = hit.querySelector('[data-select-visual]');
+  const idx = Array.from(card.parentNode.children).indexOf(card);
+  if (selectedCards.has(idx)) { selectedCards.delete(idx); card.classList.remove('is-selected'); visual.classList.remove('is-checked'); }
+  else { selectedCards.add(idx); card.classList.add('is-selected'); visual.classList.add('is-checked'); }
+  const bar = document.getElementById('bulkBar');
+  if (selectedCards.size > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('bulkBarMsg').textContent = `${selectedCards.size} selected`;
+  } else {
+    bar.classList.add('hidden');
+  }
+}, true);
+
+// ---- unused-only chip toggle (visual only) ------------------------------
+document.getElementById('unusedChip').addEventListener('click', function () { this.classList.toggle('is-active'); });
+
+// ---- mobile filter bottom sheet ------------------------------------------
+function openSheet() { document.getElementById('sheetBackdrop').classList.add('is-open'); document.getElementById('sheetPanel').classList.add('is-open'); }
+function closeSheet() { document.getElementById('sheetBackdrop').classList.remove('is-open'); document.getElementById('sheetPanel').classList.remove('is-open'); }
+document.getElementById('mobileRailToggleBtn').addEventListener('click', openSheet);
+document.getElementById('sheetCloseBtn').addEventListener('click', closeSheet);
+document.getElementById('sheetBackdrop').addEventListener('click', closeSheet);
+
+// ---- mobile nav drawer (real Drawer open/close pattern: toggle `hidden`,
+// same as the asset detail drawer below, not a transform/is-open slide) ---
+function openMobileNav() { document.getElementById('mobileNavBackdrop').classList.remove('hidden'); document.getElementById('mobileNavPanel').classList.remove('hidden'); }
+function closeMobileNav() { document.getElementById('mobileNavBackdrop').classList.add('hidden'); document.getElementById('mobileNavPanel').classList.add('hidden'); }
+document.getElementById('burgerBtn').addEventListener('click', openMobileNav);
+document.getElementById('mobileNavBackdrop').addEventListener('click', closeMobileNav);
+document.getElementById('mobileNavCloseBtn').addEventListener('click', closeMobileNav);
+
+// ---- theme toggle -----------------------------------------------------
+function toggleTheme() {
+  const body = document.body;
+  body.setAttribute('data-uiv2-theme', body.getAttribute('data-uiv2-theme') === 'dark' ? 'light' : 'dark');
+}
+document.getElementById('themeToggleMock').addEventListener('click', toggleTheme);
+document.getElementById('themeToggleReal').addEventListener('click', toggleTheme);
+
+// ---- keep .header stacked below the sticky dev bar (see the "top: 0"
+// comment above the real .header CSS rule) instead of overlapping it ----
+function stackDevBarOverHeader() {
+  const bar = document.querySelector('.mockupBar');
+  const header = document.querySelector('.header');
+  if (!bar || !header) return;
+  header.style.top = bar.getBoundingClientRect().height + 'px';
+}
+window.addEventListener('resize', stackDevBarOverHeader);
+stackDevBarOverHeader();
+
+// ---- frame width simulator (quick-check without resizing the browser) ---
+document.querySelectorAll('[data-frame-btn]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-frame-btn]').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    const frame = document.getElementById('frame');
+    const w = btn.dataset.frameBtn;
+    if (w === 'full') { frame.style.maxWidth = 'none'; frame.style.margin = '0'; frame.style.border = 'none'; }
+    else { frame.style.maxWidth = w + 'px'; frame.style.margin = '0 auto'; frame.style.border = '1px dashed var(--uiv2-accent-solid)'; }
+    stackDevBarOverHeader();
+  });
+});
+
+// ---- upload dropzone drag visual (demo only) -----------------------------
+const dz = document.getElementById('dropzoneDemo');
+if (dz) {
+  dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('is-dragging'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('is-dragging'));
+  dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('is-dragging'); });
+}
+
+// default view on load
+setView('grid');
+</script>
+
+</body>
+</html>

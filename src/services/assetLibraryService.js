@@ -394,6 +394,21 @@ export async function updatePersonalAssetMetadata(assetId, updates = {}) {
   return data;
 }
 
+// Clones the row + underlying storage object via the trusted
+// personal-asset-duplicate edge function (never writes personal_assets
+// directly from the client, matching uploadPersonalAsset's pattern).
+export async function duplicatePersonalAsset(assetId) {
+  if (!assetId) throw new Error('An asset id is required.');
+
+  const { data, error } = await supabase.functions.invoke('personal-asset-duplicate', {
+    body: { asset_id: assetId },
+  });
+
+  if (error) throw error;
+  if (!data?.asset) throw new Error('Duplicate failed — no asset returned.');
+  return data.asset;
+}
+
 export async function archivePersonalAsset(assetId) {
   if (!assetId) throw new Error('An asset id is required.');
   const userId = await requireUserId();

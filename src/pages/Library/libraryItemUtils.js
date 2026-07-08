@@ -1,9 +1,10 @@
-// Pure display-formatting helpers shared between LibraryPageV2's grid card,
+// Pure display-formatting helpers shared between LibraryPage's grid card,
 // table row, and asset detail drawer, so all three stay in sync without
-// re-deriving logic — same rationale as the original file's header comment
-// (AS_IS_AUDIT.md §3.4 — Refactor: shape kept, implementation re-pointed at
-// the new personal_assets row shape, which has real title/description
-// fields instead of needing them derived from a post's caption).
+// re-deriving logic. Moved verbatim from
+// src/pages/LibraryPage/libraryItemUtils.js as part of the ui-v2 migration
+// (Master Brief §3 — presentation-layer rebuild only; this file is a pure
+// presentational helper, not a data-layer file, and its logic/prop shapes
+// are unchanged, only its location moved alongside the new component tree).
 
 const SOURCE_LABELS = {
   upload: 'Upload',
@@ -51,10 +52,7 @@ export function formatDate(value) {
 }
 
 // Compact "2d ago" / "just now" relative-time label, matching the mockup's
-// meta-row copy exactly (mockup-gallery.html cards: "2d ago", "just now",
-// "5d ago"). No existing shared helper does this app-wide (checked
-// src/calendar/** and src/org/**), so this is a small, local, single-purpose
-// addition rather than introducing a new dependency.
+// meta-row copy exactly ("2d ago", "just now", "5d ago").
 export function formatRelativeTime(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -104,9 +102,7 @@ export function getFormatLabel(asset) {
   return asset?.media_type ? asset.media_type.toUpperCase() : 'FILE';
 }
 
-// "JPG · 4.1 MB" / "MP4 · 0:18" — the asset-card meta-row's left segment,
-// matching the mockup's exact composition (file format + size, or format +
-// duration for video).
+// "JPG · 4.1 MB" / "MP4 · 0:18" — the asset-card meta-row's left segment.
 export function getMetaLeftLabel(asset) {
   const format = getFormatLabel(asset);
   if (asset?.media_type === 'video' && asset?.duration_seconds) {
@@ -118,7 +114,7 @@ export function getMetaLeftLabel(asset) {
 
 // "used ×3" / "2d ago" — the asset-card meta-row's right segment: usage
 // count takes priority once an asset has been used at least once, otherwise
-// falls back to a relative-time label (matches every card in the mockup).
+// falls back to a relative-time label.
 export function getMetaRightLabel(asset) {
   const usedCount = getUsedInCount(asset);
   if (usedCount > 0) return `used ×${usedCount}`;

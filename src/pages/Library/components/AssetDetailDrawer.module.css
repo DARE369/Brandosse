@@ -1,0 +1,109 @@
+/* Asset detail drawer internals — ported from the APPROVED
+   library-mockup.html .drawerSection/.drawerPreview/.field/.usedInList/
+   .drawerFooterRow classes 1:1. Version-history rows reuse the shared
+   .versionChain/.versionItem classes in ../LibraryPage.module.css. */
+
+.drawerSection { display: flex; flex-direction: column; gap: 10px; }
+.sectionKicker {
+  font-family: var(--uiv2-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-secondary);
+}
+.drawerPreview {
+  border-radius: var(--uiv2-radius-md);
+  overflow: hidden;
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border);
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--uiv2-text-tertiary);
+}
+.drawerPreview img, .drawerPreview video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.fieldLabel { font-size: 12px; color: var(--uiv2-text-secondary); display: block; margin-bottom: 5px; }
+.fieldHint { font-size: 11px; color: var(--uiv2-text-tertiary); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.fieldInput, .fieldTextarea {
+  width: 100%;
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm);
+  padding: 8px 10px;
+  color: var(--uiv2-text-primary);
+  font-size: var(--uiv2-text-sm);
+  font-family: inherit;
+  outline: none;
+}
+.fieldInput:focus, .fieldTextarea:focus { border-color: var(--uiv2-accent-solid); }
+.fieldTextarea { resize: vertical; min-height: 60px; }
+
+.tagRow { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagChip {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: var(--uiv2-radius-pill);
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border);
+  color: var(--uiv2-text-secondary);
+}
+.tagChipAi {
+  color: var(--uiv2-accent-text);
+  border-color: var(--uiv2-accent-border);
+  background: var(--uiv2-accent-wash);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.usedInEmpty { font-size: 12.5px; color: var(--uiv2-text-secondary); }
+.usedInList { display: flex; flex-direction: column; gap: 8px; }
+.usedInItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-bg-surface);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+.usedInItem:hover { border-color: var(--uiv2-border-hover); }
+.usedInThumb {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--uiv2-bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--uiv2-text-secondary);
+  flex-shrink: 0;
+}
+.usedInBody { flex: 1; min-width: 0; }
+.usedInTitle { font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usedInMeta { font-size: 11px; color: var(--uiv2-text-secondary); }
+
+.drawerFooterRow { display: flex; gap: 8px; width: 100%; }
+.drawerFooterRow > * { flex: 1; }
+.drawerFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--uiv2-border);
+}

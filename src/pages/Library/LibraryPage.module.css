@@ -1,0 +1,436 @@
+/* src/pages/Library/LibraryPage.module.css
+   Page-shell + layout classes for the ui-v2 Library rebuild. Values are a
+   1:1 port of docs/calendar-library-rebuild/ui-v2-migration/library-mockup.html
+   (APPROVED), with @container swapped for @media since production has no
+   dev-tool frame simulator to work around (see mockup DECISIONS_LOG.md,
+   2026-07-07T15:20:00Z entry — the @container conversion there was a
+   mockup-only tooling fix, not a design requirement). */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--uiv2-bg-canvas);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+  line-height: var(--uiv2-leading-normal);
+}
+
+.main {
+  flex: 1;
+  padding: 20px 20px 64px;
+}
+@media (max-width: 640px) {
+  .main { padding: 14px 12px 48px; }
+}
+.canvas {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ============ PAGE HEAD ROW ============ */
+.pageHeadRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.pageTitle {
+  font-family: var(--uiv2-font-display);
+  font-weight: 700;
+  font-size: var(--uiv2-text-3xl);
+  letter-spacing: -0.02em;
+}
+.pageDesc {
+  color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-sm);
+  margin-top: 4px;
+}
+.pageActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.viewToggle {
+  display: flex;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  overflow: hidden;
+}
+.viewToggle > button {
+  border: none;
+  border-radius: 0;
+  width: 34px;
+  height: 34px;
+}
+.viewToggle > button + button {
+  border-left: 1px solid var(--uiv2-border);
+}
+.viewToggleBtnActive {
+  border-color: var(--uiv2-accent-solid);
+  color: var(--uiv2-accent-text);
+  background: var(--uiv2-accent-wash);
+}
+
+/* ============ FILTER ROW ============ */
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.mobileRailToggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--uiv2-radius-md);
+  border: 1px solid var(--uiv2-border);
+  background: var(--uiv2-bg-elevated);
+  cursor: pointer;
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-primary);
+  font-family: inherit;
+}
+.mobileRailToggleCount {
+  font-family: var(--uiv2-font-mono);
+  font-size: 10.5px;
+  color: var(--uiv2-text-secondary);
+}
+@media (max-width: 860px) {
+  .mobileRailToggle { display: inline-flex; }
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  padding: 8px 12px;
+  flex: 1 1 220px;
+  min-width: 160px;
+  max-width: 360px;
+  color: var(--uiv2-text-secondary);
+}
+.searchBox input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-primary);
+  width: 100%;
+  font-family: inherit;
+}
+
+.selectChip {
+  width: auto;
+  border: 1px solid var(--uiv2-border);
+  background: var(--uiv2-bg-elevated);
+  border-radius: var(--uiv2-radius-md);
+  padding: 7px 10px;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-primary);
+  font-family: inherit;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--uiv2-radius-pill);
+  border: 1px solid var(--uiv2-border);
+  background: var(--uiv2-bg-elevated);
+  color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.filterChipActive {
+  border-color: var(--uiv2-accent-solid);
+  background: var(--uiv2-accent-wash);
+  color: var(--uiv2-accent-text);
+}
+
+.rememberCheck {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+}
+
+/* ============ LAYOUT: RAIL + CONTENT ============ */
+.layoutGrid {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .layoutGrid { grid-template-columns: 1fr; }
+}
+
+.leftRail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 72px;
+}
+/* Cascade-order note (mirrors the approved mockup's fixed bug, see
+   DECISIONS_LOG.md 2026-07-07T16:10:00Z "Bug 2"): this override MUST come
+   after the unconditional .leftRail rule above — same-specificity rules
+   resolve by source order, so declaring it first would make the rail never
+   actually hide on mobile regardless of viewport width. */
+@media (max-width: 860px) {
+  .leftRail { display: none; }
+}
+.railLabel {
+  font-family: var(--uiv2-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-tertiary);
+  margin: 14px 0 6px;
+}
+.railLabel:first-child { margin-top: 0; }
+.railItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--uiv2-radius-md);
+  border: none;
+  background: transparent;
+  color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.railItem:hover { background: var(--uiv2-bg-elevated); }
+.railItemActive {
+  background: var(--uiv2-accent-wash);
+  color: var(--uiv2-accent-text);
+  font-weight: 600;
+}
+.railItemCount {
+  font-family: var(--uiv2-font-mono);
+  font-size: 10.5px;
+  color: var(--uiv2-text-tertiary);
+}
+.railItemActive .railItemCount { color: var(--uiv2-accent-text); }
+
+/* Mobile filter bottom sheet */
+.bottomSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--uiv2-scrim-soft);
+  z-index: 90;
+  display: none;
+}
+.bottomSheetBackdropOpen { display: block; }
+.bottomSheetPanel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--uiv2-bg-surface);
+  border-top: 1px solid var(--uiv2-border-strong);
+  border-radius: 16px 16px 0 0;
+  z-index: 95;
+  padding: 18px;
+  transform: translateY(100%);
+  transition: transform 0.2s var(--uiv2-ease);
+}
+.bottomSheetPanelOpen { transform: translateY(0); }
+.bottomSheetHandle {
+  width: 36px;
+  height: 4px;
+  border-radius: 3px;
+  background: var(--uiv2-border-strong);
+  margin: 0 auto 14px;
+}
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.sheetTitle {
+  font-family: var(--uiv2-font-display);
+  font-weight: 600;
+  font-size: var(--uiv2-text-lg);
+  color: var(--uiv2-text-primary);
+}
+.sheetCloseBtn {
+  background: none;
+  border: none;
+  color: var(--uiv2-text-secondary);
+  cursor: pointer;
+  padding: 3px;
+}
+.sheetCloseBtn:hover { color: var(--uiv2-text-primary); }
+
+/* ============ ASSET GRID ============ */
+.assetGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+@media (max-width: 480px) {
+  .assetGrid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+}
+
+/* ============ BULK ACTION BAR ============ */
+.bulkBar {
+  position: sticky;
+  bottom: 14px;
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border-strong);
+  border-radius: var(--uiv2-radius-lg);
+  padding: 12px 16px;
+  box-shadow: var(--uiv2-shadow-popover-current);
+}
+.bulkBarMsg { font-size: var(--uiv2-text-sm); font-weight: 600; }
+.bulkBarActions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ============ TABLE (list) VIEW ============
+   AS_IS_AUDIT.md §1.4 flagged the old <table> markup's inline
+   gridTemplateColumns/style objects as "don't copy this part verbatim" —
+   this reproduces the same table shape entirely via CSS module classes. */
+.tableWrap {
+  background: var(--uiv2-bg-surface);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-lg);
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 720px;
+}
+.table thead tr {
+  border-bottom: 1px solid var(--uiv2-border);
+  text-align: left;
+  color: var(--uiv2-text-secondary);
+  font-size: 11.5px;
+}
+.table th, .table td {
+  padding: 10px 12px;
+}
+.table tbody tr {
+  border-bottom: 1px solid var(--uiv2-border);
+}
+.table tbody tr:last-child { border-bottom: none; }
+.checkboxCell { width: 30px; }
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nameCellTitle { font-weight: 600; }
+.nameCellSub { font-size: 11px; color: var(--uiv2-text-secondary); display: block; }
+.thumbWrap {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--uiv2-text-secondary);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.thumbWrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tableSecondary { color: var(--uiv2-text-secondary); }
+.tableActions { display: flex; gap: 6px; }
+
+/* ============ TRASH VIEW ============ */
+.trashBanner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--uiv2-info-wash);
+  border: 1px solid var(--uiv2-info-border);
+  border-radius: var(--uiv2-radius-md);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+}
+.trashBanner strong { color: var(--uiv2-text-primary); }
+
+/* ============ VERSION CHAIN (shared: drawer + trash view) ============ */
+.versionChain { display: flex; flex-direction: column; }
+.versionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+}
+.versionItemCurrent {
+  border-color: var(--uiv2-accent-border);
+  background: var(--uiv2-accent-wash);
+}
+.versionItemSuperseded { opacity: 0.75; }
+.versionThumb {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border);
+  flex-shrink: 0;
+}
+.versionBody { flex: 1; min-width: 0; }
+.versionLabel { font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.versionMeta { font-size: 11px; color: var(--uiv2-text-secondary); }
+.versionConnector {
+  width: 1px;
+  height: 14px;
+  background: var(--uiv2-border-strong);
+  margin-left: 25px;
+}
+
+/* ============ SKELETON CARD (loading grid) ============ */
+.skeletonCard {
+  border-radius: var(--uiv2-radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--uiv2-border);
+  background: var(--uiv2-bg-surface);
+}
+.skeletonCardBody {
+  padding: 10px 11px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ============ MISC UTIL ============ */
+.fieldHint { font-size: 11px; color: var(--uiv2-text-tertiary); }
+.usedInEmpty { font-size: 12.5px; color: var(--uiv2-text-secondary); }

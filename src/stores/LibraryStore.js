@@ -25,6 +25,7 @@ import {
   uploadPersonalAsset,
   requestAssetAiTagging,
   updatePersonalAssetMetadata,
+  duplicatePersonalAsset,
   archivePersonalAsset,
   unarchivePersonalAsset,
   softDeletePersonalAsset,
@@ -139,6 +140,13 @@ const useLibraryStore = create((set, get) => ({
     }));
     get().refreshCounts();
     return updated;
+  },
+
+  duplicateAsset: async (assetId) => {
+    const duplicate = await duplicatePersonalAsset(assetId);
+    set((state) => ({ assets: [duplicate, ...state.assets] }));
+    get().refreshCounts();
+    return duplicate;
   },
 
   unarchiveAsset: async (assetId) => {

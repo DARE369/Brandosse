@@ -1,0 +1,43 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--uiv2-bg-canvas);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+  line-height: var(--uiv2-leading-normal);
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 20px 20px;
+}
+@media (max-width: 640px) {
+  .main { padding: 10px 10px 14px; }
+}
+
+.canvas {
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  /* Real, fixed viewport-relative height so the calendar body's own
+     internal scroll areas (month grid, agenda list, drafts rail) work
+     exactly like the approved mockup's app-like full-height treatment,
+     instead of the whole page scrolling. Matches the old .cal3-shell's
+     `height: 100%` contract, now measured against the real AppHeader's
+     rendered height (52px) plus this wrapper's own padding, rather than a
+     shared dashboard-grid row. */
+  height: calc(100vh - 52px - 36px);
+  min-height: 420px;
+}
+@media (max-width: 640px) {
+  .canvas { height: calc(100vh - 52px - 24px); }
+}

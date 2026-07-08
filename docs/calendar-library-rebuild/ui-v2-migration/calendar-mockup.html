@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Calendar — ui-v2 mockup (Personal Content Calendar)</title>
+<style>
+/* =============================================================================
+   TOKENS — copied verbatim from src/ui-v2/tokens.css. Do not invent new tokens.
+   ============================================================================= */
+:root {
+  --uiv2-font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --uiv2-font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --uiv2-font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --uiv2-text-2xs: 0.65625rem;
+  --uiv2-text-xs: 0.71875rem;
+  --uiv2-text-sm: 0.8125rem;
+  --uiv2-text-base: 0.875rem;
+  --uiv2-text-md: 0.9375rem;
+  --uiv2-text-lg: 1.0625rem;
+  --uiv2-text-xl: 1.25rem;
+  --uiv2-text-2xl: 1.375rem;
+  --uiv2-text-3xl: 1.875rem;
+  --uiv2-text-4xl: 2.375rem;
+
+  --uiv2-weight-normal: 400;
+  --uiv2-weight-medium: 500;
+  --uiv2-weight-semibold: 600;
+  --uiv2-weight-bold: 700;
+
+  --uiv2-leading-tight: 1.25;
+  --uiv2-leading-snug: 1.4;
+  --uiv2-leading-normal: 1.5;
+
+  --uiv2-space-1: 4px;
+  --uiv2-space-2: 8px;
+  --uiv2-space-3: 12px;
+  --uiv2-space-4: 16px;
+  --uiv2-space-5: 20px;
+  --uiv2-space-6: 24px;
+  --uiv2-space-8: 32px;
+  --uiv2-space-10: 40px;
+
+  --uiv2-radius-xs: 4px;
+  --uiv2-radius-sm: 6px;
+  --uiv2-radius-md: 8px;
+  --uiv2-radius-lg: 10px;
+  --uiv2-radius-xl: 12px;
+  --uiv2-radius-pill: 999px;
+
+  --uiv2-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --uiv2-duration-fast: 120ms;
+  --uiv2-duration-base: 160ms;
+  --uiv2-duration-slow: 240ms;
+
+  --uiv2-accent-solid: #FF5C38;
+  --uiv2-accent-solid-hover: color-mix(in srgb, #FF5C38 92%, white);
+  --uiv2-accent-on-solid-dark: #17181B;
+  --uiv2-accent-on-solid-light: #FFFFFF;
+
+  --uiv2-success-d: #30A46C; --uiv2-success-l: #1F8F5D;
+  --uiv2-warning-d: #FFB224; --uiv2-warning-l: #9A6400;
+  --uiv2-danger-d: #E5484D;  --uiv2-danger-l: #C22A30;
+  --uiv2-info-d: #3E7BD6;    --uiv2-info-l: #2A5FBD;
+
+  --uiv2-shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.15);
+  --uiv2-shadow-modal-dark: 0 14px 32px rgba(0, 0, 0, 0.45);
+  --uiv2-shadow-popover: 0 12px 28px rgba(0, 0, 0, 0.14);
+  --uiv2-shadow-popover-dark: 0 14px 32px rgba(0, 0, 0, 0.45);
+
+  /* platform colors — reused from the legacy engine's --platform-* vars,
+     kept as literal values since ui-v2/tokens.css defines no platform
+     palette of its own (nothing to invent, nothing to contradict) */
+  --platform-instagram: #E1306C;
+  --platform-tiktok: #25F4EE;
+  --platform-linkedin: #0A66C2;
+  --platform-x: #E7E9EA;
+  --platform-youtube: #FF0000;
+  --platform-facebook: #1877F2;
+  --platform-pinterest: #E60023;
+}
+
+[data-uiv2-theme="dark"] {
+  --uiv2-bg-canvas: #0E0F11;
+  --uiv2-bg-surface: #17181B;
+  --uiv2-bg-elevated: #1E2023;
+  --uiv2-bg-inset: #131417;
+  --uiv2-border: #26282C;
+  --uiv2-border-strong: #2E3136;
+  --uiv2-border-hover: #3C4046;
+
+  --uiv2-text-primary: #F5F5F4;
+  --uiv2-text-secondary: #8B8D93;
+  --uiv2-text-tertiary: #5A5C61;
+
+  --uiv2-accent-text: #FF5C38;
+  --uiv2-accent-wash: rgba(255, 92, 56, 0.1);
+  --uiv2-accent-wash-strong: rgba(255, 92, 56, 0.12);
+  --uiv2-accent-border: rgba(255, 92, 56, 0.35);
+  --uiv2-accent-on-solid: var(--uiv2-accent-on-solid-dark);
+
+  --uiv2-success: var(--uiv2-success-d);
+  --uiv2-warning: var(--uiv2-warning-d);
+  --uiv2-danger: var(--uiv2-danger-d);
+  --uiv2-info: var(--uiv2-info-d);
+
+  --uiv2-danger-wash: rgba(229, 72, 77, 0.08);
+  --uiv2-danger-border: rgba(229, 72, 77, 0.3);
+  --uiv2-warning-wash: rgba(255, 178, 36, 0.1);
+  --uiv2-warning-border: rgba(255, 178, 36, 0.3);
+  --uiv2-info-wash: rgba(62, 123, 214, 0.1);
+  --uiv2-info-border: rgba(62, 123, 214, 0.3);
+
+  --uiv2-scrollbar-thumb: #3C4046;
+  --uiv2-shadow-modal-current: var(--uiv2-shadow-modal-dark);
+  --uiv2-shadow-popover-current: var(--uiv2-shadow-popover-dark);
+  --uiv2-scrim: rgba(0, 0, 0, 0.55);
+  --uiv2-scrim-soft: rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+[data-uiv2-theme="light"] {
+  --uiv2-bg-canvas: #F7F6F2;
+  --uiv2-bg-surface: #FFFFFF;
+  --uiv2-bg-elevated: #F4F3EE;
+  --uiv2-bg-inset: #F4F3EE;
+  --uiv2-border: #E4E2DC;
+  --uiv2-border-strong: #C9C6BC;
+  --uiv2-border-hover: #C9C6BC;
+
+  --uiv2-text-primary: #17181B;
+  --uiv2-text-secondary: #6E7075;
+  --uiv2-text-tertiary: #9A9C9F;
+
+  --uiv2-accent-text: #E14E2F;
+  --uiv2-accent-wash: rgba(255, 92, 56, 0.08);
+  --uiv2-accent-wash-strong: rgba(255, 92, 56, 0.08);
+  --uiv2-accent-border: rgba(255, 92, 56, 0.3);
+  --uiv2-accent-on-solid: var(--uiv2-accent-on-solid-light);
+
+  --uiv2-success: var(--uiv2-success-l);
+  --uiv2-warning: var(--uiv2-warning-l);
+  --uiv2-danger: var(--uiv2-danger-l);
+  --uiv2-info: var(--uiv2-info-l);
+
+  --uiv2-danger-wash: rgba(194, 42, 48, 0.06);
+  --uiv2-danger-border: rgba(194, 42, 48, 0.28);
+  --uiv2-warning-wash: rgba(154, 100, 0, 0.08);
+  --uiv2-warning-border: rgba(154, 100, 0, 0.28);
+  --uiv2-info-wash: rgba(42, 95, 189, 0.07);
+  --uiv2-info-border: rgba(42, 95, 189, 0.25);
+
+  --uiv2-scrollbar-thumb: #C9C6BC;
+  --uiv2-shadow-modal-current: var(--uiv2-shadow-modal);
+  --uiv2-shadow-popover-current: var(--uiv2-shadow-popover);
+  --uiv2-scrim: rgba(23, 24, 27, 0.35);
+  --uiv2-scrim-soft: rgba(23, 24, 27, 0.25);
+  color-scheme: light;
+}
+
+@keyframes uiv2-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes uiv2-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes uiv2-shimmer { 0% { background-position: -500px 0; } 100% { background-position: 500px 0; } }
+@keyframes uiv2-pulse-ring { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--uiv2-bg-canvas);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+  line-height: var(--uiv2-leading-normal);
+  min-height: 100vh;
+}
+button { font-family: inherit; }
+input, textarea, select { font-family: inherit; color: inherit; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--uiv2-scrollbar-thumb); border-radius: 8px; }
+
+/* ---- mockup-only meta chrome (not part of the design system) ---- */
+.mockup-banner {
+  background: var(--uiv2-accent-wash);
+  border-bottom: 1px solid var(--uiv2-accent-border);
+  color: var(--uiv2-accent-text);
+  font-family: var(--uiv2-font-mono);
+  font-size: 11px;
+  padding: 7px 16px;
+  text-align: center;
+  position: sticky; top: 0; z-index: 200;
+}
+/* MOBILE-OPTIMIZATION FIX (2026-07-07): .app-header is ALSO `position:
+   sticky; top: 0` (z-index: 100) -- both pinned to the same spot meant the
+   dev-only banner visually merged with/covered the real header (brand
+   mark, burger, credit pill, avatar) on scroll. Reproduced live via the
+   frame-simulator once its container-query fix made it possible to
+   actually scroll a narrow preview. Fixed with JS (`stackDevBarOverHeader`
+   below) that measures the banner's real rendered height and sets
+   .app-header's `top` offset to match, instead of a hardcoded px guess --
+   the banner's height itself doesn't change across widths here, but the
+   pattern needs to be robust for library-mockup.html's multi-button dev
+   bar, which DOES wrap to more lines at narrow widths. .app-header's own
+   CSS keeps `top: 0` as written above -- production is unaffected, this
+   offset is applied as an inline style only inside this mockup file. */
+.state-switcher {
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  font-family: var(--uiv2-font-mono); font-size: 10.5px; color: var(--uiv2-text-tertiary);
+  padding: 8px 16px; border-bottom: 1px dashed var(--uiv2-border); background: var(--uiv2-bg-inset);
+}
+.state-switcher b { color: var(--uiv2-text-secondary); font-weight: 600; margin-right: 2px; }
+.state-switcher button {
+  background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border-strong); color: var(--uiv2-text-secondary);
+  border-radius: var(--uiv2-radius-sm); padding: 4px 9px; font-size: 10.5px; cursor: pointer; font-family: var(--uiv2-font-mono);
+}
+.state-switcher button.is-active { background: var(--uiv2-accent-solid); color: var(--uiv2-accent-on-solid); border-color: transparent; }
+.state-switcher .sep { width: 1px; height: 14px; background: var(--uiv2-border-strong); margin: 0 4px; }
+
+/* =============================================================================
+   PRIMITIVES — mirrors src/ui-v2/primitives/*.module.css exactly
+   ============================================================================= */
+.card { background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-lg); padding: 16px 18px; }
+.card--pad-none { padding: 0; }
+.card--pad-lg { padding: 20px 22px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--uiv2-font-mono); font-size: var(--uiv2-text-2xs); font-weight: var(--uiv2-weight-semibold);
+  padding: 3px 9px; border-radius: var(--uiv2-radius-pill); border: 1px solid transparent; white-space: nowrap;
+}
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.badge--neutral { background: var(--uiv2-bg-elevated); color: var(--uiv2-text-secondary); border-color: var(--uiv2-border); }
+.badge--success { background: color-mix(in srgb, var(--uiv2-success) 15%, transparent); color: var(--uiv2-success); }
+.badge--warning { background: var(--uiv2-warning-wash); color: var(--uiv2-warning); border-color: var(--uiv2-warning-border); }
+.badge--danger { background: var(--uiv2-danger-wash); color: var(--uiv2-danger); border-color: var(--uiv2-danger-border); }
+.badge--info { background: var(--uiv2-info-wash); color: var(--uiv2-info); border-color: var(--uiv2-info-border); }
+.badge--accent { background: var(--uiv2-accent-wash); color: var(--uiv2-accent-text); border-color: var(--uiv2-accent-border); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--uiv2-space-2);
+  font-family: var(--uiv2-font-body); font-weight: var(--uiv2-weight-semibold); border-radius: var(--uiv2-radius-md);
+  border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+  transition: filter var(--uiv2-duration-fast) var(--uiv2-ease), border-color var(--uiv2-duration-fast) var(--uiv2-ease),
+    background-color var(--uiv2-duration-fast) var(--uiv2-ease), color var(--uiv2-duration-fast) var(--uiv2-ease);
+  padding: 9px 15px; font-size: var(--uiv2-text-sm);
+}
+.btn:disabled { cursor: not-allowed; }
+.btn--sm { padding: 6px 12px; font-size: var(--uiv2-text-xs); }
+.btn--solid { background: var(--uiv2-accent-solid); color: var(--uiv2-accent-on-solid); }
+.btn--solid:hover:not(:disabled) { filter: brightness(1.06); }
+.btn--subtle { background: var(--uiv2-bg-elevated); color: var(--uiv2-text-primary); border-color: var(--uiv2-border-strong); }
+.btn--subtle:hover:not(:disabled) { border-color: var(--uiv2-border-hover); }
+.btn--ghost { background: transparent; color: var(--uiv2-text-secondary); border-color: var(--uiv2-border); }
+.btn--ghost:hover:not(:disabled) { border-color: var(--uiv2-border-hover); color: var(--uiv2-text-primary); }
+.btn--danger { background: transparent; color: var(--uiv2-danger); border-color: var(--uiv2-danger-border); }
+.btn--danger:hover:not(:disabled) { background: var(--uiv2-danger-wash); }
+.btn--dangerSolid { background: var(--uiv2-danger); color: var(--uiv2-accent-on-solid); }
+.btn--dangerSolid:hover:not(:disabled) { filter: brightness(1.06); }
+
+.icon-btn {
+  width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--uiv2-radius-md); border: 1px solid var(--uiv2-border); background: transparent;
+  color: var(--uiv2-text-secondary); cursor: pointer; flex-shrink: 0; position: relative;
+  transition: border-color var(--uiv2-duration-fast) var(--uiv2-ease), color var(--uiv2-duration-fast) var(--uiv2-ease);
+}
+.icon-btn:hover { color: var(--uiv2-text-primary); border-color: var(--uiv2-border-hover); }
+
+.empty-state { text-align: center; padding: 44px 20px; border-radius: var(--uiv2-radius-xl); background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border); }
+.empty-state--dashed { border: 1.5px dashed var(--uiv2-border-strong); background: transparent; }
+.empty-state__title { font-size: var(--uiv2-text-md); font-weight: var(--uiv2-weight-semibold); margin-bottom: 5px; }
+.empty-state__desc { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); max-width: 46ch; margin: 0 auto; }
+.empty-state__actions { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+
+.skeleton {
+  background-image: linear-gradient(90deg, var(--uiv2-bg-elevated) 0px, var(--uiv2-bg-inset) 200px, var(--uiv2-bg-elevated) 400px);
+  background-size: 800px 100%; animation: uiv2-shimmer 1.4s linear infinite;
+  border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md);
+}
+
+.modal-overlay {
+  position: fixed; inset: 0; background: var(--uiv2-scrim); backdrop-filter: blur(2px); z-index: 300;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.is-open { display: flex; }
+.modal-panel {
+  background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border-strong); border-radius: var(--uiv2-radius-xl);
+  width: 100%; padding: 22px; animation: uiv2-modal-in 0.16s ease; box-shadow: var(--uiv2-shadow-modal-current);
+  max-height: 88vh; overflow-y: auto;
+}
+.modal-panel--sm { max-width: 380px; }
+.modal-panel--md { max-width: 420px; }
+.modal-panel--lg { max-width: 560px; }
+.modal-title { font-family: var(--uiv2-font-display); font-weight: var(--uiv2-weight-semibold); font-size: var(--uiv2-text-lg); margin-bottom: 4px; }
+.modal-desc { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 9px; margin-top: 20px; }
+.modal-actions > * { flex: 1; }
+
+.drawer-backdrop { position: fixed; inset: 0; background: var(--uiv2-scrim-soft); z-index: 290; display: none; }
+.drawer-backdrop.is-open { display: block; }
+.drawer-panel {
+  position: fixed; top: 0; bottom: 0; right: 0; width: min(440px, 94vw); background: var(--uiv2-bg-inset);
+  border-left: 1px solid var(--uiv2-border); z-index: 295; padding: 0; overflow-y: auto; animation: uiv2-fade-in 0.16s ease;
+  display: flex; flex-direction: column; transform: translateX(0);
+}
+.drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--uiv2-border); position: sticky; top: 0; background: var(--uiv2-bg-inset); z-index: 2; gap: 12px; }
+.drawer-title { font-family: var(--uiv2-font-display); font-weight: var(--uiv2-weight-semibold); font-size: var(--uiv2-text-lg); min-width: 0; }
+.drawer-title-group { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.drawer-title-group .drawer-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drawer-close { background: none; border: none; color: var(--uiv2-text-secondary); cursor: pointer; padding: 3px; flex-shrink: 0; }
+.drawer-close:hover { color: var(--uiv2-text-primary); }
+.drawer-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 18px; flex: 1; }
+.drawer-footer { padding: 14px 20px; border-top: 1px solid var(--uiv2-border); display: flex; flex-direction: column; gap: 8px; position: sticky; bottom: 0; background: var(--uiv2-bg-inset); }
+.drawer-footer-row { display: flex; gap: 8px; }
+.drawer-footer-row > * { flex: 1; }
+
+/* status pill/dot semantics (StatusPill.jsx) */
+.status-pill { display: inline-flex; align-items: center; gap: 5px; font-size: var(--uiv2-text-xs); font-weight: 600; padding: 3px 8px; border-radius: var(--uiv2-radius-pill); border: 1px solid transparent; }
+.status-draft { background: var(--uiv2-bg-elevated); color: var(--uiv2-text-secondary); border-color: var(--uiv2-border); }
+.status-scheduled { background: var(--uiv2-info-wash); color: var(--uiv2-info); border-color: var(--uiv2-info-border); }
+.status-publishing { background: var(--uiv2-warning-wash); color: var(--uiv2-warning); border-color: var(--uiv2-warning-border); }
+.status-published { background: color-mix(in srgb, var(--uiv2-success) 15%, transparent); color: var(--uiv2-success); }
+.status-failed { background: var(--uiv2-danger-wash); color: var(--uiv2-danger); border-color: var(--uiv2-danger-border); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.status-draft { background: var(--uiv2-text-tertiary); border: none; }
+.status-dot.status-scheduled { background: var(--uiv2-info); border: none; }
+.status-dot.status-publishing { background: var(--uiv2-warning); border: none; }
+.status-dot.status-published { background: var(--uiv2-success); border: none; }
+.status-dot.status-failed { background: var(--uiv2-danger); border: none; }
+.mock-connection-note { font-family: var(--uiv2-font-mono); font-size: 9px; color: var(--uiv2-text-tertiary); font-weight: 400; margin-left: 2px; }
+
+.ui-input, .ui-select, .ui-textarea {
+  width: 100%; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border-strong); border-radius: var(--uiv2-radius-md);
+  padding: 8px 11px; font-size: var(--uiv2-text-sm); color: var(--uiv2-text-primary);
+}
+.ui-textarea { resize: vertical; min-height: 70px; }
+.ui-input:focus, .ui-select:focus, .ui-textarea:focus { outline: none; border-color: var(--uiv2-accent-solid); }
+.field-label { display: block; font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); font-weight: 600; margin-bottom: 6px; }
+.field-hint { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-tertiary); margin-top: 4px; }
+.field-error { font-size: var(--uiv2-text-xs); color: var(--uiv2-danger); margin-top: 4px; }
+
+/* =============================================================================
+   SHELL — AppHeader (mirrors src/ui-v2/shell/AppHeader.module.css)
+   ============================================================================= */
+/* MOBILE-OPTIMIZATION FIX (2026-07-07): #themeRoot/.shell is a real CSS
+   containment context, matching the same fix applied to library-mockup.html.
+   Every responsive page-shell rule below is `@container frame (...)`, not
+   `@media (...)` -- @media only ever responds to the true browser viewport,
+   so a "frame:" width-simulator (added alongside the existing state
+   switcher) that merely shrinks this wrapper's max-width would otherwise
+   never re-trigger these rules. Container queries respond to #themeRoot's
+   own inline-size instead, so both the simulator buttons AND real
+   browser-window resizing (the banner's original instruction) work
+   identically -- #themeRoot's inline-size tracks the viewport whenever the
+   frame buttons are on "Full". */
+.shell { display: flex; flex-direction: column; min-height: 100vh; container-type: inline-size; container-name: frame; }
+
+/* NOTE: real AppHeader.module.css sticks at top: 0 (no dev banner exists in
+   production). This mockup previously offset it by 27px to sit below the
+   "mockup banner"/state-switcher dev chrome above — that offset was
+   mockup-only and has been removed per compliance review; the banner will
+   simply scroll under the header here, which is acceptable since neither
+   element ships to production. */
+.app-header {
+  flex-shrink: 0; display: flex; align-items: center; gap: 18px; padding: 0 20px; height: 52px;
+  border-bottom: 1px solid var(--uiv2-border); background: var(--uiv2-bg-canvas); position: sticky; top: 0; z-index: 100; min-width: 0;
+}
+.app-header__brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.app-header__mark { width: 22px; height: 22px; border-radius: 6px; background: var(--uiv2-accent-solid); display: inline-flex; align-items: center; justify-content: center; font-family: var(--uiv2-font-display); font-weight: 700; font-size: 13px; color: var(--uiv2-accent-on-solid); }
+.app-header__wordmark { font-family: var(--uiv2-font-display); font-weight: 600; font-size: 16px; letter-spacing: -0.02em; }
+.app-header__nav { display: flex; gap: 4px; }
+.app-header__navlink { font-size: 13px; padding: 6px 12px; border-radius: 6px; cursor: pointer; color: var(--uiv2-text-secondary); background: transparent; border: none; }
+.app-header__navlink.is-active { font-weight: 600; color: var(--uiv2-text-primary); background: var(--uiv2-bg-elevated); }
+.app-header__burger { display: none; width: 32px; height: 32px; border-radius: 6px; background: transparent; border: 1px solid var(--uiv2-border); align-items: center; justify-content: center; cursor: pointer; color: var(--uiv2-text-primary); flex-shrink: 0; }
+.app-header__right { margin-left: auto; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.credit-pill { display: flex; align-items: center; gap: 8px; border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-pill); padding: 6px 12px; flex-shrink: 0; }
+.credit-pill__track { width: 36px; height: 3px; background: var(--uiv2-border); border-radius: var(--uiv2-radius-pill); overflow: hidden; display: inline-block; }
+.credit-pill__fill { display: block; height: 100%; background: var(--uiv2-accent-solid); width: 68%; }
+.credit-pill__label { font-family: var(--uiv2-font-mono); font-size: var(--uiv2-text-2xs); white-space: nowrap; }
+.avatar { width: 28px; height: 28px; border-radius: 999px; background: var(--uiv2-border-strong); border: none; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+
+@container frame (max-width: 900px) {
+  .app-header__nav { display: none; }
+  .app-header__burger { display: flex; }
+}
+@container frame (max-width: 480px) {
+  .app-header { gap: 8px; padding: 0 12px; }
+  .app-header__right { gap: 6px; }
+  .credit-pill { padding: 5px 8px; gap: 0; }
+  .credit-pill__track { display: none; }
+}
+
+/* Mobile nav now reuses the real Drawer/MobileNavDrawer pattern's own
+   .drawer-backdrop/.drawer-panel/.drawer-header/.drawer-title/.drawer-close
+   classes (defined above) for its outer chrome — right-side slide-in,
+   bg-inset, a "Menu" title bar with a real close button — instead of a
+   hand-rolled left-side panel. Only the link list styling below is specific
+   to MobileNavDrawer.module.css's .list/.link/.linkActive. */
+.mobile-nav-list { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px; }
+.mobile-nav-link { display: block; width: 100%; text-align: left; padding: 11px 12px; border-radius: 7px; border: none; background: transparent; color: var(--uiv2-text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }
+.mobile-nav-link:hover { background: var(--uiv2-bg-elevated); }
+.mobile-nav-link.is-active { font-weight: 600; color: var(--uiv2-text-primary); background: var(--uiv2-bg-elevated); }
+
+/* =============================================================================
+   PAGE LAYOUT
+   ============================================================================= */
+.main { flex: 1; padding: 24px 28px 64px; }
+.canvas { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.page-head__title { font-family: var(--uiv2-font-display); font-weight: 700; font-size: var(--uiv2-text-3xl); letter-spacing: -0.02em; }
+.page-head__sub { font-family: var(--uiv2-font-mono); font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); margin-top: 4px; }
+.page-head__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.month-nav { display: flex; align-items: center; gap: 4px; }
+
+.view-toggle { display: inline-flex; padding: 3px; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md); }
+.view-toggle button { border: none; background: transparent; color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-xs); font-weight: 600; padding: 6px 13px; border-radius: var(--uiv2-radius-sm); cursor: pointer; }
+.view-toggle button.is-active { background: var(--uiv2-bg-surface); color: var(--uiv2-text-primary); box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+
+/* ---- Intelligence strip ---- */
+.intel-strip { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; padding: 14px 18px; }
+.intel-item { display: flex; align-items: center; gap: 8px; }
+.intel-icon { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: var(--uiv2-bg-elevated); color: var(--uiv2-text-secondary); flex-shrink: 0; }
+.intel-label { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); }
+.intel-value { font-weight: 700; font-size: var(--uiv2-text-md); font-family: var(--uiv2-font-display); }
+.intel-tip { margin-left: auto; font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); font-style: italic; max-width: 42ch; }
+@container frame (max-width: 900px) { .intel-tip { margin-left: 0; width: 100%; order: 99; } }
+
+.review-banner {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--uiv2-radius-lg);
+  background: var(--uiv2-danger-wash); border: 1px solid var(--uiv2-danger-border); color: var(--uiv2-text-primary);
+}
+.review-banner__icon { color: var(--uiv2-danger); flex-shrink: 0; }
+.review-banner__text { flex: 1; font-size: var(--uiv2-text-sm); }
+.review-banner__text b { color: var(--uiv2-danger); }
+
+/* ---- Command bar ---- */
+.cmdbar { display: flex; flex-direction: column; gap: 12px; }
+.cmdbar__input-row { display: flex; align-items: center; gap: 10px; padding: 5px 6px 5px 14px; border: 1px solid var(--uiv2-border-strong); border-radius: var(--uiv2-radius-lg); background: var(--uiv2-bg-elevated); }
+.cmdbar__input-row:focus-within { border-color: var(--uiv2-accent-solid); box-shadow: 0 0 0 3px var(--uiv2-accent-wash); }
+.cmdbar__ai-icon { color: var(--uiv2-accent-text); flex-shrink: 0; display: flex; }
+.cmdbar__input { flex: 1; border: none; background: transparent; outline: none; font-size: var(--uiv2-text-sm); color: var(--uiv2-text-primary); padding: 8px 0; }
+.cmdbar__chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.cmdbar__chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--uiv2-radius-pill);
+  background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border); color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-xs); cursor: pointer; white-space: nowrap;
+}
+.cmdbar__chip:hover { border-color: var(--uiv2-accent-border); color: var(--uiv2-text-primary); }
+.cmdbar__chip svg { flex-shrink: 0; }
+.cmdbar-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.cmdbar-scroll::-webkit-scrollbar { height: 0; }
+
+/* full ⌘K overlay (CalendarCommandBar.jsx) */
+.cmdbar-overlay { position: fixed; inset: 0; background: var(--uiv2-scrim); z-index: 260; display: none; align-items: flex-start; justify-content: center; padding: 10vh 20px 20px; }
+.cmdbar-overlay.is-open { display: flex; }
+.cmdbar-overlay__panel { width: 100%; max-width: 560px; background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border-strong); border-radius: var(--uiv2-radius-xl); box-shadow: var(--uiv2-shadow-modal-current); padding: 14px; animation: uiv2-modal-in 0.16s ease; }
+.cmdbar-overlay__suggestions { margin-top: 10px; max-height: 46vh; overflow-y: auto; }
+.cmdbar-overlay__group-label { font-family: var(--uiv2-font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--uiv2-text-tertiary); padding: 10px 8px 4px; }
+.cmdbar-overlay__item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; padding: 9px 8px; border-radius: var(--uiv2-radius-md); cursor: pointer; color: var(--uiv2-text-primary); font-size: var(--uiv2-text-sm); }
+.cmdbar-overlay__item:hover, .cmdbar-overlay__item.is-active { background: var(--uiv2-bg-elevated); }
+.cmdbar-overlay__item-icon { color: var(--uiv2-text-secondary); flex-shrink: 0; display: flex; }
+.cmdbar-overlay__result { margin-top: 10px; padding: 12px; border-radius: var(--uiv2-radius-md); background: var(--uiv2-bg-inset); border: 1px solid var(--uiv2-border); font-size: var(--uiv2-text-sm); }
+.cmdbar-overlay__result-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.cmdbar-overlay__footer { display: flex; gap: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--uiv2-border); }
+.cmdbar-overlay__hint { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--uiv2-text-tertiary); }
+.kbd { font-family: var(--uiv2-font-mono); font-size: 10px; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border-strong); border-radius: 4px; padding: 1px 6px; color: var(--uiv2-text-secondary); }
+
+/* =============================================================================
+   MAIN GRID: month/list + drafts rail
+   ============================================================================= */
+.body-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+/* Tablet tier: narrow the drafts rail before fully stacking, rather than a
+   hard cutover from 300px straight to full-width -- same fix already
+   applied to Studio's brief sidebar (see StudioPage.module.css). */
+@container frame (max-width: 1180px) { .body-grid { grid-template-columns: minmax(0, 1fr) 240px; gap: 12px; } }
+@container frame (max-width: 900px) { .body-grid { grid-template-columns: 1fr; } }
+
+/* ---- Month grid ---- */
+.month-card { position: relative; padding: 0; overflow: hidden; }
+.month-header { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--uiv2-border); }
+.month-header__cell { padding: 9px 10px; font-family: var(--uiv2-font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--uiv2-text-tertiary); text-align: center; }
+.month-body { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(96px, 1fr); }
+.month-cell { border-right: 1px solid var(--uiv2-border); border-bottom: 1px solid var(--uiv2-border); padding: 7px; display: flex; flex-direction: column; gap: 5px; min-width: 0; cursor: pointer; position: relative; }
+.month-cell:nth-child(7n) { border-right: none; }
+.month-cell:hover { background: var(--uiv2-bg-elevated); }
+.month-cell--muted { opacity: 0.35; }
+.month-cell--today { background: var(--uiv2-accent-wash); }
+.month-cell__head { display: flex; align-items: center; justify-content: space-between; }
+.month-cell__date { font-size: var(--uiv2-text-xs); font-weight: 600; color: var(--uiv2-text-secondary); }
+.month-cell--today .month-cell__date { color: var(--uiv2-accent-text); }
+.month-cell__add { width: 17px; height: 17px; border-radius: 4px; border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-elevated); color: var(--uiv2-text-tertiary); font-size: 12px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; }
+.month-cell:hover .month-cell__add { display: flex; }
+.month-cell__stack { display: flex; flex-direction: column; gap: 3px; }
+
+.post-pill { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 5px; font-size: 10.5px; font-weight: 500; border: 1px solid transparent; cursor: grab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--uiv2-bg-elevated); }
+.post-pill__dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.post-pill__label { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.post-pill__time { font-family: var(--uiv2-font-mono); font-size: 9px; color: var(--uiv2-text-tertiary); flex-shrink: 0; }
+.post-pill--scheduled { border-color: var(--uiv2-info-border); background: var(--uiv2-info-wash); }
+.post-pill--scheduled .post-pill__dot { background: var(--uiv2-info); }
+.post-pill--published { border-color: color-mix(in srgb, var(--uiv2-success) 40%, transparent); background: color-mix(in srgb, var(--uiv2-success) 12%, transparent); }
+.post-pill--published .post-pill__dot { background: var(--uiv2-success); }
+.post-pill--failed { border-color: var(--uiv2-danger-border); background: var(--uiv2-danger-wash); }
+.post-pill--failed .post-pill__dot { background: var(--uiv2-danger); }
+.post-pill--draft { border-color: var(--uiv2-border-strong); }
+.post-pill--draft .post-pill__dot { background: var(--uiv2-text-tertiary); }
+.month-cell__more { align-self: flex-start; font-size: 10px; color: var(--uiv2-text-secondary); background: none; border: none; cursor: pointer; padding: 1px 2px; text-decoration: underline; }
+
+.month-cell.is-drop-candidate { outline: 1.5px dashed var(--uiv2-accent-border); outline-offset: -1.5px; background: var(--uiv2-accent-wash); }
+
+/* skeleton month */
+.skel-cell-line { height: 14px; }
+
+/* ---- List / Agenda view ---- */
+.agenda-filterbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.agenda-filterbar .ui-input { max-width: 220px; }
+.agenda-filterbar select { max-width: 150px; }
+.agenda-day-group { margin-bottom: 18px; }
+.agenda-day-group__label { font-family: var(--uiv2-font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--uiv2-text-tertiary); margin: 0 0 8px; }
+.post-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--uiv2-border); padding: 10px 4px; cursor: pointer; color: inherit; }
+.post-row:hover { background: var(--uiv2-bg-elevated); }
+.post-row__thumb { width: 40px; height: 40px; flex: 0 0 40px; border-radius: var(--uiv2-radius-md); background: var(--uiv2-bg-inset); border: 1px solid var(--uiv2-border); display: flex; align-items: center; justify-content: center; overflow: hidden; font-size: 16px; }
+.post-row__thumb img, .post-row__thumb video { width: 100%; height: 100%; object-fit: cover; }
+.post-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.post-row__title { font-size: var(--uiv2-text-md); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.post-row__meta { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.platform-dot-stack { display: inline-flex; gap: -2px; }
+.platform-dot-stack span { width: 8px; height: 8px; border-radius: 50%; margin-left: -3px; border: 1.5px solid var(--uiv2-bg-surface); }
+.platform-dot-stack span:first-child { margin-left: 0; }
+
+/* ---- Unscheduled drafts rail ---- */
+.rail { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+.rail__header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--uiv2-border); cursor: pointer; }
+.rail__title { font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-md); }
+.rail__count { background: var(--uiv2-accent-wash); color: var(--uiv2-accent-text); font-family: var(--uiv2-font-mono); font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: var(--uiv2-radius-pill); }
+.rail__hint { font-size: 10.5px; color: var(--uiv2-text-tertiary); flex: 1; }
+.rail__toggle { color: var(--uiv2-text-secondary); display: flex; }
+.rail__scroll { padding: 12px; display: flex; flex-direction: column; gap: 9px; max-height: 560px; overflow-y: auto; }
+.rail.is-collapsed .rail__scroll, .rail.is-collapsed .rail__resize { display: none; }
+.rail__resize { height: 6px; cursor: ns-resize; background: linear-gradient(var(--uiv2-border) 1px, transparent 1px); background-position: center; margin: 0 auto; width: 40px; border-radius: 3px; }
+
+.draft-card { display: flex; align-items: center; gap: 10px; padding: 9px; border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md); background: var(--uiv2-bg-elevated); cursor: grab; position: relative; }
+.draft-card:hover { border-color: var(--uiv2-border-hover); }
+.draft-card__thumb { width: 38px; height: 38px; flex: 0 0 38px; border-radius: var(--uiv2-radius-sm); background: var(--uiv2-bg-inset); border: 1px solid var(--uiv2-border); display: flex; align-items: center; justify-content: center; color: var(--uiv2-text-tertiary); overflow: hidden; }
+.draft-card__thumb img, .draft-card__thumb video { width: 100%; height: 100%; object-fit: cover; }
+.draft-card__meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.draft-card__name { font-size: var(--uiv2-text-sm); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.draft-card__platform-row { display: flex; align-items: center; gap: 6px; font-size: 9.5px; color: var(--uiv2-text-tertiary); text-transform: uppercase; letter-spacing: .04em; }
+.draft-card__move-btn { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-surface); color: var(--uiv2-text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.draft-card__readiness { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--uiv2-border); border-radius: 0 0 var(--uiv2-radius-md) var(--uiv2-radius-md); overflow: hidden; }
+.draft-card__readiness-fill { height: 100%; }
+.dot-sm { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* =============================================================================
+   Post Detail Drawer specific
+   ============================================================================= */
+.platform-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.platform-tab { display: flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: var(--uiv2-radius-pill); border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-elevated); color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-xs); cursor: pointer; }
+.platform-tab.is-active { border-color: var(--uiv2-accent-border); color: var(--uiv2-text-primary); background: var(--uiv2-accent-wash); }
+.media-preview { border-radius: var(--uiv2-radius-md); overflow: hidden; border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-inset); }
+.media-preview img, .media-preview video { width: 100%; display: block; max-height: 240px; object-fit: cover; }
+.section-label { font-size: var(--uiv2-text-xs); font-weight: 600; color: var(--uiv2-text-secondary); text-transform: uppercase; letter-spacing: .04em; display: block; margin-bottom: 9px; }
+.hashtag-wrap { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.hashtag-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-pill); padding: 3px 9px; font-size: 11px; color: var(--uiv2-text-secondary); }
+.hashtag-chip button { background: none; border: none; color: var(--uiv2-text-tertiary); cursor: pointer; display: flex; }
+.caption-counter { font-family: var(--uiv2-font-mono); font-size: 10.5px; color: var(--uiv2-text-tertiary); text-align: right; margin-top: 4px; }
+.caption-counter.is-over { color: var(--uiv2-danger); }
+.checklist { display: flex; flex-direction: column; gap: 7px; }
+.check-item { display: flex; align-items: center; gap: 8px; font-size: var(--uiv2-text-sm); }
+.check-icon { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+.check-icon.pass { background: color-mix(in srgb, var(--uiv2-success) 18%, transparent); color: var(--uiv2-success); }
+.check-icon.fail { background: var(--uiv2-danger-wash); color: var(--uiv2-danger); }
+.check-icon.warn { background: var(--uiv2-warning-wash); color: var(--uiv2-warning); }
+.scope-note { font-size: 11px; color: var(--uiv2-text-tertiary); font-style: italic; margin: 8px 0 0; }
+.ai-prefill-note { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--uiv2-accent-text); margin-bottom: 5px; }
+.tz-banner { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border-radius: var(--uiv2-radius-md); background: var(--uiv2-info-wash); border: 1px solid var(--uiv2-info-border); font-size: var(--uiv2-text-xs); color: var(--uiv2-text-primary); }
+.tz-banner svg { color: var(--uiv2-info); flex-shrink: 0; margin-top: 1px; }
+.conflict-banner { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border-radius: var(--uiv2-radius-md); background: var(--uiv2-warning-wash); border: 1px solid var(--uiv2-warning-border); font-size: var(--uiv2-text-xs); }
+.conflict-banner svg { color: var(--uiv2-warning); flex-shrink: 0; margin-top: 1px; }
+.failure-box { padding: 10px 12px; border-radius: var(--uiv2-radius-md); background: var(--uiv2-danger-wash); border: 1px solid var(--uiv2-danger-border); font-size: var(--uiv2-text-sm); color: var(--uiv2-danger); }
+.time-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.time-row .ui-input { width: auto; flex: 1; min-width: 120px; }
+
+/* =============================================================================
+   Schedule Modal — mini calendar
+   ============================================================================= */
+.mini-cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.mini-cal-nav__label { font-weight: 600; font-size: var(--uiv2-text-sm); font-family: var(--uiv2-font-display); }
+.mini-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.mini-cal__weekday { text-align: center; font-family: var(--uiv2-font-mono); font-size: 9.5px; color: var(--uiv2-text-tertiary); padding: 4px 0; }
+.mini-cal__day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: var(--uiv2-radius-sm); border: 1px solid transparent; background: var(--uiv2-bg-elevated); font-size: var(--uiv2-text-xs); cursor: pointer; color: var(--uiv2-text-primary); }
+.mini-cal__day.is-empty { background: none; cursor: default; }
+.mini-cal__day.is-today { border-color: var(--uiv2-accent-border); color: var(--uiv2-accent-text); font-weight: 700; }
+.mini-cal__day.is-selected { background: var(--uiv2-accent-solid); color: var(--uiv2-accent-on-solid); font-weight: 700; }
+.target-account-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-md); background: var(--uiv2-bg-elevated); }
+.target-account-card__avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--uiv2-bg-inset); border: 1px solid var(--uiv2-border); display: flex; align-items: center; justify-content: center; color: var(--uiv2-text-secondary); flex-shrink: 0; overflow: hidden; }
+.target-account-card__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.target-account-card__body { flex: 1; min-width: 0; }
+.target-account-card__name { font-size: var(--uiv2-text-sm); font-weight: 600; }
+.target-account-card__meta { font-size: 11px; color: var(--uiv2-text-secondary); }
+
+/* =============================================================================
+   Cell command palette popover
+   ============================================================================= */
+.cell-palette-anchor { position: absolute; z-index: 210; }
+.cell-palette { width: 260px; background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border-strong); border-radius: var(--uiv2-radius-lg); box-shadow: var(--uiv2-shadow-popover-current); padding: 12px; animation: uiv2-fade-in 0.14s ease; }
+.cell-palette__header { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--uiv2-border); }
+.cell-palette__day { font-family: var(--uiv2-font-mono); font-size: 10px; color: var(--uiv2-text-tertiary); text-transform: uppercase; letter-spacing: .05em; }
+.cell-palette__ai-slot { background: var(--uiv2-accent-wash); border: 1px solid var(--uiv2-accent-border); border-radius: var(--uiv2-radius-md); padding: 8px 10px; margin-bottom: 8px; }
+.cell-palette__ai-slot-label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--uiv2-accent-text); margin-bottom: 3px; }
+.cell-palette__ai-slot-text { font-size: 11px; color: var(--uiv2-text-secondary); }
+.cell-palette__item { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 8px; border-radius: var(--uiv2-radius-md); cursor: pointer; text-align: left; }
+.cell-palette__item:hover { background: var(--uiv2-bg-elevated); }
+.cell-palette__item-icon { width: 28px; height: 28px; border-radius: var(--uiv2-radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--uiv2-bg-elevated); color: var(--uiv2-text-secondary); }
+.cell-palette__item-icon--ai { background: var(--uiv2-accent-wash); color: var(--uiv2-accent-text); }
+.cell-palette__item-label { font-size: var(--uiv2-text-sm); font-weight: 500; }
+.cell-palette__item-hint { font-size: 10.5px; color: var(--uiv2-text-tertiary); }
+
+/* =============================================================================
+   Quick Post Composer
+   ============================================================================= */
+.qp-step { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.qp-step__label { display: flex; align-items: center; gap: 8px; font-size: var(--uiv2-text-sm); font-weight: 600; margin: 0; }
+.qp-step__num { width: 19px; height: 19px; border-radius: 50%; background: var(--uiv2-bg-elevated); border: 1px solid var(--uiv2-border-strong); display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-family: var(--uiv2-font-mono); }
+.asset-picker-trigger { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--uiv2-border-strong); border-radius: var(--uiv2-radius-md); background: var(--uiv2-bg-elevated); cursor: pointer; }
+.asset-picker-trigger__thumb { width: 34px; height: 34px; border-radius: var(--uiv2-radius-sm); background: var(--uiv2-bg-inset); border: 1px solid var(--uiv2-border); display: flex; align-items: center; justify-content: center; color: var(--uiv2-text-tertiary); overflow: hidden; flex-shrink: 0; }
+.asset-picker-trigger__text { flex: 1; font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); }
+.platform-toggle-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.platform-toggle { display: flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: var(--uiv2-radius-pill); border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-elevated); color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-xs); cursor: pointer; }
+.platform-toggle.is-active { border-color: var(--uiv2-accent-border); background: var(--uiv2-accent-wash); color: var(--uiv2-text-primary); }
+.per-platform-caption__row { margin-bottom: 14px; }
+.per-platform-caption__head { display: flex; align-items: center; gap: 7px; font-size: var(--uiv2-text-xs); font-weight: 600; margin-bottom: 6px; }
+.asset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.asset-tile { aspect-ratio: 1; border-radius: var(--uiv2-radius-md); border: 1.5px solid var(--uiv2-border); background: var(--uiv2-bg-elevated); display: flex; align-items: center; justify-content: center; color: var(--uiv2-text-tertiary); cursor: pointer; overflow: hidden; }
+.asset-tile.is-selected { border-color: var(--uiv2-accent-solid); }
+.asset-tile img { width: 100%; height: 100%; object-fit: cover; }
+.qp-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.qp-footer__primary { display: flex; gap: 8px; }
+
+/* =============================================================================
+   RESPONSIVE — mobile-first parity pass. Below 640px: List view becomes the
+   default (matches CalendarListView.jsx's own "mobile-default under 600px"
+   comment); Month grid is still reachable but condensed + horizontally
+   scrollable so pill content never clips. Drafts rail collapses under the
+   grid and becomes a horizontally-scrollable strip (a lighter substitute for
+   its resizable-tray desktop behavior, same underlying data/actions).
+   ============================================================================= */
+@container frame (max-width: 640px) {
+  .main { padding: 14px 12px 56px; }
+  .page-head__title { font-size: var(--uiv2-text-2xl); }
+  .intel-strip { gap: 14px; padding: 12px 14px; }
+  .intel-tip { display: none; } /* shown instead inside the strip's own scroll on very small screens — kept simple here */
+  .cmdbar__chips { flex-wrap: nowrap; overflow-x: auto; }
+
+  .month-card { overflow-x: auto; }
+  .month-header, .month-body { min-width: 620px; }
+  .month-body { grid-auto-rows: minmax(72px, 1fr); }
+  .month-cell__add { display: none; } /* no hover affordance on touch — a real tap handler on .month-cell (see the page-level JS at the bottom of the file) opens the Cell Command Palette instead, see MOBILE_PARITY.md must-fix */
+
+  .body-grid { grid-template-columns: 1fr; }
+  .rail { order: -1; }
+  .rail__scroll { flex-direction: row; overflow-x: auto; max-height: none; }
+  .rail__scroll .draft-card { min-width: 220px; flex: 0 0 auto; }
+
+  .drawer-panel, .cmdbar-overlay__panel { width: 100%; max-width: 100%; }
+  .modal-panel { padding: 16px; }
+  .qp-footer { flex-direction: column; align-items: stretch; }
+  .qp-footer__primary { flex-direction: column; }
+  .asset-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@container frame (max-width: 380px) {
+  .app-header__wordmark { display: none; }
+  .page-head__actions .btn span.btn-label-full { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div data-uiv2-theme="dark" id="themeRoot" class="shell">
+
+  <!-- FIX (2026-07-07): .mockup-banner used to sit BEFORE #themeRoot opened
+       -- a sibling, not a descendant -- so it was entirely outside the
+       [data-uiv2-theme="dark"] scope every --uiv2-* custom property is
+       defined within. Its `background: var(--uiv2-accent-wash)` and
+       `color: var(--uiv2-accent-text)` resolved to nothing (those vars
+       simply don't exist outside the themed subtree), which CSS falls
+       back to as `background: transparent` / inherited black text --
+       rendering as a plain white bar over the page's default white canvas.
+       Confirmed via computed style: backgroundColor was literally
+       "rgba(0, 0, 0, 0)". Moved inside #themeRoot so it correctly inherits
+       real theme tokens (and will correctly follow the theme toggle too,
+       not just default-dark). -->
+  <div class="mockup-banner">
+    ui-v2 MOCKUP — Personal Content Calendar — static, no data wired — resize the window to see mobile → tablet → desktop
+  </div>
+
+  <!-- ============================= APP HEADER ============================= -->
+  <header class="app-header">
+    <div class="app-header__brand">
+      <span class="app-header__mark">B</span>
+      <span class="app-header__wordmark">Brandosse</span>
+    </div>
+    <nav class="app-header__nav">
+      <button class="app-header__navlink">Dashboard</button>
+      <button class="app-header__navlink">Studio</button>
+      <button class="app-header__navlink">Library</button>
+      <button class="app-header__navlink is-active">Calendar</button>
+      <button class="app-header__navlink">Brand Kit</button>
+    </nav>
+    <button class="app-header__burger" id="burgerBtn" aria-label="Open menu">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>
+    </button>
+    <div class="app-header__right">
+      <div class="credit-pill">
+        <span class="credit-pill__track"><span class="credit-pill__fill"></span></span>
+        <span class="credit-pill__label">2,140 cr</span>
+      </div>
+      <button class="icon-btn" id="themeToggleBtn" title="Switch to light mode">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke-linecap="round"/><circle cx="12" cy="12" r="4.5"/></svg>
+      </button>
+      <button class="avatar">SC</button>
+    </div>
+  </header>
+
+  <div class="drawer-backdrop" id="mobileNavBackdrop" onclick="if(event.target===this) closeMobileNav()"></div>
+  <aside class="drawer-panel" id="mobileNavPanel" role="dialog" aria-modal="true" aria-label="Menu" data-uiv2-theme="dark" style="display:none; width:min(280px, 84vw);">
+    <div class="drawer-header">
+      <span class="drawer-title">Menu</span>
+      <button class="drawer-close" onclick="closeMobileNav()" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <nav class="mobile-nav-list">
+      <button type="button" class="mobile-nav-link" onclick="closeMobileNav()">Dashboard</button>
+      <button type="button" class="mobile-nav-link" onclick="closeMobileNav()">Studio</button>
+      <button type="button" class="mobile-nav-link" onclick="closeMobileNav()">Library</button>
+      <button type="button" class="mobile-nav-link is-active" onclick="closeMobileNav()">Calendar</button>
+      <button type="button" class="mobile-nav-link" onclick="closeMobileNav()">Brand Kit</button>
+    </nav>
+  </aside>
+
+  <!-- ====================== MOCKUP STATE SWITCHER (not part of the design) ====================== -->
+  <div class="state-switcher">
+    <b>Month grid state:</b>
+    <button class="is-active" data-grid-state="populated">Populated</button>
+    <button data-grid-state="empty">Empty</button>
+    <button data-grid-state="loading">Loading</button>
+    <span class="sep"></span>
+    <b>Demo:</b>
+    <button onclick="openDrawer()">Open post drawer</button>
+    <button onclick="openScheduleModal()">Open schedule modal</button>
+    <button onclick="openQuickPost()">Open quick post</button>
+    <button onclick="openCellPalette()">Open cell palette</button>
+    <button onclick="openCmdOverlay()">Open ⌘K command bar</button>
+    <span class="sep"></span>
+    <b>view:</b>
+    <!-- Real production behavior auto-defaults to List under 640px wide
+         (applyResponsiveDefaultView -- matches CalendarListView.jsx's
+         approved "mobile-default" precedent, an intentional decision, not
+         a bug: a full 7-column month grid is hard to use on a phone). That
+         means the Month grid is genuinely not on-screen by default once
+         you use the "Mobile 375" frame button below, which is correct
+         real behavior but makes the Month grid's OWN mobile treatment
+         hard for a reviewer to find/check. This button is a review
+         shortcut only -- it force-shows Month regardless of width by
+         setting the same userPickedView flag a real user's manual tap on
+         the Month/List toggle would set; it does not change the real
+         default logic. -->
+    <button onclick="userPickedView = true; setView('month');">Preview Month view on mobile</button>
+    <span class="sep"></span>
+    <b>frame:</b>
+    <button data-frame-btn="full" class="is-active">Full</button>
+    <button data-frame-btn="1080">Tablet 1080</button>
+    <button data-frame-btn="768">Tablet 768</button>
+    <button data-frame-btn="375">Mobile 375</button>
+  </div>
+
+  <!-- ============================= MAIN ============================= -->
+  <main class="main">
+    <div class="canvas">
+
+      <!-- Page head -->
+      <div class="page-head">
+        <div>
+          <div class="page-head__title" id="monthNav">
+            <span style="display:inline-flex; align-items:center; gap:8px;">
+              <button class="icon-btn" style="width:26px;height:26px;" aria-label="Previous month">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              July 2026
+              <button class="icon-btn" style="width:26px;height:26px;" aria-label="Next month">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </span>
+          </div>
+          <div class="page-head__sub">9 POSTS THIS MONTH · AMERICA/NEW_YORK</div>
+        </div>
+        <div class="page-head__actions">
+          <div class="view-toggle" id="viewToggle">
+            <button class="is-active" data-view="month">Month</button>
+            <button data-view="list">List</button>
+          </div>
+          <button class="btn btn--subtle btn--sm" onclick="document.getElementById('railCard').scrollIntoView({behavior:'smooth'})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+            <span class="btn-label-full">Drafts</span>
+          </button>
+          <button class="btn btn--solid" onclick="openQuickPost()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span class="btn-label-full">Quick Post</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Review banner (flags a failed post) -->
+      <div class="review-banner" id="reviewBanner">
+        <span class="review-banner__icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </span>
+        <span class="review-banner__text"><b>1 post failed to publish</b> — "Summer collection teaser" on Instagram. Review it to retry or reschedule.</span>
+        <button class="btn btn--dangerSolid btn--sm" onclick="openDrawer('failed')">Review</button>
+      </div>
+
+      <!-- Intelligence strip -->
+      <div class="card intel-strip" role="complementary" aria-label="Month intelligence">
+        <div class="intel-item">
+          <span class="intel-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg></span>
+          <span class="intel-label">Scheduled</span><span class="intel-value">5</span>
+        </div>
+        <div class="intel-item">
+          <span class="intel-icon" style="background: color-mix(in srgb, var(--uiv2-success) 15%, transparent); color: var(--uiv2-success);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <span class="intel-label">Published</span><span class="intel-value">3</span>
+        </div>
+        <div class="intel-item">
+          <span class="intel-icon" style="background: var(--uiv2-danger-wash); color: var(--uiv2-danger);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+          <span class="intel-label">Failed</span><span class="intel-value" style="color:var(--uiv2-danger);">1</span>
+        </div>
+        <div class="intel-item">
+          <span class="intel-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+          <span class="intel-label">Busiest day</span><span class="intel-value">Thu</span>
+        </div>
+        <div class="intel-item">
+          <span class="intel-label">Top platform</span>
+          <span class="intel-value" style="display:flex; align-items:center; gap:6px; font-size: var(--uiv2-text-sm);">
+            <span class="dot-sm" style="background:var(--platform-instagram);"></span>Instagram
+          </span>
+        </div>
+        <div class="intel-item">
+          <span class="intel-label">Health</span>
+          <span class="badge badge--warning">Review</span>
+        </div>
+        <div class="intel-tip">"1 post failed to publish — review it to reschedule."</div>
+      </div>
+
+      <!-- Command bar -->
+      <div class="card cmdbar">
+        <div class="cmdbar__input-row" id="cmdbarInline">
+          <span class="cmdbar__ai-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-1.9-5.3L5 9.8l5.1-1.9L12 3z"/></svg>
+          </span>
+          <input class="cmdbar__input" id="cmdbarInput" type="text" placeholder="Ask: plan my week, suggest best times, reschedule anything that failed…" onfocus="openCmdOverlay()" readonly />
+          <button class="btn btn--subtle btn--sm" onclick="openCmdOverlay()">
+            <span class="kbd">⌘K</span>
+          </button>
+        </div>
+        <div class="cmdbar-scroll">
+          <button class="cmdbar__chip" onclick="openCmdOverlay()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+            Plan my week
+          </button>
+          <button class="cmdbar__chip" onclick="openCmdOverlay()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Suggest best times
+          </button>
+          <button class="cmdbar__chip" onclick="openCmdOverlay()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Reschedule failed posts
+          </button>
+          <button class="cmdbar__chip" onclick="openCmdOverlay()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-1.9-5.3L5 9.8l5.1-1.9L12 3z"/></svg>
+            Audit selected caption
+          </button>
+          <button class="cmdbar__chip" onclick="openCmdOverlay()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16"/><path d="M10 22V4a2 2 0 012-2 2 2 0 012 2v18"/><path d="M4 22V10a2 2 0 012-2h2"/><path d="M18 22V13a2 2 0 012-2h0"/></svg>
+            Which draft should I post first?
+          </button>
+        </div>
+      </div>
+
+      <!-- Body grid: month/list + drafts rail -->
+      <div class="body-grid">
+
+        <!-- ===================== MONTH VIEW ===================== -->
+        <div class="card month-card" id="monthView">
+          <div class="month-header">
+            <div class="month-header__cell">Mon</div><div class="month-header__cell">Tue</div><div class="month-header__cell">Wed</div>
+            <div class="month-header__cell">Thu</div><div class="month-header__cell">Fri</div><div class="month-header__cell">Sat</div><div class="month-header__cell">Sun</div>
+          </div>
+
+          <!-- populated body -->
+          <div class="month-body" id="monthBodyPopulated">
+            <!-- leading muted days (June) -->
+            <div class="month-cell month-cell--muted"><div class="month-cell__head"><span class="month-cell__date">29</span></div></div>
+            <div class="month-cell month-cell--muted"><div class="month-cell__head"><span class="month-cell__date">30</span></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">1</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">2</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div>
+              <div class="month-cell__stack">
+                <div class="post-pill post-pill--scheduled" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Product teaser</span><span class="post-pill__time">9am</span></div>
+              </div>
+            </div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">3</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">4</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div>
+              <div class="month-cell__stack">
+                <div class="post-pill post-pill--published" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Behind the scenes</span><span class="post-pill__time">11am</span></div>
+              </div>
+            </div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">5</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">6</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">7</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">8</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div>
+              <div class="month-cell__stack">
+                <div class="post-pill post-pill--scheduled" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">New arrivals reel</span><span class="post-pill__time">2pm</span></div>
+              </div>
+            </div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">9</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell month-cell--today"><div class="month-cell__head"><span class="month-cell__date">10</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div>
+              <div class="month-cell__stack">
+                <div class="post-pill post-pill--draft" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Draft: FAQ carousel</span></div>
+              </div>
+            </div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">11</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">12</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">13</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">14</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">15</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">16</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div>
+              <div class="month-cell__stack">
+                <div class="post-pill post-pill--scheduled" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Client spotlight</span><span class="post-pill__time">9am</span></div>
+                <div class="post-pill post-pill--scheduled" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Poll: next color</span><span class="post-pill__time">4pm</span></div>
+              </div>
+            </div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">17</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">18</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">20</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">21</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">22</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">23</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div>
+              <div class="month-cell__stack">
+                <div class="post-pill post-pill--failed" onclick="openDrawer('failed')"><span class="post-pill__dot"></span><span class="post-pill__label">Summer collection teaser</span></div>
+              </div>
+            </div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">24</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">25</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div>
+              <div class="month-cell__stack">
+                <div class="post-pill post-pill--published" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Weekend recap</span><span class="post-pill__time">10am</span></div>
+                <div class="post-pill post-pill--scheduled" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Tutorial part 2</span><span class="post-pill__time">1pm</span></div>
+                <div class="post-pill post-pill--draft" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Draft: giveaway rules</span></div>
+                <button type="button" class="month-cell__more">+2 more</button>
+              </div>
+            </div>
+
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">27</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">28</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">29</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">30</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div>
+              <div class="month-cell__stack">
+                <div class="post-pill post-pill--published" onclick="openDrawer()"><span class="post-pill__dot"></span><span class="post-pill__label">Published: EOM report</span><span class="post-pill__time">8am</span></div>
+              </div>
+            </div>
+            <div class="month-cell"><div class="month-cell__head"><span class="month-cell__date">31</span><button class="month-cell__add" onclick="openCellPalette()">+</button></div></div>
+            <div class="month-cell month-cell--muted"><div class="month-cell__head"><span class="month-cell__date">1</span></div></div>
+          </div>
+
+          <!-- empty state overlay -->
+          <div id="monthEmptyOverlay" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; padding:20px; background: color-mix(in srgb, var(--uiv2-bg-surface) 88%, transparent);">
+            <div class="empty-state" style="max-width:380px; box-shadow: var(--uiv2-shadow-popover-current);">
+              <div class="empty-state__title">Nothing scheduled yet</div>
+              <div class="empty-state__desc">Create your first post and pick a date — no need to open Studio first, though you can if you want richer generation tools.</div>
+              <div class="empty-state__actions">
+                <button class="btn btn--solid" onclick="openQuickPost()">+ Quick Post</button>
+              </div>
+              <div style="margin-top:10px;"><a href="#" style="font-size:12px; color:var(--uiv2-accent-text); text-decoration:none;">or go create in Studio →</a></div>
+            </div>
+          </div>
+
+          <!-- loading skeleton overlay -->
+          <div id="monthLoadingOverlay" style="display:none;">
+            <div class="month-body">
+              <script>
+                // rendered via static markup below instead of JS templating,
+                // kept simple: 14 skeleton cells across 2 visible rows
+              </script>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================== LIST / AGENDA VIEW ===================== -->
+        <div class="card" id="listView" style="display:none;">
+          <div class="agenda-filterbar">
+            <input class="ui-input" type="search" placeholder="Search posts…" aria-label="Search posts" />
+            <select class="ui-select" aria-label="Filter by status">
+              <option>All statuses</option><option>Scheduled</option><option>Draft</option><option>Published</option><option>Failed</option>
+            </select>
+            <select class="ui-select" aria-label="Filter by platform">
+              <option>All platforms</option><option>Instagram</option><option>TikTok</option><option>LinkedIn</option><option>X</option>
+            </select>
+          </div>
+
+          <div class="agenda-day-group">
+            <p class="agenda-day-group__label">Today — Thu, Jul 10</p>
+            <button type="button" class="post-row" onclick="openDrawer()">
+              <span class="post-row__thumb">📄</span>
+              <span class="post-row__body">
+                <span class="post-row__title">Draft: FAQ carousel</span>
+                <span class="post-row__meta"><span class="status-pill status-draft"><span class="status-dot status-draft"></span>Draft</span> · no time set</span>
+              </span>
+            </button>
+          </div>
+
+          <div class="agenda-day-group">
+            <p class="agenda-day-group__label">Wed, Jul 16</p>
+            <button type="button" class="post-row" onclick="openDrawer()">
+              <span class="post-row__thumb">🖼</span>
+              <span class="post-row__body">
+                <span class="post-row__title">Client spotlight</span>
+                <span class="post-row__meta"><span class="status-pill status-scheduled"><span class="status-dot status-scheduled"></span>Scheduled</span> · Instagram · 9:00am</span>
+              </span>
+            </button>
+            <button type="button" class="post-row" onclick="openDrawer()">
+              <span class="post-row__thumb">🖼</span>
+              <span class="post-row__body">
+                <span class="post-row__title">Poll: next color</span>
+                <span class="post-row__meta"><span class="status-pill status-scheduled"><span class="status-dot status-scheduled"></span>Scheduled</span> · X · 4:00pm</span>
+              </span>
+            </button>
+          </div>
+
+          <div class="agenda-day-group">
+            <p class="agenda-day-group__label">Wed, Jul 23</p>
+            <button type="button" class="post-row" onclick="openDrawer('failed')">
+              <span class="post-row__thumb">🎬</span>
+              <span class="post-row__body">
+                <span class="post-row__title">Summer collection teaser</span>
+                <span class="post-row__meta"><span class="status-pill status-failed"><span class="status-dot status-failed"></span>Failed</span> · Instagram · retry or reschedule from the drawer</span>
+              </span>
+            </button>
+          </div>
+
+          <div class="agenda-day-group">
+            <p class="agenda-day-group__label">Sat, Jul 25</p>
+            <button type="button" class="post-row" onclick="openDrawer()">
+              <span class="post-row__thumb">🖼</span>
+              <span class="post-row__body">
+                <span class="post-row__title">Weekend recap</span>
+                <span class="post-row__meta"><span class="status-pill status-published"><span class="status-dot status-published"></span>Published<span class="mock-connection-note">via mock connection</span></span> · Facebook · 10:00am</span>
+              </span>
+            </button>
+            <button type="button" class="post-row" onclick="openDrawer()">
+              <span class="post-row__thumb">🎬</span>
+              <span class="post-row__body">
+                <span class="post-row__title">Tutorial part 2</span>
+                <span class="post-row__meta"><span class="status-pill status-scheduled"><span class="status-dot status-scheduled"></span>Scheduled</span> ·
+                  <span class="platform-dot-stack"><span style="background:var(--platform-instagram);"></span><span style="background:var(--platform-tiktok);"></span></span> · 1:00pm</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ===================== UNSCHEDULED DRAFTS RAIL ===================== -->
+        <div class="card rail" id="railCard">
+          <button class="rail__header" id="railToggle" aria-expanded="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="rail__title">Drafts</span>
+            <span class="rail__count">4</span>
+            <span class="rail__hint">drag onto the calendar, or use Move</span>
+            <span class="rail__toggle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg></span>
+          </button>
+          <div class="rail__resize" title="Drag to resize"></div>
+          <div class="rail__scroll">
+            <div class="draft-card" draggable="true" title="Drag to schedule" onclick="openDrawer()">
+              <div class="draft-card__thumb">🖼</div>
+              <div class="draft-card__meta">
+                <div class="draft-card__name">FAQ carousel — 6 slides</div>
+                <div class="draft-card__platform-row"><span class="dot-sm" style="background:var(--platform-instagram);"></span>carousel</div>
+              </div>
+              <button class="draft-card__move-btn" aria-label="Select to move" onclick="event.stopPropagation();">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              </button>
+              <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:67%; background: var(--uiv2-warning);"></div></div>
+            </div>
+
+            <div class="draft-card" draggable="true" title="Drag to schedule" onclick="openDrawer()">
+              <div class="draft-card__thumb">🎬</div>
+              <div class="draft-card__meta">
+                <div class="draft-card__name">Giveaway rules explainer</div>
+                <div class="draft-card__platform-row"><span class="dot-sm" style="background:var(--platform-tiktok);"></span>video</div>
+              </div>
+              <button class="draft-card__move-btn" aria-label="Select to move" onclick="event.stopPropagation();">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              </button>
+              <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:100%; background: var(--uiv2-success);"></div></div>
+            </div>
+
+            <div class="draft-card" draggable="true" title="Drag to schedule" onclick="openDrawer()">
+              <div class="draft-card__thumb" style="color:var(--uiv2-text-tertiary);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              </div>
+              <div class="draft-card__meta">
+                <div class="draft-card__name">Untitled draft</div>
+                <div class="draft-card__platform-row">post</div>
+              </div>
+              <button class="draft-card__move-btn" aria-label="Select to move" onclick="event.stopPropagation();">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              </button>
+              <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:33%; background: var(--uiv2-warning);"></div></div>
+            </div>
+
+            <div class="draft-card" draggable="true" title="Drag to schedule" onclick="openDrawer()">
+              <div class="draft-card__thumb">🖼</div>
+              <div class="draft-card__meta">
+                <div class="draft-card__name">Team photo — new hires</div>
+                <div class="draft-card__platform-row"><span class="dot-sm" style="background:var(--platform-linkedin);"></span>image</div>
+              </div>
+              <button class="draft-card__move-btn" aria-label="Select to move" onclick="event.stopPropagation();">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l3 3 3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              </button>
+              <div class="draft-card__readiness"><div class="draft-card__readiness-fill" style="width:100%; background: var(--uiv2-success);"></div></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <!-- /body-grid -->
+
+    </div>
+  </main>
+
+</div>
+<!-- /themeRoot -->
+
+<!-- ============================= POST DETAIL DRAWER ============================= -->
+<div class="drawer-backdrop" id="drawerBackdrop" onclick="if(event.target===this) closeDrawer()">
+  <aside class="drawer-panel" id="drawerPanel" role="dialog" aria-modal="true" aria-label="Post details" data-uiv2-theme="dark">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <span class="drawer-title" id="drawerTitle">Client spotlight</span>
+        <span class="status-pill status-scheduled" id="drawerStatusPill"><span class="status-dot status-scheduled"></span>Scheduled — Jul 16, 9:00am (America/New_York)</span>
+      </div>
+      <button class="drawer-close" onclick="closeDrawer()" aria-label="Close drawer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+
+      <div>
+        <span class="section-label">Asset preview</span>
+        <div class="media-preview" style="height:150px; display:flex; align-items:center; justify-content:center; color:var(--uiv2-text-tertiary); font-size:28px;">🖼</div>
+      </div>
+
+      <div>
+        <span class="section-label">Platforms in this group (shared generation_id)</span>
+        <div class="platform-tabs">
+          <button class="platform-tab is-active"><span class="dot-sm" style="background:var(--platform-instagram);"></span>Instagram</button>
+          <button class="platform-tab"><span class="dot-sm" style="background:var(--platform-linkedin);"></span>LinkedIn</button>
+        </div>
+        <label class="field-label">Caption — Instagram</label>
+        <textarea class="ui-textarea" rows="4">Meet Priya, one of our longest-standing clients — three years and counting! 🎉 Swipe to see her favorite pieces from this season.</textarea>
+        <div class="caption-counter">142 / 2200</div>
+        <div class="hashtag-wrap">
+          <span class="hashtag-chip">#clientlove <button aria-label="Remove"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+          <span class="hashtag-chip">#smallbusiness <button aria-label="Remove"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+        </div>
+        <div style="margin-top:10px;">
+          <button class="btn btn--ghost btn--sm">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-1.9-5.3L5 9.8l5.1-1.9L12 3z"/></svg>
+            Audit caption
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <span class="section-label">Account &amp; platform (currently editing: Instagram tab)</span>
+        <select class="ui-select">
+          <option>Instagram — @brandosse.studio</option>
+          <option>LinkedIn — Brandosse Inc</option>
+        </select>
+        <p class="field-hint">Reassigning here changes which connected account this platform's row publishes from.</p>
+      </div>
+
+      <div>
+        <span class="section-label">Reschedule (full detail-panel edit)</span>
+        <div class="time-row">
+          <input class="ui-input" type="date" value="2026-07-16" style="max-width:150px;" />
+          <input class="ui-input" type="time" value="09:00" style="max-width:110px;" />
+          <span class="field-hint">America/New_York</span>
+        </div>
+        <button class="btn btn--subtle btn--sm" style="margin-top:10px;" onclick="openScheduleModal()">Open Schedule modal…</button>
+      </div>
+
+      <div>
+        <span class="section-label">Readiness</span>
+        <div class="checklist">
+          <div class="check-item"><span class="check-icon pass">✓</span>Caption present</div>
+          <div class="check-item"><span class="check-icon pass">✓</span>Asset attached</div>
+          <div class="check-item"><span class="check-icon pass">✓</span>Account connected</div>
+          <div class="check-item"><span class="check-icon warn">!</span>No hashtags beyond 2 (recommended 5+)</div>
+        </div>
+        <p class="scope-note">Pipeline approval history is an org-only section (not shown here — personal scope has no approval gate).</p>
+      </div>
+
+      <div id="drawerFailureBox" style="display:none;">
+        <span class="section-label" style="color:var(--uiv2-danger);">Failure reason</span>
+        <div class="failure-box">Instagram API returned "media processing timeout" — the connected account's token may need re-authorization. Retry or reschedule to a later time.</div>
+      </div>
+
+    </div>
+    <div class="drawer-footer">
+      <div class="drawer-footer-row">
+        <button class="btn btn--subtle">Save changes</button>
+        <button class="btn btn--solid" onclick="openScheduleModal()">Reschedule…</button>
+      </div>
+      <div class="drawer-footer-row">
+        <button class="btn btn--subtle">Duplicate</button>
+        <button class="btn btn--danger">Unschedule</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- ============================= SCHEDULE MODAL ============================= -->
+<div class="modal-overlay" id="scheduleModalOverlay" onclick="if(event.target===this) closeScheduleModal()">
+  <div class="modal-panel modal-panel--md" role="dialog" aria-modal="true" aria-label="Schedule post" data-uiv2-theme="dark">
+    <div class="modal-title">Schedule post</div>
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <div class="tz-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>All times below are in your <strong>account timezone: America/New_York</strong>, not your browser's local timezone.</span>
+      </div>
+
+      <div>
+        <div class="mini-cal-nav">
+          <span class="mini-cal-nav__label">July 2026</span>
+          <div style="display:flex; gap:4px;">
+            <button class="icon-btn" style="width:26px;height:26px;" aria-label="Previous month">‹</button>
+            <button class="icon-btn" style="width:26px;height:26px;" aria-label="Next month">›</button>
+          </div>
+        </div>
+        <div class="mini-cal">
+          <div class="mini-cal__weekday">Su</div><div class="mini-cal__weekday">Mo</div><div class="mini-cal__weekday">Tu</div><div class="mini-cal__weekday">We</div><div class="mini-cal__weekday">Th</div><div class="mini-cal__weekday">Fr</div><div class="mini-cal__weekday">Sa</div>
+          <div class="mini-cal__day is-empty"></div><div class="mini-cal__day is-empty"></div><div class="mini-cal__day is-empty"></div>
+          <div class="mini-cal__day">1</div><div class="mini-cal__day">2</div><div class="mini-cal__day">3</div><div class="mini-cal__day">4</div>
+          <div class="mini-cal__day">5</div><div class="mini-cal__day">6</div><div class="mini-cal__day">7</div><div class="mini-cal__day">8</div><div class="mini-cal__day">9</div><div class="mini-cal__day is-today">10</div><div class="mini-cal__day">11</div>
+          <div class="mini-cal__day">12</div><div class="mini-cal__day">13</div><div class="mini-cal__day">14</div><div class="mini-cal__day">15</div><div class="mini-cal__day is-selected">16</div><div class="mini-cal__day">17</div><div class="mini-cal__day">18</div>
+          <div class="mini-cal__day">19</div><div class="mini-cal__day">20</div><div class="mini-cal__day">21</div><div class="mini-cal__day">22</div><div class="mini-cal__day">23</div><div class="mini-cal__day">24</div><div class="mini-cal__day">25</div>
+          <div class="mini-cal__day">26</div><div class="mini-cal__day">27</div><div class="mini-cal__day">28</div><div class="mini-cal__day">29</div><div class="mini-cal__day">30</div><div class="mini-cal__day">31</div><div class="mini-cal__day is-empty"></div>
+        </div>
+      </div>
+
+      <div class="time-row">
+        <input class="ui-input" type="time" value="09:00" style="max-width:120px;" />
+        <span class="field-hint">Thu, Jul 16</span>
+        <span class="field-hint">America/New_York</span>
+      </div>
+
+      <div class="target-account-card">
+        <span class="target-account-card__avatar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/></svg>
+        </span>
+        <div class="target-account-card__body">
+          <div class="target-account-card__name">Instagram — @brandosse.studio</div>
+          <div class="target-account-card__meta">Connected · this is where the post will publish</div>
+        </div>
+        <span class="badge badge--success">Active</span>
+      </div>
+
+      <div class="conflict-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Another post is already scheduled to this account at this exact time. You can still schedule this one — it will not overwrite the other.</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn--subtle" onclick="closeScheduleModal()">Cancel</button>
+      <button class="btn btn--solid" onclick="closeScheduleModal()">Confirm schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= QUICK POST COMPOSER ============================= -->
+<div class="modal-overlay" id="quickPostOverlay" onclick="if(event.target===this) closeQuickPost()">
+  <div class="modal-panel modal-panel--lg" role="dialog" aria-modal="true" aria-label="Quick Post" data-uiv2-theme="dark">
+    <div class="modal-title">Quick Post</div>
+    <div class="modal-desc">Minimal, calendar-native creation — not a Studio reimplementation. Pick an optional asset, write per-platform captions (AI pre-fills a starting point), then schedule or save as a draft.</div>
+
+    <div class="qp-step">
+      <p class="qp-step__label"><span class="qp-step__num">1</span>Library asset (optional)</p>
+      <div class="asset-picker-trigger" onclick="openAssetPicker()">
+        <span class="asset-picker-trigger__thumb">🖼</span>
+        <span class="asset-picker-trigger__text">Team photo — new hires.jpg</span>
+        <button class="icon-btn" style="width:24px;height:24px;" onclick="event.stopPropagation();" aria-label="Clear selected asset">×</button>
+      </div>
+    </div>
+
+    <div class="qp-step">
+      <p class="qp-step__label"><span class="qp-step__num">2</span>Platforms &amp; captions</p>
+      <div class="platform-toggle-row">
+        <button class="platform-toggle is-active"><span class="dot-sm" style="background:var(--platform-instagram);"></span>Instagram</button>
+        <button class="platform-toggle"><span class="dot-sm" style="background:var(--platform-tiktok);"></span>TikTok</button>
+        <button class="platform-toggle"><span class="dot-sm" style="background:var(--platform-linkedin);"></span>LinkedIn</button>
+        <button class="platform-toggle"><span class="dot-sm" style="background:var(--platform-x);"></span>X</button>
+      </div>
+      <div class="per-platform-caption__row">
+        <div class="per-platform-caption__head"><span class="dot-sm" style="background:var(--platform-instagram);"></span>Instagram caption</div>
+        <div class="ai-prefill-note">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-1.9-5.3L5 9.8l5.1-1.9L12 3z"/></svg>
+          Pre-filled by AI — edit freely
+        </div>
+        <textarea class="ui-textarea" rows="3">Say hi to the newest faces on our team! 👋 We're thrilled to have them on board.</textarea>
+        <div class="caption-counter">78 / 2200</div>
+      </div>
+    </div>
+
+    <div class="qp-step">
+      <p class="qp-step__label"><span class="qp-step__num">3</span>When</p>
+      <div class="tz-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Times shown in your account timezone: <strong>&nbsp;America/New_York</strong>
+      </div>
+      <div class="time-row" style="margin-top:10px;">
+        <input class="ui-input" type="date" value="2026-07-10" style="max-width:150px;" />
+        <input class="ui-input" type="time" value="09:00" style="max-width:110px;" />
+        <span class="field-hint">or save as draft below</span>
+      </div>
+    </div>
+
+    <div class="qp-footer">
+      <button class="btn btn--subtle">Save as draft</button>
+      <div class="qp-footer__primary">
+        <button class="btn btn--subtle" onclick="closeQuickPost()">Cancel</button>
+        <button class="btn btn--solid" onclick="closeQuickPost()">Schedule post</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Asset picker (nested modal, triggered from Quick Post step 1) -->
+<div class="modal-overlay" id="assetPickerOverlay" onclick="if(event.target===this) closeAssetPicker()">
+  <div class="modal-panel modal-panel--md" role="dialog" aria-modal="true" aria-label="Pick a Library asset" data-uiv2-theme="dark">
+    <div class="modal-title">Pick an asset</div>
+    <input class="ui-input" type="search" placeholder="Search your Library…" />
+    <div class="asset-grid">
+      <div class="asset-tile is-selected">🖼</div>
+      <div class="asset-tile">🖼</div>
+      <div class="asset-tile">🎬</div>
+      <div class="asset-tile">🖼</div>
+      <div class="asset-tile">🎬</div>
+      <div class="asset-tile">🖼</div>
+      <div class="asset-tile">🖼</div>
+      <div class="asset-tile">🎬</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn--subtle" onclick="closeAssetPicker()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= ⌘K COMMAND BAR OVERLAY ============================= -->
+<div class="cmdbar-overlay" id="cmdOverlay" onclick="if(event.target===this) closeCmdOverlay()">
+  <div class="cmdbar-overlay__panel" data-uiv2-theme="dark">
+    <div class="cmdbar__input-row">
+      <span class="cmdbar__ai-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-1.9-5.3L5 9.8l5.1-1.9L12 3z"/></svg></span>
+      <input class="cmdbar__input" id="cmdOverlayInput" type="text" placeholder="Ask AI anything about your calendar…" autocomplete="off" />
+    </div>
+    <div class="cmdbar-overlay__suggestions" id="cmdSuggestions">
+      <div class="cmdbar-overlay__group-label">Planning</div>
+      <button class="cmdbar-overlay__item is-active" onclick="runCmd(this)">
+        <span class="cmdbar-overlay__item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg></span>
+        Generate a week plan for 3 posts
+      </button>
+      <button class="cmdbar-overlay__item" onclick="runCmd(this)">
+        <span class="cmdbar-overlay__item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+        Suggest the best times to post this week
+      </button>
+      <div class="cmdbar-overlay__group-label">Content</div>
+      <button class="cmdbar-overlay__item" onclick="runCmd(this)">
+        <span class="cmdbar-overlay__item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-1.9-5.3L5 9.8l5.1-1.9L12 3z"/></svg></span>
+        Audit my caption for the selected post
+      </button>
+      <button class="cmdbar-overlay__item" onclick="runCmd(this)">
+        <span class="cmdbar-overlay__item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></span>
+        Which draft should I post first?
+      </button>
+      <div class="cmdbar-overlay__group-label">Scheduling</div>
+      <button class="cmdbar-overlay__item" onclick="runCmd(this)">
+        <span class="cmdbar-overlay__item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></span>
+        Reschedule failed posts to next available slot
+      </button>
+      <div class="cmdbar-overlay__group-label">Insights</div>
+      <button class="cmdbar-overlay__item" onclick="runCmd(this)">
+        <span class="cmdbar-overlay__item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16"/><path d="M10 22V4a2 2 0 012-2 2 2 0 012 2v18"/></svg></span>
+        How many posts do I have scheduled this week?
+      </button>
+    </div>
+
+    <div class="cmdbar-overlay__result" id="cmdResult" style="display:none;">
+      <div id="cmdResultText">You have 5 posts scheduled and 1 that failed this week. Want me to move the failed one to the next open slot on Instagram?</div>
+      <div class="cmdbar-overlay__result-actions">
+        <button class="btn btn--solid btn--sm" onclick="closeCmdOverlay()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          Apply reschedule
+        </button>
+        <button class="btn btn--ghost btn--sm" onclick="closeCmdOverlay()">Dismiss</button>
+      </div>
+    </div>
+
+    <div class="cmdbar-overlay__footer">
+      <span class="cmdbar-overlay__hint"><span class="kbd">↑↓</span>navigate</span>
+      <span class="cmdbar-overlay__hint"><span class="kbd">↵</span>run</span>
+      <span class="cmdbar-overlay__hint"><span class="kbd">Esc</span>close</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= CELL COMMAND PALETTE ============================= -->
+<div class="cell-palette-anchor" id="cellPaletteAnchor" style="display:none; top:340px; left:50%; transform:translateX(-50%);">
+  <div class="cell-palette" data-uiv2-theme="dark">
+    <div class="cell-palette__header">
+      <span class="cell-palette__day">Thursday, Jul 10</span>
+      <span style="font-size:13px; font-weight:600;">All-day slot</span>
+    </div>
+    <div class="cell-palette__ai-slot">
+      <div class="cell-palette__ai-slot-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-1.9-5.3L5 9.8l5.1-1.9L12 3z"/></svg>
+        AI recommended slot
+      </div>
+      <div class="cell-palette__ai-slot-text">Best time for Instagram engagement (score 87/100)</div>
+    </div>
+    <div class="cell-palette__list" role="group">
+      <button class="cell-palette__item" onclick="closeCellPalette(); openDrawer();">
+        <span class="cell-palette__item-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
+        <span>
+          <div class="cell-palette__item-label">Schedule a draft</div>
+          <div class="cell-palette__item-hint">Pick a draft from your library</div>
+        </span>
+      </button>
+      <button class="cell-palette__item" onclick="closeCellPalette(); openQuickPost();">
+        <span class="cell-palette__item-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+        <span>
+          <div class="cell-palette__item-label">New post</div>
+          <div class="cell-palette__item-hint">Create a post for this slot</div>
+        </span>
+      </button>
+      <button class="cell-palette__item" onclick="closeCellPalette(); openCmdOverlay();">
+        <span class="cell-palette__item-icon cell-palette__item-icon--ai"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-1.9-5.3L5 9.8l5.1-1.9L12 3z"/></svg></span>
+        <span>
+          <div class="cell-palette__item-label">Ask AI what to post</div>
+          <div class="cell-palette__item-hint">Get a content idea for this time</div>
+        </span>
+      </button>
+      <button class="cell-palette__item" onclick="closeCellPalette(); openCmdOverlay();">
+        <span class="cell-palette__item-icon cell-palette__item-icon--ai"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg></span>
+        <span>
+          <div class="cell-palette__item-label">Generate week plan</div>
+          <div class="cell-palette__item-hint">AI fills your whole week</div>
+        </span>
+      </button>
+    </div>
+  </div>
+</div>
+<div id="cellPaletteBackdrop" style="display:none; position:fixed; inset:0; z-index:205;" onclick="closeCellPalette()"></div>
+
+<script>
+// ---- theme toggle ----
+const themeRoot = document.getElementById('themeRoot');
+document.getElementById('themeToggleBtn').addEventListener('click', () => {
+  const next = themeRoot.getAttribute('data-uiv2-theme') === 'dark' ? 'light' : 'dark';
+  themeRoot.setAttribute('data-uiv2-theme', next);
+  document.querySelectorAll('[data-uiv2-theme]').forEach(el => { if (el !== themeRoot) el.setAttribute('data-uiv2-theme', next); });
+});
+
+// ---- mobile nav (real Drawer/MobileNavDrawer pattern: right-side slide,
+//      bg-inset, title bar + close button — see MobileNavDrawer.jsx) ----
+const burgerBtn = document.getElementById('burgerBtn');
+const mobileNavPanel = document.getElementById('mobileNavPanel');
+const mobileNavBackdrop = document.getElementById('mobileNavBackdrop');
+function openMobileNav() {
+  mobileNavPanel.style.display = 'flex';
+  mobileNavBackdrop.classList.add('is-open');
+}
+function closeMobileNav() {
+  mobileNavPanel.style.display = 'none';
+  mobileNavBackdrop.classList.remove('is-open');
+}
+burgerBtn.addEventListener('click', openMobileNav);
+
+// ---- view toggle (month / list) ----
+const viewToggle = document.getElementById('viewToggle');
+const monthView = document.getElementById('monthView');
+const listView = document.getElementById('listView');
+let userPickedView = false;
+function setView(view) {
+  viewToggle.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b.dataset.view === view));
+  monthView.style.display = view === 'month' ? 'block' : 'none';
+  listView.style.display = view === 'list' ? 'block' : 'none';
+}
+viewToggle.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-view]');
+  if (!btn) return;
+  userPickedView = true;
+  setView(btn.dataset.view);
+});
+// Mobile-first default: below 640px, default to List view (matches
+// CalendarListView.jsx's own "mobile-default under 600px" comment), unless
+// the reviewer has explicitly picked a view already. Measures #themeRoot's
+// own width (not window.innerWidth) so this stays correct both on a real
+// browser-window resize AND when the "frame:" width-simulator buttons
+// shrink #themeRoot without changing the real window size.
+function applyResponsiveDefaultView() {
+  if (userPickedView) return;
+  const w = document.getElementById('themeRoot').getBoundingClientRect().width;
+  setView(w <= 640 ? 'list' : 'month');
+}
+window.addEventListener('resize', applyResponsiveDefaultView);
+applyResponsiveDefaultView();
+
+// ---- keep .app-header stacked below the sticky dev banner (see the
+// .mockup-banner comment above) instead of overlapping it ----
+function stackDevBarOverHeader() {
+  const banner = document.querySelector('.mockup-banner');
+  const header = document.querySelector('.app-header');
+  if (!banner || !header) return;
+  header.style.top = banner.getBoundingClientRect().height + 'px';
+}
+window.addEventListener('resize', stackDevBarOverHeader);
+stackDevBarOverHeader();
+
+// ---- frame width simulator (quick-check without resizing the browser) ----
+// Mirrors library-mockup.html's simulator exactly: #themeRoot is a real
+// `container-type: inline-size` context (see .shell), so shrinking its
+// max-width here genuinely re-triggers every `@container frame (...)` rule
+// in the stylesheet -- not a cosmetic-only resize. Also re-runs
+// applyResponsiveDefaultView() since that reads #themeRoot's width, not
+// window.innerWidth, precisely so this simulator drives it correctly too.
+document.querySelectorAll('[data-frame-btn]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-frame-btn]').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    const root = document.getElementById('themeRoot');
+    const w = btn.dataset.frameBtn;
+    if (w === 'full') { root.style.maxWidth = 'none'; root.style.margin = '0'; root.style.border = 'none'; }
+    else { root.style.maxWidth = w + 'px'; root.style.margin = '0 auto'; root.style.border = '1px dashed var(--uiv2-accent-solid)'; }
+    applyResponsiveDefaultView();
+    stackDevBarOverHeader();
+  });
+});
+
+// ---- month grid state switcher (populated / empty / loading) ----
+const gridStateBtns = document.querySelectorAll('[data-grid-state]');
+const monthBodyPopulated = document.getElementById('monthBodyPopulated');
+const monthEmptyOverlay = document.getElementById('monthEmptyOverlay');
+const monthLoadingOverlay = document.getElementById('monthLoadingOverlay');
+gridStateBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    gridStateBtns.forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    const state = btn.dataset.gridState;
+    monthBodyPopulated.style.display = state === 'populated' ? 'grid' : 'none';
+    monthEmptyOverlay.style.display = state === 'empty' ? 'flex' : 'none';
+    if (state === 'loading') {
+      monthLoadingOverlay.style.display = 'block';
+      monthLoadingOverlay.innerHTML = buildLoadingSkeleton();
+    } else {
+      monthLoadingOverlay.style.display = 'none';
+    }
+  });
+});
+function buildLoadingSkeleton() {
+  let cells = '';
+  for (let i = 0; i < 14; i++) {
+    cells += `<div class="month-cell"><div class="month-cell__head"><span class="skeleton" style="width:18px;height:12px;"></span></div>${i % 3 === 0 ? '<span class="skeleton" style="height:20px;"></span>' : ''}</div>`;
+  }
+  return `<div class="month-body" style="grid-auto-rows:minmax(80px,1fr);">${cells}</div>`;
+}
+
+// ---- drawer ----
+function openDrawer(kind) {
+  document.getElementById('drawerBackdrop').classList.add('is-open');
+  const failBox = document.getElementById('drawerFailureBox');
+  const title = document.getElementById('drawerTitle');
+  const pill = document.getElementById('drawerStatusPill');
+  if (kind === 'failed') {
+    title.textContent = 'Summer collection teaser';
+    pill.className = 'status-pill status-failed';
+    pill.innerHTML = '<span class="status-dot status-failed"></span>Failed — was due Jul 23, 2:00pm (America/New_York)';
+    failBox.style.display = 'block';
+  } else {
+    title.textContent = 'Client spotlight';
+    pill.className = 'status-pill status-scheduled';
+    pill.innerHTML = '<span class="status-dot status-scheduled"></span>Scheduled — Jul 16, 9:00am (America/New_York)';
+    failBox.style.display = 'none';
+  }
+}
+function closeDrawer() { document.getElementById('drawerBackdrop').classList.remove('is-open'); }
+
+// ---- schedule modal ----
+function openScheduleModal() { document.getElementById('scheduleModalOverlay').classList.add('is-open'); }
+function closeScheduleModal() { document.getElementById('scheduleModalOverlay').classList.remove('is-open'); }
+
+// ---- quick post composer ----
+function openQuickPost() { document.getElementById('quickPostOverlay').classList.add('is-open'); }
+function closeQuickPost() { document.getElementById('quickPostOverlay').classList.remove('is-open'); }
+function openAssetPicker() { document.getElementById('assetPickerOverlay').classList.add('is-open'); }
+function closeAssetPicker() { document.getElementById('assetPickerOverlay').classList.remove('is-open'); }
+
+// ---- ⌘K command bar overlay ----
+function openCmdOverlay() {
+  document.getElementById('cmdOverlay').classList.add('is-open');
+  document.getElementById('cmdResult').style.display = 'none';
+  document.getElementById('cmdSuggestions').style.display = 'block';
+  setTimeout(() => document.getElementById('cmdOverlayInput').focus(), 10);
+}
+function closeCmdOverlay() { document.getElementById('cmdOverlay').classList.remove('is-open'); }
+function runCmd(el) {
+  document.getElementById('cmdSuggestions').style.display = 'none';
+  document.getElementById('cmdResult').style.display = 'block';
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeCmdOverlay(); closeDrawer(); closeScheduleModal(); closeQuickPost(); closeAssetPicker(); closeCellPalette(); closeMobileNav();
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCmdOverlay(); }
+});
+
+// ---- cell command palette ----
+function openCellPalette() {
+  document.getElementById('cellPaletteBackdrop').style.display = 'block';
+  document.getElementById('cellPaletteAnchor').style.display = 'block';
+}
+function closeCellPalette() {
+  document.getElementById('cellPaletteBackdrop').style.display = 'none';
+  document.getElementById('cellPaletteAnchor').style.display = 'none';
+}
+
+// ---- mobile tap-to-open cell palette (MOBILE_PARITY.md MUST-FIX) ----
+// Desktop/tablet reach the palette via the hover-only "+" button
+// (.month-cell__add, onclick="openCellPalette()" per cell). That button is
+// display:none below 640px (no hover affordance exists on touch), so this
+// wires a real tap handler directly on .month-cell for narrow viewports —
+// tapping empty cell space (not a post pill / "+N more" / the "+" button
+// itself, which already have their own handlers) opens the same Cell
+// Command Palette desktop's "+" leads to, restoring the AI slot suggestion /
+// New Post / Ask AI / Generate week plan actions on touch devices.
+document.querySelectorAll('.month-cell').forEach((cell) => {
+  cell.addEventListener('click', (e) => {
+    if (window.innerWidth > 640) return; // desktop/tablet already have the hover "+" affordance
+    if (e.target.closest('.post-pill') || e.target.closest('.month-cell__add') || e.target.closest('.month-cell__more')) return;
+    openCellPalette();
+  });
+});
+
+// ---- drafts rail collapse ----
+document.getElementById('railToggle').addEventListener('click', () => {
+  const rail = document.getElementById('railCard');
+  const expanded = rail.getAttribute('aria-expanded') !== 'false';
+  rail.classList.toggle('is-collapsed');
+  document.getElementById('railToggle').setAttribute('aria-expanded', String(!expanded));
+});
+</script>
+
+</body>
+</html>

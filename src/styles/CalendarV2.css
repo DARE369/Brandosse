@@ -1778,144 +1778,16 @@
 }
 
 
-/* ===========================
-   DRAFTS SIDEBAR (Fixed Width)
-=========================== */
-.drafts-sidebar {
-  width: 300px;
-  height: 100%;
-  background: var(--surface-sidebar, var(--panel-bg));
-  border-right: 1px solid var(--border-default, var(--border-color));
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.drafts-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border-default, var(--border-color));
-  min-height: 50px;
-}
-
-.drafts-header h3 {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--color-text-secondary, var(--text-muted));
-}
-
-.drafts-count {
-  padding: 2px 8px;
-  background: var(--brand-primary-light);
-  color: var(--brand-primary);
-  border-radius: 10px;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.drafts-subtitle {
-  padding: 10px 16px 4px;
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--color-text-tertiary, var(--text-muted));
-}
-
-.drafts-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.drafts-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-muted);
-}
-
-.drafts-empty p {
-  margin: 12px 0 4px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.drafts-empty span {
-  font-size: 0.8rem;
-}
-
-.draft-card {
-  background: var(--surface-card, var(--element-bg));
-  border: 1px solid var(--border-default, var(--border-color));
-  border-radius: 10px;
-  padding: 10px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-  overflow: hidden;
-}
-
-.draft-card:hover {
-  border-color: var(--calendar-chrome-accent, var(--brand-primary));
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--brand-primary) 10%, transparent);
-  transform: translateY(-1px);
-}
-
-.draft-card:focus-visible {
-  outline: 2px solid var(--calendar-chrome-accent, var(--brand-primary));
-  outline-offset: 2px;
-}
-
-.draft-thumbnail {
-  width: 100%;
-  height: 140px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--color-bg-page);
-  margin-bottom: 10px;
-  position: relative;
-}
-
-.draft-thumbnail img,
-.draft-thumbnail video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.media-badge {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  padding: 3px 8px;
-  background: color-mix(in srgb, var(--color-bg-page) 70%, transparent);
-  color: white;
-  font-size: 0.65rem;
-  font-weight: 700;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
-
-.draft-caption {
-  margin: 0 0 8px 0;
-  font-size: 0.85rem;
-  color: var(--text-main);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+/* DRAFTS SIDEBAR block removed — superseded by src/calendar/calendar-engine-v2.css's
+   .cal3-rail / .draft-card rules (right-docked drafts rail, ui-v2 tokens).
+   The old .draft-card rule here (light-theme --surface-card/--element-bg,
+   with no dark-mode scoping) was still being loaded via app-entry.css's
+   global @import and, depending on module bundling order, sometimes won
+   the cascade over the new rail's rule at equal specificity — rendering
+   white draft cards in dark mode. Confirmed dead: grepped every class in
+   this block (drafts-sidebar, drafts-header, drafts-count, drafts-subtitle,
+   drafts-list, drafts-empty, draft-card, draft-thumbnail, media-badge,
+   draft-caption) across all .jsx — zero real usages remain. */
 
 .draft-platform {
   display: inline-block;
