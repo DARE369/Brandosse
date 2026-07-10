@@ -12,8 +12,7 @@ import {
   generateImages,
   editImage,
   createVideoJob,
-  checkVideoJobStatus,
-} from '../services/magnific.service';
+} from '../services/media.service';
 import {
   enhancePrompt as apiEnhancePrompt,
 } from '../services/ApiService';
@@ -31,7 +30,6 @@ import { normalizeEdgeFunctionError } from '../services/edgeFunctionClient';
 
 export { GENERATION_STATUS, POST_STATUS } from '../constants/statuses';
 
-const VIDEO_POLL_INTERVAL_MS = 8000;
 const CONTENT_SYNC_EVENT = 'socialai:data-sync';
 
 const DEFAULT_SOCIAL_SEO_BREAKDOWN = {
@@ -64,6 +62,11 @@ const DEFAULT_POST_PRODUCTION = {
   assetReferences: [],
   metadataStatus: 'idle',
   metadataUpdatedAt: null,
+  brandConsistencyStatus: 'idle',
+  brandConsistencyScore: null,
+  brandConsistencyPass: null,
+  brandConsistencyIssues: [],
+  brandConsistencyNotes: [],
 };
 
 const DEFAULT_VIDEO_JOB_STATE = {
@@ -1165,9 +1168,7 @@ const useSessionStore = create((set, get) => ({
           numImages: 1,
           brandKit,
           sessionId: session.id,
-          model: settings.model || 'realism',
           imageModel: settings.imageModel || 'ideogram',
-          resolution: settings.resolution || '2k',
           category: 'image',
         });
 
@@ -1305,9 +1306,7 @@ const useSessionStore = create((set, get) => ({
           numImages: 1,
           brandKit,
           sessionId: session.id,
-          model: settings.model || 'realism',
           imageModel: settings.imageModel || 'ideogram',
-          resolution: settings.resolution || '2k',
           category: 'carousel',
         });
 
@@ -1421,8 +1420,8 @@ const useSessionStore = create((set, get) => ({
             edit_mode: true,
             source_image_url: cleanSource,
             aspect_ratio: settings.aspectRatio,
-            model: 'seedream-v4-5-edit',
-            provider: 'magnific',
+            model: 'flux-pro/kontext',
+            provider: 'fal-ai',
             ...(generationLineage ? { lineage: generationLineage } : {}),
           },
         }))
@@ -1444,7 +1443,6 @@ const useSessionStore = create((set, get) => ({
         sourceImageUrl: cleanSource,
         brandKit,
         aspectRatio: settings.aspectRatio,
-        providerOptions: {},
       });
 
       set({
@@ -1457,10 +1455,9 @@ const useSessionStore = create((set, get) => ({
         ...(created.metadata || {}),
         width: edited.width,
         height: edited.height,
-        provider: edited.provider || 'magnific',
-        provider_task_id: edited.providerTaskId || edited.taskId || null,
-        provider_model: edited.providerModel || 'seedream-v4-5-edit',
-        provider_endpoint: edited.providerEndpoint || '/v1/ai/text-to-image/seedream-v4-5-edit',
+        provider: edited.provider || 'fal-ai',
+        provider_model: edited.providerModel || 'fal-ai/flux-pro/kontext',
+        provider_endpoint: edited.providerEndpoint || 'fal-ai/flux-pro/kontext',
         generation_time_ms: edited.generationTimeMs || null,
         generation_cost: edited.generationCost || null,
       };
@@ -1552,15 +1549,15 @@ const useSessionStore = create((set, get) => ({
         brandKit,
         mode: videoMode,
         imageUrl: settings.referenceImageUrl || '',
-        resolution: settings.videoResolution || settings.resolution || '1080p',
-        fps: settings.fps || 25,
-        generateAudio: settings.generateAudio || false,
-        model: settings.model || (videoMode === 'image-to-video' ? 'ltx-2-pro-i2v' : 'ltx-2-pro'),
+        quality: settings.videoQuality === 'premium' ? 'premium' : 'standard',
         sessionId: session.id,
       });
-      const isCompletedVideo = videoJob.status === GENERATION_STATUS.COMPLETED || Boolean(videoJob.videoUrl);
-      if (!isCompletedVideo && !videoJob.jobId) {
-        throw new Error('Video renderer returned neither a completed video URL nor a polling job id');
+
+      if (videoJob.tierUpgraded) {
+        toast(
+          'Standard tier requires a source image — this rendered at premium quality instead, billed accordingly.',
+          { icon: 'ℹ️', duration: 6000 },
+        );
       }
 
       const { data: created, error: insertError } = await supabase
@@ -1570,21 +1567,20 @@ const useSessionStore = create((set, get) => ({
           session_id: session.id,
           prompt,
           media_type: 'video',
-          status: isCompletedVideo ? GENERATION_STATUS.COMPLETED : GENERATION_STATUS.PROCESSING,
-          progress: isCompletedVideo ? 100 : 12,
+          status: GENERATION_STATUS.COMPLETED,
+          progress: 100,
           storage_path: videoJob.videoUrl || null,
           metadata: {
             provider: videoJob.provider || 'fal-ai',
-            provider_task_id: videoJob.providerTaskId || videoJob.jobId,
-            provider_model: videoJob.providerModel || settings.model || 'ltx-2-pro',
+            provider_model: videoJob.providerModel || null,
             provider_endpoint: videoJob.providerEndpoint || null,
             generation_mode: videoMode,
             source_image_url: videoMode === 'image-to-video' ? settings.referenceImageUrl || null : null,
             aspect_ratio: settings.aspectRatio,
-            model: settings.model || (videoMode === 'image-to-video' ? 'ltx-2-pro-i2v' : 'ltx-2-pro'),
+            requested_quality: videoJob.requestedQuality,
+            actual_quality: videoJob.actualQuality,
+            tier_upgraded: Boolean(videoJob.tierUpgraded),
             duration: settings.duration || 6,
-            fps: settings.fps || 25,
-            generate_audio: Boolean(settings.generateAudio),
             generation_cost: videoJob.generationCost || null,
           },
         }))
@@ -1595,40 +1591,35 @@ const useSessionStore = create((set, get) => ({
 
       set((state) => ({
         activeGenerations: [...state.activeGenerations, created],
-        generationProgress: 15,
-        progressLabel: 'Video job started...',
+        generationProgress: 100,
+        progressLabel: 'Video completed',
         generationStage: 'Processing video...',
         videoJobState: {
           ...state.videoJobState,
-          status: isCompletedVideo ? GENERATION_STATUS.COMPLETED : GENERATION_STATUS.PROCESSING,
-          jobId: videoJob.jobId,
+          status: GENERATION_STATUS.COMPLETED,
           generationId: created.id,
           providerEndpoint: videoJob.providerEndpoint || null,
-          progress: isCompletedVideo ? 100 : 15,
+          progress: 100,
           videoUrl: videoJob.videoUrl || null,
         },
       }));
 
       await touchSession(session.id);
 
-      if (isCompletedVideo) {
-        await get().fetchGenerations(session.id, { silent: true });
-        await ensureDraftForGeneration({
-          userId: user.id,
-          generationId: created.id,
-          caption: prompt,
-        });
-        dispatchContentSync('video-completed');
-        set({
-          isGenerating: false,
-          generationProgress: 0,
-          progressLabel: null,
-          generationStage: null,
-        });
-        return videoJob.videoUrl;
-      }
-
-      get().startVideoPolling(videoJob.jobId, created.id, videoJob.providerEndpoint || null);
+      await get().fetchGenerations(session.id, { silent: true });
+      await ensureDraftForGeneration({
+        userId: user.id,
+        generationId: created.id,
+        caption: prompt,
+      });
+      dispatchContentSync('video-completed');
+      set({
+        isGenerating: false,
+        generationProgress: 0,
+        progressLabel: null,
+        generationStage: null,
+      });
+      return videoJob.videoUrl;
     } catch (err) {
       logGenerationFailure('startVideoGeneration error', err);
       set((state) => ({
@@ -1646,118 +1637,6 @@ const useSessionStore = create((set, get) => ({
       }));
       throw err;
     }
-  },
-
-  startVideoPolling: (jobId, generationId, providerEndpoint = null) => {
-    if (!jobId) return;
-
-    const existingInterval = get().videoJobState.pollInterval;
-    if (existingInterval) clearInterval(existingInterval);
-
-    const pollOnce = async () => {
-      try {
-        const result = await checkVideoJobStatus({ jobId, generationId, providerEndpoint });
-        const nextProgress = Math.max(10, Math.min(100, result.progress || 0));
-
-        if (result.status === 'queued' || result.status === GENERATION_STATUS.PROCESSING) {
-          set((state) => ({
-            isGenerating: true,
-            generationProgress: nextProgress,
-            progressLabel: result.status === 'queued' ? 'Video queued...' : 'Generating video...',
-            generationStage: result.status === 'queued' ? 'Queued' : 'Processing video...',
-            videoJobState: {
-              ...state.videoJobState,
-              status: result.status,
-              progress: nextProgress,
-              videoUrl: null,
-            },
-          }));
-          return;
-        }
-
-        if (result.status === GENERATION_STATUS.COMPLETED) {
-          const intervalRef = get().videoJobState.pollInterval;
-          if (intervalRef) clearInterval(intervalRef);
-
-          set((state) => ({
-            isGenerating: false,
-            generationProgress: 100,
-            progressLabel: 'Video completed',
-            generationStage: 'Completed',
-            activeGenerations: state.activeGenerations.map((generation) => (
-              generation.id === generationId
-                ? {
-                    ...generation,
-                    status: GENERATION_STATUS.COMPLETED,
-                    progress: 100,
-                    storage_path: result.videoUrl || generation.storage_path,
-                  }
-                : generation
-            )),
-            videoJobState: {
-              ...state.videoJobState,
-              status: GENERATION_STATUS.COMPLETED,
-              progress: 100,
-              videoUrl: result.videoUrl,
-              pollInterval: null,
-            },
-          }));
-
-          const { activeSession } = get();
-          if (activeSession?.id) {
-            await get().fetchGenerations(activeSession.id, { silent: true });
-          }
-
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user?.id && generationId) {
-            await ensureDraftForGeneration({
-              userId: user.id,
-              generationId,
-              caption: get().videoJobState.prompt || '',
-            });
-            dispatchContentSync('video-completed');
-          }
-          return;
-        }
-
-        const intervalRef = get().videoJobState.pollInterval;
-        if (intervalRef) clearInterval(intervalRef);
-
-        const isMinimized = get().videoJobState.isMinimized;
-        if (isMinimized) {
-          toast.error('Video generation failed. Expand the status bar to retry.', { duration: 8000 });
-        }
-
-        set((state) => ({
-          isGenerating: false,
-          generationProgress: 0,
-          progressLabel: null,
-          generationStage: null,
-          error: result.error || 'Video generation failed',
-          videoJobState: {
-            ...state.videoJobState,
-            status: GENERATION_STATUS.FAILED,
-            progress: 100,
-            pollInterval: null,
-          },
-        }));
-      } catch (err) {
-        console.error('[VideoPolling] Error:', err);
-      }
-    };
-
-    const intervalId = setInterval(pollOnce, VIDEO_POLL_INTERVAL_MS);
-    set((state) => ({
-      videoJobState: {
-        ...state.videoJobState,
-        jobId,
-        generationId,
-        providerEndpoint,
-        pollInterval: intervalId,
-      },
-    }));
-
-    pollOnce();
   },
 
   dismissVideoJob: () => {
@@ -2159,6 +2038,68 @@ const useSessionStore = create((set, get) => ({
         },
       }));
       console.error('scoreSeo:', err);
+      throw err;
+    }
+  },
+
+  // Org-only: checks the current caption/hashtags against the org's brand
+  // voice via ai-brand-consistency-check. organizationId/brandProjectId are
+  // passed explicitly by the caller (PostProductionPanel reads them from
+  // useOrgContext()) since this store isn't itself org-scoped.
+  checkBrandConsistency: async (organizationId, brandProjectId) => {
+    const { postProduction } = get();
+    if (!organizationId || !brandProjectId) {
+      throw new Error('Brand consistency check requires an active organization and brand project.');
+    }
+    if (!String(postProduction.caption || '').trim()) {
+      throw new Error('Caption is required before checking brand consistency.');
+    }
+
+    try {
+      set((state) => ({
+        postProduction: { ...state.postProduction, brandConsistencyStatus: 'checking' },
+      }));
+
+      const platform = await resolvePrimaryPlatform(postProduction.selectedPlatforms || []);
+      const { data, error } = await supabase.functions.invoke('ai-brand-consistency-check', {
+        body: {
+          organization_id: organizationId,
+          brand_project_id: brandProjectId,
+          caption: String(postProduction.caption || '').trim(),
+          hashtags: normalizeHashtags(postProduction.hashtags || []),
+          platform,
+        },
+      });
+
+      if (error) {
+        throw normalizeEdgeFunctionError(error, 'ai-brand-consistency-check');
+      }
+
+      const result = data?.result || {};
+      const normalized = {
+        score: typeof result.overall_score === 'number' ? result.overall_score : null,
+        pass: typeof result.passes === 'boolean' ? result.passes : null,
+        issues: Array.isArray(result.issues) ? result.issues : [],
+        notes: Array.isArray(result.positive_notes) ? result.positive_notes : [],
+      };
+
+      set((state) => ({
+        postProduction: {
+          ...state.postProduction,
+          brandConsistencyStatus: 'checked',
+          brandConsistencyScore: normalized.score,
+          brandConsistencyPass: normalized.pass,
+          brandConsistencyIssues: normalized.issues,
+          brandConsistencyNotes: normalized.notes,
+        },
+      }));
+
+      return normalized;
+    } catch (err) {
+      set((state) => ({
+        postProduction: { ...state.postProduction, brandConsistencyStatus: 'failed' },
+      }));
+      console.error('checkBrandConsistency:', err);
       throw err;
     }
   },

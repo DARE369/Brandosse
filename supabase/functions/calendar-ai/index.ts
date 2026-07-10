@@ -57,7 +57,7 @@ Shape: { "suggestions": [{ "day":"<Mon|Tue|Wed|Thu|Fri|Sat|Sun>","time":"<HH:MM>
 
   const r = await callLlm({ systemPrompt: system, messages: [{ role: "user", content: user }], preferredProvider: "groq", maxTokens: 900, temperature: 0.5, jsonMode: true });
   const p = safeParseJson(r.content, { suggestions: [], rationale: "" });
-  return { suggestions: Array.isArray(p.suggestions) ? p.suggestions : [], rationale: typeof p.rationale === "string" ? p.rationale : "" };
+  return { suggestions: Array.isArray(p.suggestions) ? p.suggestions : [], rationale: typeof p.rationale === "string" ? p.rationale : "", provider: r.provider, model: r.model };
 }
 
 // ── caption_audit ─────────────────────────────────────────────────────────────
@@ -79,6 +79,8 @@ Shape: { "score":<0-100>, "grade":"<Poor|Fair|Good|Great>", "issues":[{"type":"<
     fixedCaption: typeof p.fixedCaption === "string" ? p.fixedCaption : caption,
     fixedHashtags: Array.isArray(p.fixedHashtags) ? p.fixedHashtags : hashtags,
     explanation:  typeof p.explanation === "string" ? p.explanation : "",
+    provider: r.provider,
+    model: r.model,
   };
 }
 
@@ -96,7 +98,7 @@ Shape: { "plan": [{ "day":"<YYYY-MM-DD>","time":"<HH:MM>","platform":"<platform>
 
   const r = await callLlm({ systemPrompt: system, messages: [{ role: "user", content: user }], preferredProvider: "groq", maxTokens: 2500, temperature: 0.65, jsonMode: true });
   const p = safeParseJson(r.content, { plan: [], summary: "" });
-  return { plan: Array.isArray(p.plan) ? p.plan : [], summary: typeof p.summary === "string" ? p.summary : "" };
+  return { plan: Array.isArray(p.plan) ? p.plan : [], summary: typeof p.summary === "string" ? p.summary : "", provider: r.provider, model: r.model };
 }
 
 // ── command (⌘K) ──────────────────────────────────────────────────────────────
@@ -140,13 +142,13 @@ No actions needed for explain/unknown.`;
         existingPosts: posts,
       };
       const pd = await weekPlanData(planBody);
-      return { intent, actions: [{ type: "week_plan", payload: {} }, ...actions], reply, plan: pd.plan, summary: pd.summary };
+      return { intent, actions: [{ type: "week_plan", payload: {} }, ...actions], reply, plan: pd.plan, summary: pd.summary, provider: r.provider, model: r.model };
     } catch (_e) {
       // Return without plan; client will still show the action button
     }
   }
 
-  return { intent, actions, reply };
+  return { intent, actions, reply, provider: r.provider, model: r.model };
 }
 
 // ── HTTP handlers ─────────────────────────────────────────────────────────────

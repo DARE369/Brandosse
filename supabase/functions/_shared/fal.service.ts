@@ -71,6 +71,7 @@ export const FAL_MODELS = {
   imageFlux2Pro:    "fal-ai/flux-2-pro",
   imageIdeogramV3:  "fal-ai/ideogram/v3",                 // best exact-text rendering (flyers, captions in-image)
   imageRecraftV3:   "fal-ai/recraft/v3/text-to-image",    // typography/vector + brand-color control
+  imageEditKontext: "fal-ai/flux-pro/kontext",            // prompt-driven edit of an existing image
   videoHailuo23:    "fal-ai/minimax/video-01",    // Hailuo 2.3 standard — image-to-video
   videoKling25Pro:  "fal-ai/kling-video/v2.5/pro", // Kling 2.5 Pro text-to-video
   videoKling25I2V:  "fal-ai/kling-video/v2.5/pro/image-to-video",
@@ -258,6 +259,33 @@ export async function generateImageRecraft(input: FalImageGenInput): Promise<Fal
   return runImageModel(FAL_MODELS.imageRecraftV3, normalized, apiKey);
 }
 
+export interface FalImageEditInput {
+  prompt: string;
+  image_url: string;
+  aspect_ratio?: string;
+  seed?: number;
+  output_format?: "jpeg" | "png";
+  guidance_scale?: number;
+}
+
+/**
+ * Edit an existing image with a text prompt using FLUX.1 Kontext Pro (fal.ai).
+ * Sync-first, queue fallback — same pattern as the other image models.
+ */
+export async function generateImageEdit(input: FalImageEditInput): Promise<FalImageResult> {
+  const apiKey = getFalKey();
+  const normalized: Record<string, unknown> = {
+    prompt:         input.prompt,
+    image_url:      input.image_url,
+    output_format:  input.output_format ?? "jpeg",
+    guidance_scale: input.guidance_scale ?? 3.5,
+  };
+  if (input.seed !== undefined) normalized.seed = input.seed;
+  if (input.aspect_ratio) normalized.aspect_ratio = input.aspect_ratio;
+
+  return runImageModel(FAL_MODELS.imageEditKontext, normalized, apiKey);
+}
+
 /**
  * Route an image generation to the chosen provider. Default: Ideogram (exact text).
  * Returns the result plus which provider/model/cost was actually used.
@@ -349,6 +377,7 @@ export const FAL_COST_USD = {
   imageFluxPerMP:        0.030, // first MP; $0.015 each additional
   imageIdeogramBalanced: 0.060, // fal-ai/ideogram/v3 BALANCED (TURBO $0.03 / QUALITY $0.09)
   imageRecraft:          0.040, // fal-ai/recraft/v3 raster ($0.08 vector)
+  imageEditKontext:      0.040, // fal-ai/flux-pro/kontext per edit
   videoHailouPerClip:    0.500, // per 5-6s clip
   videoKlingPerSec:      0.070, // per second of output
 } as const;

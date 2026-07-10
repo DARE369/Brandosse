@@ -9,8 +9,11 @@
  *   - The scheduled-publish SQL worker (service-role, via pg_net)
  *   - Manual publish actions in the UI (user JWT)
  *
- * On success:  post.status → "published", platform_post_id + platform_post_url saved
- * On failure:  post.status → "failed", failure_reason saved, retriable tracked
+ * On success:  post.status → "published", external_post_id saved (platform post
+ *              URL saved under workflow_state.publish.platform_post_url — posts
+ *              has no dedicated column for it)
+ * On failure:  post.status → "failed", error_message saved, retry count
+ *              tracked under workflow_state.publish.retry_count
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
@@ -76,7 +79,7 @@ serve(async (req) => {
       .from("posts")
       .select(`
         id, user_id, organization_id, caption, platform, status,
-        scheduled_at, hashtags, media_type, consecutive_failure_count,
+        scheduled_at, hashtags, media_type, workflow_state,
         generations ( storage_path, media_type, output_url )
       `)
       .eq("id", postId)
@@ -137,7 +140,14 @@ serve(async (req) => {
     let result;
 
     if (account.is_mock) {
-      // Existing mock publish flow — unchanged
+      // Mock publish flow — runMockPublish() already writes posts.status/
+      // published_at/platform/account_id (and mock_publish_logs, and
+      // connected_accounts) itself; do not update posts again here. An
+      // earlier version of this function did a second, redundant posts
+      // update referencing platform_post_id/platform_post_url/
+      // failure_reason, none of which exist on posts (confirmed via live
+      // schema introspection 2026-07-10) — that update was silently failing
+      // on every mock-routed call through this endpoint.
       result = await runMockPublish({
         adminClient,
         account,
@@ -146,32 +156,38 @@ serve(async (req) => {
         publishRequestId: publishRequestId as string | null,
       });
 
-      await adminClient
-        .from("posts")
-        .update({
-          status: result.success ? "published" : "failed",
-          platform_post_id: result.mockPostId,
-          platform_post_url: result.mockPostUrl,
-          failure_reason: result.failureReason,
-          published_at: result.success ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", postId);
-
     } else {
       // Real platform publish
       result = await publishToRealPlatform({ post, account, mediaUrl });
 
+      // posts has no consecutive_failure_count/last_failure_at/
+      // platform_post_url columns (confirmed via live schema introspection
+      // 2026-07-10 — an earlier version of this function assumed columns
+      // from a migration that never actually ran against the live DB).
+      // external_post_id and error_message are the real equivalents of
+      // platform_post_id/failure_reason. Retry count and the platform post
+      // URL have no dedicated column, so they're tracked inside
+      // workflow_state, the same flexible jsonb column posts already uses
+      // for other workflow bookkeeping.
+      const existingWorkflowState = (post.workflow_state && typeof post.workflow_state === "object")
+        ? post.workflow_state as Record<string, unknown>
+        : {};
+      const existingPublish = (existingWorkflowState.publish && typeof existingWorkflowState.publish === "object")
+        ? existingWorkflowState.publish as Record<string, unknown>
+        : {};
+
       if (!result.success && result.retriable) {
         // Increment retry counter; caller (cron) will retry later
-        const retries = Number(post.consecutive_failure_count ?? 0) + 1;
+        const retries = Number(existingPublish.retry_count ?? 0) + 1;
         await adminClient
           .from("posts")
           .update({
             status: retries >= MAX_RETRIES ? "failed" : "scheduled",
-            failure_reason: result.failureReason,
-            consecutive_failure_count: retries,
-            last_failure_at: new Date().toISOString(),
+            error_message: result.failureReason,
+            workflow_state: {
+              ...existingWorkflowState,
+              publish: { ...existingPublish, retry_count: retries, last_failure_at: new Date().toISOString() },
+            },
             updated_at: new Date().toISOString(),
           })
           .eq("id", postId);
@@ -180,10 +196,14 @@ serve(async (req) => {
           .from("posts")
           .update({
             status: result.success ? "published" : "failed",
-            platform_post_id: result.platformPostId,
-            platform_post_url: result.platformPostUrl,
-            failure_reason: result.failureReason,
+            external_post_id: result.platformPostId,
+            error_message: result.failureReason,
             published_at: result.success ? new Date().toISOString() : null,
+            failed_at: result.success ? null : new Date().toISOString(),
+            workflow_state: {
+              ...existingWorkflowState,
+              publish: { ...existingPublish, platform_post_url: result.platformPostUrl },
+            },
             updated_at: new Date().toISOString(),
           })
           .eq("id", postId);

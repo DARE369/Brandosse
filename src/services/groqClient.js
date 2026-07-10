@@ -284,6 +284,10 @@ Produce the ContentPlan JSON now.
 `.trim();
 }
 
+// Returns { plan, provider, model, totalTokens } — provider/model reflect
+// whichever provider actually served the request (generate-content-plan
+// prefers Groq but silently falls back to Claude 3.5 Sonnet on failure), not
+// just the one requested. Callers must record these, not assume Groq.
 export async function callGroqContentPlan(brief) {
   const data = await invokeContentPlanFunction({
     mode: 'plan',
@@ -294,9 +298,15 @@ export async function callGroqContentPlan(brief) {
     throw new Error('Content plan edge function returned no plan');
   }
 
-  return data.plan;
+  return {
+    plan: data.plan,
+    provider: data.provider || null,
+    model: data.model || null,
+    totalTokens: data.totalTokens ?? null,
+  };
 }
 
+// Returns { plan, provider, model } — same provider/model honesty as above.
 export async function callGroqRevision(plan, violations, brandKit) {
   const data = await invokeContentPlanFunction({
     mode: 'revision',
@@ -309,7 +319,11 @@ export async function callGroqRevision(plan, violations, brandKit) {
     throw new Error('Content plan revision edge function returned no plan');
   }
 
-  return data.plan;
+  return {
+    plan: data.plan,
+    provider: data.provider || null,
+    model: data.model || null,
+  };
 }
 
 export async function enhancePromptWithBrand(rawPrompt, brandKit) {

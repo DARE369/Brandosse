@@ -198,6 +198,7 @@ async function generatePlan(brief: Record<string, unknown>) {
     plan: parsed,
     provider: llmResult.provider,
     model: llmResult.model,
+    totalTokens: llmResult.totalTokens,
   };
 }
 
@@ -220,6 +221,7 @@ async function revisePlan(
     plan: parsed,
     provider: llmResult.provider,
     model: llmResult.model,
+    totalTokens: llmResult.totalTokens,
   };
 }
 

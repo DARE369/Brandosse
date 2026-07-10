@@ -197,7 +197,7 @@ Rules:
     // ── Record generation + deduct credits ────────────────────────────────────
     let generationId: string | null = null;
     if (body.record_generation !== false) {
-      const { data: generation } = await adminClient
+      const { data: generation, error: insertError } = await adminClient
         .from("generations")
         .insert({
           user_id:         user.id,
@@ -220,6 +220,10 @@ Rules:
         })
         .select("id")
         .single();
+      if (insertError) {
+        console.error("[generateImage] failed to record generation:", insertError);
+        throw new Error(`Failed to record generation: ${insertError.message}`);
+      }
       generationId = generation?.id ?? null;
     }
 

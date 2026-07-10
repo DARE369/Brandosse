@@ -21,13 +21,12 @@ import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useCreditBalance } from "../../hooks/useCreditBalance";
 import useConnectedAccounts from "../../components/GenerateStudio/hooks/useConnectedAccounts";
 import {
-  MAGNIFIC_CONTENT_TYPES,
-  MAGNIFIC_ASPECT_RATIOS,
-  MAGNIFIC_VIDEO_FPS,
-  estimateMagnificCost,
-  getMagnificModelsForMode,
-  getVideoDurationsForModel,
-} from "../../config/magnificModels";
+  CONTENT_TYPES,
+  ASPECT_RATIOS,
+  VIDEO_QUALITY_TIERS,
+  estimateGenerationCost,
+  getVideoDurations,
+} from "../../config/mediaGenerationOptions";
 import { PROMPT_LIMIT } from "../../components/GenerateStudio/shared/constants";
 import {
   UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, Avatar, IconButton,
@@ -126,7 +125,7 @@ function StudioBody({ brandKit }) {
     return "image";
   }, [settings.mediaType, settings.contentType]);
 
-  const cost = useMemo(() => estimateMagnificCost(settings), [settings]);
+  const cost = useMemo(() => estimateGenerationCost(settings), [settings]);
   const availableCredits = credits.balance;
   const canAfford = !credits.ready || availableCredits >= cost;
   const isCarousel = selectedMode === "carousel";
@@ -185,17 +184,15 @@ function StudioBody({ brandKit }) {
 
   const handleModeChange = useCallback(
     (mode) => {
-      const next = MAGNIFIC_CONTENT_TYPES.find((t) => t.id === mode) || MAGNIFIC_CONTENT_TYPES[0];
-      const nextModel = getMagnificModelsForMode(next.id)[0]?.id || "realism";
+      const next = CONTENT_TYPES.find((t) => t.id === mode) || CONTENT_TYPES[0];
       const isVid = next.mediaType === "video" || next.mediaType === "image-to-video";
       updateSettings({
         mediaType: next.mediaType,
         contentType: next.contentType,
-        model: nextModel,
         batchSize: next.id === "image" ? Math.max(1, Number(settings.batchSize) || 1) : 1,
         slideCount: next.id === "carousel" ? settings.slideCount || 6 : "auto",
-        resolution: isVid ? "1080p" : "2k",
-        duration: isVid ? (nextModel === "kling-v2-6-pro" ? 5 : 6) : settings.duration,
+        duration: isVid ? 5 : settings.duration,
+        videoQuality: isVid ? (settings.videoQuality || "standard") : settings.videoQuality,
         referenceImageUrl: sourceImageUrl,
       });
     },
@@ -385,7 +382,7 @@ function StudioBody({ brandKit }) {
               <Card>
                 <div className={styles.sectionLabel}>Mode</div>
                 <div className={styles.modeRow}>
-                  {MAGNIFIC_CONTENT_TYPES.map((m) => (
+                  {CONTENT_TYPES.map((m) => (
                     <button
                       key={m.id}
                       type="button"
@@ -452,7 +449,7 @@ function StudioBody({ brandKit }) {
                 <div className={styles.formatBlock}>
                   <span className={styles.formatSubLabel}>Aspect ratio</span>
                   <div className={styles.formatRow}>
-                    {MAGNIFIC_ASPECT_RATIOS.map((r) => (
+                    {ASPECT_RATIOS.map((r) => (
                       <button
                         key={r.id}
                         type="button"
@@ -495,7 +492,7 @@ function StudioBody({ brandKit }) {
                   <div className={styles.formatBlock}>
                     <span className={styles.formatSubLabel}>Duration</span>
                     <div className={styles.formatRow}>
-                      {getVideoDurationsForModel(settings.model).map((d) => (
+                      {getVideoDurations().map((d) => (
                         <button
                           key={d}
                           type="button"
@@ -506,19 +503,25 @@ function StudioBody({ brandKit }) {
                         </button>
                       ))}
                     </div>
-                    <span className={styles.formatSubLabel} style={{ marginTop: 4 }}>FPS</span>
+                    <span className={styles.formatSubLabel} style={{ marginTop: 4 }}>Quality</span>
                     <div className={styles.formatRow}>
-                      {MAGNIFIC_VIDEO_FPS.map((f) => (
+                      {VIDEO_QUALITY_TIERS.map((tier) => (
                         <button
-                          key={f}
+                          key={tier.id}
                           type="button"
-                          className={[styles.formatChip, Number(settings.fps) === f ? styles.formatChipActive : ""].join(" ")}
-                          onClick={() => updateSettings({ fps: f })}
+                          title={tier.hint}
+                          className={[styles.formatChip, (settings.videoQuality || "standard") === tier.id ? styles.formatChipActive : ""].join(" ")}
+                          onClick={() => updateSettings({ videoQuality: tier.id })}
                         >
-                          {f}
+                          {tier.label}
                         </button>
                       ))}
                     </div>
+                    {(settings.videoQuality || "standard") === "standard" && selectedMode === "video" && !sourceImageUrl && (
+                      <span className={styles.formatSubLabel} style={{ marginTop: 4, opacity: 0.8 }}>
+                        Standard requires a source image — without one this renders at premium quality and is billed accordingly.
+                      </span>
+                    )}
                   </div>
                 )}
               </Card>
@@ -626,7 +629,7 @@ function StudioBody({ brandKit }) {
                 <div style={{ minWidth: 0 }}>
                   <div className={styles.sessionTitle}>{activeSession?.title || "Untitled session"}</div>
                   <div className={styles.sessionMeta}>
-                    {MAGNIFIC_CONTENT_TYPES.find((m) => m.id === selectedMode)?.label} · {aspectRatio}
+                    {CONTENT_TYPES.find((m) => m.id === selectedMode)?.label} · {aspectRatio}
                   </div>
                 </div>
                 <Button variant="subtle" onClick={() => setHistoryOpen(true)}>

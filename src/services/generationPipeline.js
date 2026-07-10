@@ -2,14 +2,10 @@
 // CANONICAL GENERATION ORCHESTRATOR
 // All generation (single, carousel, edit, video) flows through this file.
 // ApiService.js caption/SEO helpers remain active for now (see Task 1C).
-// Legacy adapters: src/legacy/generation/
 //
-// ⚠️ DEPENDENCY: This file calls generateImage(prompt, aspectRatio).
-//    That function must be imported from wherever your existing image
-//    provider call lives. Search for the call that sends to fal.ai / 
-//    Replicate / DALL-E / etc. and import it here.
-//    EXAMPLE: import { generateImage } from './imageProviders';
-//
+// The actual image generator is injected at call time via
+// registerImageGenerator() — see src/stores/SessionStore.js, which registers
+// a function backed by src/services/media.service.js (fal.ai).
 import { supabase }                from '../services/supabaseClient';
 import { GENERATION_STATUS }       from '../constants/statusEnums';
 import { buildGenerationBrief }    from './briefBuilder';
@@ -19,9 +15,6 @@ import { runQualityGate }          from './qualityGate';
 import { loadBrandKit }            from './brandKitLoader';
 import { loadUserHistory }         from './historyLoader';
 
-// ⚠️ Replace this import with your actual image generation function:
-// import { generateImage } from './imageProviders';
-// Signature expected: async (prompt: string, aspectRatio: string) => string (URL)
 let _generateImage = null;
 export function registerImageGenerator(fn) { _generateImage = fn; }
 async function generateImage(prompt, aspectRatio) {
@@ -41,7 +34,7 @@ function normalizeGeneratedAsset(result) {
   return {
     url: result.url || result.publicUrl || '',
     metadata: {
-      provider: result.provider || 'magnific',
+      provider: result.provider || 'fal-ai',
       provider_task_id: result.providerTaskId || result.taskId || null,
       provider_model: result.providerModel || null,
       provider_endpoint: result.providerEndpoint || null,
@@ -119,9 +112,12 @@ export async function runGenerationPipeline({
   onProgress('Planning content...');
   const brief = buildGenerationBrief({ userInput, clarifications, brandKit, history, settings });
 
-  // 4. Call Groq for ContentPlan
+  // 4. Call Groq for ContentPlan (falls back to Claude if Groq fails — the
+  //    provider/model actually used is whatever the edge function reports,
+  //    not necessarily Groq)
   onProgress('Generating content plan...');
-  const rawGroqResponse = await callGroqContentPlan(brief);
+  const { plan: rawGroqResponse, provider: planProvider, model: planModel, totalTokens: planTokens } =
+    await callGroqContentPlan(brief);
 
   // 5. Validate + auto-repair
   const { plan, repairLog } = validateAndRepairPlan(rawGroqResponse);
@@ -131,7 +127,7 @@ export async function runGenerationPipeline({
 
   // 6. Quality gate
   onProgress('Quality check...');
-  const { passed, revisedPlan, notes } = await runQualityGate(plan, brandKit);
+  const { passed, revisedPlan, notes, revisionProvider, revisionModel } = await runQualityGate(plan, brandKit);
   const finalPlan = revisedPlan ?? plan;
 
   // 7. Store ContentPlan
@@ -143,7 +139,11 @@ export async function runGenerationPipeline({
       raw_user_input:     userInput,
       intent_summary:     finalPlan.intent_summary,
       content_plan:       finalPlan,
-      groq_model:         'llama-3.3-70b-versatile',
+      groq_model:         planModel,
+      groq_tokens_used:   planTokens,
+      plan_provider:      planProvider,
+      revision_provider:  revisionProvider,
+      revision_model:     revisionModel,
       quality_gate_pass:  passed,
       quality_gate_notes: notes,
     })

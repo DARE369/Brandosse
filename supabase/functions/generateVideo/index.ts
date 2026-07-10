@@ -5,6 +5,10 @@
  *
  * Tier selection (via `quality` param):
  *   "standard" → Hailuo 2.3  — $0.50/clip, 5-6s, 768p, fast, strong consistency
+ *                Image-to-video only. A "standard" request with no `image_url`
+ *                cannot run on Hailuo, so it is billed and recorded as
+ *                "premium" (Kling) instead — never silently billed as standard.
+ *                See `tierUpgraded`/`tier_upgrade_reason` in the response.
  *   "premium"  → Kling 2.5 Pro — $0.07/sec, up to 30s, near-cinematic, image-to-video
  *
  * Both support text-to-video and image-to-video (pass `image_url` for i2v).
@@ -60,17 +64,30 @@ serve(async (req) => {
     if (!rawPrompt) return jsonResponse({ error: "prompt is required" }, 400);
 
     const startedAt = Date.now();
-    const quality      = body.quality === "premium" ? "premium" : "standard";
-    const creditsNeeded = quality === "premium" ? CREDITS_PRO_VIDEO : CREDITS_STD_VIDEO;
+    const requestedQuality = body.quality === "premium" ? "premium" : "standard";
     const isI2V        = Boolean(body.image_url);
 
-    // ── Credit check (authoritative source: user_credits) ────────────────────
+    // Hailuo 2.3 (the "standard" tier engine) is image-to-video only. A
+    // "standard" request with no source image cannot run on Hailuo, so it
+    // renders on Kling 2.5 Pro (premium) instead. That is a real tier/engine
+    // substitution — it must be billed and recorded as premium, not silently
+    // passed through as standard. See generateVideo header comment.
+    const tierUpgraded = requestedQuality === "standard" && !isI2V;
+    const quality = tierUpgraded ? "premium" : requestedQuality;
+    const creditsNeeded = quality === "premium" ? CREDITS_PRO_VIDEO : CREDITS_STD_VIDEO;
+
+    // ── Credit check (authoritative source: user_credits) ─────────────────────
+    // Checked against the tier that will actually render/bill, not the one requested.
     const { data: creditRow } = await adminClient
       .from("user_credits").select("balance").eq("user_id", user.id).maybeSingle();
 
     const currentCredits = creditRow?.balance ?? 0;
     if (currentCredits < creditsNeeded) {
-      return jsonResponse({ error: "Insufficient credits" }, 402);
+      return jsonResponse({
+        error: tierUpgraded
+          ? `Insufficient credits. Standard-tier text-to-video requires a source image; without one this renders at premium quality (${CREDITS_PRO_VIDEO} credits).`
+          : "Insufficient credits",
+      }, 402);
     }
 
     // ── Prompt enhancement — Claude Haiku ─────────────────────────────────────
@@ -110,15 +127,10 @@ Rules:
       providerModel = isI2V ? "kling-video/v2.5-pro/i2v" : "kling-video/v2.5-pro";
       costUsd      = FAL_COST_USD.videoKlingPerSec * Number(duration);
     } else {
-      // Hailuo 2.3 — always image-to-video; if no image, we can still pass prompt only via t2v variant
-      if (isI2V) {
-        const result = await generateVideoHailuo({ prompt: finalPrompt, image_url: body.image_url!, duration, aspect_ratio });
-        videoUrl = result.video.url;
-      } else {
-        // For text-only standard, fall back to Kling 2.5 text-to-video (Hailuo is i2v-focused)
-        const result = await generateVideoKling({ prompt: finalPrompt, duration, aspect_ratio });
-        videoUrl = result.video.url;
-      }
+      // quality === "standard" is only reachable here when isI2V is true —
+      // a standard request with no image is upgraded to premium/Kling above.
+      const result = await generateVideoHailuo({ prompt: finalPrompt, image_url: body.image_url!, duration, aspect_ratio });
+      videoUrl      = result.video.url;
       providerModel = "hailuo-2.3";
       costUsd       = FAL_COST_USD.videoHailouPerClip;
     }
@@ -142,7 +154,7 @@ Rules:
     // ── Record + deduct credits ────────────────────────────────────────────────
     let generationId: string | null = null;
     if (body.record_generation !== false) {
-      const { data: generation } = await adminClient
+      const { data: generation, error: insertError } = await adminClient
         .from("generations")
         .insert({
           user_id:         user.id,
@@ -157,11 +169,16 @@ Rules:
           provider_model:  providerModel,
           aspect_ratio:    aspect_ratio,
           metadata: {
-            quality, duration, is_image_to_video: isI2V, cost_usd: costUsd,
+            quality, requested_quality: requestedQuality, tier_upgraded: tierUpgraded,
+            duration, is_image_to_video: isI2V, cost_usd: costUsd,
           },
         })
         .select("id")
         .single();
+      if (insertError) {
+        console.error("[generateVideo] failed to record generation:", insertError);
+        throw new Error(`Failed to record generation: ${insertError.message}`);
+      }
       generationId = generation?.id ?? null;
     }
 
@@ -182,6 +199,11 @@ Rules:
       status:            "completed",
       prompt_used:       finalPrompt,
       quality,
+      requested_quality: requestedQuality,
+      tier_upgraded:     tierUpgraded,
+      tier_upgrade_reason: tierUpgraded
+        ? "Standard tier requires a source image for image-to-video; this request had none, so it rendered (and is billed) at premium quality instead."
+        : null,
       provider:          "fal-ai",
       providerModel,
       provider_model:    providerModel,

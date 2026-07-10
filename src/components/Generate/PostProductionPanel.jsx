@@ -118,6 +118,7 @@ export default function PostProductionPanel({
     regeneratePostMetadata,
     scoreSeo,
     optimizeSeo,
+    checkBrandConsistency,
     hydratePostProductionFromGeneration,
     saveDraft,
     preparePostForApproval,
@@ -383,6 +384,22 @@ export default function PostProductionPanel({
       toast.success(`Optimized. New score: ${result?.overall ?? '?'}/100`, { id: toastId });
     } catch (err) {
       toast.error(err?.message || 'Optimization failed', { id: toastId });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckBrandConsistency = async () => {
+    setLoading(true);
+    const toastId = toast.loading('Checking brand consistency...');
+    try {
+      const result = await checkBrandConsistency(organizationId, brandProjectId);
+      toast.success(
+        result.pass ? `Brand consistency: ${result.score ?? '?'}/100 — looks good` : `Brand consistency: ${result.score ?? '?'}/100 — see issues below`,
+        { id: toastId },
+      );
+    } catch (err) {
+      toast.error(err?.message || 'Brand consistency check failed', { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -925,6 +942,47 @@ export default function PostProductionPanel({
                       </button>
                     </div>
                   </div>
+
+                  {isOrgWorkspace ? (
+                    <div className="ppp-seo-score-card">
+                      <div className="ppp-seo-head">
+                        <span className="ppp-seo-title">
+                          <ShieldCheck size={15} />
+                          Brand Consistency
+                        </span>
+                        {postProduction.brandConsistencyScore != null ? (
+                          <strong>{postProduction.brandConsistencyScore} / 100</strong>
+                        ) : null}
+                      </div>
+
+                      {postProduction.brandConsistencyStatus === 'checked' ? (
+                        postProduction.brandConsistencyIssues.length > 0 ? (
+                          <ul className="ppp-seo-suggestions">
+                            {postProduction.brandConsistencyIssues.map((issue, index) => (
+                              <li key={`bc-issue-${index}`}>
+                                {issue?.description || issue?.message || String(issue)}
+                                {issue?.suggestion ? ` — ${issue.suggestion}` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="hashtag-empty">No brand consistency issues found.</p>
+                        )
+                      ) : (
+                        <p className="hashtag-empty">Check this caption against the org's brand voice before submitting.</p>
+                      )}
+
+                      <div className="ppp-seo-actions">
+                        <button
+                          className="btn-sm"
+                          onClick={handleCheckBrandConsistency}
+                          disabled={loading || !postProduction.caption.trim() || !brandProjectId}
+                        >
+                          {postProduction.brandConsistencyStatus === 'checking' ? 'Checking...' : 'Check Brand Consistency'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
 

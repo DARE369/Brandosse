@@ -44,12 +44,31 @@ const GUARDRAIL_CHECKS = [
 ];
 
 /**
- * Runs guardrail checks. On violation calls Groq once for a revision.
- * @returns {{ passed: boolean, revisedPlan: object|null, notes: string }}
+ * Thrown when a brand-guardrail violation cannot be cleared — either the
+ * auto-revision call itself failed, or the revised plan still violates one
+ * or more guardrails. Callers must let this abort generation (fail closed),
+ * not swallow it and proceed with a violating plan.
+ */
+export class QualityGateBlockedError extends Error {
+  constructor(violations, reason) {
+    super(`Content blocked by brand guardrails (${reason}): ${violations.join('; ')}`);
+    this.name = 'QualityGateBlockedError';
+    this.violations = violations;
+    this.reason = reason;
+  }
+}
+
+/**
+ * Runs guardrail checks. On violation, calls Groq once for a revision, then
+ * re-checks the revised plan against the same guardrails. If the violation
+ * cannot be cleared — the revision call fails, or the revised plan still
+ * violates — throws QualityGateBlockedError instead of letting the
+ * violating plan through.
+ * @returns {{ passed: boolean, revisedPlan: object|null, notes: string, revisionProvider: string|null, revisionModel: string|null }}
  */
 export async function runQualityGate(plan, brandKit) {
   if (!brandKit?.configured) {
-    return { passed: true, revisedPlan: null, notes: 'No brand kit — gate skipped.' };
+    return { passed: true, revisedPlan: null, notes: 'No brand kit — gate skipped.', revisionProvider: null, revisionModel: null };
   }
 
   const violations = GUARDRAIL_CHECKS
@@ -57,25 +76,35 @@ export async function runQualityGate(plan, brandKit) {
     .filter(Boolean);
 
   if (violations.length === 0) {
-    return { passed: true, revisedPlan: null, notes: '' };
+    return { passed: true, revisedPlan: null, notes: '', revisionProvider: null, revisionModel: null };
   }
 
   console.warn('[QualityGate] Violations found, requesting revision:', violations);
 
+  let revised;
+  let provider;
+  let model;
   try {
-    const revised = await callGroqRevision(plan, violations, brandKit);
-    return {
-      passed: false,
-      revisedPlan: revised,
-      notes: `Auto-revised. Violations: ${violations.join('; ')}`,
-    };
+    ({ plan: revised, provider, model } = await callGroqRevision(plan, violations, brandKit));
   } catch (err) {
-    console.error('[QualityGate] Revision call failed:', err);
-    // Return original plan rather than blocking generation
-    return {
-      passed: false,
-      revisedPlan: null,
-      notes: `Revision failed (${err.message}). Original plan used. Violations: ${violations.join('; ')}`,
-    };
+    console.error('[QualityGate] Revision call failed — blocking generation:', err);
+    throw new QualityGateBlockedError(violations, `revision request failed: ${err.message}`);
   }
+
+  const remainingViolations = GUARDRAIL_CHECKS
+    .map(check => check(revised, brandKit))
+    .filter(Boolean);
+
+  if (remainingViolations.length > 0) {
+    console.error('[QualityGate] Revision did not clear violations — blocking generation:', remainingViolations);
+    throw new QualityGateBlockedError(remainingViolations, 'revision did not clear the violation(s)');
+  }
+
+  return {
+    passed: false,
+    revisedPlan: revised,
+    notes: `Auto-revised. Violations: ${violations.join('; ')}`,
+    revisionProvider: provider,
+    revisionModel: model,
+  };
 }
