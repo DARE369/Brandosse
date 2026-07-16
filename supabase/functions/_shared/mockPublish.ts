@@ -73,6 +73,8 @@ export async function runMockPublish({
         published_at: publishTimestamp,
         platform: account.platform,
         account_id: account.id,
+        error_message: null,
+        failed_at: null,
       })
       .eq("id", post.id);
 
@@ -153,6 +155,8 @@ export async function runMockPublish({
       status: "failed",
       platform: account.platform,
       account_id: account.id,
+      error_message: outcome.reason,
+      failed_at: publishTimestamp,
     })
     .eq("id", post.id);
 

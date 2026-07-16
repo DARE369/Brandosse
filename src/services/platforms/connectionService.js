@@ -33,6 +33,7 @@ const CONNECTED_ACCOUNT_SAFE_SELECT = [
   'follower_count',
   'account_category',
   'is_mock',
+  'provider',
   'last_token_refresh_at',
   'health_score',
   'consecutive_failure_count',
@@ -474,17 +475,17 @@ export async function getAccountHealth(accountId) {
 }
 
 // =============================================================================
-// Real OAuth flow (replaces mock when platform credentials are configured)
+// Real OAuth flow (replaces mock when Zernio is configured)
 // =============================================================================
 
 /**
  * initiateOAuthConnection — smart OAuth router.
  *
- * If the platform has real credentials configured on the server:
- *   → redirects the browser to /api/auth/oauth?platform=...
- *     (browser goes to platform consent screen, returns to /api/auth/oauth/callback)
+ * If Zernio is configured (ZERNIO_API_KEY set):
+ *   → redirects the browser to /api/auth/zernio/connect?platform=...
+ *     (Zernio owns the OAuth exchange; browser returns to /api/auth/zernio/callback)
  *
- * If not (development or platform not yet approved):
+ * If not (development, or org-scoped — Zernio is personal-only for now):
  *   → falls back to connectAccount() with mock data
  *
  * The Settings page calls this instead of MockOAuthService.connectMockAccount().
@@ -497,41 +498,40 @@ export async function initiateOAuthConnection({
   formData = {},
   fallbackToMock = true,
 } = {}) {
-  // Check if real OAuth is available for this platform
-  const checkRes = await fetch(`/api/auth/oauth/available?platform=${encodeURIComponent(platform)}`).catch(() => null);
-  const availability = checkRes?.ok ? await checkRes.json().catch(() => ({})) : {};
-  const isRealAvailable = Boolean(availability?.available);
+  // Org-scoped accounts aren't wired for Zernio yet (personal-only for this
+  // pass), so those go straight to the mock fallback below.
+  if (scope === 'personal') {
+    const zernioCheckRes = await fetch('/api/auth/zernio/available').catch(() => null);
+    const zernioAvailability = zernioCheckRes?.ok ? await zernioCheckRes.json().catch(() => ({})) : {};
 
-  if (isRealAvailable) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      throw new Error('Sign in again before connecting a real platform account.');
+    if (zernioAvailability?.available) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Sign in again before connecting a real platform account.');
+      }
+
+      const response = await fetch(`/api/auth/zernio/connect?platform=${encodeURIComponent(platform)}&format=json`, {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload?.url) {
+        window.location.href = payload.url;
+        return { redirecting: true };
+      }
+      // Fall through to direct-OAuth/mock if Zernio couldn't start the flow
+      // (e.g. platform unsupported by Zernio) instead of hard-failing here.
     }
-
-    const params = new URLSearchParams({ platform, scope });
-    if (orgId) params.set('org_id', orgId);
-
-    const response = await fetch(`/api/auth/oauth?${params}&format=json`, {
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload?.url) {
-      throw new Error(payload?.error || 'Could not start the platform authorization flow.');
-    }
-
-    window.location.href = payload.url;
-    return { redirecting: true };
   }
 
   if (!fallbackToMock) {
     return {
       redirecting: false,
       realAvailable: false,
-      reason: availability?.reason || 'oauth_unavailable',
+      reason: 'oauth_unavailable',
     };
   }
 

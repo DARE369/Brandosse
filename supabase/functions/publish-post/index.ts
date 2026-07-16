@@ -2,8 +2,8 @@
  * publish-post — unified publish endpoint (real + mock)
  *
  * Routes automatically:
- *   account.is_mock = true  → mock flow (existing mockPublish.ts)
- *   account.is_mock = false → real platform API (publisher.service.ts)
+ *   account.is_mock = true  → mock flow (mockPublish.ts)
+ *   account.is_mock = false → real platform API via Zernio (zernio.service.ts)
  *
  * Called by:
  *   - The scheduled-publish SQL worker (service-role, via pg_net)
@@ -21,7 +21,7 @@ import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorP
 import { requireServiceRole } from "../_shared/connectionHelpers.ts";
 import { createHttpError, requireActiveOrgMember } from "../_shared/org.ts";
 import { runMockPublish } from "../_shared/mockPublish.ts";
-import { publishToRealPlatform } from "../_shared/publisher.service.ts";
+import { publishToZernio } from "../_shared/zernio.service.ts";
 
 type PublishRequest = {
   post_id: string;
@@ -79,7 +79,7 @@ serve(async (req) => {
       .from("posts")
       .select(`
         id, user_id, organization_id, caption, platform, status,
-        scheduled_at, hashtags, media_type, workflow_state,
+        scheduled_at, hashtags, workflow_state,
         generations ( storage_path, media_type, output_url )
       `)
       .eq("id", postId)
@@ -157,8 +157,21 @@ serve(async (req) => {
       });
 
     } else {
-      // Real platform publish
-      result = await publishToRealPlatform({ post, account, mediaUrl });
+      // Real platform publish — Zernio is the only real-publish provider.
+      // (The earlier direct-per-platform-OAuth path, publisher.service.ts,
+      // was removed: no platform ever had app credentials configured for it,
+      // so it could never actually publish anything.)
+      if (account.provider && account.provider !== "zernio") {
+        result = {
+          success: false,
+          platformPostId: null,
+          platformPostUrl: null,
+          failureReason: `Unsupported publishing provider "${account.provider}". Reconnect this account through Zernio.`,
+          retriable: false,
+        };
+      } else {
+        result = await publishToZernio({ post, account, mediaUrl });
+      }
 
       // posts has no consecutive_failure_count/last_failure_at/
       // platform_post_url columns (confirmed via live schema introspection
