@@ -1373,6 +1373,17 @@ const useSessionStore = create((set, get) => ({
       const generationIds = [];
       const outcomes = [];
 
+      // 3.4: deliberate batch variation — instead of sending the same prompt N
+      // times (near-dupes), give each variant a distinct creative direction so
+      // the batch explores angle/lighting/crop/mood. Only applied for true
+      // multi-variant image batches; a single image is untouched.
+      const VARIANT_DIRECTIONS = [
+        '',
+        'a different camera angle and tighter composition',
+        'different lighting and mood, wider shot',
+        'an alternative composition with a fresh perspective',
+      ];
+
       for (let index = 0; index < requestedVariants; index += 1) {
         // Store-level cancellation check (not just a UI stage guard): a
         // variant not yet started when Cancel fires is skipped entirely —
@@ -1401,6 +1412,9 @@ const useSessionStore = create((set, get) => ({
               ...settings,
               contentType: settings.contentType ?? 'single',
               mediaType: 'image',
+              // 3.4: distinct direction per variant (empty for variant 0 and
+              // for single-image runs, so those are unchanged).
+              variantHint: requestedVariants > 1 ? VARIANT_DIRECTIONS[index % VARIANT_DIRECTIONS.length] : '',
             },
             onProgress: (stage) => {
               const mapped = mapStageProgress(stage);

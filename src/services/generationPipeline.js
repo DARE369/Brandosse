@@ -252,7 +252,12 @@ async function runSingleGeneration(
   // de-tuning the plan's full_prompt to save the pass is a creative-core
   // change that needs before/after image A/B (see plan 1.3 risk) — a
   // follow-up, not this PR.
-  const prompt      = plan.visual_prompt?.slides?.[0]?.full_prompt ?? plan.visual_prompt?.global_style ?? '';
+  const basePrompt  = plan.visual_prompt?.slides?.[0]?.full_prompt ?? plan.visual_prompt?.global_style ?? '';
+  // 3.4: a per-variant direction hint (set by startGeneration for multi-variant
+  // batches) nudges each variant toward a different angle/lighting/crop so the
+  // batch isn't 4 near-dupes. Empty for single images and variant 0.
+  const variantHint = String(settings?.variantHint || '').trim();
+  const prompt      = variantHint ? `${basePrompt}. Variation: ${variantHint}.` : basePrompt;
   const aspectRatio = plan.visual_prompt?.aspect_ratio ?? '1:1';
 
   onProgress('Generating image...');

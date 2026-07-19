@@ -165,6 +165,9 @@ function StudioBody({ brandKit }) {
 
   const [prompt, setPrompt] = useState("");
   const [sourceImageUrl, setSourceImageUrl] = useState("");
+  const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
+  const [sourcePickerItems, setSourcePickerItems] = useState([]);
+  const [sourcePickerLoading, setSourcePickerLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [localError, setLocalError] = useState("");
   const [publishing, setPublishing] = useState(false);
@@ -291,7 +294,7 @@ function StudioBody({ brandKit }) {
   }, [prompt]);
 
   const handleModeChange = useCallback(
-    (mode) => {
+    (mode, explicitSource) => {
       const next = CONTENT_TYPES.find((t) => t.id === mode) || CONTENT_TYPES[0];
       const isVid = next.mediaType === "video" || next.mediaType === "image-to-video";
       updateSettings({
@@ -301,7 +304,10 @@ function StudioBody({ brandKit }) {
         slideCount: next.id === "carousel" ? settings.slideCount || 6 : "auto",
         duration: isVid ? 5 : settings.duration,
         videoQuality: isVid ? (settings.videoQuality || "standard") : settings.videoQuality,
-        referenceImageUrl: sourceImageUrl,
+        // explicitSource lets handleUseAsSource (3.1) pass the just-selected URL
+        // directly, avoiding a stale-closure read of sourceImageUrl (which it
+        // sets in the same tick). Falls back to current state otherwise.
+        referenceImageUrl: explicitSource ?? sourceImageUrl,
       });
     },
     [settings, sourceImageUrl, updateSettings]
@@ -512,6 +518,63 @@ function StudioBody({ brandKit }) {
     [regenerateVariant]
   );
 
+  /* 3.1: turn a generated image into the source for an edit / frames-to-video
+     run in one click — no more hand-copying a URL into the source box. Feeds
+     the generation's stored image straight into sourceImageUrl, flips the
+     mode, and scrolls the brief into view. Only images can be a source. */
+  const handleUseAsSource = useCallback(
+    (generation, targetMode) => {
+      const src = generation?.storage_path || generation?.output_url || generation?.thumbnail_url;
+      if (!src) {
+        toast.error("This image is no longer available to use as a source.");
+        return;
+      }
+      setSourceImageUrl(src);
+      handleModeChange(targetMode, src); // 'edit' | 'image-to-video'; pass src explicitly (state not yet committed)
+      setStudioStage("brief");
+      setLightboxOpen(false);
+      toast.success(targetMode === "edit" ? "Loaded as source — describe the edit." : "Loaded as first frame — describe the motion.");
+      setTimeout(() => promptRef.current?.focus(), 120);
+    },
+    [handleModeChange]
+  );
+
+  /* 3.2: open the "pick a source from your Library" modal. Loads the user's
+     recent completed IMAGE generations — the exact set that makes sense as an
+     edit / frames-to-video source — so they don't have to hand-paste a URL. */
+  const openSourcePicker = useCallback(async () => {
+    setSourcePickerOpen(true);
+    setSourcePickerLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("generations")
+        .select("id, storage_path, prompt, media_type, created_at")
+        .eq("user_id", user?.id)
+        .eq("media_type", "image")
+        .eq("status", "completed")
+        .is("organization_id", null)
+        .not("storage_path", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(48);
+      if (error) throw error;
+      setSourcePickerItems(data || []);
+    } catch (err) {
+      toast.error("Couldn't load your images — you can still paste a URL.");
+      setSourcePickerItems([]);
+    } finally {
+      setSourcePickerLoading(false);
+    }
+  }, [user?.id]);
+
+  const handlePickSource = useCallback((item) => {
+    const src = item?.storage_path;
+    if (src) {
+      setSourceImageUrl(src);
+      toast.success("Source image selected.");
+    }
+    setSourcePickerOpen(false);
+  }, []);
+
   const toggleSlideSelected = useCallback((id) => {
     setSlideSelection((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
@@ -677,13 +740,28 @@ function StudioBody({ brandKit }) {
                 </div>
 
                 {needsSourceImage && (
-                  <input
-                    className={styles.fieldInput}
-                    style={{ width: "100%", marginBottom: 8 }}
-                    placeholder="Source image URL (from Library or a generated asset)"
-                    value={sourceImageUrl}
-                    onChange={(e) => setSourceImageUrl(e.target.value)}
-                  />
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                      {sourceImageUrl ? (
+                        <img
+                          src={sourceImageUrl}
+                          alt="Source"
+                          style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover", flexShrink: 0, border: "1px solid var(--uiv2-border)" }}
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                        />
+                      ) : null}
+                      <input
+                        className={styles.fieldInput}
+                        style={{ flex: 1 }}
+                        placeholder="Source image URL, or pick from your Library →"
+                        value={sourceImageUrl}
+                        onChange={(e) => setSourceImageUrl(e.target.value)}
+                      />
+                      <Button variant="subtle" size="sm" onClick={openSourcePicker} style={{ flexShrink: 0 }}>
+                        Pick
+                      </Button>
+                    </div>
+                  </div>
                 )}
 
                 {guided ? (
@@ -1106,6 +1184,16 @@ function StudioBody({ brandKit }) {
                             >
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-7 3L3 8" strokeLinecap="round" strokeLinejoin="round" /><path d="M3 3v5h5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                             </button>
+                            {g.media_type !== "video" && (
+                              <>
+                                <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); handleUseAsSource(g, "edit"); }} title="Edit this image with a prompt">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" strokeLinecap="round" /><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                </button>
+                                <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); handleUseAsSource(g, "image-to-video"); }} title="Animate this image into a video">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" strokeLinejoin="round" /></svg>
+                                </button>
+                              </>
+                            )}
                           </span>
                         </div>
                         {g.metadata?.quality?.verdict === "fail" && !regeneratingIds.includes(g.id) && (
@@ -1424,6 +1512,40 @@ function StudioBody({ brandKit }) {
         }
       />
 
+      {/* 3.2: Library source picker */}
+      <Modal
+        open={sourcePickerOpen}
+        onClose={() => setSourcePickerOpen(false)}
+        size="lg"
+        title="Pick a source image"
+        description="Choose one of your generated images to edit or animate."
+      >
+        {sourcePickerLoading ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8 }}>
+            {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} height="96px" radius="8px" />)}
+          </div>
+        ) : sourcePickerItems.length === 0 ? (
+          <EmptyState title="No images yet" description="Generate an image first, then you can edit or animate it." />
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8, maxHeight: "56vh", overflowY: "auto" }}>
+            {sourcePickerItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handlePickSource(item)}
+                title={item.prompt || "Use this image"}
+                style={{
+                  padding: 0, border: "1px solid var(--uiv2-border)", borderRadius: 8,
+                  overflow: "hidden", cursor: "pointer", aspectRatio: "1/1", background: "var(--uiv2-surface-sunken, #1a1a1c)",
+                }}
+              >
+                <img src={item.storage_path} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={(e) => { e.currentTarget.style.opacity = "0.2"; }} />
+              </button>
+            ))}
+          </div>
+        )}
+      </Modal>
+
       {lightboxOpen && lightboxGeneration && (
         <StudioLightbox
           generation={lightboxGeneration}
@@ -1435,6 +1557,8 @@ function StudioBody({ brandKit }) {
           onSelect={() => { selectGeneration(lightboxGeneration); setLightboxOpen(false); }}
           onUseForPost={() => { setLightboxOpen(false); handleGoToPublish(lightboxGeneration); }}
           onRegenerate={() => handleRegenerateVariant(lightboxGeneration)}
+          onEdit={() => handleUseAsSource(lightboxGeneration, "edit")}
+          onAnimate={() => handleUseAsSource(lightboxGeneration, "image-to-video")}
           regenerating={regeneratingIds.includes(lightboxGeneration.id)}
         />
       )}
