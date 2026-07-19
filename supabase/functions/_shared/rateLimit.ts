@@ -65,6 +65,8 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   // it's an unmetered cost leak — 24/min comfortably covers a 4-image batch +
   // a full carousel scored back-to-back, while blocking a tight-loop abuser.
   "quality-gate": { max: 24, windowSeconds: 60 },
+  // upscale is a credited, single-shot finishing action — modest cap.
+  upscaleImage: { max: 10, windowSeconds: 60 },
 };
 
 type CheckRateLimitRow = { allowed: boolean; retry_after_seconds: number };

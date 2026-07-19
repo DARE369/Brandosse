@@ -278,6 +278,23 @@ export async function editImage({
   };
 }
 
+// 5.3: upscale / finish an existing generated image. Charged (2 credits) by
+// the edge fn. When generationId is given, the edge fn swaps that row's stored
+// image to the upscaled one; the returned url is the new image.
+export async function upscaleImage({ imageUrl, generationId = null, scale = 2, requestId = null, signal }) {
+  const cleaned = cleanPrompt(imageUrl);
+  if (!cleaned) throw new Error('An image is required to upscale');
+  const data = await invokeFunction('upscaleImage', {
+    image_url: cleaned,
+    generation_id: generationId,
+    scale,
+    request_id: requestId,
+  }, { signal });
+  const url = data.publicUrl || data.url;
+  if (!url) throw new Error('Upscaler returned no image URL');
+  return { url, storagePath: data.storagePath || null, generationId: data.generation_id || null, generationCost: data.credits_used ?? null };
+}
+
 // Week 3 Fix 3: generateVideo is submit-and-return now — this resolves as
 // soon as fal.ai accepts the job (seconds), not after the video finishes
 // rendering (minutes). The actual video appears later via

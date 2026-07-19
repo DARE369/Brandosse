@@ -82,6 +82,7 @@ export const FAL_MODELS = {
   imageIdeogramV3:  "fal-ai/ideogram/v3",                 // best exact-text rendering (flyers, captions in-image)
   imageRecraftV3:   "fal-ai/recraft/v3/text-to-image",    // typography/vector + brand-color control
   imageEditKontext: "fal-ai/flux-pro/kontext",            // prompt-driven edit of an existing image
+  imageUpscale:     "fal-ai/clarity-upscaler",            // upscale + sharpen/denoise finish pass (5.3)
   videoHailuo23:    "fal-ai/minimax/video-01",    // Hailuo 2.3 standard — image-to-video
   videoKling25Pro:  "fal-ai/kling-video/v2.5/pro", // Kling 2.5 Pro text-to-video
   videoKling25I2V:  "fal-ai/kling-video/v2.5/pro/image-to-video",
@@ -386,6 +387,20 @@ export async function generateImageRecraft(input: FalImageGenInput): Promise<Fal
   return runImageModel(FAL_MODELS.imageRecraftV3, normalized, apiKey);
 }
 
+/**
+ * Upscale / finish an existing image (5.3). Uses fal's clarity upscaler, which
+ * both enlarges and sharpens/denoises — the "make it look finished" pass a
+ * human would do before publishing. Sync-first with queue fallback.
+ */
+export async function upscaleImage(input: { image_url: string; scale?: number }): Promise<FalImageResult> {
+  const apiKey = getFalKey();
+  const normalized: Record<string, unknown> = {
+    image_url: input.image_url,
+    scale: input.scale ?? 2,
+  };
+  return runImageModel(FAL_MODELS.imageUpscale, normalized, apiKey);
+}
+
 export interface FalImageEditInput {
   prompt: string;
   image_url: string;
@@ -572,6 +587,7 @@ export const FAL_COST_USD = {
   imageIdeogramBalanced: 0.060, // fal-ai/ideogram/v3 BALANCED (TURBO $0.03 / QUALITY $0.09)
   imageRecraft:          0.040, // fal-ai/recraft/v3 raster ($0.08 vector)
   imageEditKontext:      0.040, // fal-ai/flux-pro/kontext per edit
+  imageUpscale:          0.040, // fal-ai/clarity-upscaler per image (5.3)
   videoHailouPerClip:    0.500, // per 5-6s clip
   videoKlingPerSec:      0.070, // per second of output
 } as const;

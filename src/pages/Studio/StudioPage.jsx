@@ -666,6 +666,27 @@ function StudioBody({ brandKit }) {
     updateSettings({ referenceImages: current.filter((u) => u !== url) });
   }, [settings.referenceImages, updateSettings]);
 
+  /* 5.3: upscale / finish a generated image (charged 2 cr by the edge fn).
+     Swaps the row's stored image to the higher-res one, then refreshes so the
+     grid/lightbox show it. */
+  const [upscalingId, setUpscalingId] = useState(null);
+  const handleUpscale = useCallback(async (generation) => {
+    const src = generation?.storage_path || generation?.output_url;
+    if (!src) { toast.error("This image is no longer available."); return; }
+    if (generation?.metadata?.upscaled) { toast("Already upscaled."); return; }
+    setUpscalingId(generation.id);
+    try {
+      const { upscaleImage } = await import("../../services/media.service");
+      await upscaleImage({ imageUrl: src, generationId: generation.id, requestId: crypto.randomUUID() });
+      toast.success("Upscaled — higher resolution and cleaner.");
+      if (activeSession?.id) await useSessionStore.getState().fetchGenerations(activeSession.id, { silent: true });
+    } catch (err) {
+      if (!applyRateLimit("upscale", err)) toast.error(err?.message || "Could not upscale this image.");
+    } finally {
+      setUpscalingId(null);
+    }
+  }, [activeSession?.id, applyRateLimit]);
+
   /* 4.3: pin a generated image as a reference so future generations match it
      (a recurring product / character / style). Adds to the same
      referenceImages sink as 4.1's picker. */
@@ -1787,6 +1808,8 @@ function StudioBody({ brandKit }) {
           onEdit={() => handleUseAsSource(lightboxGeneration, "edit")}
           onAnimate={() => handleUseAsSource(lightboxGeneration, "image-to-video")}
           onAddReference={() => handleAddAsReference(lightboxGeneration)}
+          onUpscale={() => handleUpscale(lightboxGeneration)}
+          upscaling={upscalingId === lightboxGeneration.id}
           regenerating={regeneratingIds.includes(lightboxGeneration.id)}
         />
       )}
