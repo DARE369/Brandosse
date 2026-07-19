@@ -17,10 +17,19 @@ import { readEnv } from "./env.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// fal.ai image models accept image_size as EITHER a named preset OR an
+// explicit { width, height } object. The presets are coarse (there is no
+// portrait_4_5), so for social ratios the enum can't express exactly — 4:5
+// (Instagram portrait) being the important one — we pass explicit dimensions
+// instead of silently snapping to the nearest preset (which used to drop 4:5
+// to square_hd — see aspectToFalImageSize).
+export type FalImageDimensions = { width: number; height: number };
+
 export type FalImageSize =
   | "square_hd" | "square"
   | "portrait_4_3" | "portrait_16_9"
-  | "landscape_4_3" | "landscape_16_9";
+  | "landscape_4_3" | "landscape_16_9"
+  | FalImageDimensions;
 
 export type FalVideoAspect = "16:9" | "9:16" | "1:1";
 export type FalVideoDuration = "5" | "10";
@@ -103,10 +112,35 @@ async function checkFalError(res: Response, context: string): Promise<void> {
 
 // ── Queue-based async generation (for video + large images) ──────────────────
 
-interface QueueSubmitResult { request_id: string; status: string; queue_position?: number }
+interface QueueSubmitResult {
+  request_id: string;
+  status: string;
+  queue_position?: number;
+  status_url?: string;
+  response_url?: string;
+  cancel_url?: string;
+}
 
-async function queueSubmit(modelId: string, input: unknown, apiKey: string): Promise<string> {
-  const res = await fetch(`${FAL_QUEUE_BASE}/${modelId}`, {
+/**
+ * Returns fal.ai's FULL submit response, not just request_id. This matters:
+ * fal.ai's queue status/response/cancel endpoints are keyed on the app's
+ * BASE id (e.g. "fal-ai/kling-video"), not the full model endpoint id used
+ * at submit time (e.g. "fal-ai/kling-video/v2.5/pro" — the "/v2.5/pro" is a
+ * model-variant suffix, submit-only). Reconstructing the status/response
+ * URL by guessing how many path segments to keep is fragile and was
+ * confirmed WRONG live (2026-07-12): a real Kling video completed
+ * successfully on fal.ai's side, but our own status URL (built from the
+ * full model id) 405'd on every poll, so the job was never recognized as
+ * done and was eventually given up on / refunded despite fal.ai having
+ * already rendered it. fal.ai's own submit response already includes the
+ * correct status_url/response_url/cancel_url — using those directly avoids
+ * ever needing to guess this again for any current or future model.
+ */
+async function queueSubmit(modelId: string, input: unknown, apiKey: string, webhookUrl?: string): Promise<QueueSubmitResult> {
+  const url = webhookUrl
+    ? `${FAL_QUEUE_BASE}/${modelId}?fal_webhook=${encodeURIComponent(webhookUrl)}`
+    : `${FAL_QUEUE_BASE}/${modelId}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: falHeaders(apiKey),
     body: JSON.stringify({ input }),
@@ -114,7 +148,70 @@ async function queueSubmit(modelId: string, input: unknown, apiKey: string): Pro
   await checkFalError(res, "queue submit");
   const data: QueueSubmitResult = await res.json();
   if (!data.request_id) throw new Error("fal.ai did not return a request_id");
-  return data.request_id;
+  return data;
+}
+
+export type QueueStatus = "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | string;
+
+/**
+ * Submit-and-return for Week 3 Fix 3's async video job mechanism — unlike
+ * queueSubmit+queuePoll (which blocks the caller until fal.ai resolves),
+ * this returns the fal request id immediately so the edge function can
+ * respond to the client right away and let fal.ai's own webhook (preferred)
+ * or the process-jobs poller (fallback) observe completion later.
+ *
+ * Persists statusUrl/responseUrl/cancelUrl (fal.ai's own, authoritative
+ * URLs from the submit response) alongside falRequestId/modelId — callers
+ * should store all of these and pass the URLs back into
+ * getQueueStatus/getQueueResult/cancelQueueJob rather than reconstructing
+ * them from modelId.
+ */
+export async function submitVideoJob(
+  modelId: string,
+  input: unknown,
+  webhookUrl?: string,
+): Promise<{ falRequestId: string; modelId: string; statusUrl: string; responseUrl: string; cancelUrl: string }> {
+  const apiKey = getFalKey();
+  const result = await queueSubmit(modelId, input, apiKey, webhookUrl);
+  return {
+    falRequestId: result.request_id,
+    modelId,
+    statusUrl: result.status_url || `${FAL_QUEUE_BASE}/${modelId}/requests/${result.request_id}/status`,
+    responseUrl: result.response_url || `${FAL_QUEUE_BASE}/${modelId}/requests/${result.request_id}`,
+    cancelUrl: result.cancel_url || `${FAL_QUEUE_BASE}/${modelId}/requests/${result.request_id}/cancel`,
+  };
+}
+
+/** Used by the process-jobs poller (fallback for dropped webhooks) and the
+ * job-webhook function (to fetch the final result once notified). Takes
+ * fal.ai's own status_url directly (see submitVideoJob) rather than
+ * reconstructing it from a model id. */
+export async function getQueueStatus(statusUrl: string): Promise<{ status: QueueStatus; error?: string }> {
+  const apiKey = getFalKey();
+  const res = await fetch(statusUrl, { headers: falHeaders(apiKey) });
+  await checkFalError(res, "queue status");
+  return res.json();
+}
+
+export async function getQueueResult<T = FalVideoResult>(responseUrl: string): Promise<T> {
+  const apiKey = getFalKey();
+  const res = await fetch(responseUrl, { headers: falHeaders(apiKey) });
+  await checkFalError(res, "queue response");
+  return res.json() as Promise<T>;
+}
+
+/** Best-effort cancellation — not all fal.ai models support queue cancel;
+ * failures here are swallowed by the caller (see cancel-job edge action)
+ * since a job already marked cancelled locally should not resurrect on a
+ * fal-side error. Takes fal.ai's own cancel_url directly (see submitVideoJob). */
+export async function cancelQueueJob(cancelUrl: string): Promise<boolean> {
+  try {
+    const apiKey = getFalKey();
+    const res = await fetch(cancelUrl, { method: "PUT", headers: falHeaders(apiKey) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function queuePoll<T>(
@@ -161,7 +258,15 @@ async function falRunSync<T>(modelId: string, input: unknown, apiKey: string): P
   const res = await fetch(`${FAL_RUN_BASE}/${modelId}`, {
     method: "POST",
     headers: falHeaders(apiKey),
-    body: JSON.stringify({ input }),
+    // fal.ai's SYNC endpoint (fal.run/{model}) takes the model's parameters
+    // directly as the request body — unlike the QUEUE endpoint
+    // (queue.fal.run/{model}, see queueSubmit above), which wraps them in an
+    // {"input": {...}} envelope. Wrapping here double-nested the payload
+    // (fal.ai received {"input": {"input": {prompt: ...}}}), which fal.ai's
+    // own validation correctly rejected as a missing "prompt" field — found
+    // live 2026-07-12 once a valid FAL_API_KEY let requests actually reach
+    // this validation step for the first time.
+    body: JSON.stringify(input),
     signal: AbortSignal.timeout(60_000), // 60s hard timeout
   });
   await checkFalError(res, "sync run");
@@ -355,18 +460,73 @@ export async function generateVideoKlingI2V(input: FalImageToVideoInput): Promis
 }
 
 /**
- * Map a user-facing aspect ratio string to the fal image_size enum.
- * Accepts "1:1", "16:9", "9:16", "4:5", "4:3", etc.
+ * Submit-and-return variants of the three video generators above, for the
+ * async job mechanism (Week 3 Fix 3). Same input normalization as
+ * generateVideoHailuo/generateVideoKling/generateVideoKlingI2V; the only
+ * difference is these return immediately with a fal request id instead of
+ * blocking on queuePoll.
+ */
+export async function submitVideoHailuo(input: FalImageToVideoInput, webhookUrl?: string) {
+  const normalized = {
+    prompt:       input.prompt,
+    image_url:    input.image_url,
+    duration:     input.duration     ?? "5",
+    aspect_ratio: input.aspect_ratio ?? "16:9",
+  };
+  return submitVideoJob(FAL_MODELS.videoHailuo23, normalized, webhookUrl);
+}
+
+export async function submitVideoKling(input: FalTextToVideoInput, webhookUrl?: string) {
+  const normalized = {
+    prompt:          input.prompt,
+    duration:        input.duration        ?? "5",
+    aspect_ratio:    input.aspect_ratio    ?? "16:9",
+    negative_prompt: input.negative_prompt ?? "blurry, distorted, low quality, watermark",
+    cfg_scale:       input.cfg_scale       ?? 0.5,
+  };
+  return submitVideoJob(FAL_MODELS.videoKling25Pro, normalized, webhookUrl);
+}
+
+export async function submitVideoKlingI2V(input: FalImageToVideoInput, webhookUrl?: string) {
+  const normalized = {
+    prompt:          input.prompt,
+    image_url:       input.image_url,
+    duration:        input.duration        ?? "5",
+    aspect_ratio:    input.aspect_ratio    ?? "16:9",
+    negative_prompt: input.negative_prompt ?? "blurry, distorted, low quality, watermark",
+  };
+  return submitVideoJob(FAL_MODELS.videoKling25I2V, normalized, webhookUrl);
+}
+
+/**
+ * Map a user-facing aspect ratio string to a fal image_size value.
+ * Accepts "1:1", "16:9", "9:16", "4:5", "4:3", "3:4", etc.
+ *
+ * Ratios the coarse preset enum expresses exactly use the preset; ratios it
+ * does NOT (notably 4:5 — Instagram portrait, and 5:4) use explicit
+ * dimensions so the delivered image is the ratio the user actually asked for.
+ * Dimensions target ~1MP so cost (fal bills per megapixel) stays predictable
+ * and comparable to the square_hd preset (1024²).
  */
 export function aspectToFalImageSize(aspect: string): FalImageSize {
-  const map: Record<string, FalImageSize> = {
+  const presets: Record<string, FalImageSize> = {
     "1:1":  "square_hd",
     "4:3":  "landscape_4_3",
     "16:9": "landscape_16_9",
     "3:4":  "portrait_4_3",
     "9:16": "portrait_16_9",
   };
-  return map[aspect] ?? "square_hd";
+  if (presets[aspect]) return presets[aspect];
+
+  // Ratios with no exact preset → explicit ~1MP dimensions (multiples of 32,
+  // which fal's models require).
+  const explicit: Record<string, FalImageDimensions> = {
+    "4:5": { width: 896,  height: 1120 }, // Instagram portrait
+    "5:4": { width: 1120, height: 896 },
+  };
+  if (explicit[aspect]) return explicit[aspect];
+
+  return "square_hd";
 }
 
 /**

@@ -43,6 +43,17 @@ export const CONTENT_TYPES = [
   },
 ];
 
+// Advanced image-model override (1.2). 'auto' lets the content plan's
+// render_intent pick the engine (photo→FLUX, text→Ideogram, design→Recraft);
+// the others force a specific fal model. Kept short + jargon-free — the label
+// describes the OUTCOME, not the model name, so a non-technical user can pick.
+export const IMAGE_MODEL_OPTIONS = [
+  { id: 'auto',     label: 'Auto',   hint: 'Picks the best engine for what you described' },
+  { id: 'flux',     label: 'Photo',  hint: 'Photorealistic — people, products, scenes (FLUX.2 Pro)' },
+  { id: 'ideogram', label: 'Text',   hint: 'Legible text in the image — flyers, quote cards (Ideogram v3)' },
+  { id: 'recraft',  label: 'Design', hint: 'Logos, icons, vector & flat illustration (Recraft v3)' },
+];
+
 export const ASPECT_RATIOS = [
   { id: '1:1', label: '1:1', hint: 'Feed square' },
   { id: '4:5', label: '4:5', hint: 'Instagram portrait' },

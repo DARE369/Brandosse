@@ -22,6 +22,10 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
 const DEFAULT_GENERATION_DEFAULTS = {
   media_type: 'image',
   aspect_ratio: '1:1',
+  video_quality: 'standard',
+  match_brand_kit: true,
+  image_model: 'auto',
+  default_platforms: [],
 };
 
 const DEFAULT_CALENDAR_DEFAULTS = {
@@ -108,6 +112,12 @@ function normalizeGenerationDefaults(value) {
   return {
     media_type: String(source.media_type || DEFAULT_GENERATION_DEFAULTS.media_type),
     aspect_ratio: String(source.aspect_ratio || DEFAULT_GENERATION_DEFAULTS.aspect_ratio),
+    video_quality: String(source.video_quality || DEFAULT_GENERATION_DEFAULTS.video_quality),
+    match_brand_kit: normalizeBoolean(source.match_brand_kit, DEFAULT_GENERATION_DEFAULTS.match_brand_kit),
+    image_model: String(source.image_model || DEFAULT_GENERATION_DEFAULTS.image_model),
+    default_platforms: Array.isArray(source.default_platforms)
+      ? source.default_platforms.filter((p) => typeof p === 'string')
+      : DEFAULT_GENERATION_DEFAULTS.default_platforms,
   };
 }
 
@@ -277,4 +287,68 @@ export async function updateUserProfileSettings(userId, patch = {}) {
     full_name: updates.full_name || null,
     avatar_url: updates.avatar_url || null,
   };
+}
+
+// ── Account requests (Settings > Data & privacy) ─────────────────────────────
+// Request-only: no automated deletion/export pipeline exists yet. Submitting
+// records a real row an admin actions manually — see
+// supabase/migrations/20260716120000_user_account_requests.sql.
+export async function fetchPendingAccountRequests(userId) {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('user_account_requests')
+    .select('id, request_type, status, note, created_at')
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function submitAccountRequest(userId, requestType, note = '') {
+  if (!userId) throw new Error('User ID is required to submit an account request.');
+  if (!['deletion', 'export'].includes(requestType)) {
+    throw new Error('Invalid account request type.');
+  }
+
+  const { data, error } = await supabase
+    .from('user_account_requests')
+    .insert({ user_id: userId, request_type: requestType, note: note || null })
+    .select('id, request_type, status, note, created_at')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function cancelAccountRequest(requestId) {
+  const { error } = await supabase
+    .from('user_account_requests')
+    .update({ status: 'cancelled' })
+    .eq('id', requestId);
+
+  if (error) throw error;
+}
+
+// ── Onboarding wizard (first login) ──────────────────────────────────────────
+export async function fetchOnboardingCompleted(userId) {
+  if (!userId) return true;
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('onboarding_completed_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data?.onboarding_completed_at);
+}
+
+export async function markOnboardingCompleted(userId) {
+  if (!userId) return;
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert({ user_id: userId, onboarding_completed_at: new Date().toISOString() }, { onConflict: 'user_id' });
+
+  if (error) throw error;
 }

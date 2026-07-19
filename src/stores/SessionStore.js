@@ -12,6 +12,7 @@ import {
   generateImages,
   editImage,
   createVideoJob,
+  isAbortError,
 } from '../services/media.service';
 import {
   enhancePrompt as apiEnhancePrompt,
@@ -23,14 +24,18 @@ import {
   syncOrgPostAssetLinks,
 } from '../org/services/assetLibraryService';
 import { requestOrgDraftMetadata } from '../org/services/orgDraftWorkflowService';
-import { ensureLibraryRowsForPosts } from '../services/contentLibraryService';
 import { generateSessionTitle } from '../services/sessionTitleService';
 import { executeMockPublishAttempts } from '../services/platforms/mockPublishWorkflow';
-import { normalizeEdgeFunctionError } from '../services/edgeFunctionClient';
+import { normalizeEdgeFunctionError, getEdgeStatus } from '../services/edgeFunctionClient';
 
 export { GENERATION_STATUS, POST_STATUS } from '../constants/statuses';
 
 const CONTENT_SYNC_EVENT = 'socialai:data-sync';
+
+// Module-level singleton guard for the realtime channel — see
+// subscribeToSession. Not store state on purpose: it's not meant to be
+// reactive/rendered, just a lifecycle handle.
+let _activeRealtimeChannel = null;
 
 const DEFAULT_SOCIAL_SEO_BREAKDOWN = {
   readability: 0,
@@ -78,7 +83,6 @@ const DEFAULT_VIDEO_JOB_STATE = {
   progress: 0,
   videoUrl: null,
   isMinimized: false,
-  pollInterval: null,
 };
 
 const normalizeHashtags = (tags = []) => tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`));
@@ -228,6 +232,20 @@ function normalizeSeoOverall(rawOverall, breakdown) {
   return normalizeSeoNumeric(rawOverall, rawOverall > 0 && rawOverall <= 10);
 }
 
+// WEEK 2 FIX 4: this function (and its shouldNormalizeSeoTenPointScale/
+// normalizeSeoBreakdown/computeWeightedSeoOverall helpers above) used to be
+// called on every LIVE seo-score response too — i.e. the exact same
+// weighting/scale-detection algorithm ran twice for the same content: once
+// server-side (now in supabase/functions/_shared/seo.ts), once again here.
+// That duplication is gone from the live path: scoreSeo/optimizeSeo now
+// read the server's already-normalized response fields directly via
+// readSeoResponseFields() below, with no re-computation. This function is
+// kept ONLY as a tolerant reader for hydrating posts.seo_state rows written
+// before this fix (or, defensively, any future shape drift) — normalizing
+// already-normalized 0-100 data through this same math is a safe no-op
+// (the ten-point-scale heuristic only fires on data that still looks like a
+// 0-10 scale), so it doubles as backward-compatible hydration without being
+// a second live-scoring implementation.
 function normalizeSeoScorePayload(raw = {}) {
   const overallRaw = parseSeoNumeric(
     raw?.overall
@@ -269,6 +287,24 @@ function normalizeSeoScorePayload(raw = {}) {
     provider: raw?.provider || null,
     model: raw?.model || null,
     providerWarning: raw?.provider_warning || null,
+  };
+}
+
+// Reads an already-normalized score payload straight off a live
+// seo-score/optimize-seo response — no re-computation, since the server
+// (supabase/functions/_shared/seo.ts) is now the single source of the
+// scoring algorithm. Only field-mapping/defaults, not an alternate
+// normalization implementation.
+function readSeoResponseFields(raw = {}) {
+  return {
+    overall: Number(raw?.overall ?? raw?.discoveryScore ?? raw?.discovery_score ?? 0) || 0,
+    breakdown: raw?.breakdown && typeof raw.breakdown === 'object' ? raw.breakdown : { ...DEFAULT_SOCIAL_SEO_BREAKDOWN },
+    suggestions: Array.isArray(raw?.suggestions) ? raw.suggestions : [],
+    benchmarkReport: Array.isArray(raw?.benchmarkReport) ? raw.benchmarkReport : [],
+    hashtagSuggestions: Array.isArray(raw?.hashtagSuggestions) ? raw.hashtagSuggestions : [],
+    category: String(raw?.scoreCategory || raw?.score_category || 'Poor'),
+    provider: raw?.provider || null,
+    model: raw?.model || null,
   };
 }
 
@@ -393,68 +429,39 @@ async function requestPostMetadataForDraft(post, fields = ['title', 'caption', '
   });
 
   if (error) {
-    throw normalizeEdgeFunctionError(error, 'generate-post-metadata');
+    throw await normalizeEdgeFunctionError(error, 'generate-post-metadata');
   }
 
   return data || null;
 }
 
-async function tryUpdateDraftWorkflowState(postId, patch) {
-  if (!postId) return;
-
-  try {
-    const { error } = await supabase
-      .from('posts')
-      .update(patch)
-      .eq('id', postId);
-
-    if (error) {
-      console.warn('Draft metadata workflow update skipped:', error.message);
-    }
-  } catch (error) {
-    console.warn('Draft metadata workflow update failed:', error?.message || error);
-  }
-}
-
+// WEEK 2 FIX 3: generate-post-metadata (personal workspace) now owns the
+// entire workflow_state.metadata_status lifecycle itself — 'in_progress'
+// before the LLM call, 'completed'/'failed' after, always combined with
+// whatever content field(s) that same write touches. The client used to
+// also write 'in_progress' optimistically before calling it and 'failed' in
+// its own catch; both were removed (see git history / FIXLOG Fix 3) so
+// there is exactly one writer of this field for the personal-workspace
+// path. Org-workspace drafts route through requestOrgDraftMetadata, a
+// separate service not covered by this pass.
 async function scheduleDraftMetadataGeneration(post) {
   if (!shouldGenerateDraftMetadata(post)) return;
-
-  const metadataUpdatedAt = new Date().toISOString();
-
-  if (!post?.organization_id && post?.id) {
-    const nextWorkflowState = {
-      ...(post.workflow_state && typeof post.workflow_state === 'object' ? post.workflow_state : {}),
-      metadata_status: 'in_progress',
-      metadata_error: null,
-      metadata_updated_at: metadataUpdatedAt,
-    };
-
-    post.workflow_state = nextWorkflowState;
-    await tryUpdateDraftWorkflowState(post.id, {
-      workflow_state: nextWorkflowState,
-      updated_at: metadataUpdatedAt,
-    });
-  }
 
   try {
     await requestPostMetadataForDraft(post, ['title', 'caption', 'hashtags']);
     dispatchContentSync(post?.organization_id ? 'org-draft-metadata-generated' : 'draft-metadata-generated');
   } catch (error) {
     console.error('Failed to generate draft metadata:', error);
-    if (!post?.organization_id && post?.id) {
-      await tryUpdateDraftWorkflowState(post.id, {
-        workflow_state: {
-          ...(post.workflow_state && typeof post.workflow_state === 'object' ? post.workflow_state : {}),
-          metadata_status: 'failed',
-          metadata_error: error?.message || 'Metadata generation failed.',
-          metadata_updated_at: new Date().toISOString(),
-        },
-        updated_at: new Date().toISOString(),
-      });
-    }
   }
 }
 
+// Writes org scope onto the generations rows only. Nothing in the DB ever
+// sets generations.organization_id/brand_project_id on its own, so this is
+// the sole writer for that direction (see FIXLOG Week 3 Fix 1 ownership
+// map). Propagation from generation -> its posts is handled automatically
+// by the zz_sync_generation_org_scope_to_posts trigger the instant this
+// UPDATE commits — a second, client-side posts UPDATE here would just be a
+// redundant race with that trigger, so it was removed.
 async function syncOrgScopeToGenerations(generationIds = []) {
   const normalizedIds = Array.from(new Set((generationIds || []).filter(Boolean)));
   const orgScope = getActiveOrgScope();
@@ -467,13 +474,6 @@ async function syncOrgScopeToGenerations(generationIds = []) {
     .in('id', normalizedIds);
 
   if (generationError) throw generationError;
-
-  const { error: postError } = await supabase
-    .from('posts')
-    .update(orgScope)
-    .in('generation_id', normalizedIds);
-
-  if (postError) throw postError;
 }
 
 function dispatchContentSync(reason = 'updated') {
@@ -486,6 +486,17 @@ function dispatchContentSync(reason = 'updated') {
       },
     }),
   );
+}
+
+// Single source of truth for "is this post scheduled, and what should
+// scheduled_at/status be" — shared by saveDraft and publishContent so there
+// is exactly one place that decides the scheduled-post payload shape.
+function resolveScheduledPostFields(postProduction, { immediateStatus, immediateScheduledAt = new Date().toISOString() }) {
+  const scheduleDate = postProduction.scheduleDate || null;
+  if (scheduleDate) {
+    return { scheduled_at: scheduleDate, status: POST_STATUS.SCHEDULED };
+  }
+  return { scheduled_at: immediateScheduledAt, status: immediateStatus };
 }
 
 function buildFinalCaption(caption = '', hashtags = []) {
@@ -596,6 +607,35 @@ async function fetchGenerationPosts(userId, generationId) {
   return data || [];
 }
 
+// Client-side post inserts (saveDraft, preparePostForApproval, publishContent)
+// still exist for user-driven publish-flow writes the DB trigger has no
+// reason to perform on its own (those flows fill in title/caption/hashtags/
+// account_id/scheduled_at from user input, not just a bare draft shell).
+// Because the DB trigger can independently create a bare draft row for the
+// same user+generation the moment a generation completes, a race between
+// "the trigger already created a draft" and "this insert is also trying to
+// create one" is a real, reachable 23505 (unique_draft_per_generation_account)
+// — not a bug, just two legitimate writers momentarily overlapping. Recover
+// by re-fetching and reusing the row that won, instead of surfacing a raw
+// Postgres error to the user.
+async function insertDraftPostWithConflictRecovery(payload, { userId, generationId }) {
+  const { data: inserted, error: insertError } = await supabase
+    .from('posts')
+    .insert(payload)
+    .select('id, user_id')
+    .single();
+
+  if (!insertError) return inserted;
+
+  if (insertError.code === '23505') {
+    const existing = await fetchGenerationPosts(userId, generationId);
+    const draft = existing.find((row) => row.status === POST_STATUS.DRAFT);
+    if (draft) return { id: draft.id, user_id: draft.user_id };
+  }
+
+  throw insertError;
+}
+
 async function fetchPostAssetReferences(post) {
   if (!post?.id || !post?.organization_id) return [];
   const links = await fetchOrgPostAssetLinks({
@@ -630,47 +670,39 @@ async function resolvePrimaryPlatform(selectedAccountIds = []) {
   return String(account.platform).trim().toLowerCase() || 'instagram';
 }
 
-async function ensureDraftForGeneration({
-  userId,
-  generationId,
-  caption = '',
-}) {
+// Draft-post CREATION is owned entirely by the ensure_draft_post_for_generation
+// DB trigger now (Week 3 Fix 1) — it fires in the same transaction as the
+// generation's completion, so by the time any caller here is running (either
+// synchronously after awaiting that completion, or asynchronously off a
+// realtime broadcast of it), the row already exists or is about to be
+// visible. This function's remaining job is purely read-side: find the
+// trigger-created draft (with a brief bounded retry to absorb the small
+// window between the trigger's INSERT committing and it becoming visible to
+// a subsequent SELECT on a different connection/replica) and kick off
+// metadata generation for it exactly once. It never inserts into `posts`
+// itself and never touches content_library_items (create_library_item_from_post
+// already covers every post insert, including the trigger's own).
+async function findDraftForGeneration(userId, generationId, { retries = 4, delayMs = 250 } = {}) {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const existing = await fetchGenerationPosts(userId, generationId);
+    const draft = existing.find((row) => row.status === POST_STATUS.DRAFT);
+    if (draft) return draft;
+    if (existing.length > 0) return null; // some other lifecycle row already exists; not our concern
+    if (attempt < retries) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return null;
+}
+
+async function ensureDraftForGeneration({ userId, generationId }) {
   if (!userId || !generationId) return null;
 
-  const existing = await fetchGenerationPosts(userId, generationId);
-  const existingDraft = existing.find((row) => row.status === POST_STATUS.DRAFT);
-  if (existingDraft) {
-    void scheduleDraftMetadataGeneration(existingDraft);
-    return existingDraft;
-  }
+  const draft = await findDraftForGeneration(userId, generationId);
+  if (!draft) return null;
 
-  // If any lifecycle row already exists for this generation, do not mutate it.
-  // We only auto-create draft rows for generations with no post records yet.
-  if (existing.length > 0) return null;
-
-  const { data: inserted, error: insertError } = await supabase
-    .from('posts')
-    .insert(withOrgScope({
-      user_id: userId,
-      generation_id: generationId,
-      title: getTitleFromPrompt(caption || ''),
-      caption: caption || '',
-      hashtags: [],
-      scheduled_at: null,
-      status: POST_STATUS.DRAFT,
-      workflow_state: {
-        metadata_status: 'in_progress',
-        metadata_updated_at: new Date().toISOString(),
-      },
-    }))
-    .select('*')
-    .single();
-
-  if (insertError) throw insertError;
-
-  await ensureLibraryRowsForPosts([{ id: inserted.id, user_id: userId }]);
-  void scheduleDraftMetadataGeneration(inserted);
-  return inserted;
+  void scheduleDraftMetadataGeneration(draft);
+  return draft;
 }
 
 const STAGE_PROGRESS = {
@@ -719,6 +751,42 @@ async function ensureSession(get, userInput) {
   });
 }
 
+// ADDENDUM UPGRADE 4: a generation starting from a session "uses up" that
+// session's saved prompt draft — the prompt is now embodied in a real
+// generation, so the draft that was standing in for it is cleared. Clearing
+// rule (deliberately chosen and documented, per the addendum's own
+// instruction to decide and document it): clear the moment a generation
+// STARTS against that session, not on success/completion — attempting a
+// generation is the point the user "used" the draft, regardless of whether
+// that particular attempt succeeds or fails. Fire-and-forget/best-effort:
+// failing to clear it is not worth blocking or failing a generation over.
+async function clearSessionDraftPrompt(sessionId) {
+  if (!sessionId) return;
+
+  try {
+    const { data: row, error: readError } = await applySessionScope(
+      supabase.from('sessions').select('metadata').eq('id', sessionId),
+    ).maybeSingle();
+    if (readError) throw readError;
+
+    const metadata = row?.metadata && typeof row.metadata === 'object' ? { ...row.metadata } : {};
+    if (!('draft_prompt' in metadata) && !('draft_settings' in metadata) && !('draft_saved_at' in metadata)) {
+      return;
+    }
+
+    delete metadata.draft_prompt;
+    delete metadata.draft_settings;
+    delete metadata.draft_saved_at;
+
+    const { error: updateError } = await applySessionScope(
+      supabase.from('sessions').update({ metadata }),
+    ).eq('id', sessionId);
+    if (updateError) throw updateError;
+  } catch (err) {
+    console.warn('Failed to clear session draft prompt:', err?.message || err);
+  }
+}
+
 const useSessionStore = create((set, get) => ({
   // -- STATE ------------------------------------------------------------------
   sessions: [],
@@ -738,8 +806,26 @@ const useSessionStore = create((set, get) => ({
   generationStage: null,
   pendingClarifications: {},
   error: null,
+  // Store-level cancellation (Week 3 Fix 2) — the AbortController backing
+  // whatever generation attempt is currently in flight, so Cancel aborts the
+  // actual in-flight request(s) rather than only hiding them in the UI.
+  generationAbortController: null,
+  // Summary of the most recently completed multi-unit attempt (image batch
+  // or carousel), for the partial-failure banner: { kind, succeededCount,
+  // failedCount, totalCount, failedSlots, requestId }.
+  lastBatchOutcome: null,
+  // Generation ids currently being redone in place via regenerateVariant/
+  // regenerateSlides — lets the grid/filmstrip/lightbox show a per-item
+  // spinner without touching the page-level isGenerating/studioStage
+  // machine (this happens ON the results/carousel screen, not before it).
+  regeneratingIds: [],
 
   videoJobState: { ...DEFAULT_VIDEO_JOB_STATE },
+  // Real, persistent, multi-job video history (Week 3 Fix 3) — fed by
+  // fetchVideoJobs (initial load) + subscribeToBackgroundJobs (live
+  // updates). Survives refresh/tab-close since it's a query against
+  // background_jobs, not in-memory-only state.
+  videoJobs: [],
 
   settings: {
     mediaType: 'image', // image | video | edit | image-to-video
@@ -748,7 +834,11 @@ const useSessionStore = create((set, get) => ({
     contentType: 'single',
     slideCount: 'auto',
     model: 'realism',
-    imageModel: 'ideogram',
+    // 'auto' → route by the content plan's render_intent (1.1). A concrete
+    // value ('flux'|'ideogram'|'recraft') is the advanced override (1.2) and
+    // wins over intent. Was hardcoded 'ideogram', which sent every image
+    // through the text-rendering engine regardless of what it needed.
+    imageModel: 'auto',
     resolution: '2k',
     duration: 6,
     fps: 25,
@@ -758,6 +848,23 @@ const useSessionStore = create((set, get) => ({
 
   postProduction: { ...DEFAULT_POST_PRODUCTION },
   generationLineage: null,
+
+  // One-shot prompt seed for cross-page handoffs (library asset / template /
+  // repurpose-edit). Replaces the old socialai:seed-prompt /
+  // socialai:activate-generation-edit window events, which had no listener
+  // anywhere in the current Studio component tree. Shape:
+  // { text, source, assetReference?, activateEditMode?, sourceImageUrl?, seededAt }
+  promptSeed: null,
+  setPromptSeed: (seed) => {
+    set({
+      promptSeed: seed ? { ...seed, seededAt: new Date().toISOString() } : null,
+    });
+  },
+  consumePromptSeed: () => {
+    const seed = get().promptSeed;
+    if (seed) set({ promptSeed: null });
+    return seed;
+  },
 
   // -- SESSION MANAGEMENT ----------------------------------------------------
   sessionsLoading: false,
@@ -880,6 +987,47 @@ const useSessionStore = create((set, get) => ({
         title_source: 'groq',
       },
     });
+  },
+
+  // ADDENDUM UPGRADE 4 — replaces Week 1 Fix 5's disable-only
+  // implementation: persists the typed prompt + a snapshot of current
+  // generation settings (mode, aspect ratio, slide count, etc.) into the
+  // active session's metadata, creating a session via ensureSession if none
+  // exists yet — exactly the "Save as draft" affordance the brief panel
+  // button always implied but never actually did before this.
+  saveDraftPrompt: async (promptText) => {
+    const trimmed = String(promptText || '').trim();
+    if (!trimmed) {
+      throw new Error('Type a prompt before saving a draft.');
+    }
+
+    const session = await ensureSession(get, trimmed);
+    if (!session?.id) {
+      throw new Error('Could not create a session for this draft.');
+    }
+
+    const { settings } = get();
+    const draftSavedAt = new Date().toISOString();
+    const nextMetadata = {
+      ...(session.metadata && typeof session.metadata === 'object' ? session.metadata : {}),
+      draft_prompt: trimmed,
+      draft_settings: settings,
+      draft_saved_at: draftSavedAt,
+    };
+
+    const { error } = await applySessionScope(
+      supabase.from('sessions').update({ metadata: nextMetadata, updated_at: draftSavedAt }),
+    ).eq('id', session.id);
+    if (error) throw error;
+
+    set((state) => ({
+      activeSession: state.activeSession?.id === session.id
+        ? { ...state.activeSession, metadata: nextMetadata }
+        : state.activeSession,
+      sessions: state.sessions.map((item) => (item.id === session.id ? { ...item, metadata: nextMetadata } : item)),
+    }));
+
+    return { success: true, session: { ...session, metadata: nextMetadata } };
   },
 
   createSession: async (title = 'New Session') => {
@@ -1051,6 +1199,25 @@ const useSessionStore = create((set, get) => ({
       }));
 
       await get().fetchGenerations(sessionId, { silent: hasCached });
+
+      // ADDENDUM UPGRADE 4: seed the brief panel from a saved prompt draft
+      // (session.metadata.draft_prompt, written by saveDraftPrompt) when
+      // this session has nothing else to restore — i.e. no generations at
+      // all yet, so there's no completed-generation selection state that
+      // would otherwise take priority. Reuses the same one-shot promptSeed
+      // mechanism Week 1 Fix 3 built for cross-page handoffs, rather than a
+      // second seeding path.
+      const draftPrompt = String(session?.metadata?.draft_prompt || '').trim();
+      if (draftPrompt && get().activeGenerations.length === 0) {
+        get().setPromptSeed({
+          text: draftPrompt,
+          source: 'session_draft',
+          settingsSnapshot: session?.metadata?.draft_settings && typeof session.metadata.draft_settings === 'object'
+            ? session.metadata.draft_settings
+            : null,
+        });
+      }
+
       return session;
     } catch (err) {
       console.error('loadSession:', err);
@@ -1138,16 +1305,27 @@ const useSessionStore = create((set, get) => ({
       throw new Error('Edit mode requires a source image. Use startEditGeneration.');
     }
 
+    // One id per user-initiated attempt — a Retry click calls startGeneration
+    // again, which runs this line again, minting a NEW id; nothing inside a
+    // single call ever reuses another attempt's id. Each variant gets its
+    // own request_slot under this same id so a duplicate/retried invocation
+    // of the SAME attempt can't double-render/double-bill any one variant.
+    const requestId = crypto.randomUUID();
+    const abortController = new AbortController();
+
     set({
       isGenerating: true,
       error: null,
       generationProgress: 0,
       progressLabel: 'Preparing generation...',
       generationStage: null,
+      generationAbortController: abortController,
+      lastBatchOutcome: null,
     });
 
     try {
       const session = await ensureSession(get, prompt);
+      void clearSessionDraftPrompt(session?.id);
       const { pendingClarifications } = get();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -1155,7 +1333,7 @@ const useSessionStore = create((set, get) => ({
       const brandKit = await loadBrandKit(user.id);
       const { registerImageGenerator, runGenerationPipeline } = await import('../services/generationPipeline');
 
-      registerImageGenerator(async (promptText, aspectRatio) => {
+      registerImageGenerator(async (promptText, aspectRatio, opts = {}) => {
         set({
           generationProgress: 68,
           progressLabel: 'Requesting image render...',
@@ -1168,8 +1346,15 @@ const useSessionStore = create((set, get) => ({
           numImages: 1,
           brandKit,
           sessionId: session.id,
-          imageModel: settings.imageModel || 'ideogram',
+          // opts.imageModel = the pipeline-resolved model (render_intent +
+          // override, 1.1/1.2); settings fallback preserves old behavior when
+          // a caller doesn't thread it.
+          imageModel: opts.imageModel || settings.imageModel || 'ideogram',
           category: 'image',
+          requestId: opts.requestId,
+          slotOffset: opts.requestSlot ?? 0,
+          generationId: opts.generationId,
+          signal: opts.signal,
         });
 
         const first = images?.[0];
@@ -1186,40 +1371,82 @@ const useSessionStore = create((set, get) => ({
 
       const requestedVariants = Math.max(1, Math.min(Number(settings.batchSize) || 1, 4));
       const generationIds = [];
+      const outcomes = [];
 
       for (let index = 0; index < requestedVariants; index += 1) {
-        const pipelineResult = await runGenerationPipeline({
-          userInput: prompt,
-          clarifications: pendingClarifications ?? {},
-          sessionId: session.id,
-          userId: user.id,
-          workspaceScope: getSessionScope(),
-          lineageMetadata: {
-            ...(generationLineage || {}),
-            variant_index: index + 1,
-            variant_total: requestedVariants,
-          },
-          settings: {
-            ...settings,
-            contentType: settings.contentType ?? 'single',
-            mediaType: 'image',
-          },
-          onProgress: (stage) => {
-            const mapped = mapStageProgress(stage);
-            const variantOffset = requestedVariants > 1 ? ((index / requestedVariants) * 100) : 0;
-            const variantPct = requestedVariants > 1
-              ? Math.min(98, Math.round(variantOffset + (mapped.pct / requestedVariants)))
-              : mapped.pct;
-            set({
-              generationProgress: variantPct,
-              progressLabel: requestedVariants > 1 ? `Variant ${index + 1}/${requestedVariants}: ${mapped.label}` : mapped.label,
-              generationStage: stage,
-            });
+        // Store-level cancellation check (not just a UI stage guard): a
+        // variant not yet started when Cancel fires is skipped entirely —
+        // it never gets a request sent to the provider, never gets billed.
+        if (abortController.signal.aborted) {
+          outcomes.push({ index, ok: false, cancelled: true });
+          continue;
+        }
+
+        try {
+          const pipelineResult = await runGenerationPipeline({
+            userInput: prompt,
+            clarifications: pendingClarifications ?? {},
+            sessionId: session.id,
+            userId: user.id,
+            workspaceScope: getSessionScope(),
+            requestId,
+            requestSlot: index,
+            cancelSignal: abortController.signal,
+            lineageMetadata: {
+              ...(generationLineage || {}),
+              variant_index: index + 1,
+              variant_total: requestedVariants,
+            },
+            settings: {
+              ...settings,
+              contentType: settings.contentType ?? 'single',
+              mediaType: 'image',
+            },
+            onProgress: (stage) => {
+              const mapped = mapStageProgress(stage);
+              const variantOffset = requestedVariants > 1 ? ((index / requestedVariants) * 100) : 0;
+              const variantPct = requestedVariants > 1
+                ? Math.min(98, Math.round(variantOffset + (mapped.pct / requestedVariants)))
+                : mapped.pct;
+              set({
+                generationProgress: variantPct,
+                progressLabel: requestedVariants > 1 ? `Variant ${index + 1}/${requestedVariants}: ${mapped.label}` : mapped.label,
+                generationStage: stage,
+              });
+            },
+          });
+
+          if (Array.isArray(pipelineResult?.generationIds)) {
+            generationIds.push(...pipelineResult.generationIds);
+          }
+          outcomes.push({ index, ok: true });
+        } catch (variantErr) {
+          if (isAbortError(variantErr)) {
+            outcomes.push({ index, ok: false, cancelled: true });
+            continue;
+          }
+          console.error(`[startGeneration] variant ${index + 1} failed:`, variantErr);
+          outcomes.push({ index, ok: false, error: variantErr?.message || 'Variant failed' });
+          // Isolate the failure — continue to the next variant instead of
+          // aborting the whole batch (mirrors the carousel path's existing
+          // per-slide isolation in generationPipeline.js).
+        }
+      }
+
+      const succeededCount = outcomes.filter((o) => o.ok).length;
+      if (requestedVariants > 1) {
+        set({
+          lastBatchOutcome: {
+            kind: 'image',
+            succeededCount,
+            failedCount: outcomes.length - succeededCount,
+            totalCount: outcomes.length,
+            failedSlots: outcomes.filter((o) => !o.ok && !o.cancelled).map((o) => o.index),
+            requestId,
           },
         });
-
-        if (Array.isArray(pipelineResult?.generationIds)) {
-          generationIds.push(...pipelineResult.generationIds);
+        if (succeededCount === 0) {
+          throw new Error('All variants failed to generate.');
         }
       }
 
@@ -1231,7 +1458,6 @@ const useSessionStore = create((set, get) => ({
         await ensureDraftForGeneration({
           userId: user.id,
           generationId,
-          caption: prompt,
         });
       }
 
@@ -1241,6 +1467,11 @@ const useSessionStore = create((set, get) => ({
       dispatchContentSync('generation-completed');
       set({ error: null });
     } catch (err) {
+      if (isAbortError(err)) {
+        // Cancelled on purpose — not a real failure, don't surface a scary error.
+        set({ error: null });
+        return;
+      }
       logGenerationFailure('startGeneration error', err);
       set({ error: err.message });
       throw err;
@@ -1250,7 +1481,158 @@ const useSessionStore = create((set, get) => ({
         generationProgress: 0,
         progressLabel: null,
         generationStage: null,
+        generationAbortController: null,
       });
+    }
+  },
+
+  // Retries ONLY the variants that failed in the last batch, reusing the
+  // SAME request_id so idempotency protects the slots that already
+  // succeeded (see generateImage/index.ts findCachedGeneration) — a
+  // re-invocation of a succeeded slot replays its cached result instead of
+  // rendering/billing it again.
+  retryFailedVariants: async (userInput) => {
+    const { lastBatchOutcome, settings } = get();
+    if (!lastBatchOutcome?.failedSlots?.length) return;
+    const prompt = String(userInput || '').trim();
+    if (!prompt) return;
+
+    const { registerImageGenerator, runGenerationPipeline } = await import('../services/generationPipeline');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    const session = get().activeSession;
+    if (!session) return;
+
+    const brandKit = await loadBrandKit(user.id);
+    const abortController = new AbortController();
+    set({ isGenerating: true, generationAbortController: abortController });
+
+    registerImageGenerator(async (promptText, aspectRatio, opts = {}) => {
+      const images = await generateImages({
+        prompt: promptText,
+        aspectRatio,
+        numImages: 1,
+        brandKit,
+        sessionId: session.id,
+        imageModel: opts.imageModel || settings.imageModel || 'ideogram',
+        category: 'image',
+        requestId: opts.requestId,
+        slotOffset: opts.requestSlot ?? 0,
+        generationId: opts.generationId,
+        signal: opts.signal,
+      });
+      const first = images?.[0];
+      if (!first?.url) throw new Error('Image renderer returned no image URL');
+      return first;
+    });
+
+    const outcomes = [];
+    try {
+      for (const slot of lastBatchOutcome.failedSlots) {
+        try {
+          await runGenerationPipeline({
+            userInput: prompt,
+            sessionId: session.id,
+            userId: user.id,
+            workspaceScope: getSessionScope(),
+            requestId: lastBatchOutcome.requestId,
+            requestSlot: slot,
+            cancelSignal: abortController.signal,
+            settings: { ...settings, contentType: settings.contentType ?? 'single', mediaType: 'image' },
+            onProgress: () => {},
+          });
+          outcomes.push({ index: slot, ok: true });
+        } catch (err) {
+          outcomes.push({ index: slot, ok: false, error: err?.message });
+        }
+      }
+    } finally {
+      set({ isGenerating: false, generationAbortController: null });
+    }
+
+    const stillFailed = outcomes.filter((o) => !o.ok).map((o) => o.index);
+    set({
+      lastBatchOutcome: stillFailed.length
+        ? { ...lastBatchOutcome, failedSlots: stillFailed, failedCount: stillFailed.length }
+        : null,
+    });
+    await get().fetchGenerations(session.id, { silent: true });
+    dispatchContentSync('generation-completed');
+  },
+
+  // Aborts whatever generation attempt is currently in flight. Variants/
+  // slides not yet started are skipped (never billed); ones already
+  // in-flight are aborted via the AbortSignal reaching invokeFunction's
+  // fetch (media.service.js) where the provider hasn't been reached yet.
+  cancelActiveGeneration: () => {
+    get().generationAbortController?.abort();
+  },
+
+  // Re-renders a single already-completed variant or carousel slide IN
+  // PLACE — passing generationId to generateImages/generateImage writes the
+  // new render onto that same row (completeGeneration in the edge function),
+  // rather than creating a new one, so the grid/filmstrip position is
+  // unchanged. Always mints a fresh request_id: the same one that produced
+  // the original render would idempotency-replay the OLD cached image
+  // instead of actually re-rendering (see findCachedGeneration), so a real
+  // regenerate must look like a brand-new billed render.
+  regenerateVariant: async (generation) => {
+    if (!generation?.id) return;
+    set((state) => ({ regeneratingIds: [...new Set([...state.regeneratingIds, generation.id])] }));
+    try {
+      const { settings } = get();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const prompt = generation.slide_prompt || generation.prompt || '';
+      if (!prompt.trim()) throw new Error('No prompt available to regenerate this variant.');
+
+      const brandKit = await loadBrandKit(user.id);
+      const aspectRatio = generation.metadata?.aspect_ratio || settings.aspectRatio || '1:1';
+      const category = generation.carousel_slide_index ? 'carousel' : 'image';
+
+      const images = await generateImages({
+        prompt,
+        aspectRatio,
+        numImages: 1,
+        brandKit,
+        sessionId: generation.session_id,
+        // Regenerate with the SAME model the original used (now stored on the
+        // row's metadata, 0.2) so a re-roll stays visually consistent; fall
+        // back to the user's setting, then the safe default.
+        imageModel: generation.metadata?.image_model || settings.imageModel || 'ideogram',
+        category,
+        requestId: crypto.randomUUID(),
+        slotOffset: 0,
+        generationId: generation.id,
+      });
+
+      const first = images?.[0];
+      if (!first?.url) throw new Error('Image renderer returned no image URL');
+    } catch (err) {
+      console.error('regenerateVariant:', err);
+      throw err;
+    } finally {
+      set((state) => ({ regeneratingIds: state.regeneratingIds.filter((id) => id !== generation.id) }));
+      if (generation.session_id) await get().fetchGenerations(generation.session_id, { silent: true });
+    }
+  },
+
+  // Regenerates a user-picked subset of carousel slides, one at a time
+  // (matching the sequential, per-slide-isolated style the initial carousel
+  // orchestration uses) — a failure on one selected slide doesn't stop the
+  // rest from being retried.
+  regenerateSlides: async (generationIds) => {
+    const ids = Array.from(new Set(generationIds || []));
+    const { activeGenerations } = get();
+    for (const id of ids) {
+      const generation = activeGenerations.find((g) => g.id === id);
+      if (!generation) continue;
+      try {
+        await get().regenerateVariant(generation);
+      } catch (err) {
+        console.error(`regenerateSlides: slide ${id} failed:`, err);
+      }
     }
   },
 
@@ -1269,17 +1651,23 @@ const useSessionStore = create((set, get) => ({
       batchSize: 1,
     });
 
+    const requestId = crypto.randomUUID();
+    const abortController = new AbortController();
+
     set({
       isGenerating: true,
       error: null,
       generationProgress: 0,
       progressLabel: 'Planning carousel...',
       generationStage: 'Planning carousel...',
+      generationAbortController: abortController,
+      lastBatchOutcome: null,
     });
 
     try {
       const { settings, generationLineage } = get();
       const session = await ensureSession(get, prompt);
+      void clearSessionDraftPrompt(session?.id);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -1299,15 +1687,19 @@ const useSessionStore = create((set, get) => ({
         generationStage: 'Breaking into slides...',
       });
 
-      registerImageGenerator(async (promptText, aspectRatio) => {
+      registerImageGenerator(async (promptText, aspectRatio, opts = {}) => {
         const images = await generateImages({
           prompt: promptText,
           aspectRatio,
           numImages: 1,
           brandKit,
           sessionId: session.id,
-          imageModel: settings.imageModel || 'ideogram',
+          imageModel: opts.imageModel || settings.imageModel || 'ideogram',
           category: 'carousel',
+          requestId: opts.requestId,
+          slotOffset: opts.requestSlot ?? 0,
+          generationId: opts.generationId,
+          signal: opts.signal,
         });
 
         const first = images?.[0];
@@ -1321,6 +1713,8 @@ const useSessionStore = create((set, get) => ({
         sessionId: session.id,
         userId: user.id,
         workspaceScope: getSessionScope(),
+        requestId,
+        cancelSignal: abortController.signal,
         lineageMetadata: generationLineage,
         settings: pipelineSettings,
         onProgress: (stage) => {
@@ -1336,6 +1730,19 @@ const useSessionStore = create((set, get) => ({
       const generationIds = Array.isArray(pipelineResult?.generationIds)
         ? pipelineResult.generationIds
         : [];
+
+      if (Number.isFinite(pipelineResult?.totalCount) && pipelineResult.totalCount > 1) {
+        set({
+          lastBatchOutcome: {
+            kind: 'carousel',
+            succeededCount: pipelineResult.succeededCount,
+            failedCount: pipelineResult.failedCount,
+            totalCount: pipelineResult.totalCount,
+            failedSlots: (pipelineResult.outcomes || []).filter((o) => !o.ok && !o.cancelled).map((o) => o.index),
+            requestId,
+          },
+        });
+      }
 
       if (generationIds.length > 0) {
         await syncOrgScopeToGenerations(generationIds);
@@ -1356,7 +1763,6 @@ const useSessionStore = create((set, get) => ({
         await ensureDraftForGeneration({
           userId: user.id,
           generationId,
-          caption: generationRow?.prompt || prompt,
         });
       }
 
@@ -1369,6 +1775,10 @@ const useSessionStore = create((set, get) => ({
         generationStage: 'Done!',
       });
     } catch (err) {
+      if (isAbortError(err)) {
+        set({ error: null });
+        return;
+      }
       logGenerationFailure('startCarouselGeneration error', err);
       set({ error: err.message });
       throw err;
@@ -1378,6 +1788,7 @@ const useSessionStore = create((set, get) => ({
         generationProgress: 0,
         progressLabel: null,
         generationStage: null,
+        generationAbortController: null,
       });
     }
   },
@@ -1389,18 +1800,23 @@ const useSessionStore = create((set, get) => ({
     if (!cleanSource) throw new Error('Source image is required for edit mode');
     if (!prompt) throw new Error('Edit instruction is required');
 
+    const requestId = crypto.randomUUID();
+    const abortController = new AbortController();
+
     set({
       isGenerating: true,
       error: null,
       generationProgress: 8,
       progressLabel: 'Preparing edit...',
       generationStage: 'Preparing',
+      generationAbortController: abortController,
     });
 
     let createdGeneration = null;
 
     try {
       const session = await ensureSession(get, prompt);
+      void clearSessionDraftPrompt(session?.id);
       const { settings, generationLineage } = get();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -1415,6 +1831,8 @@ const useSessionStore = create((set, get) => ({
           prompt,
           media_type: 'image',
           status: GENERATION_STATUS.PROCESSING,
+          request_id: requestId,
+          request_slot: 0,
           progress: 10,
           metadata: {
             edit_mode: true,
@@ -1443,6 +1861,9 @@ const useSessionStore = create((set, get) => ({
         sourceImageUrl: cleanSource,
         brandKit,
         aspectRatio: settings.aspectRatio,
+        requestId,
+        generationId: created.id,
+        signal: abortController.signal,
       });
 
       set({
@@ -1481,7 +1902,6 @@ const useSessionStore = create((set, get) => ({
       await ensureDraftForGeneration({
         userId: user.id,
         generationId: created.id,
-        caption: prompt,
       });
       dispatchContentSync('edit-completed');
       set({ error: null });
@@ -1509,12 +1929,26 @@ const useSessionStore = create((set, get) => ({
     }
   },
 
+  // Week 3 Fix 3 — submit-and-return. generateVideo now returns a job id
+  // immediately (fal.ai's queue submit, not a blocking wait for the queue
+  // to resolve) — isGenerating clears right after submit, not after the
+  // video actually finishes rendering. The video's own generations row is
+  // created server-side by generateVideo/index.ts with status 'processing'
+  // (fixing the prior video-only inconsistency of being born 'completed');
+  // its transition to 'completed'/'failed' happens via job-webhook/
+  // process-jobs, which this tab observes through the SAME session-scoped
+  // generations broadcast every other media type already uses (Week 2 Fix
+  // 1) — no video-specific realtime branch needed for that part anymore.
+  // videoJobs (fed by subscribeToBackgroundJobs) is the real, persistent,
+  // multi-job history that survives refresh/tab-close; videoJobState keeps
+  // tracking only "the job this tab most recently submitted or is looking
+  // at," for the existing single-job UI affordances (progress bar, minimize
+  // pill) to key off without a larger UI rewrite.
   startVideoGeneration: async (userInput) => {
     const prompt = String(userInput || '').trim();
     if (!prompt) return;
 
-    const existingInterval = get().videoJobState.pollInterval;
-    if (existingInterval) clearInterval(existingInterval);
+    const requestId = crypto.randomUUID();
 
     set((state) => ({
       isGenerating: true,
@@ -1533,6 +1967,7 @@ const useSessionStore = create((set, get) => ({
 
     try {
       const session = await ensureSession(get, prompt);
+      void clearSessionDraftPrompt(session?.id);
       const { settings } = get();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -1542,7 +1977,7 @@ const useSessionStore = create((set, get) => ({
       if (videoMode === 'image-to-video' && !String(settings.referenceImageUrl || '').trim()) {
         throw new Error('Source image is required for image-to-video generation');
       }
-      const videoJob = await createVideoJob({
+      const submitted = await createVideoJob({
         prompt,
         aspectRatio: settings.aspectRatio,
         duration: settings.duration || 6,
@@ -1551,98 +1986,60 @@ const useSessionStore = create((set, get) => ({
         imageUrl: settings.referenceImageUrl || '',
         quality: settings.videoQuality === 'premium' ? 'premium' : 'standard',
         sessionId: session.id,
+        requestId,
       });
 
-      if (videoJob.tierUpgraded) {
+      if (submitted.tierUpgraded) {
         toast(
-          'Standard tier requires a source image — this rendered at premium quality instead, billed accordingly.',
+          'Standard tier requires a source image — this renders (and is billed) at premium quality instead.',
           { icon: 'ℹ️', duration: 6000 },
         );
       }
 
-      const { data: created, error: insertError } = await supabase
-        .from('generations')
-        .insert(withOrgScope({
-          user_id: user.id,
-          session_id: session.id,
-          prompt,
-          media_type: 'video',
-          status: GENERATION_STATUS.COMPLETED,
-          progress: 100,
-          storage_path: videoJob.videoUrl || null,
-          metadata: {
-            provider: videoJob.provider || 'fal-ai',
-            provider_model: videoJob.providerModel || null,
-            provider_endpoint: videoJob.providerEndpoint || null,
-            generation_mode: videoMode,
-            source_image_url: videoMode === 'image-to-video' ? settings.referenceImageUrl || null : null,
-            aspect_ratio: settings.aspectRatio,
-            requested_quality: videoJob.requestedQuality,
-            actual_quality: videoJob.actualQuality,
-            tier_upgraded: Boolean(videoJob.tierUpgraded),
-            duration: settings.duration || 6,
-            generation_cost: videoJob.generationCost || null,
-          },
-        }))
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
       set((state) => ({
-        activeGenerations: [...state.activeGenerations, created],
-        generationProgress: 100,
-        progressLabel: 'Video completed',
-        generationStage: 'Processing video...',
         videoJobState: {
           ...state.videoJobState,
-          status: GENERATION_STATUS.COMPLETED,
-          generationId: created.id,
-          providerEndpoint: videoJob.providerEndpoint || null,
-          progress: 100,
-          videoUrl: videoJob.videoUrl || null,
+          jobId: submitted.jobId,
+          generationId: submitted.generationId,
+          status: 'processing',
+          progress: 40,
         },
+        videoJobs: [
+          { id: submitted.jobId, generationId: submitted.generationId, prompt, status: 'running', createdAt: new Date().toISOString() },
+          ...state.videoJobs.filter((j) => j.id !== submitted.jobId),
+        ],
       }));
 
       await touchSession(session.id);
+      dispatchContentSync('video-queued');
 
-      await get().fetchGenerations(session.id, { silent: true });
-      await ensureDraftForGeneration({
-        userId: user.id,
-        generationId: created.id,
-        caption: prompt,
-      });
-      dispatchContentSync('video-completed');
+      return { jobId: submitted.jobId, generationId: submitted.generationId };
+    } catch (err) {
+      logGenerationFailure('startVideoGeneration error', err);
+      set((state) => ({
+        error: err.message,
+        videoJobState: {
+          ...state.videoJobState,
+          status: GENERATION_STATUS.FAILED,
+          progress: 100,
+        },
+      }));
+      throw err;
+    } finally {
       set({
         isGenerating: false,
         generationProgress: 0,
         progressLabel: null,
         generationStage: null,
       });
-      return videoJob.videoUrl;
-    } catch (err) {
-      logGenerationFailure('startVideoGeneration error', err);
-      set((state) => ({
-        isGenerating: false,
-        generationProgress: 0,
-        progressLabel: null,
-        generationStage: null,
-        error: err.message,
-        videoJobState: {
-          ...state.videoJobState,
-          status: GENERATION_STATUS.FAILED,
-          progress: 100,
-          pollInterval: null,
-        },
-      }));
-      throw err;
     }
   },
 
+  // Video jobs genuinely keep running server-side after this — dismissing
+  // only stops this tab from foregrounding it as "the" active job; it
+  // remains visible (and, if still in flight, live-updating) in the
+  // persistent videoJobs list / drawer.
   dismissVideoJob: () => {
-    const pollInterval = get().videoJobState.pollInterval;
-    if (pollInterval) clearInterval(pollInterval);
-
     set({
       isGenerating: false,
       videoJobState: { ...DEFAULT_VIDEO_JOB_STATE },
@@ -1659,6 +2056,101 @@ const useSessionStore = create((set, get) => ({
         isMinimized: Boolean(isMinimized),
       },
     }));
+  },
+
+  // Fetches the user's recent video jobs (so the drawer has real history
+  // immediately on mount, before any realtime event arrives) and subscribes
+  // to live updates on their private background-jobs-<uid> topic (see
+  // migration 20260712110000_week3_background_jobs.sql). Mirrors
+  // subscribeToSession's private-channel pattern (Week 2 Fix 1).
+  fetchVideoJobs: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('background_jobs')
+      .select('id, status, payload, result, error, created_at')
+      .eq('user_id', user.id)
+      .eq('job_type', 'video_generation')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (error) {
+      console.error('Failed to fetch video jobs:', error);
+      return;
+    }
+    set({
+      videoJobs: (data || []).map((row) => ({
+        id: row.id,
+        generationId: row.payload?.generation_id ?? null,
+        prompt: null,
+        status: row.status,
+        videoUrl: row.result?.video_url ?? null,
+        errorMessage: row.error ?? null,
+        createdAt: row.created_at,
+      })),
+    });
+  },
+
+  subscribeToBackgroundJobs: (userId) => {
+    if (!userId) return () => {};
+    const channel = supabase.channel(`background-jobs-${userId}`, { config: { private: true } });
+    channel.on('broadcast', { event: '*' }, (message) => {
+      const payload = message?.payload || {};
+      const updated = payload.record || payload.new_record || payload.new || null;
+      if (!updated || updated.job_type !== 'video_generation') return;
+
+      set((state) => {
+        const nextJob = {
+          id: updated.id,
+          generationId: updated.payload?.generation_id ?? null,
+          prompt: state.videoJobs.find((j) => j.id === updated.id)?.prompt ?? null,
+          status: updated.status,
+          videoUrl: updated.result?.video_url ?? null,
+          errorMessage: updated.error ?? null,
+          createdAt: updated.created_at || new Date().toISOString(),
+        };
+        const exists = state.videoJobs.some((j) => j.id === updated.id);
+        const nextJobs = exists
+          ? state.videoJobs.map((j) => (j.id === updated.id ? nextJob : j))
+          : [nextJob, ...state.videoJobs];
+
+        const matchesActive = state.videoJobState.jobId === updated.id;
+        return {
+          videoJobs: nextJobs,
+          videoJobState: matchesActive
+            ? {
+                ...state.videoJobState,
+                status: updated.status === 'completed' ? GENERATION_STATUS.COMPLETED
+                  : updated.status === 'failed' ? GENERATION_STATUS.FAILED
+                  : state.videoJobState.status,
+                progress: updated.status === 'completed' || updated.status === 'failed' ? 100 : state.videoJobState.progress,
+                videoUrl: updated.result?.video_url ?? state.videoJobState.videoUrl,
+              }
+            : state.videoJobState,
+        };
+      });
+
+      if (updated.status === 'completed' || updated.status === 'failed') {
+        dispatchContentSync(updated.status === 'completed' ? 'video-completed' : 'video-failed');
+      }
+    });
+    channel.subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
+  cancelVideoJob: async (jobId) => {
+    if (!jobId) return;
+    try {
+      const { error } = await supabase.functions.invoke('cancel-video-job', { body: { job_id: jobId } });
+      if (error) throw await normalizeEdgeFunctionError(error, 'cancel-video-job');
+      set((state) => ({
+        videoJobs: state.videoJobs.map((j) => (j.id === jobId ? { ...j, status: 'cancelled' } : j)),
+      }));
+    } catch (err) {
+      toast.error(err?.message || 'Could not cancel this video job.');
+    }
   },
 
   enhancePrompt: async (prompt) => {
@@ -1698,6 +2190,21 @@ const useSessionStore = create((set, get) => ({
           ...promptContext,
         },
       });
+
+      // An auth failure (expired/missing session) is not the same as the
+      // edge function being unreachable — it must NOT fall through to the
+      // legacy ApiService.enhancePrompt path below, since that would mask
+      // the fact that the user is no longer authenticated. Only genuine
+      // availability failures (network/deploy issues) reach the fallback.
+      const edgeStatus = edgeResponse.error ? getEdgeStatus(edgeResponse.error) : null;
+      if (edgeStatus === 401 || edgeStatus === 403) {
+        console.warn('[SessionStore] enhancePrompt auth failure:', edgeResponse.error?.message || edgeResponse.error);
+        toast.error('Your session has expired. Please log in again to enhance prompts.');
+        return {
+          enhancedPrompt: cleanPrompt,
+          suggestions: [cleanPrompt],
+        };
+      }
 
       if (!edgeResponse.error) {
         const fromEdge = edgeResponse.data?.enhancedPrompt || edgeResponse.data?.enhanced_prompt || '';
@@ -1840,26 +2347,14 @@ const useSessionStore = create((set, get) => ({
         || null;
 
       const postId = preferred?.id || postProduction.postId || null;
-      if (postId) {
-        const nextWorkflowState = {
-          ...(preferred?.workflow_state && typeof preferred.workflow_state === 'object'
-            ? preferred.workflow_state
-            : {}),
-          metadata_status: 'in_progress',
-          metadata_error: null,
-          metadata_updated_at: metadataUpdatedAt,
-        };
-
-        const { error: metadataUpdateError } = await supabase
-          .from('posts')
-          .update({
-            workflow_state: nextWorkflowState,
-            updated_at: metadataUpdatedAt,
-          })
-          .eq('id', postId);
-        if (metadataUpdateError) throw metadataUpdateError;
-      }
-
+      // WEEK 2 FIX 3: no longer writes workflow_state.metadata_status here.
+      // generate-post-metadata now writes 'in_progress' (with
+      // metadata_started_at) itself the moment it has a post_id, before it
+      // calls the LLM — the server is the single writer of this field, so a
+      // client-side pre-write here would just be a redundant, race-prone
+      // second writer of the same value. The local postProduction state
+      // update right below is UI-only (not a DB write) and stays, purely as
+      // instant feedback while the request is in flight.
       set((state) => ({
         postProduction: {
           ...state.postProduction,
@@ -1885,7 +2380,7 @@ const useSessionStore = create((set, get) => ({
           },
         });
         if (error) {
-          throw normalizeEdgeFunctionError(error, 'generate-post-metadata');
+          throw await normalizeEdgeFunctionError(error, 'generate-post-metadata');
         }
         result = data || null;
       }
@@ -1975,45 +2470,15 @@ const useSessionStore = create((set, get) => ({
       });
 
       if (error) {
-        throw normalizeEdgeFunctionError(error, 'seo-score');
+        throw await normalizeEdgeFunctionError(error, 'seo-score');
       }
 
-      const normalized = normalizeSeoScorePayload(data || {});
-
-      if (postProduction.postId) {
-        const { data: currentPost } = await supabase
-          .from('posts')
-          .select('seo_state, workflow_state')
-          .eq('id', postProduction.postId)
-          .maybeSingle();
-
-        await supabase
-          .from('posts')
-          .update({
-            seo_state: {
-              ...(currentPost?.seo_state && typeof currentPost.seo_state === 'object' ? currentPost.seo_state : {}),
-              seo_score: normalized.overall,
-              discovery_score: normalized.overall,
-              score_category: normalized.category,
-              score_breakdown: normalized.breakdown,
-              suggestions: normalized.suggestions,
-              recommendations: normalized.suggestions,
-              benchmark_report: normalized.benchmarkReport,
-              hashtag_suggestions: normalized.hashtagSuggestions,
-              provider: normalized.provider,
-              model: normalized.model,
-              provider_warning: normalized.providerWarning,
-              updated_at: new Date().toISOString(),
-            },
-            workflow_state: {
-              ...(currentPost?.workflow_state && typeof currentPost.workflow_state === 'object' ? currentPost.workflow_state : {}),
-              seo_status: 'scored',
-              seo_updated_at: new Date().toISOString(),
-            },
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', postProduction.postId);
-      }
+      // WEEK 2 FIX 4: no client-side re-normalization (data is already
+      // canonical, server-computed) and no client-side seo_state write —
+      // seo-score itself now persists posts.seo_state/workflow_state when
+      // given a content_id (which this call already sends above), matching
+      // Fix 3's "server owns its own writes" philosophy.
+      const normalized = readSeoResponseFields(data || {});
 
       set((state) => ({
         postProduction: {
@@ -2072,7 +2537,7 @@ const useSessionStore = create((set, get) => ({
       });
 
       if (error) {
-        throw normalizeEdgeFunctionError(error, 'ai-brand-consistency-check');
+        throw await normalizeEdgeFunctionError(error, 'ai-brand-consistency-check');
       }
 
       const result = data?.result || {};
@@ -2120,8 +2585,15 @@ const useSessionStore = create((set, get) => ({
 
       const platform = await resolvePrimaryPlatform(postProduction.selectedPlatforms || []);
       const brandKit = await loadBrandKit(user.id);
+      // WEEK 2 FIX 4: optimize-seo now scores its own optimized output
+      // server-side (via the same _shared/seo.ts scoreContent() seo-score
+      // uses) and, given a content_id, persists posts.seo_state/
+      // workflow_state itself — one round trip covers optimize + score,
+      // with one canonical normalization. This no longer chains a separate
+      // get().scoreSeo() call below.
       const { data, error } = await supabase.functions.invoke('optimize-seo', {
         body: {
+          content_id: postProduction.postId || null,
           title: String(postProduction.title || '').trim(),
           caption: postProduction.caption,
           hashtags: normalizeHashtags(postProduction.hashtags),
@@ -2132,7 +2604,7 @@ const useSessionStore = create((set, get) => ({
           visualPrompt: selectedGeneration?.prompt || '',
         },
       });
-      if (error) throw normalizeEdgeFunctionError(error, 'optimize-seo');
+      if (error) throw await normalizeEdgeFunctionError(error, 'optimize-seo');
 
       const result = data || {};
       const optimizedTitle = String(
@@ -2153,6 +2625,7 @@ const useSessionStore = create((set, get) => ({
           || postProduction.hashtags
           || [],
       );
+      const normalizedScore = readSeoResponseFields(result);
 
       set((state) => ({
         postProduction: {
@@ -2160,37 +2633,34 @@ const useSessionStore = create((set, get) => ({
           title: optimizedTitle,
           caption: optimizedCaption,
           hashtags: optimizedHashtags,
+          seoScore: normalizedScore.overall,
+          seoCategory: normalizedScore.category,
+          seoBreakdown: normalizedScore.breakdown,
+          seoSuggestions: normalizedScore.suggestions,
+          seoBenchmarkReport: normalizedScore.benchmarkReport,
+          seoHashtagSuggestions: normalizedScore.hashtagSuggestions,
+          seoProvider: normalizedScore.provider,
+          seoStatus: 'scored',
         },
       }));
 
+      // Content persistence (title/caption/hashtags) stays client-owned —
+      // only seo_state/workflow_state.seo_status ownership moved
+      // server-side in this fix, per FIXLOG's documented scope decision.
       if (postProduction.postId) {
-        const { data: currentPost } = await supabase
-          .from('posts')
-          .select('workflow_state')
-          .eq('id', postProduction.postId)
-          .maybeSingle();
-
         await supabase
           .from('posts')
           .update({
             title: optimizedTitle || null,
             caption: optimizedCaption,
             hashtags: optimizedHashtags,
-            workflow_state: {
-              ...(currentPost?.workflow_state && typeof currentPost.workflow_state === 'object'
-                ? currentPost.workflow_state
-                : {}),
-              seo_status: 'optimized',
-              seo_optimized_at: new Date().toISOString(),
-            },
             updated_at: new Date().toISOString(),
           })
           .eq('id', postProduction.postId);
       }
 
-      const scored = await get().scoreSeo();
       return {
-        ...scored,
+        ...normalizedScore,
         optimizedTitle,
         optimizedCaption,
         optimizedHashtags,
@@ -2248,10 +2718,32 @@ const useSessionStore = create((set, get) => ({
     const workflowState = preferred.workflow_state && typeof preferred.workflow_state === 'object'
       ? preferred.workflow_state
       : {};
-    const metadataStatus = String(workflowState.metadata_status || '').trim().toLowerCase() || 'idle';
+    const rawMetadataStatus = String(workflowState.metadata_status || '').trim().toLowerCase() || 'idle';
     const metadataUpdatedAt = workflowState.metadata_generated_at
       || workflowState.metadata_updated_at
       || null;
+
+    // WEEK 2 FIX 3 — stale-'in_progress' reconciliation: the server now
+    // owns writing 'in_progress'/'completed'/'failed' (see
+    // generate-post-metadata), but a lost response, network drop, or closed
+    // tab mid-request can still leave a row stuck at 'in_progress' forever
+    // with nothing to ever correct it server-side. On every read here, a
+    // row that has been 'in_progress' for more than 2 minutes (or has no
+    // timestamp to prove otherwise — covers rows stuck from before this fix
+    // existed) is treated as failed instead, both in what's surfaced to the
+    // UI and in-memory on `preferred` itself so the existing
+    // shouldGenerateDraftMetadata/scheduleDraftMetadataGeneration retry
+    // gate below (which reads preferred.workflow_state directly) sees it as
+    // recoverable rather than permanently blocked.
+    const STALE_IN_PROGRESS_MS = 2 * 60 * 1000;
+    const metadataStartedAt = workflowState.metadata_started_at || workflowState.metadata_updated_at || null;
+    const isStaleInProgress = rawMetadataStatus === 'in_progress' && (
+      !metadataStartedAt || (Date.now() - new Date(metadataStartedAt).getTime()) > STALE_IN_PROGRESS_MS
+    );
+    const metadataStatus = isStaleInProgress ? 'failed' : rawMetadataStatus;
+    if (isStaleInProgress) {
+      preferred.workflow_state = { ...workflowState, metadata_status: 'failed' };
+    }
     const selectedPlatforms = rows
       .filter((row) => row.account_id && row.status !== POST_STATUS.FAILED)
       .map((row) => row.account_id);
@@ -2342,11 +2834,9 @@ const useSessionStore = create((set, get) => ({
 
         if (updateError) throw updateError;
         targetPostId = reusable.id;
-        await ensureLibraryRowsForPosts([{ id: reusable.id, user_id: user.id }]);
       } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from('posts')
-          .insert(withOrgScope({
+        const inserted = await insertDraftPostWithConflictRecovery(
+          withOrgScope({
             user_id: user.id,
             generation_id: selectedGeneration.id,
             title,
@@ -2355,12 +2845,9 @@ const useSessionStore = create((set, get) => ({
             hashtags: normalizeHashtags(postProduction.hashtags),
             scheduled_at: null,
             status: POST_STATUS.DRAFT,
-          }))
-          .select('id, user_id')
-          .single();
-
-        if (insertError) throw insertError;
-        await ensureLibraryRowsForPosts([inserted]);
+          }),
+          { userId: user.id, generationId: selectedGeneration.id },
+        );
         targetPostId = inserted.id;
       }
 
@@ -2411,9 +2898,45 @@ const useSessionStore = create((set, get) => ({
     }
   },
 
+  // Real conflict check for the Schedule dialog — true if any OTHER
+  // scheduled post on one of the currently-selected target accounts already
+  // lands within 30 minutes of the proposed time. Never blocks scheduling
+  // (the mock's own copy says "nothing will be overwritten") — it's purely
+  // informational, so a query failure is swallowed as "no conflict found"
+  // rather than surfaced as an error.
+  checkScheduleConflict: async (scheduledAtISO) => {
+    try {
+      const accountIds = (get().postProduction.selectedPlatforms || []).filter(Boolean);
+      if (!accountIds.length || !scheduledAtISO) return false;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const target = new Date(scheduledAtISO).getTime();
+      if (!Number.isFinite(target)) return false;
+      const windowMs = 30 * 60 * 1000;
+
+      const { data, error } = await supabase
+        .from('posts')
+        .select('id, account_id, scheduled_at')
+        .eq('user_id', user.id)
+        .eq('status', POST_STATUS.SCHEDULED)
+        .in('account_id', accountIds)
+        .gte('scheduled_at', new Date(target - windowMs).toISOString())
+        .lte('scheduled_at', new Date(target + windowMs).toISOString());
+
+      if (error) throw error;
+      const currentPostId = get().postProduction.postId;
+      return (data || []).some((row) => row.id !== currentPostId);
+    } catch (err) {
+      console.error('checkScheduleConflict:', err);
+      return false;
+    }
+  },
+
   saveDraft: async () => {
     const { selectedGeneration, postProduction } = get();
-    if (!selectedGeneration) throw new Error('No generation selected');
+    if (!selectedGeneration) throw new Error('Select a generation to save as a draft.');
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -2427,6 +2950,22 @@ const useSessionStore = create((set, get) => ({
         || getTitleFromPrompt(postProduction.caption || selectedGeneration.prompt || '');
 
       const selectedAccountId = postProduction.selectedPlatforms[0] || null;
+
+      const { scheduled_at: scheduledAt, status: targetStatus } = resolveScheduledPostFields(postProduction, {
+        immediateStatus: POST_STATUS.DRAFT,
+        immediateScheduledAt: null,
+      });
+      const isScheduled = targetStatus === POST_STATUS.SCHEDULED;
+      // A scheduled post with no target account can never be dispatched —
+      // process_scheduled_posts() matches by account_id (or, absent that, by
+      // platform), and both are null here, so the cron's join never finds a
+      // row to publish. It would otherwise sit as "scheduled" forever with
+      // no error shown anywhere. A plain (non-scheduled) draft is fine
+      // without a target account — only the scheduled path requires one.
+      if (isScheduled && !selectedAccountId) {
+        throw new Error('Select a platform before scheduling — otherwise there’s nothing to publish to.');
+      }
+
       const existing = await fetchGenerationPosts(user.id, selectedGeneration.id);
       const reusable = existing.find((row) => row.status === POST_STATUS.DRAFT)
         || existing.find((row) => NON_TERMINAL_STATUSES.includes(row.status));
@@ -2434,7 +2973,7 @@ const useSessionStore = create((set, get) => ({
       let targetPostId = reusable?.id || null;
 
       if (reusable) {
-        const nextStatus = assertPostStatusTransition(reusable.status, POST_STATUS.DRAFT, 'saveDraft');
+        const nextStatus = assertPostStatusTransition(reusable.status, targetStatus, 'saveDraft');
         const { error: updateError } = await supabase
           .from('posts')
           .update(withOrgScope({
@@ -2442,32 +2981,27 @@ const useSessionStore = create((set, get) => ({
             caption: finalCaption,
             hashtags: normalizeHashtags(postProduction.hashtags),
             account_id: selectedAccountId,
-            scheduled_at: null,
+            scheduled_at: scheduledAt,
             status: nextStatus,
           }))
           .eq('id', reusable.id);
 
         if (updateError) throw updateError;
         targetPostId = reusable.id;
-        await ensureLibraryRowsForPosts([{ id: reusable.id, user_id: user.id }]);
       } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from('posts')
-          .insert(withOrgScope({
+        const inserted = await insertDraftPostWithConflictRecovery(
+          withOrgScope({
             user_id: user.id,
             generation_id: selectedGeneration.id,
             title,
             account_id: selectedAccountId,
             caption: finalCaption,
             hashtags: normalizeHashtags(postProduction.hashtags),
-            scheduled_at: null,
-            status: POST_STATUS.DRAFT,
-          }))
-          .select('id, user_id')
-          .single();
-
-        if (insertError) throw insertError;
-        await ensureLibraryRowsForPosts([inserted]);
+            scheduled_at: scheduledAt,
+            status: targetStatus,
+          }),
+          { userId: user.id, generationId: selectedGeneration.id },
+        );
         targetPostId = inserted.id;
       }
 
@@ -2486,13 +3020,20 @@ const useSessionStore = create((set, get) => ({
         postProduction: { ...DEFAULT_POST_PRODUCTION },
       });
       window.history.replaceState(null, '', window.location.pathname);
-      dispatchContentSync('draft-saved');
+      dispatchContentSync(isScheduled ? 'post-scheduled' : 'draft-saved');
 
-      return {
-        success: true,
-        message: 'Saved to drafts!',
-        status: POST_STATUS.DRAFT,
-      };
+      return isScheduled
+        ? {
+            success: true,
+            message: 'Scheduled successfully!',
+            status: POST_STATUS.SCHEDULED,
+            scheduledAt,
+          }
+        : {
+            success: true,
+            message: 'Saved to drafts!',
+            status: POST_STATUS.DRAFT,
+          };
     } catch (err) {
       console.error('saveDraft:', err);
       throw err;
@@ -2517,9 +3058,10 @@ const useSessionStore = create((set, get) => ({
       const title = String(postProduction.title || '').trim()
         || getTitleFromPrompt(postProduction.caption || selectedGeneration.prompt || '');
 
-      const scheduleDate = postProduction.scheduleDate || new Date().toISOString();
       const isImmediatePublish = !postProduction.scheduleDate;
-      const status = postProduction.scheduleDate ? POST_STATUS.SCHEDULED : POST_STATUS.PUBLISHING;
+      const { scheduled_at: scheduleDate, status } = resolveScheduledPostFields(postProduction, {
+        immediateStatus: POST_STATUS.PUBLISHING,
+      });
       const [primaryAccountId, ...secondaryAccountIds] = postProduction.selectedPlatforms;
       const accountIdsForPublish = [...new Set(postProduction.selectedPlatforms.filter(Boolean))];
       const { data: selectedAccountRows, error: selectedAccountsError } = await supabase
@@ -2535,7 +3077,6 @@ const useSessionStore = create((set, get) => ({
       }
       const primaryPlatform = selectedAccountMap.get(primaryAccountId)?.platform || await resolvePrimaryPlatform([primaryAccountId]);
       const existing = await fetchGenerationPosts(user.id, selectedGeneration.id);
-      const insertedRows = [];
       const targetPostIds = [];
       const publishTargets = [];
       const orgScope = getActiveOrgScope();
@@ -2561,9 +3102,8 @@ const useSessionStore = create((set, get) => ({
         targetPostIds.push(reusable.id);
         publishTargets.push({ postId: reusable.id, accountId: primaryAccountId });
       } else {
-        const { data: insertedPrimary, error: insertPrimaryError } = await supabase
-          .from('posts')
-          .insert(withOrgScope({
+        const insertedPrimary = await insertDraftPostWithConflictRecovery(
+          withOrgScope({
             user_id: user.id,
             generation_id: selectedGeneration.id,
             title,
@@ -2573,12 +3113,9 @@ const useSessionStore = create((set, get) => ({
             hashtags: normalizeHashtags(postProduction.hashtags),
             scheduled_at: scheduleDate,
             status,
-          }))
-          .select('id, user_id')
-          .single();
-
-        if (insertPrimaryError) throw insertPrimaryError;
-        insertedRows.push(insertedPrimary);
+          }),
+          { userId: user.id, generationId: selectedGeneration.id },
+        );
         targetPostIds.push(insertedPrimary.id);
         publishTargets.push({ postId: insertedPrimary.id, accountId: primaryAccountId });
       }
@@ -2605,9 +3142,8 @@ const useSessionStore = create((set, get) => ({
           continue;
         }
 
-        const { data: insertedAccount, error: insertAccountError } = await supabase
-          .from('posts')
-          .insert(withOrgScope({
+        const insertedAccount = await insertDraftPostWithConflictRecovery(
+          withOrgScope({
             user_id: user.id,
             generation_id: selectedGeneration.id,
             title,
@@ -2617,24 +3153,11 @@ const useSessionStore = create((set, get) => ({
             hashtags: normalizeHashtags(postProduction.hashtags),
             scheduled_at: scheduleDate,
             status,
-          }))
-          .select('id, user_id')
-          .single();
-        if (insertAccountError) throw insertAccountError;
-        insertedRows.push(insertedAccount);
+          }),
+          { userId: user.id, generationId: selectedGeneration.id },
+        );
         targetPostIds.push(insertedAccount.id);
         publishTargets.push({ postId: insertedAccount.id, accountId });
-      }
-
-      const libraryRows = [
-        ...insertedRows,
-        ...targetPostIds
-          .filter((postId) => !insertedRows.some((row) => row.id === postId))
-          .map((postId) => ({ id: postId, user_id: user.id })),
-      ];
-
-      if (libraryRows.length > 0) {
-        await ensureLibraryRowsForPosts(libraryRows);
       }
 
       const refreshedRows = await fetchGenerationPosts(user.id, selectedGeneration.id);
@@ -2746,98 +3269,151 @@ const useSessionStore = create((set, get) => ({
   clearError: () => set({ error: null }),
 
   // -- REALTIME ---------------------------------------------------------------
-  subscribeToGenerations: (callback) => {
+  // WEEK 2 FIX 1 (+ ADDENDUM UPGRADE 1): session-scoped, RLS-authorized
+  // private-channel broadcast — replaces the old subscribeToGenerations,
+  // which subscribed to postgres_changes on the ENTIRE `generations` table
+  // with no server-side filter (every client received every user's/org's
+  // row changes, filtered only client-side by session_id). The new
+  // subscription is scoped to one session's topic (`session-<id>`) and
+  // authorization for that topic is enforced server-side by an RLS policy
+  // on `realtime.messages` (see migration
+  // 20260711000000_realtime_session_broadcast.sql) — a client cannot
+  // subscribe to a session it doesn't own (personal) or have brand access
+  // to (org), regardless of what filter it asks for client-side.
+  //
+  // Lifecycle: ownership of "tear down and re-subscribe on session switch"
+  // is deliberately NOT scattered across loadSession/createNewSession/
+  // clearActiveSession — those all funnel into changing `activeSession`,
+  // and the caller (GeneratePageV2's effect) keys its subscription on
+  // `activeSession?.id`, so React's own effect-cleanup-before-rerun
+  // semantics guarantee exactly one channel is ever active and that it is
+  // torn down before a new one is created, without needing every
+  // session-mutating action to know about realtime at all. This function
+  // additionally guards defensively: calling it again removes any
+  // previously-created channel first, in case some future caller invokes it
+  // without going through that effect.
+  //
+  // No active session (bare /app/generate before one exists) → no
+  // subscription is created at all; the first call with a real sessionId
+  // (once ensureSession/loadSession/createNewSession sets one) establishes
+  // it lazily.
+  subscribeToSession: (sessionId, callback) => {
+    if (_activeRealtimeChannel) {
+      supabase.removeChannel(_activeRealtimeChannel);
+      _activeRealtimeChannel = null;
+    }
+
+    if (!sessionId) {
+      return () => {};
+    }
+
+    const topic = `session-${sessionId}`;
     const channel = supabase
-      .channel('generations_updates')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'generations' },
-        (payload) => {
-          const { activeSession, videoJobState } = get();
+      .channel(topic, { config: { private: true } })
+      .on('broadcast', { event: '*' }, (message) => {
+        // realtime.broadcast_changes() payload shape (Supabase's documented
+        // broadcast-from-database contract): { operation, table, schema,
+        // record, old_record }. Extraction is defensive against minor
+        // field-naming variance across Realtime server versions since this
+        // could not be exercised against a live project in this pass — see
+        // FIXLOG "REALTIME EXPOSURE VERDICT" / Fix 1 for the exact caveat.
+        const payload = message?.payload || {};
+        const operation = String(
+          payload.operation || payload.type || message?.event || '',
+        ).toUpperCase();
+        const updated = payload.record || payload.new_record || payload.new || null;
+        if (!updated) return;
 
-          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-            const updated = payload.new;
+        const { activeSession, videoJobState } = get();
 
-            if (updated.session_id === activeSession?.id) {
-              set((state) => {
-                const exists = state.activeGenerations.find((generation) => generation.id === updated.id);
-                const nextGenerations = exists
-                  ? state.activeGenerations.map((generation) => (generation.id === updated.id ? updated : generation))
-                  : [...state.activeGenerations, updated];
-                return {
-                  activeGenerations: nextGenerations,
-                  selectedGeneration: state.selectedGenerationId === updated.id
-                    ? updated
-                    : state.selectedGeneration,
-                };
-              });
+        if (operation === 'UPDATE' || operation === 'INSERT') {
+          if (updated.session_id === activeSession?.id) {
+            set((state) => {
+              const exists = state.activeGenerations.find((generation) => generation.id === updated.id);
+              const nextGenerations = exists
+                ? state.activeGenerations.map((generation) => (generation.id === updated.id ? updated : generation))
+                : [...state.activeGenerations, updated];
+              return {
+                activeGenerations: nextGenerations,
+                selectedGeneration: state.selectedGenerationId === updated.id
+                  ? updated
+                  : state.selectedGeneration,
+              };
+            });
 
-              if (updated.status === GENERATION_STATUS.COMPLETED && updated.storage_path && updated.user_id) {
-                ensureDraftForGeneration({
-                  userId: updated.user_id,
-                  generationId: updated.id,
-                  caption: updated.prompt || '',
-                })
-                  .then(() => dispatchContentSync('generation-realtime-completed'))
-                  .catch((err) => {
-                    console.error('Failed to sync generation draft from realtime:', err);
-                  });
-              }
-            }
-
-            if (videoJobState.generationId && updated.id === videoJobState.generationId) {
-              if (updated.status === GENERATION_STATUS.COMPLETED && updated.storage_path) {
-                const pollInterval = videoJobState.pollInterval;
-                if (pollInterval) clearInterval(pollInterval);
-
-                set((state) => ({
-                  isGenerating: false,
-                  generationProgress: 100,
-                  progressLabel: 'Video completed',
-                  generationStage: 'Completed',
-                  videoJobState: {
-                    ...state.videoJobState,
-                    status: GENERATION_STATUS.COMPLETED,
-                    progress: 100,
-                    videoUrl: updated.storage_path,
-                    pollInterval: null,
-                  },
-                }));
-              }
-
-              if (updated.status === GENERATION_STATUS.FAILED) {
-                const pollInterval = videoJobState.pollInterval;
-                if (pollInterval) clearInterval(pollInterval);
-
-                set((state) => ({
-                  isGenerating: false,
-                  generationProgress: 0,
-                  progressLabel: null,
-                  generationStage: null,
-                  videoJobState: {
-                    ...state.videoJobState,
-                    status: GENERATION_STATUS.FAILED,
-                    progress: 100,
-                    pollInterval: null,
-                  },
-                }));
-              }
+            if (updated.status === GENERATION_STATUS.COMPLETED && updated.storage_path && updated.user_id) {
+              // This is now the ONE mechanism that works for every completion
+              // path, not just the originating tab's own synchronous call
+              // (which also calls ensureDraftForGeneration itself, redundantly
+              // but harmlessly — findDraftForGeneration is read-only and
+              // scheduleDraftMetadataGeneration is deduped server-side via
+              // workflow_state.metadata_status, see shouldGenerateDraftMetadata).
+              // A second tab, an admin backfill, or (Fix 3) a server-side job
+              // finalizer with no client present at all all funnel through
+              // this same broadcast-driven path.
+              ensureDraftForGeneration({
+                userId: updated.user_id,
+                generationId: updated.id,
+              })
+                .then(() => dispatchContentSync('generation-realtime-completed'))
+                .catch((err) => {
+                  console.error('Failed to sync generation draft from realtime:', err);
+                });
             }
           }
 
-          if (typeof callback === 'function') callback(payload);
-        },
-      )
+          // Week 3 Fix 3: video completion/failure is now a real generations
+          // UPDATE written by job-webhook/process-jobs (via completeGeneration-
+          // equivalent logic in _shared/videoJobFinalize.ts), which broadcasts
+          // through this SAME session-scoped channel like any other media
+          // type — no dead pollInterval scaffolding needed anymore (the
+          // synchronous video implementation that scaffolding was inert
+          // leftover from no longer exists). This only mirrors the terminal
+          // state into videoJobState for whichever tab currently has this
+          // job foregrounded; subscribeToBackgroundJobs is the source of
+          // truth for the persistent multi-job drawer list.
+          if (videoJobState.generationId && updated.id === videoJobState.generationId) {
+            if (updated.status === GENERATION_STATUS.COMPLETED && updated.storage_path) {
+              set((state) => ({
+                videoJobState: {
+                  ...state.videoJobState,
+                  status: GENERATION_STATUS.COMPLETED,
+                  progress: 100,
+                  videoUrl: updated.storage_path,
+                },
+              }));
+            }
+
+            if (updated.status === GENERATION_STATUS.FAILED) {
+              set((state) => ({
+                videoJobState: {
+                  ...state.videoJobState,
+                  status: GENERATION_STATUS.FAILED,
+                  progress: 100,
+                },
+              }));
+            }
+          }
+        }
+
+        if (typeof callback === 'function') {
+          callback({ eventType: operation, new: updated, old: payload.old_record || payload.old || null });
+        }
+      })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    _activeRealtimeChannel = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (_activeRealtimeChannel === channel) {
+        _activeRealtimeChannel = null;
+      }
+    };
   },
 
   // -- CLEANUP ----------------------------------------------------------------
   reset: () => {
-    const pollInterval = get().videoJobState.pollInterval;
-    if (pollInterval) clearInterval(pollInterval);
-
     set({
       sessions: [],
       activeSession: null,
@@ -2852,9 +3428,12 @@ const useSessionStore = create((set, get) => ({
       generationStage: null,
       pendingClarifications: {},
       error: null,
+      regeneratingIds: [],
       videoJobState: { ...DEFAULT_VIDEO_JOB_STATE },
+      videoJobs: [],
       postProduction: { ...DEFAULT_POST_PRODUCTION },
       generationLineage: null,
+      promptSeed: null,
       settings: {
         mediaType: 'image',
         aspectRatio: '1:1',

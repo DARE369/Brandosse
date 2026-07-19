@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callLlm } from "../_shared/llm.ts";
 import { createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { createHttpError } from "../_shared/org.ts";
+import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 
 type GenerateContentPlanBody = {
@@ -33,6 +35,7 @@ const CONTENT_PLAN_SCHEMA_SKELETON = {
   visual_prompt: {
     global_style: "<string>",
     aspect_ratio: "<1:1|16:9|9:16|4:5>",
+    render_intent: "<photo|text_graphic|vector_design>",
     slides: [{
       slide_index: "<number>",
       full_prompt: "<string, min 40 words>",
@@ -101,6 +104,11 @@ RULES:
 8. SEO scores should be honest and include improvement_report rationale.
 9. If brand kit exists, follow brand voice, visual style, and forbidden phrases.
 10. guardrails_check must actively check content_restrictions.
+11. visual_prompt.render_intent selects the image engine — choose it honestly from what the image needs:
+   - "photo": photorealistic scenes, people, products, lifestyle, food, real environments. THIS IS THE DEFAULT when unsure.
+   - "text_graphic": the image must contain legible, specific words baked in — flyers, quote cards, posters, promo graphics with a headline/price/date rendered IN the image.
+   - "vector_design": logos, icons, badges, flat illustration, typographic/vector layouts.
+   When render_intent is "text_graphic", write the exact words that must appear, in quotes, inside each full_prompt (e.g. headline: "50% OFF THIS WEEKEND").
 
 JSON schema to follow:
 ${JSON.stringify(CONTENT_PLAN_SCHEMA_SKELETON, null, 2)}
@@ -235,24 +243,28 @@ serve(async (req) => {
 
   try {
     const authClient = createAuthClient(req.headers.get("Authorization"));
-    await requireUser(authClient);
+    const user = await requireUser(authClient);
+    // check_rate_limit() is SECURITY DEFINER — callable via the user-scoped
+    // client (granted EXECUTE to `authenticated`), no admin client needed
+    // just for this.
+    await enforceRateLimit(authClient, user.id, "generate-content-plan");
 
     const body = await parseJsonBody<GenerateContentPlanBody>(req);
     const mode = body.mode === "revision" ? "revision" : "plan";
 
     if (mode === "revision") {
       if (!body.plan || typeof body.plan !== "object") {
-        return jsonResponse({ error: "Missing plan" }, 400);
+        throw createHttpError("Missing plan", 400);
       }
       const violations = Array.isArray(body.violations) ? body.violations.map(String).filter(Boolean) : [];
       if (!violations.length) {
-        return jsonResponse({ error: "Missing violations" }, 400);
+        throw createHttpError("Missing violations", 400);
       }
       return jsonResponse(await revisePlan(body.plan, violations, body.brandKit));
     }
 
     if (!body.brief || typeof body.brief !== "object") {
-      return jsonResponse({ error: "Missing brief" }, 400);
+      throw createHttpError("Missing brief", 400);
     }
 
     return jsonResponse(await generatePlan(body.brief));

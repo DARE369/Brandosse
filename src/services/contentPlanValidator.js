@@ -85,6 +85,15 @@ export function validateAndRepairPlan(raw) {
     repairLog.push('Repaired: visual_prompt.slides was missing → generated from carousel.slides');
   }
 
+  // ── visual_prompt.render_intent: default to 'photo' if missing/invalid (1.1).
+  // 'photo' → FLUX (the safe generalist). resolveImageModel also guards this,
+  // but normalizing here keeps the stored plan record honest.
+  const VALID_INTENTS = ['photo', 'text_graphic', 'vector_design'];
+  if (plan.visual_prompt && !VALID_INTENTS.includes(plan.visual_prompt.render_intent)) {
+    plan.visual_prompt.render_intent = 'photo';
+    repairLog.push("Repaired: visual_prompt.render_intent missing/invalid → default 'photo'");
+  }
+
   // ── hashtags.platform_sets: derive if missing
   if (!plan.hashtags?.platform_sets || typeof plan.hashtags.platform_sets !== 'object') {
     const allTags = [

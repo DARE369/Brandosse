@@ -17,9 +17,9 @@ import { loadUserHistory }         from './historyLoader';
 
 let _generateImage = null;
 export function registerImageGenerator(fn) { _generateImage = fn; }
-async function generateImage(prompt, aspectRatio) {
+async function generateImage(prompt, aspectRatio, opts = {}) {
   if (!_generateImage) throw new Error('[Pipeline] No image generator registered. Call registerImageGenerator() first.');
-  return _generateImage(prompt, aspectRatio);
+  return _generateImage(prompt, aspectRatio, opts);
 }
 
 function normalizeGeneratedAsset(result) {
@@ -45,11 +45,42 @@ function normalizeGeneratedAsset(result) {
       height: result.height || null,
       resolution: result.resolution || null,
       format: result.format || 'image',
+      // Reproducibility: the edge fn already wrote these onto the row via
+      // completeGeneration, but the client's own row update below merges THIS
+      // metadata on top — so carry them through here or the update silently
+      // drops the seed/model the edge fn just wrote (0.2). Only overwrites the
+      // row's value when the provider actually returned one (?? null keeps the
+      // edge-fn write intact if the client didn't receive it).
+      ...(result.seed != null ? { seed: result.seed } : {}),
+      ...(result.imageModel ? { image_model: result.imageModel } : {}),
+      ...(result.promptUsed ? { enhanced_prompt: result.promptUsed } : {}),
     },
   };
 }
 
 const HISTORY_WINDOW = 10;
+
+// Maps the content plan's render_intent to a fal image model (1.1). The
+// content-plan LLM picks render_intent from what the image needs (photo /
+// text_graphic / vector_design); this turns that into the concrete model the
+// generateImage edge fn routes on. FLUX.2 Pro is the safe generalist default.
+const INTENT_TO_MODEL = {
+  photo: 'flux',
+  text_graphic: 'ideogram',
+  vector_design: 'recraft',
+};
+
+// Resolves which image model to use for a generation. An explicit user
+// override (settings.imageModel set to a concrete model, i.e. NOT 'auto'/
+// falsy) always wins — that's the advanced override chip (1.2). Otherwise we
+// route by the plan's render_intent, falling back to FLUX when intent is
+// missing or unrecognized.
+export function resolveImageModel(settings, plan) {
+  const override = settings?.imageModel;
+  if (override && override !== 'auto') return override;
+  const intent = plan?.visual_prompt?.render_intent;
+  return INTENT_TO_MODEL[intent] || 'flux';
+}
 
 function normalizeWorkspaceScope(scope = {}) {
   if (scope?.organizationId) {
@@ -97,12 +128,23 @@ export async function runGenerationPipeline({
   workspaceScope = {},
   lineageMetadata = null,
   onProgress = () => {},
+  requestId = null,
+  requestSlot = 0,
+  cancelSignal = null,
 }) {
+  if (cancelSignal?.aborted) {
+    const err = new Error('Generation cancelled before it started.');
+    err.name = 'AbortError';
+    throw err;
+  }
   const normalizedWorkspaceScope = normalizeWorkspaceScope(workspaceScope);
 
-  // 1. Load brand kit
-  onProgress('Loading brand kit...');
-  const brandKit = await loadBrandKit(userId);
+  // 1. Load brand kit — skipped only when the user's persisted "Match brand
+  // kit" content default (Settings > Content defaults) is explicitly off.
+  // Unset/true preserves the original unconditional-load behavior exactly.
+  const shouldMatchBrandKit = settings?.matchBrandKit !== false;
+  onProgress(shouldMatchBrandKit ? 'Loading brand kit...' : 'Skipping brand kit (disabled in settings)...');
+  const brandKit = shouldMatchBrandKit ? await loadBrandKit(userId) : null;
   const brandKitHash = brandKit?.raw?.version_hash || null;
 
   // 2. Load history
@@ -152,6 +194,11 @@ export async function runGenerationPipeline({
 
   if (planErr) throw new Error(`[Pipeline] Failed to store content plan: ${planErr.message}`);
 
+  // Resolve the image model once from the final plan's render_intent (+ any
+  // user override) so every slide/variant of this generation uses the same
+  // engine (1.1/1.2).
+  const resolvedImageModel = resolveImageModel(settings, finalPlan);
+
   // 8. Dispatch to image orchestrator
   if (settings.contentType === 'carousel') {
     return runCarouselOrchestration(
@@ -163,6 +210,7 @@ export async function runGenerationPipeline({
       brandKitHash,
       lineageMetadata,
       normalizedWorkspaceScope,
+      { requestId, cancelSignal, resolvedImageModel },
     );
   } else {
     return runSingleGeneration(
@@ -175,6 +223,7 @@ export async function runGenerationPipeline({
       brandKitHash,
       lineageMetadata,
       normalizedWorkspaceScope,
+      { requestId, requestSlot, cancelSignal, resolvedImageModel },
     );
   }
 }
@@ -192,7 +241,16 @@ async function runSingleGeneration(
   brandKitHash = null,
   lineageMetadata = null,
   workspaceScope = {},
+  { requestId = null, requestSlot = 0, cancelSignal = null, resolvedImageModel = null } = {},
 ) {
+  // The content plan produces a strong model-agnostic full_prompt; the
+  // generateImage edge fn then runs ONE model-aware render-prompt pass on it
+  // (1.3 — it used to always assume FLUX vocabulary regardless of the model).
+  // We deliberately leave enhance_prompt ON (do not pass enhancePrompt:false)
+  // so that single pass tailors the prompt to the resolved engine. Fully
+  // de-tuning the plan's full_prompt to save the pass is a creative-core
+  // change that needs before/after image A/B (see plan 1.3 risk) — a
+  // follow-up, not this PR.
   const prompt      = plan.visual_prompt?.slides?.[0]?.full_prompt ?? plan.visual_prompt?.global_style ?? '';
   const aspectRatio = plan.visual_prompt?.aspect_ratio ?? '1:1';
 
@@ -207,6 +265,8 @@ async function runSingleGeneration(
       media_type:     settings.mediaType ?? 'image',
       status:         GENERATION_STATUS.PROCESSING,
       content_plan_id: contentPlanId,
+      request_id:     requestId,
+      request_slot:   requestSlot,
       metadata:       {
         aspect_ratio: aspectRatio,
         brand_kit_hash: brandKitHash,
@@ -219,7 +279,12 @@ async function runSingleGeneration(
   if (genErr) throw new Error(`[Pipeline] Failed to insert generation: ${genErr.message}`);
 
   try {
-    const generated = normalizeGeneratedAsset(await generateImage(prompt, aspectRatio));
+    const generated = normalizeGeneratedAsset(
+      await generateImage(prompt, aspectRatio, {
+        requestId, requestSlot, signal: cancelSignal, generationId: generation.id,
+        imageModel: resolvedImageModel,
+      }),
+    );
     if (!generated.url) throw new Error('[Pipeline] Image provider returned no image URL.');
     await supabase.from('generations').update({
       status:       GENERATION_STATUS.COMPLETED,
@@ -250,6 +315,7 @@ async function runCarouselOrchestration(
   brandKitHash = null,
   lineageMetadata = null,
   workspaceScope = {},
+  { requestId = null, cancelSignal = null, resolvedImageModel = null } = {},
 ) {
   const slides      = plan.carousel?.slides ?? [];
   const aspectRatio = plan.visual_prompt?.aspect_ratio ?? '1:1';
@@ -267,6 +333,8 @@ async function runCarouselOrchestration(
     status:                GENERATION_STATUS.PROCESSING,
     batch_id:              batchId,
     batch_index:           idx,
+    request_id:            requestId,
+    request_slot:          idx,
     content_plan_id:       contentPlanId,
     carousel_slide_index:  idx + 1,
     carousel_slide_total:  slides.length,
@@ -291,14 +359,31 @@ async function runCarouselOrchestration(
   const sortedRows = [...insertedRows].sort((a, b) => (a.batch_index ?? 0) - (b.batch_index ?? 0));
 
   // Generate one at a time — sequential
+  const outcomes = [];
   for (const row of sortedRows) {
     const idx        = row.batch_index ?? 0;
     const fullPrompt = plan.visual_prompt?.slides?.[idx]?.full_prompt ?? slides[idx]?.image_prompt ?? '';
 
+    // Honest cancel: a slide not yet started when Cancel fires is marked
+    // skipped and never sent to the provider — it never gets billed. Slides
+    // already in flight when cancelSignal fires are handled by the abort
+    // reaching invokeFunction's fetch below (media.service.js).
+    if (cancelSignal?.aborted) {
+      await supabase.from('generations').update({ status: GENERATION_STATUS.FAILED, metadata: { ...(row.metadata || {}), skipped_reason: 'cancelled' } }).eq('id', row.id);
+      outcomes.push({ id: row.id, index: idx, ok: false, cancelled: true });
+      generationIds.push(row.id);
+      continue;
+    }
+
     onProgress(`Generating slide ${idx + 1} of ${slides.length}...`);
 
     try {
-      const generated = normalizeGeneratedAsset(await generateImage(fullPrompt, aspectRatio));
+      const generated = normalizeGeneratedAsset(
+        await generateImage(fullPrompt, aspectRatio, {
+          requestId, requestSlot: idx, signal: cancelSignal, generationId: row.id,
+          imageModel: resolvedImageModel,
+        }),
+      );
       if (!generated.url) throw new Error('[Pipeline] Image provider returned no image URL.');
       await supabase.from('generations').update({
         status:       GENERATION_STATUS.COMPLETED,
@@ -309,14 +394,25 @@ async function runCarouselOrchestration(
           ...generated.metadata,
         },
       }).eq('id', row.id);
+      outcomes.push({ id: row.id, index: idx, ok: true });
     } catch (err) {
       await supabase.from('generations').update({ status: GENERATION_STATUS.FAILED }).eq('id', row.id);
       console.error(`[Pipeline] Slide ${idx + 1} failed:`, err);
+      outcomes.push({ id: row.id, index: idx, ok: false, error: err?.message || 'Slide generation failed' });
       // Continue to next slide — partial carousel is better than none
     }
 
     generationIds.push(row.id);
   }
 
-  return { contentPlanId, batchId, generationIds };
+  const succeededCount = outcomes.filter((o) => o.ok).length;
+  return {
+    contentPlanId,
+    batchId,
+    generationIds,
+    outcomes,
+    succeededCount,
+    failedCount: outcomes.length - succeededCount,
+    totalCount: outcomes.length,
+  };
 }

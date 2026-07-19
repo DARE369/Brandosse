@@ -23,14 +23,16 @@ import useConnectedAccounts from "../../components/GenerateStudio/hooks/useConne
 import {
   CONTENT_TYPES,
   ASPECT_RATIOS,
+  IMAGE_MODEL_OPTIONS,
   VIDEO_QUALITY_TIERS,
   estimateGenerationCost,
   getVideoDurations,
 } from "../../config/mediaGenerationOptions";
 import { PROMPT_LIMIT } from "../../components/GenerateStudio/shared/constants";
 import {
-  UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, Avatar, IconButton,
+  UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton,
   Card, Badge, Skeleton, EmptyState, Button, Modal, Drawer, Dropdown, MobileNavDrawer,
+  NotificationBell, AvatarMenu,
 } from "../../ui-v2";
 import PostProductionPanel from "./PostProductionPanel";
 import SessionHistoryDrawer from "./SessionHistoryDrawer";
@@ -76,9 +78,12 @@ function StudioBody({ brandKit }) {
     isGenerating, generationProgress, progressLabel, error, settings, postProduction,
     updateSettings, startGeneration, startCarouselGeneration, startEditGeneration,
     startVideoGeneration, enhancePrompt, selectGeneration, hydratePostProductionFromGeneration,
-    regeneratePostMetadata, optimizeSeo, updatePostProduction, saveDraft, publishContent,
-    videoJobState, dismissVideoJob, setVideoJobMinimized,
-    sessions, projects, activeProject, createNewSession, loadSession, updateSessionTitle, deleteSession,
+    regeneratePostMetadata, optimizeSeo, scoreSeo, updatePostProduction, saveDraft, saveDraftPrompt, publishContent,
+    videoJobState, dismissVideoJob, setVideoJobMinimized, promptSeed, consumePromptSeed,
+    cancelActiveGeneration, lastBatchOutcome, retryFailedVariants,
+    regenerateVariant, regenerateSlides, regeneratingIds, checkScheduleConflict,
+    videoJobs, fetchVideoJobs, subscribeToBackgroundJobs, cancelVideoJob,
+    sessions, projects, activeProject, createNewSession, updateSessionTitle, deleteSession,
     fetchSessions, fetchProjects, createProject, renameProject, deleteProject, reorderProjects,
     sessionsLoading, projectsLoading,
   } = useSessionStore();
@@ -89,6 +94,41 @@ function StudioBody({ brandKit }) {
     fetchSessions();
     fetchProjects();
   }, [fetchSessions, fetchProjects]);
+
+  // Seed Studio's default aspect ratio / video quality / brand-kit-matching
+  // from Settings > Content defaults, once per page load. Guarded so it
+  // never overwrites a choice the user has already made this session.
+  const defaultsSeededRef = useRef(false);
+  useEffect(() => {
+    if (!user?.id || defaultsSeededRef.current) return;
+    defaultsSeededRef.current = true;
+    import("../../services/userSettingsService").then(({ fetchUserSettings }) => {
+      fetchUserSettings(user.id)
+        .then((loaded) => {
+          const gen = loaded?.generationDefaults;
+          if (!gen) return;
+          updateSettings({
+            aspectRatio: gen.aspect_ratio || settings.aspectRatio,
+            videoQuality: gen.video_quality || settings.videoQuality,
+            matchBrandKit: gen.match_brand_kit !== false,
+            imageModel: gen.image_model || settings.imageModel,
+          });
+        })
+        .catch(() => {});
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // Week 3 Fix 3: real, persistent video job history — load it once, then
+  // subscribe to the user's own background-jobs-<uid> topic for live
+  // updates for as long as this page is mounted (independent of which
+  // session is active, unlike subscribeToSession).
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    fetchVideoJobs();
+    const unsubscribe = subscribeToBackgroundJobs(user.id);
+    return unsubscribe;
+  }, [user?.id, fetchVideoJobs, subscribeToBackgroundJobs]);
 
   const [prompt, setPrompt] = useState("");
   const [sourceImageUrl, setSourceImageUrl] = useState("");
@@ -108,10 +148,26 @@ function StudioBody({ brandKit }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleConflict, setScheduleConflict] = useState(false);
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState(null);
   const [deleteProjectTarget, setDeleteProjectTarget] = useState(null);
   const [slideSelection, setSlideSelection] = useState({});
+  // Old generations from a since-removed image provider (Pollinations.ai)
+  // have URLs that no longer resolve — track which generation's publish
+  // preview failed to load so a placeholder renders instead of a
+  // permanently broken img/video element.
+  const [publishPreviewFailedId, setPublishPreviewFailedId] = useState(null);
+  const [failedThumbIds, setFailedThumbIds] = useState(() => new Set());
+  const markThumbFailed = useCallback((id) => {
+    setFailedThumbIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
+  // WEEK 2 FIX 5 (+ ADDENDUM UPGRADE 3): per-action rate-limit countdown —
+  // { [actionKey]: epochMsWhenClickableAgain }. Ticks every second while
+  // any entry is still in the future so the buttons below can show a real
+  // "Retry in Ns" countdown instead of guessing.
+  const [rateLimitedUntil, setRateLimitedUntil] = useState({});
+  const [rateLimitTick, setRateLimitTick] = useState(0);
 
   const cancelRequestedRef = useRef(false);
   const promptRef = useRef(null);
@@ -154,6 +210,25 @@ function StudioBody({ brandKit }) {
     const parts = [guidedFields.subject, guidedFields.setting, guidedFields.style, guidedFields.mood].filter(Boolean);
     if (parts.length) setPrompt(parts.join(", ").slice(0, PROMPT_LIMIT));
   }, [guided, guidedFields]);
+
+  /* WEEK 2 FIX 3 (+ ADDENDUM UPGRADE 2): the automationRunRef guard used to
+     be "run once per generation id, ever" — if that one attempt silently
+     failed (or the row it wrote got stuck 'in_progress'), leaving and
+     re-entering publish stage for the exact same generation would never
+     retry automatically, no matter how many times the user came back. It's
+     now "once per publish-stage *entry*": the guard set is cleared every
+     time studioStage leaves 'publish', so a fresh entry — including
+     re-entering the same generation's publish stage after a prior failed
+     attempt — always gets one automatic retry. Combined with the server-
+     side stale-'in_progress' reconciliation in hydratePostProductionFromGeneration,
+     a previously-stuck row is now both recoverable automatically on
+     re-entry AND recoverable manually via the Regenerate/Re-score buttons
+     below at any time. */
+  useEffect(() => {
+    if (studioStage !== "publish") {
+      automationRunRef.current.clear();
+    }
+  }, [studioStage]);
 
   /* Auto-hydrate captions when entering publish stage — same automation the old orchestrator ran. */
   useEffect(() => {
@@ -199,6 +274,64 @@ function StudioBody({ brandKit }) {
     [settings, sourceImageUrl, updateSettings]
   );
 
+  /* Consume a one-shot prompt seed set by GeneratePageV2's route-state
+     handoff effect (library asset / template / repurpose-edit arrivals).
+     Freeform prompt always wins over guided fields on a seed — guided mode
+     is switched off rather than trying to map free text into the
+     subject/setting/style/mood fields. */
+  useEffect(() => {
+    if (!promptSeed) return;
+    const seed = consumePromptSeed();
+    if (!seed) return;
+
+    const seedText = String(seed.text || "").trim().slice(0, PROMPT_LIMIT);
+    setGuided(false);
+    if (seedText) setPrompt(seedText);
+
+    if (seed.activateEditMode) {
+      if (seed.sourceImageUrl) setSourceImageUrl(seed.sourceImageUrl);
+      handleModeChange("edit");
+    }
+
+    // ADDENDUM UPGRADE 4: a session-draft seed (source: 'session_draft',
+    // from loadSession restoring sessions.metadata.draft_prompt) also
+    // carries a settings snapshot — restore mode/aspect ratio/slide count/
+    // etc. exactly as they were when the draft was saved, same as the
+    // prompt text itself.
+    if (seed.settingsSnapshot) {
+      updateSettings(seed.settingsSnapshot);
+    }
+  }, [promptSeed, consumePromptSeed, handleModeChange, updateSettings]);
+
+  useEffect(() => {
+    const hasActive = Object.values(rateLimitedUntil).some((until) => until > Date.now());
+    if (!hasActive) return undefined;
+    const interval = setInterval(() => setRateLimitTick((tick) => tick + 1), 1000);
+    return () => clearInterval(interval);
+  }, [rateLimitedUntil]);
+
+  /* If the error carries a retryAfterSeconds (a 429 from our own rate
+     limiter — see edgeFunctionClient.js/media.service.js), starts a real
+     countdown for that action's key and shows the exact wait time instead
+     of a generic message. Returns true if it handled the error (so the
+     caller skips its normal toast). */
+  const applyRateLimit = useCallback((key, err) => {
+    const seconds = Number(err?.retryAfterSeconds);
+    if (!Number.isFinite(seconds) || seconds <= 0) return false;
+    setRateLimitedUntil((prev) => ({ ...prev, [key]: Date.now() + seconds * 1000 }));
+    toast.error(`You're going a bit fast — try again in ${seconds}s.`);
+    return true;
+  }, []);
+
+  const getRateLimitRemaining = useCallback((key) => {
+    const until = rateLimitedUntil[key];
+    if (!until) return 0;
+    const remaining = Math.ceil((until - Date.now()) / 1000);
+    return remaining > 0 ? remaining : 0;
+    // rateLimitTick is read only to force this to recompute every second —
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rateLimitedUntil, rateLimitTick]);
+
   const handleEnhance = useCallback(async () => {
     const src = prompt.trim();
     if (!src) return;
@@ -207,11 +340,38 @@ function StudioBody({ brandKit }) {
       const result = await enhancePrompt(src);
       if (result?.enhanced) setPrompt(result.enhanced.slice(0, PROMPT_LIMIT));
     } catch (err) {
-      toast.error(err?.message || "Could not enhance prompt.");
+      if (!applyRateLimit("enhance", err)) {
+        toast.error(err?.message || "Could not enhance prompt.");
+      }
     } finally {
       setEnhancing(false);
     }
-  }, [prompt, enhancePrompt]);
+  }, [prompt, enhancePrompt, applyRateLimit]);
+
+  /* WEEK 2 FIX 3 (+ ADDENDUM UPGRADE 2) — manual recovery controls. These
+     work regardless of whether the automatic publish-stage hydrate ever
+     ran, succeeded, or got stuck: metadataStatus/seoStatus reflect whatever
+     the server last wrote (or the stale-reconciled 'failed' from
+     hydratePostProductionFromGeneration), so a permanently-stuck row is
+     always recoverable from here even without re-entering publish stage. */
+  const handleRegenerateMetadata = useCallback(async () => {
+    try {
+      await regeneratePostMetadata(["title", "caption", "hashtags"]);
+    } catch (err) {
+      if (!applyRateLimit("regenerateMetadata", err)) {
+        toast.error(err?.message || "Could not regenerate caption & title.");
+      }
+    }
+  }, [regeneratePostMetadata, applyRateLimit]);
+
+  const handleRescore = useCallback(async () => {
+    try {
+      await scoreSeo();
+    } catch (err) {
+      if (applyRateLimit("rescore", err)) return;
+      toast.error(err?.message || "Could not score this post.");
+    }
+  }, [scoreSeo, applyRateLimit]);
 
   const validatePreflight = useCallback(() => {
     if (!prompt.trim()) return "Prompt is required.";
@@ -238,32 +398,57 @@ function StudioBody({ brandKit }) {
     try {
       if (isCarousel) await startCarouselGeneration(prompt.trim(), settings.slideCount || 6);
       else if (selectedMode === "edit") await startEditGeneration(sourceImageUrl.trim(), prompt.trim());
-      else if (isVideoMode) await startVideoGeneration(prompt.trim());
+      else if (isVideoMode) {
+        // Week 3 Fix 3: video submits-and-returns in seconds — it does not
+        // belong in the generic isGenerating->"generating"->"results"
+        // transition (which is keyed on completedGenerations, and would
+        // otherwise flip to "results" showing OLDER completed generations
+        // from this session the instant isGenerating clears, well before
+        // this video is actually done). The job lives in the persistent
+        // Video Jobs drawer instead.
+        await startVideoGeneration(prompt.trim());
+        setStudioStage("brief");
+        setVideoJobsOpen(true);
+        toast("Video queued — rendering in the background. Track it in Video jobs.");
+        return;
+      }
       else await startGeneration(prompt.trim());
     } catch (genErr) {
-      const msg = genErr?.message || "Generation failed.";
       if (!cancelRequestedRef.current) {
+        // WEEK 2 FIX 5: a 429 here still uses the standard error box (per
+        // this fix's own instruction — "the standard error box + Retry is
+        // fine" for the Generate button specifically), but also starts the
+        // countdown so the button itself discourages an immediate re-click.
+        applyRateLimit("generate", genErr);
+        const msg = genErr?.message || "Generation failed.";
         setLocalError(msg);
         toast.error(msg);
       }
     }
-  }, [validatePreflight, isCarousel, selectedMode, isVideoMode, prompt, sourceImageUrl, negativePrompt, applyBrandKit, brandKit, settings, updateSettings, startGeneration, startCarouselGeneration, startEditGeneration, startVideoGeneration]);
+  }, [validatePreflight, isCarousel, selectedMode, isVideoMode, prompt, sourceImageUrl, negativePrompt, applyBrandKit, brandKit, settings, updateSettings, startGeneration, startCarouselGeneration, startEditGeneration, startVideoGeneration, applyRateLimit]);
 
-  /* Cancel: video has a real interruption path (stop polling — job keeps
-     running server-side, matching "safe to navigate away"). Sync modes
-     (image/carousel/edit) have no server-side abort available in the store,
-     so — same as the mockup's own reference behavior — this returns the UI
-     to the brief and discards the in-flight result when it lands; it does
-     not stop the request or refund credits. */
+  /* Cancel (Week 3 Fix 2 — honest cancel): for image/carousel/edit,
+     cancelActiveGeneration() aborts the store's AbortController, which
+     reaches the in-flight fetch for whichever variant/slide hasn't already
+     passed the point of no return, and skips any not-yet-started
+     variants/slides entirely (never billed, never sent to the provider —
+     see SessionStore.js/generationPipeline.js). A render already past that
+     point (mid-upload, mid-DB-write on the provider's side) will still
+     complete and appear in this session, which is why the copy below says
+     so rather than claiming a full stop. Video's "cancel" only detaches the
+     client from the still-running server-side job (Week 3 Fix 3) — the job
+     itself keeps going and is recoverable from the Video Jobs drawer. */
   const handleCancelGenerate = useCallback(() => {
     if (isVideoMode && videoJobState.status) {
       dismissVideoJob();
+      toast("Detached from this video job — it keeps rendering in the background and will appear when done.");
     } else {
       cancelRequestedRef.current = true;
+      cancelActiveGeneration();
+      toast("Cancelled — any renders already in progress will still appear in this session.");
     }
     setStudioStage("brief");
-    toast("Generation cancelled");
-  }, [isVideoMode, videoJobState.status, dismissVideoJob]);
+  }, [isVideoMode, videoJobState.status, dismissVideoJob, cancelActiveGeneration]);
 
   const handleGoToPublish = useCallback(
     (gen) => {
@@ -282,6 +467,32 @@ function StudioBody({ brandKit }) {
     },
     [selectGeneration, completedGenerations]
   );
+
+  const handleRegenerateVariant = useCallback(
+    async (generation) => {
+      try {
+        await regenerateVariant(generation);
+      } catch (err) {
+        toast.error(err?.message || "Could not regenerate this variant.");
+      }
+    },
+    [regenerateVariant]
+  );
+
+  const toggleSlideSelected = useCallback((id) => {
+    setSlideSelection((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const selectedSlideIds = useMemo(
+    () => Object.keys(slideSelection).filter((id) => slideSelection[id]),
+    [slideSelection]
+  );
+
+  const handleRegenerateSelectedSlides = useCallback(async () => {
+    if (selectedSlideIds.length === 0) return;
+    await regenerateSlides(selectedSlideIds);
+    setSlideSelection({});
+  }, [selectedSlideIds, regenerateSlides]);
 
   const handleSaveDraft = useCallback(async () => {
     setPublishing(true);
@@ -310,6 +521,18 @@ function StudioBody({ brandKit }) {
     }
   }, [publishContent]);
 
+  useEffect(() => {
+    if (!scheduleOpen || !scheduleDate || !scheduleTime) {
+      setScheduleConflict(false);
+      return undefined;
+    }
+    let cancelled = false;
+    checkScheduleConflict(new Date(`${scheduleDate}T${scheduleTime}`).toISOString()).then((hasConflict) => {
+      if (!cancelled) setScheduleConflict(hasConflict);
+    });
+    return () => { cancelled = true; };
+  }, [scheduleOpen, scheduleDate, scheduleTime, checkScheduleConflict]);
+
   const handleConfirmSchedule = useCallback(async () => {
     if (!scheduleDate || !scheduleTime) {
       toast.error("Pick a date and time.");
@@ -319,7 +542,11 @@ function StudioBody({ brandKit }) {
     setPublishing(true);
     try {
       const result = await saveDraft();
-      toast.success(result?.message || `Scheduled for ${scheduleDate} ${scheduleTime}`);
+      toast.success(
+        result?.status === "scheduled"
+          ? `Scheduled for ${scheduleDate} ${scheduleTime}`
+          : result?.message || "Saved as draft."
+      );
       setScheduleOpen(false);
       setStudioStage("brief");
     } catch (err) {
@@ -333,7 +560,11 @@ function StudioBody({ brandKit }) {
   const creditPct = credits.lifetimePurchased > 0 ? Math.max(0, Math.min(100, Math.round((credits.balance / credits.lifetimePurchased) * 100))) : 100;
   const shimmerCount = isCarousel ? (settings.slideCount === "auto" ? 6 : Number(settings.slideCount || 6)) : selectedMode === "image" ? Number(settings.batchSize || 1) : 1;
   const aspectRatio = settings.aspectRatio || "1:1";
-  const videoJobActive = isGenerating && isVideoMode;
+  // Week 3 Fix 3: video submits-and-returns, so isGenerating clears within
+  // seconds — it no longer reflects "is a video actually rendering." Any
+  // job still queued/running (across the whole persistent list, not just
+  // the most recently submitted one) keeps this indicator lit.
+  const videoJobActive = videoJobs.some((job) => job.status === "queued" || job.status === "running");
 
   return (
     <>
@@ -345,10 +576,10 @@ function StudioBody({ brandKit }) {
         right={
           <>
             {videoJobActive && (
-              <div className={styles.videoIndicator} title="Video jobs keep processing in the background — safe to navigate anywhere">
+              <div className={styles.videoIndicator} title="Video renders server-side — safe to navigate away, close this tab, or refresh; it'll still be here in the Video jobs drawer when you come back">
                 <span className={styles.loadingDot} />
                 <span className={styles.videoIndicatorLabel} style={{ fontFamily: "var(--uiv2-font-mono)", fontSize: 11, color: "var(--uiv2-warning)" }}>
-                  Video processing {Math.round(generationProgress)}%
+                  Video rendering…
                 </span>
               </div>
             )}
@@ -361,7 +592,8 @@ function StudioBody({ brandKit }) {
               <VideoIcon size={15} />
             </IconButton>
             <ThemeToggleButton />
-            <Avatar initials={userInitials || "U"} onClick={() => navigate("/app/profile")} />
+            <NotificationBell userId={user?.id} onNavigate={navigate} />
+            <AvatarMenu initials={userInitials || "U"} name={profile?.full_name} email={user?.email} onNavigate={navigate} />
           </>
         }
       />
@@ -398,8 +630,16 @@ function StudioBody({ brandKit }) {
               <Card>
                 <div className={styles.promptHead}>
                   <span className={styles.sectionLabel} style={{ marginBottom: 0 }}>Prompt</span>
-                  <Button variant="ghost" size="sm" onClick={handleEnhance} disabled={enhancing || !prompt.trim() || isGenerating}>
-                    <Sliders size={12} /> {enhancing ? "Enhancing…" : "Enhance prompt"}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleEnhance}
+                    disabled={enhancing || !prompt.trim() || isGenerating || getRateLimitRemaining("enhance") > 0}
+                  >
+                    <Sliders size={12} />
+                    {getRateLimitRemaining("enhance") > 0
+                      ? `Retry in ${getRateLimitRemaining("enhance")}s`
+                      : enhancing ? "Enhancing…" : "Enhance prompt"}
                   </Button>
                 </div>
 
@@ -461,6 +701,28 @@ function StudioBody({ brandKit }) {
                     ))}
                   </div>
                 </div>
+
+                {(selectedMode === "image" || isCarousel) && (
+                  <div className={styles.formatBlock}>
+                    <span className={styles.formatSubLabel}>Image style</span>
+                    <div className={styles.formatRow}>
+                      {IMAGE_MODEL_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          title={opt.hint}
+                          className={[styles.formatChip, (settings.imageModel || "auto") === opt.id ? styles.formatChipActive : ""].join(" ")}
+                          onClick={() => updateSettings({ imageModel: opt.id })}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <span className={styles.formatSubLabel} style={{ marginTop: 4, opacity: 0.8 }}>
+                      {IMAGE_MODEL_OPTIONS.find((o) => o.id === (settings.imageModel || "auto"))?.hint}
+                    </span>
+                  </div>
+                )}
 
                 {selectedMode === "image" && (
                   <div className={styles.formatBlock}>
@@ -599,19 +861,37 @@ function StudioBody({ brandKit }) {
                 )}
                 <Button
                   onClick={handleGenerate}
-                  disabled={!prompt.trim() || !canAfford || isGenerating}
+                  disabled={!prompt.trim() || !canAfford || isGenerating || getRateLimitRemaining("generate") > 0}
                   style={{ width: "100%" }}
                 >
                   <Sparkles size={14} aria-hidden="true" />
-                  {isGenerating ? "Generating…" : `Generate${shimmerCount > 1 ? ` ${shimmerCount} variants` : ""}`}
+                  {getRateLimitRemaining("generate") > 0
+                    ? `Retry in ${getRateLimitRemaining("generate")}s`
+                    : isGenerating ? "Generating…" : `Generate${shimmerCount > 1 ? ` ${shimmerCount} variants` : ""}`}
                 </Button>
+                {/* ADDENDUM UPGRADE 4: replaces Week 1 Fix 5's disable-only
+                    fix. When a generation is selected, behaves exactly as
+                    before (saveDraft, a post-level draft). When none is
+                    selected, this now genuinely saves the typed prompt +
+                    current settings onto the session (saveDraftPrompt) —
+                    the promptless "save my brief for later" feature the
+                    button's label always implied but never did. Only
+                    disabled when there is truly nothing to save either
+                    way. */}
                 <Button
                   variant="ghost"
                   size="sm"
+                  disabled={!selectedGeneration && !prompt.trim()}
+                  title={selectedGeneration || prompt.trim() ? undefined : "Type a prompt or generate first"}
                   onClick={async () => {
                     try {
-                      await saveDraft();
-                      toast.success("Saved as draft");
+                      if (selectedGeneration) {
+                        await saveDraft();
+                        toast.success("Saved as draft");
+                      } else {
+                        await saveDraftPrompt(prompt);
+                        toast.success("Draft saved to this session");
+                      }
                     } catch (err) {
                       toast.error(err?.message || "Could not save draft");
                     }
@@ -666,11 +946,42 @@ function StudioBody({ brandKit }) {
                 </Card>
               )}
 
+              {(studioStage === "brief" || studioStage === "results") && lastBatchOutcome && lastBatchOutcome.failedCount > 0 && (
+                <Card style={{ borderColor: "var(--uiv2-warning, #b98900)" }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+                    {lastBatchOutcome.succeededCount} of {lastBatchOutcome.totalCount} {lastBatchOutcome.kind === "carousel" ? "slides" : "variants"} completed
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginTop: 4 }}>
+                    {lastBatchOutcome.failedCount} failed to render. Retrying only re-runs the failed ones — credits already spent on the successful ones are not charged again.
+                  </div>
+                  {lastBatchOutcome.kind === "image" && lastBatchOutcome.failedSlots?.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="subtle"
+                      style={{ marginTop: 10 }}
+                      onClick={() => retryFailedVariants(prompt.trim())}
+                    >
+                      Retry failed only
+                    </Button>
+                  )}
+                  {lastBatchOutcome.kind === "carousel" && lastBatchOutcome.failedSlots?.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="subtle"
+                      style={{ marginTop: 10 }}
+                      onClick={handleGenerate}
+                    >
+                      Regenerate whole carousel
+                    </Button>
+                  )}
+                </Card>
+              )}
+
               {(studioStage === "brief" || studioStage === "results") && completedGenerations.length > 0 && (
                 isCarousel ? (
                   <Card>
                     <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginBottom: 12 }}>
-                      Click a slide to preview it full-size.
+                      Click a slide to preview it full-size. Check the ones you want redone.
                     </div>
                     <div className={styles.filmstrip}>
                       {completedGenerations.map((g, i) => (
@@ -679,10 +990,23 @@ function StudioBody({ brandKit }) {
                             className={[styles.filmThumb, selectedGenerationId === g.id ? styles.filmThumbSelected : ""].join(" ")}
                             onClick={() => openLightbox(g)}
                           >
-                            {g.storage_path || g.output_url || g.thumbnail_url ? (
-                              <img className={styles.variantImg} src={g.storage_path || g.output_url || g.thumbnail_url} alt="" />
+                            {(g.storage_path || g.output_url || g.thumbnail_url) && !failedThumbIds.has(g.id) ? (
+                              <img className={styles.variantImg} src={g.storage_path || g.output_url || g.thumbnail_url} alt="" onError={() => markThumbFailed(g.id)} />
                             ) : (
                               <span className={styles.variantLabel}>Slide {i + 1}</span>
+                            )}
+                            <button
+                              type="button"
+                              className={[styles.filmCheck, slideSelection[g.id] ? styles.filmCheckOn : ""].join(" ")}
+                              onClick={(e) => { e.stopPropagation(); toggleSlideSelected(g.id); }}
+                              aria-label={slideSelection[g.id] ? `Deselect slide ${i + 1}` : `Select slide ${i + 1} for regeneration`}
+                            >
+                              {slideSelection[g.id] && (
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#17181B" strokeWidth="3.4"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              )}
+                            </button>
+                            {regeneratingIds.includes(g.id) && (
+                              <div className={styles.regeneratingOverlay}><span className={styles.regeneratingDot} /></div>
                             )}
                           </div>
                           <div className={styles.filmCaption}>Slide {i + 1}</div>
@@ -690,7 +1014,22 @@ function StudioBody({ brandKit }) {
                       ))}
                     </div>
                     <div className={styles.searchRow}>
-                      <Button variant="subtle" onClick={() => handleModeChange("carousel")}>Regenerate whole carousel</Button>
+                      <Button
+                        variant="subtle"
+                        onClick={handleRegenerateSelectedSlides}
+                        disabled={selectedSlideIds.length === 0 || isGenerating || selectedSlideIds.some((id) => regeneratingIds.includes(id))}
+                      >
+                        {selectedSlideIds.length > 0 ? `Regenerate ${selectedSlideIds.length} selected slide${selectedSlideIds.length > 1 ? "s" : ""}` : "Regenerate selected slides"}
+                      </Button>
+                      <Button
+                        variant="subtle"
+                        onClick={handleGenerate}
+                        disabled={!prompt.trim() || !canAfford || isGenerating || getRateLimitRemaining("generate") > 0}
+                      >
+                        {getRateLimitRemaining("generate") > 0
+                          ? `Retry in ${getRateLimitRemaining("generate")}s`
+                          : `Regenerate whole carousel · ${cost} credits`}
+                      </Button>
                       <Button style={{ marginLeft: "auto" }} onClick={() => handleGoToPublish(completedGenerations[0])}>Use this carousel</Button>
                     </div>
                   </Card>
@@ -703,11 +1042,11 @@ function StudioBody({ brandKit }) {
                         style={{ aspectRatio: aspectRatio.replace(":", "/") }}
                         onClick={() => selectGeneration(g)}
                       >
-                        {g.storage_path || g.output_url || g.thumbnail_url ? (
+                        {(g.storage_path || g.output_url || g.thumbnail_url) && !failedThumbIds.has(g.id) ? (
                           g.media_type === "video" ? (
-                            <video className={styles.variantImg} src={g.storage_path || g.output_url} muted />
+                            <video className={styles.variantImg} src={g.storage_path || g.output_url} muted onError={() => markThumbFailed(g.id)} />
                           ) : (
-                            <img className={styles.variantImg} src={g.storage_path || g.output_url || g.thumbnail_url} alt="" />
+                            <img className={styles.variantImg} src={g.storage_path || g.output_url || g.thumbnail_url} alt="" onError={() => markThumbFailed(g.id)} />
                           )
                         ) : (
                           <span className={styles.variantLabel}>V{i + 1}</span>
@@ -723,8 +1062,20 @@ function StudioBody({ brandKit }) {
                             <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); openLightbox(g); }} title="View maximized">
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                             </button>
+                            <button
+                              type="button"
+                              className={styles.variantIconBtn}
+                              onClick={(e) => { e.stopPropagation(); handleRegenerateVariant(g); }}
+                              disabled={regeneratingIds.includes(g.id)}
+                              title="Regenerate this variant"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-7 3L3 8" strokeLinecap="round" strokeLinejoin="round" /><path d="M3 3v5h5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </button>
                           </span>
                         </div>
+                        {regeneratingIds.includes(g.id) && (
+                          <div className={styles.regeneratingOverlay}><span className={styles.regeneratingDot} /></div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -746,13 +1097,19 @@ function StudioBody({ brandKit }) {
                   {(() => {
                     const gen = selectedGeneration || completedGenerations[0];
                     const src = gen?.storage_path || gen?.output_url || gen?.thumbnail_url;
-                    return src ? (
-                      gen.media_type === "video" ? (
-                        <video src={src} controls style={{ width: "100%", maxHeight: 480, display: "block", background: "#000" }} />
-                      ) : (
-                        <img src={src} alt="Selected generation" style={{ width: "100%", maxHeight: 480, objectFit: "contain", display: "block" }} />
-                      )
-                    ) : null;
+                    const failed = gen && publishPreviewFailedId === gen.id;
+                    if (!src || failed) {
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "64px 24px", color: "var(--uiv2-text-secondary)", fontSize: 13, textAlign: "center" }}>
+                          {src ? "This media is no longer available" : "No media for this generation"}
+                        </div>
+                      );
+                    }
+                    return gen.media_type === "video" ? (
+                      <video src={src} controls style={{ width: "100%", maxHeight: 480, display: "block", background: "#000" }} onError={() => setPublishPreviewFailedId(gen.id)} />
+                    ) : (
+                      <img src={src} alt="Selected generation" style={{ width: "100%", maxHeight: 480, objectFit: "contain", display: "block" }} onError={() => setPublishPreviewFailedId(gen.id)} />
+                    );
                   })()}
                 </Card>
               )}
@@ -775,6 +1132,10 @@ function StudioBody({ brandKit }) {
           onOpenPublishConfirm={() => setPublishConfirmOpen(true)}
           onClose={() => setStudioStage("results")}
           onGenerateAnother={() => setStudioStage("brief")}
+          onRegenerateMetadata={handleRegenerateMetadata}
+          onRescore={handleRescore}
+          metadataRetryAfter={getRateLimitRemaining("regenerateMetadata")}
+          seoRetryAfter={getRateLimitRemaining("rescore")}
         />
       )}
 
@@ -788,7 +1149,13 @@ function StudioBody({ brandKit }) {
         actions={
           <>
             <Button variant="ghost" onClick={() => setScheduleOpen(false)}>Cancel</Button>
-            <Button onClick={handleConfirmSchedule} disabled={publishing}>Confirm schedule</Button>
+            <Button
+              onClick={handleConfirmSchedule}
+              disabled={publishing || (postProduction.selectedPlatforms || []).length === 0}
+              title={(postProduction.selectedPlatforms || []).length === 0 ? "Pick a target platform in the brief panel first" : undefined}
+            >
+              Confirm schedule
+            </Button>
           </>
         }
       >
@@ -802,6 +1169,20 @@ function StudioBody({ brandKit }) {
             <input type="time" className={styles.dialogInput} value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
           </label>
         </div>
+        {(postProduction.selectedPlatforms || []).length === 0 && (
+          <div className={styles.errorBox} style={{ marginTop: 12 }}>
+            <span className={styles.errorText}>
+              No target platform selected — go back and pick one in "Target platforms" first, or this post can never actually publish.
+            </span>
+          </div>
+        )}
+        {scheduleConflict && (
+          <div className={styles.errorBox} style={{ marginTop: 12, background: "var(--uiv2-warning-wash)", borderColor: "var(--uiv2-warning-border)" }}>
+            <span className={styles.errorText}>
+              This account already has a post scheduled at this time. You can still schedule this one — nothing will be overwritten.
+            </span>
+          </div>
+        )}
       </Modal>
 
       {/* Publish confirm */}
@@ -819,34 +1200,69 @@ function StudioBody({ brandKit }) {
         }
       />
 
-      {/* Video jobs panel */}
+      {/* Video jobs panel — Week 3 Fix 3: real, persistent, multi-job history
+          (background_jobs table, survives refresh/tab-close), not the old
+          single in-memory slot. */}
       <Drawer open={videoJobsOpen} onClose={() => setVideoJobsOpen(false)} title="Video jobs" width="min(380px, 92vw)">
         <div style={{ fontSize: 11.5, color: "var(--uiv2-text-tertiary)", marginBottom: 8 }}>
-          Video runs keep processing here even if you leave Studio.
+          Video jobs keep processing here even if you leave Studio or close this tab — reopen later and they'll still be here.
         </div>
-        {videoJobState.status ? (
-          <div className={styles.videoJobRow}>
-            <div className={styles.videoJobHead}>
-              <span style={{ fontSize: 12.5, fontWeight: 500 }}>{videoJobState.prompt?.slice(0, 40) || "Video job"}</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--uiv2-font-mono)", fontSize: 10.5, color: videoJobState.status === "failed" ? "var(--uiv2-danger)" : "var(--uiv2-warning)" }}>
-                <span className={styles.statusDot} style={{ background: videoJobState.status === "failed" ? "var(--uiv2-danger)" : "var(--uiv2-warning)" }} />
-                {videoJobState.status}
-              </span>
-            </div>
-            {videoJobState.status === "processing" && (
-              <div className={styles.videoJobBar}><div className={styles.videoJobBarFill} style={{ width: `${videoJobState.progress}%` }} /></div>
-            )}
-            {videoJobState.status === "failed" && (
-              <Button size="sm" variant="subtle" onClick={() => { dismissVideoJob(); setVideoJobsOpen(false); handleGenerate(); }}>Retry</Button>
-            )}
-            {videoJobState.status === "completed" && (
-              <Button size="sm" onClick={() => { setVideoJobsOpen(false); }}>View result</Button>
-            )}
+        {videoJobs.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {videoJobs.map((job) => (
+              <div key={job.id} className={styles.videoJobRow}>
+                <div className={styles.videoJobHead}>
+                  <span style={{ fontSize: 12.5, fontWeight: 500 }}>{(job.prompt || "Video job").slice(0, 40)}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--uiv2-font-mono)", fontSize: 10.5, color: job.status === "failed" ? "var(--uiv2-danger)" : "var(--uiv2-warning)" }}>
+                    <span className={styles.statusDot} style={{ background: job.status === "completed" ? "var(--uiv2-success, #2a9d5c)" : job.status === "failed" ? "var(--uiv2-danger)" : "var(--uiv2-warning)" }} />
+                    {job.status}
+                  </span>
+                </div>
+                {(job.status === "queued" || job.status === "running") && (
+                  <>
+                    <div
+                      className={styles.videoJobBarTrack}
+                      title={job.status === "queued" ? "Queued" : "Rendering — the provider doesn't report a percentage"}
+                    >
+                      <span className={styles.videoJobBarIndeterminate} style={{ opacity: job.status === "running" ? 1 : 0.4 }} />
+                    </div>
+                    <Button size="sm" variant="subtle" onClick={() => cancelVideoJob(job.id)}>Cancel job</Button>
+                  </>
+                )}
+                {job.status === "failed" && (
+                  <div style={{ fontSize: 11.5, color: "var(--uiv2-text-secondary)" }}>{job.errorMessage || "Failed — credits were refunded."}</div>
+                )}
+                {job.status === "completed" && (
+                  <Button size="sm" onClick={() => setVideoJobsOpen(false)}>View result</Button>
+                )}
+              </div>
+            ))}
           </div>
         ) : (
           <EmptyState title="No video jobs" description="Video runs will show up here while processing." />
         )}
       </Drawer>
+
+      {/* Floating minimized pill — shown when a video job is active but the
+          drawer isn't open and the tab isn't otherwise on it. Now meaningful
+          (the drawer is real), unlike the old dead setVideoJobMinimized. */}
+      {videoJobState.isMinimized && (videoJobState.status === "processing" || videoJobState.status === "submitting") && !videoJobsOpen && (
+        <button
+          type="button"
+          onClick={() => { setVideoJobMinimized(false); setVideoJobsOpen(true); }}
+          style={{
+            position: "fixed", bottom: 20, right: 20, zIndex: 40,
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "10px 16px", borderRadius: 999,
+            background: "var(--uiv2-surface-raised, #1c1c1e)", color: "var(--uiv2-text-primary)",
+            border: "1px solid var(--uiv2-border)", boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
+            cursor: "pointer", fontSize: 12.5,
+          }}
+        >
+          <span className={styles.statusDot} style={{ background: "var(--uiv2-warning)" }} />
+          Video rendering…
+        </button>
+      )}
 
       {/* Session history */}
       <SessionHistoryDrawer
@@ -856,11 +1272,20 @@ function StudioBody({ brandKit }) {
         projects={projects}
         activeSession={activeSession}
         loading={sessionsLoading || projectsLoading}
-        onResume={async (s) => { await loadSession(s.id); setHistoryOpen(false); }}
+        onResume={(s) => {
+          // URL is the source of truth for the active session — navigate
+          // and let GeneratePageV2's URL-driven init effect perform the
+          // load, rather than loading here directly. Keeps exactly one
+          // session-loading mechanism and keeps the URL in sync so a
+          // refresh lands on the same session.
+          navigate(`/app/generate/${s.id}`);
+          setHistoryOpen(false);
+        }}
         onNewSession={async (projectId) => {
-          await createNewSession("New session", { projectId });
+          const created = await createNewSession("New session", { projectId });
           setHistoryOpen(false);
           setStudioStage("brief");
+          if (created?.id) navigate(`/app/generate/${created.id}`);
         }}
         onRenameSession={(id, title) => updateSessionTitle(id, title)}
         onRequestDeleteSession={(s) => setDeleteSessionTarget(s)}
@@ -901,9 +1326,15 @@ function StudioBody({ brandKit }) {
             <Button
               variant="dangerSolid"
               onClick={async () => {
+                const wasActive = activeSession?.id === deleteSessionTarget.id;
                 await deleteSession(deleteSessionTarget.id);
                 setDeleteSessionTarget(null);
                 toast.success("Session deleted");
+                // Keep the URL in sync — deleting the session currently open
+                // (the store already clears activeSession/activeGenerations
+                // for this case) must not leave the address bar pointing at
+                // a session that no longer exists.
+                if (wasActive) navigate("/app/generate");
               }}
             >
               Delete session
@@ -950,6 +1381,8 @@ function StudioBody({ brandKit }) {
           onNext={() => setLightboxIndex((i) => Math.min(completedGenerations.length - 1, i + 1))}
           onSelect={() => { selectGeneration(lightboxGeneration); setLightboxOpen(false); }}
           onUseForPost={() => { setLightboxOpen(false); handleGoToPublish(lightboxGeneration); }}
+          onRegenerate={() => handleRegenerateVariant(lightboxGeneration)}
+          regenerating={regeneratingIds.includes(lightboxGeneration.id)}
         />
       )}
     </>
