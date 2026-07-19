@@ -200,6 +200,13 @@ export async function runGenerationPipeline({
   // engine (1.1/1.2).
   const resolvedImageModel = resolveImageModel(settings, finalPlan);
 
+  // 4.1/4.2/4.3: reference images (brand style anchors, a "match these" set, or
+  // a pinned subject) that ride along on every image so output stays on-brand /
+  // consistent. Deduped, cap 9 (FLUX.2's multi-reference limit).
+  const resolvedReferenceImages = Array.isArray(settings?.referenceImages)
+    ? [...new Set(settings.referenceImages.filter(Boolean))].slice(0, 9)
+    : [];
+
   // 8. Dispatch to image orchestrator
   if (settings.contentType === 'carousel') {
     return runCarouselOrchestration(
@@ -211,7 +218,7 @@ export async function runGenerationPipeline({
       brandKitHash,
       lineageMetadata,
       normalizedWorkspaceScope,
-      { requestId, cancelSignal, resolvedImageModel },
+      { requestId, cancelSignal, resolvedImageModel, resolvedReferenceImages },
     );
   } else {
     return runSingleGeneration(
@@ -224,7 +231,7 @@ export async function runGenerationPipeline({
       brandKitHash,
       lineageMetadata,
       normalizedWorkspaceScope,
-      { requestId, requestSlot, cancelSignal, resolvedImageModel },
+      { requestId, requestSlot, cancelSignal, resolvedImageModel, resolvedReferenceImages },
     );
   }
 }
@@ -242,7 +249,7 @@ async function runSingleGeneration(
   brandKitHash = null,
   lineageMetadata = null,
   workspaceScope = {},
-  { requestId = null, requestSlot = 0, cancelSignal = null, resolvedImageModel = null } = {},
+  { requestId = null, requestSlot = 0, cancelSignal = null, resolvedImageModel = null, resolvedReferenceImages = [] } = {},
 ) {
   // The content plan produces a strong model-agnostic full_prompt; the
   // generateImage edge fn then runs ONE model-aware render-prompt pass on it
@@ -288,7 +295,7 @@ async function runSingleGeneration(
     const generated = normalizeGeneratedAsset(
       await generateImage(prompt, aspectRatio, {
         requestId, requestSlot, signal: cancelSignal, generationId: generation.id,
-        imageModel: resolvedImageModel,
+        imageModel: resolvedImageModel, referenceImages: resolvedReferenceImages,
       }),
     );
     if (!generated.url) throw new Error('[Pipeline] Image provider returned no image URL.');
@@ -323,7 +330,7 @@ async function runCarouselOrchestration(
   brandKitHash = null,
   lineageMetadata = null,
   workspaceScope = {},
-  { requestId = null, cancelSignal = null, resolvedImageModel = null } = {},
+  { requestId = null, cancelSignal = null, resolvedImageModel = null, resolvedReferenceImages = [] } = {},
 ) {
   const slides      = plan.carousel?.slides ?? [];
   const aspectRatio = plan.visual_prompt?.aspect_ratio ?? '1:1';
@@ -389,7 +396,7 @@ async function runCarouselOrchestration(
       const generated = normalizeGeneratedAsset(
         await generateImage(fullPrompt, aspectRatio, {
           requestId, requestSlot: idx, signal: cancelSignal, generationId: row.id,
-          imageModel: resolvedImageModel,
+          imageModel: resolvedImageModel, referenceImages: resolvedReferenceImages,
         }),
       );
       if (!generated.url) throw new Error('[Pipeline] Image provider returned no image URL.');

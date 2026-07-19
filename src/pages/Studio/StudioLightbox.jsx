@@ -13,7 +13,7 @@ function modelLabel(meta) {
   return MODEL_LABELS[m] || (meta?.provider_model ? String(meta.provider_model).split("/").pop() : null);
 }
 
-export default function StudioLightbox({ generation, index, count, onClose, onPrev, onNext, onSelect, onUseForPost, onRegenerate, onEdit, onAnimate, regenerating = false }) {
+export default function StudioLightbox({ generation, index, count, onClose, onPrev, onNext, onSelect, onUseForPost, onRegenerate, onEdit, onAnimate, onAddReference, regenerating = false }) {
   const [mediaFailed, setMediaFailed] = useState(false);
 
   useEffect(() => {
@@ -94,6 +94,7 @@ export default function StudioLightbox({ generation, index, count, onClose, onPr
           )}
           {isImage && onEdit && <Button variant="ghost" onClick={onEdit}>Edit</Button>}
           {isImage && onAnimate && <Button variant="ghost" onClick={onAnimate}>Animate</Button>}
+          {isImage && onAddReference && <Button variant="ghost" onClick={onAddReference}>Pin as reference</Button>}
           <Button variant="ghost" onClick={onSelect}>Select this</Button>
           <Button onClick={onUseForPost}>Use for post</Button>
         </div>

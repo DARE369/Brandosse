@@ -161,6 +161,10 @@ export async function generateImages({
   // Raw/direct callers leave this undefined so the edge fn's model-aware
   // single pass still runs.
   enhancePrompt,
+  // 4.1: reference images (brand anchors / pinned subject) — when present the
+  // edge fn routes to FLUX.2's multi-reference endpoint for brand/subject
+  // consistency, regardless of imageModel.
+  referenceImageUrls = null,
   signal,
   onProgress,
 }) {
@@ -181,6 +185,9 @@ export async function generateImages({
       output_format: providerOptions.outputFormat || providerOptions.output_format || 'jpeg',
       session_id: sessionId || null,
       ...(enhancePrompt === false ? { enhance_prompt: false } : {}),
+      ...(Array.isArray(referenceImageUrls) && referenceImageUrls.length
+        ? { reference_image_urls: referenceImageUrls.filter(Boolean).slice(0, 9) }
+        : {}),
       // request_id / slot: see idempotency note above.
       request_id: requestId,
       request_slot: slotOffset + index,

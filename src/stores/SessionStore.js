@@ -839,6 +839,10 @@ const useSessionStore = create((set, get) => ({
     // wins over intent. Was hardcoded 'ideogram', which sent every image
     // through the text-rendering engine regardless of what it needed.
     imageModel: 'auto',
+    // 4.1/4.2: reference images that condition generation for brand/subject
+    // consistency; styleLock persists them across sessions ("match my feed").
+    referenceImages: [],
+    styleLock: false,
     resolution: '2k',
     duration: 6,
     fps: 25,
@@ -1350,6 +1354,7 @@ const useSessionStore = create((set, get) => ({
           // override, 1.1/1.2); settings fallback preserves old behavior when
           // a caller doesn't thread it.
           imageModel: opts.imageModel || settings.imageModel || 'ideogram',
+          referenceImageUrls: opts.referenceImages || undefined,
           category: 'image',
           requestId: opts.requestId,
           slotOffset: opts.requestSlot ?? 0,
@@ -1529,6 +1534,7 @@ const useSessionStore = create((set, get) => ({
         brandKit,
         sessionId: session.id,
         imageModel: opts.imageModel || settings.imageModel || 'ideogram',
+        referenceImageUrls: opts.referenceImages || undefined,
         category: 'image',
         requestId: opts.requestId,
         slotOffset: opts.requestSlot ?? 0,
@@ -1709,6 +1715,7 @@ const useSessionStore = create((set, get) => ({
           brandKit,
           sessionId: session.id,
           imageModel: opts.imageModel || settings.imageModel || 'ideogram',
+          referenceImageUrls: opts.referenceImages || undefined,
           category: 'carousel',
           requestId: opts.requestId,
           slotOffset: opts.requestSlot ?? 0,

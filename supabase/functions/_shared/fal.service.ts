@@ -78,6 +78,7 @@ const FAL_RUN_BASE   = "https://fal.run";
 
 export const FAL_MODELS = {
   imageFlux2Pro:    "fal-ai/flux-2-pro",
+  imageFlux2Edit:   "fal-ai/flux-2-pro/edit",             // FLUX.2 multi-reference — up to ~9 image_urls for brand/subject consistency (4.1)
   imageIdeogramV3:  "fal-ai/ideogram/v3",                 // best exact-text rendering (flyers, captions in-image)
   imageRecraftV3:   "fal-ai/recraft/v3/text-to-image",    // typography/vector + brand-color control
   imageEditKontext: "fal-ai/flux-pro/kontext",            // prompt-driven edit of an existing image
@@ -305,6 +306,27 @@ export async function generateImageFlux(input: FalImageInput): Promise<FalImageR
   }
 }
 
+/**
+ * FLUX.2 with REFERENCE images (4.1 — brand/subject consistency). Uses the
+ * multi-reference edit endpoint (fal-ai/flux-2-pro/edit), which accepts up to
+ * ~9 image_urls and generates a NEW image guided by them (brand style, a
+ * recurring product/character), rather than a plain text-to-image. Only used
+ * when references are actually present — the plain generateImageFlux path is
+ * unchanged for reference-free requests.
+ */
+export async function generateImageFluxRef(input: FalImageGenInput): Promise<FalImageResult> {
+  const apiKey = getFalKey();
+  const refs = (input.image_urls || []).filter(Boolean).slice(0, 9);
+  const normalized: Record<string, unknown> = {
+    prompt:        input.prompt,
+    image_urls:    refs,
+    image_size:    input.image_size ?? "square_hd",
+    output_format: input.output_format ?? "jpeg",
+  };
+  if (input.seed !== undefined) normalized.seed = input.seed;
+  return runImageModel(FAL_MODELS.imageFlux2Edit, normalized, apiKey);
+}
+
 // Shared sync-then-queue runner for image models (sync is fast; queue is the busy fallback).
 async function runImageModel(
   modelId: string,
@@ -399,6 +421,18 @@ export async function generateImageByModel(
   model: FalImageModel | undefined,
   input: FalImageGenInput,
 ): Promise<{ result: FalImageResult; provider: string; modelId: string; costUsd: number }> {
+  const hasRefs = Array.isArray(input.image_urls) && input.image_urls.filter(Boolean).length > 0;
+
+  // 4.1: reference images route to FLUX.2's multi-reference endpoint — the one
+  // model here with real, documented reference support. Ideogram/Recraft don't
+  // support it reliably, so references there gracefully no-op (plain gen). This
+  // means a "match these" request effectively renders on FLUX regardless of the
+  // intent-picked model, which is correct: brand/subject fidelity is a photo-
+  // consistency job, exactly FLUX's strength.
+  if (hasRefs) {
+    return { result: await generateImageFluxRef(input), provider: "fal-ai", modelId: FAL_MODELS.imageFlux2Edit, costUsd: FAL_COST_USD.imageFluxPerMP };
+  }
+
   switch (model) {
     case "recraft":
       return { result: await generateImageRecraft(input), provider: "fal-ai", modelId: FAL_MODELS.imageRecraftV3, costUsd: FAL_COST_USD.imageRecraft };

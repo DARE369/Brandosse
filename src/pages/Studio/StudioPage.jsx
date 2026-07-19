@@ -145,6 +145,9 @@ function StudioBody({ brandKit }) {
             videoQuality: gen.video_quality || settings.videoQuality,
             matchBrandKit: gen.match_brand_kit !== false,
             imageModel: gen.image_model || settings.imageModel,
+            // 4.2: restore a persisted style-lock reference set across sessions.
+            styleLock: Boolean(gen.style_lock),
+            referenceImages: gen.style_lock && Array.isArray(gen.reference_images) ? gen.reference_images : [],
           });
         })
         .catch(() => {});
@@ -168,6 +171,9 @@ function StudioBody({ brandKit }) {
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [sourcePickerItems, setSourcePickerItems] = useState([]);
   const [sourcePickerLoading, setSourcePickerLoading] = useState(false);
+  // pickerMode: "source" (3.2, single, for edit/animate) | "reference" (4.1,
+  // multi-add, for brand/subject matching). Same modal, different sink.
+  const [pickerMode, setPickerMode] = useState("source");
   const [enhancing, setEnhancing] = useState(false);
   const [localError, setLocalError] = useState("");
   const [publishing, setPublishing] = useState(false);
@@ -542,7 +548,8 @@ function StudioBody({ brandKit }) {
   /* 3.2: open the "pick a source from your Library" modal. Loads the user's
      recent completed IMAGE generations — the exact set that makes sense as an
      edit / frames-to-video source — so they don't have to hand-paste a URL. */
-  const openSourcePicker = useCallback(async () => {
+  const openSourcePicker = useCallback(async (mode = "source") => {
+    setPickerMode(mode);
     setSourcePickerOpen(true);
     setSourcePickerLoading(true);
     try {
@@ -568,12 +575,43 @@ function StudioBody({ brandKit }) {
 
   const handlePickSource = useCallback((item) => {
     const src = item?.storage_path;
-    if (src) {
+    if (!src) { setSourcePickerOpen(false); return; }
+    if (pickerMode === "reference") {
+      // 4.1: multi-add to settings.referenceImages (deduped, cap 6 for UI sanity).
+      const current = Array.isArray(settings.referenceImages) ? settings.referenceImages : [];
+      if (current.includes(src)) {
+        toast("Already added as a reference.");
+      } else if (current.length >= 6) {
+        toast.error("Up to 6 reference images.");
+      } else {
+        updateSettings({ referenceImages: [...current, src] });
+        toast.success("Added as a reference.");
+      }
+      // keep the modal open so several can be added in a row
+    } else {
       setSourceImageUrl(src);
       toast.success("Source image selected.");
+      setSourcePickerOpen(false);
     }
-    setSourcePickerOpen(false);
-  }, []);
+  }, [pickerMode, settings.referenceImages, updateSettings]);
+
+  const removeReferenceImage = useCallback((url) => {
+    const current = Array.isArray(settings.referenceImages) ? settings.referenceImages : [];
+    updateSettings({ referenceImages: current.filter((u) => u !== url) });
+  }, [settings.referenceImages, updateSettings]);
+
+  /* 4.3: pin a generated image as a reference so future generations match it
+     (a recurring product / character / style). Adds to the same
+     referenceImages sink as 4.1's picker. */
+  const handleAddAsReference = useCallback((generation) => {
+    const url = generation?.storage_path || generation?.output_url || generation?.thumbnail_url;
+    if (!url) { toast.error("This image is no longer available."); return; }
+    const current = Array.isArray(settings.referenceImages) ? settings.referenceImages : [];
+    if (current.includes(url)) { toast("Already a reference."); return; }
+    if (current.length >= 6) { toast.error("Up to 6 reference images — remove one first."); return; }
+    updateSettings({ referenceImages: [...current, url] });
+    toast.success("Pinned as a reference for future generations.");
+  }, [settings.referenceImages, updateSettings]);
 
   const toggleSlideSelected = useCallback((id) => {
     setSlideSelection((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -927,6 +965,60 @@ function StudioBody({ brandKit }) {
                   </div>
                 )}
               </Card>
+
+              {(selectedMode === "image" || isCarousel) && (
+                <Card>
+                  <div className={styles.sectionLabel}>Reference images</div>
+                  <span style={{ fontSize: 11.5, color: "var(--uiv2-text-secondary)", display: "block", marginBottom: 8 }}>
+                    Match the look of images you pick — keep a product, character, or style consistent. Renders on the photo engine.
+                  </span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {(settings.referenceImages || []).map((url) => (
+                      <div key={url} style={{ position: "relative", width: 52, height: 52 }}>
+                        <img src={url} alt="Reference" style={{ width: 52, height: 52, borderRadius: 6, objectFit: "cover", border: "1px solid var(--uiv2-border)" }} onError={(e) => { e.currentTarget.style.opacity = "0.3"; }} />
+                        <button
+                          type="button"
+                          onClick={() => removeReferenceImage(url)}
+                          aria-label="Remove reference"
+                          style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: 999, border: "none", cursor: "pointer", background: "var(--uiv2-surface-raised, #1c1c1e)", color: "var(--uiv2-text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)", fontSize: 12, lineHeight: "16px" }}
+                        >×</button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => openSourcePicker("reference")}
+                      style={{ width: 52, height: 52, borderRadius: 6, border: "1px dashed var(--uiv2-border-strong)", background: "transparent", color: "var(--uiv2-text-secondary)", cursor: "pointer", fontSize: 20 }}
+                      title="Add a reference image"
+                    >+</button>
+                  </div>
+                  {(settings.referenceImages || []).length > 0 && (
+                    <label className={styles.toggleRow} style={{ marginTop: 12 }} onClick={() => {
+                      const next = !settings.styleLock;
+                      updateSettings({ styleLock: next });
+                      // 4.2: persist the reference set so it rides along on every
+                      // future generation (style-lock), via Content Defaults.
+                      if (user?.id) {
+                        import("../../services/userSettingsService").then(({ saveUserSettings }) => {
+                          saveUserSettings(user.id, {
+                            generationDefaults: {
+                              style_lock: next,
+                              reference_images: next ? (settings.referenceImages || []) : [],
+                            },
+                          }).catch(() => {});
+                        });
+                      }
+                    }}>
+                      <span className={styles.toggleCopy}>
+                        <span className={styles.toggleTitle}>Keep for every generation</span>
+                        <span className={styles.toggleSub}>Match my feed — reuse these across sessions</span>
+                      </span>
+                      <span className={styles.toggleTrack} style={{ background: settings.styleLock ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)" }}>
+                        <span className={styles.toggleKnob} style={{ left: settings.styleLock ? "18px" : "2px" }} />
+                      </span>
+                    </label>
+                  )}
+                </Card>
+              )}
 
               <Card>
                 <div className={styles.sectionLabel}>Target platforms</div>
@@ -1517,8 +1609,13 @@ function StudioBody({ brandKit }) {
         open={sourcePickerOpen}
         onClose={() => setSourcePickerOpen(false)}
         size="lg"
-        title="Pick a source image"
-        description="Choose one of your generated images to edit or animate."
+        title={pickerMode === "reference" ? "Add reference images" : "Pick a source image"}
+        description={pickerMode === "reference"
+          ? "Tap images to match their look. Add several, then close when done."
+          : "Choose one of your generated images to edit or animate."}
+        actions={pickerMode === "reference" ? (
+          <Button onClick={() => setSourcePickerOpen(false)}>Done</Button>
+        ) : undefined}
       >
         {sourcePickerLoading ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8 }}>
@@ -1559,6 +1656,7 @@ function StudioBody({ brandKit }) {
           onRegenerate={() => handleRegenerateVariant(lightboxGeneration)}
           onEdit={() => handleUseAsSource(lightboxGeneration, "edit")}
           onAnimate={() => handleUseAsSource(lightboxGeneration, "image-to-video")}
+          onAddReference={() => handleAddAsReference(lightboxGeneration)}
           regenerating={regeneratingIds.includes(lightboxGeneration.id)}
         />
       )}

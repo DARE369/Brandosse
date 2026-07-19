@@ -25,6 +25,8 @@ const DEFAULT_GENERATION_DEFAULTS = {
   video_quality: 'standard',
   match_brand_kit: true,
   image_model: 'auto',
+  style_lock: false,
+  reference_images: [],
   default_platforms: [],
 };
 
@@ -115,6 +117,10 @@ function normalizeGenerationDefaults(value) {
     video_quality: String(source.video_quality || DEFAULT_GENERATION_DEFAULTS.video_quality),
     match_brand_kit: normalizeBoolean(source.match_brand_kit, DEFAULT_GENERATION_DEFAULTS.match_brand_kit),
     image_model: String(source.image_model || DEFAULT_GENERATION_DEFAULTS.image_model),
+    style_lock: normalizeBoolean(source.style_lock, DEFAULT_GENERATION_DEFAULTS.style_lock),
+    reference_images: Array.isArray(source.reference_images)
+      ? source.reference_images.filter((u) => typeof u === 'string' && u).slice(0, 6)
+      : DEFAULT_GENERATION_DEFAULTS.reference_images,
     default_platforms: Array.isArray(source.default_platforms)
       ? source.default_platforms.filter((p) => typeof p === 'string')
       : DEFAULT_GENERATION_DEFAULTS.default_platforms,

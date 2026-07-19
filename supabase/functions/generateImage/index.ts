@@ -47,6 +47,10 @@ type GenerateImageBody = {
    * completeGeneration) instead of leaving completion solely to the client. */
   generation_id?: string;
   image_model?: FalImageModel;
+  /** Reference images for brand/subject consistency (4.1). When present the
+   * request routes to FLUX.2's multi-reference endpoint regardless of
+   * image_model (see generateImageByModel). Up to ~9 are used. */
+  reference_image_urls?: string[];
   rendering_speed?: "TURBO" | "BALANCED" | "QUALITY";
   negative_prompt?: string;
   recraft_style?: string;
@@ -243,6 +247,10 @@ serve(async (req) => {
       : (body.brandKit ?? {});
     const brandColors = extractBrandColors(rawKit);
 
+    const referenceUrls = Array.isArray(body.reference_image_urls)
+      ? body.reference_image_urls.filter((u) => typeof u === "string" && u.trim()).slice(0, 9)
+      : [];
+
     const { result, provider, modelId, costUsd } = await generateImageByModel(imageModel, {
       prompt:          finalPrompt,
       image_size:      imageSize,
@@ -252,6 +260,7 @@ serve(async (req) => {
       negative_prompt: body.negative_prompt,
       recraft_style:   body.recraft_style,
       brand_colors:    imageModel === "recraft" ? brandColors : undefined,
+      image_urls:      referenceUrls.length ? referenceUrls : undefined,
     });
 
     const sourceUrl = result.images?.[0]?.url;
@@ -320,6 +329,9 @@ serve(async (req) => {
         image_size:  imageSize,
         image_model: imageModel,
         cost_usd:    costUsd,
+        // 4.1: record that/how many references guided this render (for
+        // reproducibility receipts; not the URLs themselves to keep the row lean).
+        reference_count: referenceUrls.length || undefined,
       },
     });
 
