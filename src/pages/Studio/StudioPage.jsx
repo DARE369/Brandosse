@@ -110,7 +110,7 @@ function StudioBody({ brandKit }) {
     activeSession, activeGenerations, selectedGeneration, selectedGenerationId,
     isGenerating, generationProgress, progressLabel, error, settings, postProduction,
     updateSettings, startGeneration, startCarouselGeneration, startEditGeneration,
-    startVideoGeneration, enhancePrompt, selectGeneration, hydratePostProductionFromGeneration,
+    startVideoGeneration, generateVideoFirstFrame, enhancePrompt, selectGeneration, hydratePostProductionFromGeneration,
     regeneratePostMetadata, optimizeSeo, scoreSeo, updatePostProduction, saveDraft, saveDraftPrompt, publishContent,
     videoJobState, dismissVideoJob, setVideoJobMinimized, promptSeed, consumePromptSeed,
     cancelActiveGeneration, lastBatchOutcome, retryFailedVariants,
@@ -168,6 +168,11 @@ function StudioBody({ brandKit }) {
 
   const [prompt, setPrompt] = useState("");
   const [sourceImageUrl, setSourceImageUrl] = useState("");
+  // 5.1: first-frame approval for text-to-video — hold the candidate frame
+  // (a still, billed as an image) until the user approves it, then animate
+  // (billed as video). null = no pending frame.
+  const [pendingFrame, setPendingFrame] = useState(null); // { url }
+  const [framePhase, setFramePhase] = useState("idle"); // idle | generating | review | animating
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [sourcePickerItems, setSourcePickerItems] = useState([]);
   const [sourcePickerLoading, setSourcePickerLoading] = useState(false);
@@ -443,14 +448,27 @@ function StudioBody({ brandKit }) {
     try {
       if (isCarousel) await startCarouselGeneration(prompt.trim(), settings.slideCount || 6);
       else if (selectedMode === "edit") await startEditGeneration(sourceImageUrl.trim(), prompt.trim());
+      else if (selectedMode === "video" && !sourceImageUrl.trim()) {
+        // 5.1: text-to-video → generate a still first frame for approval before
+        // spending the (expensive) animate credits. The frame is billed as an
+        // image; the animate step is billed separately when the user approves.
+        setFramePhase("generating");
+        setPendingFrame(null);
+        try {
+          const frame = await generateVideoFirstFrame(prompt.trim());
+          setPendingFrame(frame);
+          setFramePhase("review");
+        } catch (frameErr) {
+          setFramePhase("idle");
+          if (!applyRateLimit("generate", frameErr)) {
+            toast.error(frameErr?.message || "Could not generate a first frame.");
+          }
+        }
+        return;
+      }
       else if (isVideoMode) {
-        // Week 3 Fix 3: video submits-and-returns in seconds — it does not
-        // belong in the generic isGenerating->"generating"->"results"
-        // transition (which is keyed on completedGenerations, and would
-        // otherwise flip to "results" showing OLDER completed generations
-        // from this session the instant isGenerating clears, well before
-        // this video is actually done). The job lives in the persistent
-        // Video Jobs drawer instead.
+        // image-to-video (source already provided) OR any remaining video path:
+        // submits-and-returns; the job lives in the persistent Video Jobs drawer.
         await startVideoGeneration(prompt.trim());
         setStudioStage("brief");
         setVideoJobsOpen(true);
@@ -471,6 +489,43 @@ function StudioBody({ brandKit }) {
       }
     }
   }, [validatePreflight, isCarousel, selectedMode, isVideoMode, prompt, sourceImageUrl, negativePrompt, applyBrandKit, brandKit, settings, updateSettings, startGeneration, startCarouselGeneration, startEditGeneration, startVideoGeneration, applyRateLimit]);
+
+  /* 5.1: approve the reviewed first frame → animate it (image-to-video). The
+     frame was already billed as an image; this is the separate video charge. */
+  const handleApproveFrame = useCallback(async () => {
+    if (!pendingFrame?.url) return;
+    setFramePhase("animating");
+    try {
+      updateSettings({ mediaType: "image-to-video", referenceImageUrl: pendingFrame.url });
+      // startVideoGeneration reads settings.referenceImageUrl for the source.
+      await startVideoGeneration(prompt.trim());
+      setPendingFrame(null);
+      setFramePhase("idle");
+      setStudioStage("brief");
+      setVideoJobsOpen(true);
+      toast("Frame approved — animating in the background. Track it in Video jobs.");
+    } catch (err) {
+      setFramePhase("review");
+      if (!applyRateLimit("generate", err)) toast.error(err?.message || "Could not start the animation.");
+    }
+  }, [pendingFrame, prompt, updateSettings, startVideoGeneration, applyRateLimit]);
+
+  const handleRegenerateFrame = useCallback(async () => {
+    setFramePhase("generating");
+    try {
+      const frame = await generateVideoFirstFrame(prompt.trim());
+      setPendingFrame(frame);
+      setFramePhase("review");
+    } catch (err) {
+      setFramePhase("review");
+      if (!applyRateLimit("generate", err)) toast.error(err?.message || "Could not regenerate the frame.");
+    }
+  }, [prompt, generateVideoFirstFrame, applyRateLimit]);
+
+  const handleCancelFrame = useCallback(() => {
+    setPendingFrame(null);
+    setFramePhase("idle");
+  }, []);
 
   /* Cancel (Week 3 Fix 2 — honest cancel): for image/carousel/edit,
      cancelActiveGeneration() aborts the store's AbortController, which
@@ -1603,6 +1658,38 @@ function StudioBody({ brandKit }) {
           </>
         }
       />
+
+      {/* 5.1: first-frame approval for text-to-video */}
+      <Modal
+        open={framePhase === "generating" || framePhase === "review" || framePhase === "animating"}
+        onClose={framePhase === "review" ? handleCancelFrame : undefined}
+        size="md"
+        title="Approve the first frame"
+        description="This still is the frame your video animates from. Approve it or regenerate before spending the video credits."
+        actions={framePhase === "review" ? (
+          <>
+            <Button variant="ghost" onClick={handleCancelFrame}>Cancel</Button>
+            <Button variant="subtle" onClick={handleRegenerateFrame}>Regenerate frame</Button>
+            <Button onClick={handleApproveFrame}>Approve &amp; animate</Button>
+          </>
+        ) : undefined}
+      >
+        <div style={{ display: "flex", justifyContent: "center", minHeight: 200 }}>
+          {framePhase === "generating" ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "40px 0" }}>
+              <span className={styles.loadingDot} />
+              <span style={{ fontSize: 13, color: "var(--uiv2-text-secondary)" }}>Rendering the first frame…</span>
+            </div>
+          ) : framePhase === "animating" ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "40px 0" }}>
+              <span className={styles.loadingDot} />
+              <span style={{ fontSize: 13, color: "var(--uiv2-text-secondary)" }}>Queuing the animation…</span>
+            </div>
+          ) : pendingFrame?.url ? (
+            <img src={pendingFrame.url} alt="First frame" style={{ maxWidth: "100%", maxHeight: "48vh", borderRadius: 8, objectFit: "contain" }} />
+          ) : null}
+        </div>
+      </Modal>
 
       {/* 3.2: Library source picker */}
       <Modal

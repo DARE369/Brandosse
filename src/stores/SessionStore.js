@@ -1965,6 +1965,37 @@ const useSessionStore = create((set, get) => ({
   // tracking only "the job this tab most recently submitted or is looking
   // at," for the existing single-job UI affordances (progress bar, minimize
   // pill) to key off without a larger UI rewrite.
+  // 5.1: generate a single STILL first frame for a text-to-video request so
+  // the user can approve it before the (expensive) animate step. Billed as an
+  // image (category 'image') — separate from the later video charge, per the
+  // credit model. Returns { url } or throws. Does NOT create a session-visible
+  // results grid entry; the frame is a staging artifact the caller manages.
+  generateVideoFirstFrame: async (userInput) => {
+    const prompt = String(userInput || '').trim();
+    if (!prompt) throw new Error('A prompt is required to generate a first frame.');
+    const { settings } = get();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    const session = await ensureSession(get, prompt);
+    const brandKit = settings.brandKit || (await loadBrandKit(user.id));
+
+    const images = await generateImages({
+      prompt,
+      aspectRatio: settings.aspectRatio || '16:9',
+      numImages: 1,
+      brandKit,
+      sessionId: session.id,
+      imageModel: settings.imageModel || 'auto',
+      referenceImageUrls: settings.styleLock ? settings.referenceImages : undefined,
+      category: 'image',
+      requestId: crypto.randomUUID(),
+      slotOffset: 0,
+    });
+    const url = images?.[0]?.url;
+    if (!url) throw new Error('First-frame renderer returned no image.');
+    return { url };
+  },
+
   startVideoGeneration: async (userInput) => {
     const prompt = String(userInput || '').trim();
     if (!prompt) return;
