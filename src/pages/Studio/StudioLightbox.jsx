@@ -81,6 +81,9 @@ export default function StudioLightbox({ generation, index, count, onClose, onPr
                   quality {quality.quality_score}
                 </span>
               )}
+              {/* 6.4: complete the recipe — references + upscale finish. */}
+              {meta.reference_count > 0 && <span className={styles.shotTag} title="Reference images guided this render">{meta.reference_count} ref{meta.reference_count > 1 ? "s" : ""}</span>}
+              {meta.upscaled && <span className={styles.shotTag} title="Upscaled / finished">upscaled</span>}
             </div>
             {promptUsed && <p className={styles.shotPrompt} title={promptUsed}>{promptUsed}</p>}
           </div>

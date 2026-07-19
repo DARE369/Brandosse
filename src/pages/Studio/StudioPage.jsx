@@ -240,6 +240,13 @@ function StudioBody({ brandKit }) {
     [activeGenerations]
   );
   const lightboxGeneration = completedGenerations[lightboxIndex] || null;
+  // 6.3: generations the quality gate hard-flagged — offer a one-click bulk
+  // regenerate ("regenerate the losers"). Each regen is charged (uses the same
+  // per-variant regenerate path).
+  const flaggedGenerations = useMemo(
+    () => completedGenerations.filter((g) => g.media_type !== "video" && g.metadata?.quality?.verdict === "fail"),
+    [completedGenerations]
+  );
 
   useEffect(() => {
     if (isGenerating && !cancelRequestedRef.current) setStudioStage("generating");
@@ -686,6 +693,19 @@ function StudioBody({ brandKit }) {
       setUpscalingId(null);
     }
   }, [activeSession?.id, applyRateLimit]);
+
+  /* 6.3: regenerate every quality-flagged image in one go. Sequential so the
+     per-item regenerating overlay reads correctly; each is charged. */
+  const handleRegenerateFlagged = useCallback(async () => {
+    for (const g of flaggedGenerations) {
+      try {
+        await regenerateVariant(g);
+      } catch (err) {
+        toast.error(err?.message || `Could not regenerate a flagged image.`);
+        break; // stop on first failure (likely rate limit / credits)
+      }
+    }
+  }, [flaggedGenerations, regenerateVariant]);
 
   /* 4.3: pin a generated image as a reference so future generations match it
      (a recurring product / character / style). Adds to the same
@@ -1233,6 +1253,27 @@ function StudioBody({ brandKit }) {
                     ))}
                   </div>
                   <Button variant="ghost" size="sm" onClick={handleCancelGenerate} style={{ marginTop: 14 }}>Cancel</Button>
+                </Card>
+              )}
+
+              {/* 6.3: quality-flagged bulk regenerate */}
+              {(studioStage === "brief" || studioStage === "results") && flaggedGenerations.length > 0 && (
+                <Card style={{ borderColor: "var(--uiv2-danger, #c0392b)" }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+                    {flaggedGenerations.length} image{flaggedGenerations.length > 1 ? "s" : ""} flagged by the quality check
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginTop: 4 }}>
+                    The quality check found likely issues (garbled text, artifacts, wrong crop). Regenerating re-rolls each one — this spends credits.
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    style={{ marginTop: 10 }}
+                    onClick={handleRegenerateFlagged}
+                    disabled={flaggedGenerations.some((g) => regeneratingIds.includes(g.id))}
+                  >
+                    Regenerate {flaggedGenerations.length} flagged
+                  </Button>
                 </Card>
               )}
 
