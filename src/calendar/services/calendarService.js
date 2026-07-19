@@ -288,7 +288,7 @@ export async function generateQuickPostCaption({ prompt, platform, mediaType } =
       markEdgeFunctionUnavailable(METADATA_FUNCTION);
       throw new Error(buildUnavailableEdgeFunctionMessage(METADATA_FUNCTION));
     }
-    throw normalizeEdgeFunctionError(error, METADATA_FUNCTION);
+    throw await normalizeEdgeFunctionError(error, METADATA_FUNCTION);
   }
 
   clearEdgeFunctionUnavailable(METADATA_FUNCTION);

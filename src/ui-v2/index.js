@@ -19,3 +19,5 @@ export { useOutsideDismiss } from "./primitives/useOutsideDismiss";
 
 export { AppHeader, NavLink, CreditPill, Avatar } from "./shell/AppHeader";
 export { MobileNavDrawer } from "./shell/MobileNavDrawer";
+export { NotificationBell } from "./shell/NotificationBell";
+export { AvatarMenu } from "./shell/AvatarMenu";

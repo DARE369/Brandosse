@@ -1,6 +1,9 @@
 import React, { useRef, useState } from 'react';
+import { Upload, FileImage, FileText, FileType, Film, File as FileIcon } from 'lucide-react';
 import useBrandKitStore from '../../stores/BrandKitStore';
 import { ASSET_STATUS } from '../../constants/statusEnums';
+import { Button } from '../../ui-v2';
+import styles from './BrandKit.module.css';
 
 const ASSET_TYPE_MAP = {
   'image/png': 'logo',
@@ -10,6 +13,8 @@ const ASSET_TYPE_MAP = {
   'application/pdf': 'document',
   'application/msword': 'document',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+  'application/zip': 'document',
+  'application/x-zip-compressed': 'document',
   'font/ttf': 'font',
   'font/otf': 'font',
   'application/x-font-ttf': 'font',
@@ -18,13 +23,13 @@ const ASSET_TYPE_MAP = {
   'video/webm': 'video',
 };
 
-const iconByAssetType = {
-  logo: '[LOGO]',
-  font: '[FONT]',
-  document: '[DOC]',
-  video: '[VIDEO]',
-  image: '[IMG]',
-  other: '[FILE]',
+const ICON_BY_ASSET_TYPE = {
+  logo: FileImage,
+  font: FileType,
+  document: FileText,
+  video: Film,
+  image: FileImage,
+  other: FileIcon,
 };
 
 export default function AssetUploader({ userId, brandKitId }) {
@@ -73,9 +78,7 @@ export default function AssetUploader({ userId, brandKitId }) {
           brandKitId,
           file,
           { asset_type: assetType },
-          {
-            onProgress: (pct) => setUploadItem(queueItem.id, { progress: pct }),
-          },
+          { onProgress: (pct) => setUploadItem(queueItem.id, { progress: pct }) },
         );
 
         setUploadItem(queueItem.id, { progress: 100, status: 'done' });
@@ -83,9 +86,7 @@ export default function AssetUploader({ userId, brandKitId }) {
     } catch (error) {
       setUploadError(error.message || 'Upload failed');
       setUploadItems((items) => items.map((item) => (
-        item.status === 'done'
-          ? item
-          : { ...item, status: 'failed' }
+        item.status === 'done' ? item : { ...item, status: 'failed' }
       )));
     } finally {
       setUploading(false);
@@ -112,22 +113,16 @@ export default function AssetUploader({ userId, brandKitId }) {
   const saveEdit = async () => {
     await updateAsset(editingId, {
       ...editForm,
-      tags: String(editForm.tags || '')
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
+      tags: String(editForm.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean),
     });
     setEditingId(null);
   };
 
   return (
-    <div className="asset-uploader">
+    <div>
       <div
-        className={`asset-drop-zone${dragging ? ' dragging' : ''}`}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
+        className={[styles.dropZone, dragging ? styles.dropZoneDragging : ''].filter(Boolean).join(' ')}
+        onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
@@ -146,96 +141,101 @@ export default function AssetUploader({ userId, brandKitId }) {
           type="file"
           multiple
           hidden
-          accept=".png,.jpg,.jpeg,.webp,.svg,.gif,.pdf,.doc,.docx,.txt,.md,.ttf,.otf,.mp4,.webm"
-          onChange={(event) => {
-            handleFiles(event.target.files);
-            event.target.value = '';
-          }}
+          accept=".png,.jpg,.jpeg,.webp,.svg,.gif,.pdf,.doc,.docx,.txt,.md,.ttf,.otf,.mp4,.webm,.zip"
+          onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }}
         />
+        <Upload size={20} className={styles.dropZoneIcon} />
         {uploading ? (
-          <span>Uploading files...</span>
+          <span className={styles.dropZoneTitle}>Uploading files…</span>
         ) : (
-          <span>
-            Drop files here or click to upload
-            <br />
-            <small>Logos, Fonts, Brand Docs, Mood Boards</small>
-          </span>
+          <>
+            <span className={styles.dropZoneTitle}>Drop files here or click to upload</span>
+            <span className={styles.dropZoneSub}>Logos, fonts, brand docs, mood boards</span>
+          </>
         )}
       </div>
 
       {uploadItems.length > 0 && (
-        <div className="asset-upload-progress-list">
+        <div className={styles.uploadProgressList}>
           {uploadItems.map((item) => (
-            <div key={item.id} className={`asset-upload-progress-item ${item.status}`}>
-              <div className="asset-upload-progress-head">
-                <span className="asset-upload-progress-name" title={item.name}>{item.name}</span>
-                <span className="asset-upload-progress-pct">{item.progress}%</span>
+            <div key={item.id} className={[styles.progressItem, item.status === 'failed' ? styles.progressItemFailed : ''].filter(Boolean).join(' ')}>
+              <div className={styles.progressItemHead}>
+                <span className={styles.progressItemName} title={item.name}>{item.name}</span>
+                <span className={styles.progressItemPct}>{item.progress}%</span>
               </div>
-              <div className="asset-upload-progress-track">
-                <div className="asset-upload-progress-fill" style={{ width: `${item.progress}%` }} />
+              <div className={styles.progressItemTrack}>
+                <div className={styles.progressItemFill} style={{ width: `${item.progress}%` }} />
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {uploadError && (
-        <p className="asset-upload-error" role="alert">{uploadError}</p>
-      )}
+      {uploadError && <p className={styles.uploadErrorText} role="alert">{uploadError}</p>}
 
       {assets.length > 0 && (
-        <div className="asset-list">
-          <h4>Uploaded assets ({assets.length})</h4>
-          {assets.map((asset) => (
-            <div key={asset.id} className="asset-row">
-              <div className="asset-row-header">
-                <span className="asset-icon">{iconByAssetType[asset.asset_type] || iconByAssetType.other}</span>
-                <span className="asset-name">{asset.name}</span>
-                <span className="asset-type-badge">{asset.asset_type}</span>
-                <span className={`asset-status-dot ${asset.status}`} title={asset.status} />
-                <button className="asset-btn" onClick={() => startEdit(asset)}>Edit</button>
-                <button className="asset-btn danger" onClick={() => deleteAsset(asset.id)}>Delete</button>
-              </div>
-
-              {asset.description && <p className="asset-meta">Description: {asset.description}</p>}
-              {asset.usage_hints && <p className="asset-meta">Usage: {asset.usage_hints}</p>}
-              {asset.status === ASSET_STATUS.READY && asset.extracted_text && (
-                <p className="asset-meta extracted-ok">Text extracted</p>
-              )}
-
-              {editingId === asset.id && (
-                <div className="asset-edit-form">
-                  {[
-                    { label: 'Name', key: 'name', type: 'text' },
-                    { label: 'Description', key: 'description', type: 'textarea' },
-                    { label: 'Usage hints', key: 'usage_hints', type: 'textarea' },
-                    { label: 'Alt text (images)', key: 'alt_text', type: 'text' },
-                    { label: 'Tags (comma-separated)', key: 'tags', type: 'text' },
-                  ].map(({ label, key, type }) => (
-                    <label key={key}>
-                      {label}
-                      {type === 'textarea' ? (
-                        <textarea
-                          value={editForm[key] ?? ''}
-                          onChange={(event) => setEditForm((form) => ({ ...form, [key]: event.target.value }))}
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={editForm[key] ?? ''}
-                          onChange={(event) => setEditForm((form) => ({ ...form, [key]: event.target.value }))}
-                        />
-                      )}
-                    </label>
-                  ))}
-                  <div className="asset-edit-actions">
-                    <button className="bk-btn-primary" onClick={saveEdit}>Save</button>
-                    <button className="bk-btn-secondary" onClick={() => setEditingId(null)}>Cancel</button>
-                  </div>
+        <div className={styles.assetListWrap}>
+          <h4 className={styles.assetListTitle}>Uploaded assets ({assets.length})</h4>
+          {assets.map((asset) => {
+            const Icon = ICON_BY_ASSET_TYPE[asset.asset_type] || ICON_BY_ASSET_TYPE.other;
+            return (
+              <div key={asset.id} className={styles.assetRow}>
+                <div className={styles.assetRowHeader}>
+                  <span className={styles.assetIcon}><Icon size={14} /></span>
+                  <span className={styles.assetName}>{asset.name}</span>
+                  <span className={styles.assetTypeBadge}>{asset.asset_type}</span>
+                  <span
+                    className={[
+                      styles.assetStatusDot,
+                      asset.status === ASSET_STATUS.READY ? styles.assetStatusReady : '',
+                      asset.status === ASSET_STATUS.UPLOADING ? styles.assetStatusUploading : '',
+                      asset.status === ASSET_STATUS.FAILED ? styles.assetStatusFailed : '',
+                    ].filter(Boolean).join(' ')}
+                    title={asset.status}
+                  />
+                  <Button variant="ghost" size="sm" onClick={() => startEdit(asset)}>Edit</Button>
+                  <Button variant="danger" size="sm" onClick={() => deleteAsset(asset.id)}>Delete</Button>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {asset.description && <p className={styles.assetMeta}>Description: {asset.description}</p>}
+                {asset.usage_hints && <p className={styles.assetMeta}>Usage: {asset.usage_hints}</p>}
+
+                {editingId === asset.id && (
+                  <div className={styles.assetEditForm}>
+                    {[
+                      { label: 'Name', key: 'name', type: 'text' },
+                      { label: 'Description', key: 'description', type: 'textarea' },
+                      { label: 'Usage hints', key: 'usage_hints', type: 'textarea' },
+                      { label: 'Alt text (images)', key: 'alt_text', type: 'text' },
+                      { label: 'Tags (comma-separated)', key: 'tags', type: 'text' },
+                    ].map(({ label, key, type }) => (
+                      <label key={key} className={styles.field}>
+                        <span className={styles.label}>{label}</span>
+                        {type === 'textarea' ? (
+                          <textarea
+                            className={styles.textarea}
+                            value={editForm[key] ?? ''}
+                            onChange={(event) => setEditForm((form) => ({ ...form, [key]: event.target.value }))}
+                          />
+                        ) : (
+                          <input
+                            className={styles.input}
+                            type="text"
+                            value={editForm[key] ?? ''}
+                            onChange={(event) => setEditForm((form) => ({ ...form, [key]: event.target.value }))}
+                          />
+                        )}
+                      </label>
+                    ))}
+                    <div className={styles.assetEditActions}>
+                      <Button onClick={saveEdit}>Save</Button>
+                      <Button variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

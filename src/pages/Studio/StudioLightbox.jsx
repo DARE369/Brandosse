@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ImageOff } from "lucide-react";
 import { Button } from "../../ui-v2";
 import styles from "./StudioLightbox.module.css";
 
-export default function StudioLightbox({ generation, index, count, onClose, onPrev, onNext, onSelect, onUseForPost }) {
+export default function StudioLightbox({ generation, index, count, onClose, onPrev, onNext, onSelect, onUseForPost, onRegenerate, regenerating = false }) {
+  const [mediaFailed, setMediaFailed] = useState(false);
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") onClose();
@@ -15,6 +18,11 @@ export default function StudioLightbox({ generation, index, count, onClose, onPr
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, onPrev, onNext]);
+
+  // Reset per generation — old rows from a since-removed image provider
+  // (Pollinations.ai) have URLs that no longer resolve at all; this shows a
+  // plain placeholder instead of a permanently broken image/video element.
+  useEffect(() => { setMediaFailed(false); }, [generation?.id]);
 
   if (typeof document === "undefined") return null;
   const src = generation?.storage_path || generation?.output_url || generation?.thumbnail_url;
@@ -32,16 +40,26 @@ export default function StudioLightbox({ generation, index, count, onClose, onPr
       </button>
       <div className={styles.body} onClick={(e) => e.stopPropagation()}>
         <div className={styles.mediaWrap}>
-          {src ? (
+          {src && !mediaFailed ? (
             generation?.media_type === "video" ? (
-              <video className={styles.media} src={src} controls />
+              <video className={styles.media} src={src} controls onError={() => setMediaFailed(true)} />
             ) : (
-              <img className={styles.media} src={src} alt="" />
+              <img className={styles.media} src={src} alt="" onError={() => setMediaFailed(true)} />
             )
-          ) : null}
+          ) : (
+            <div className={styles.mediaFallback}>
+              <ImageOff size={28} aria-hidden="true" />
+              <span>{src ? "This media is no longer available" : "No media for this generation"}</span>
+            </div>
+          )}
         </div>
         <div className={styles.actions}>
           <span className={styles.position}>{index + 1} / {count}</span>
+          {onRegenerate && (
+            <Button variant="ghost" onClick={onRegenerate} disabled={regenerating}>
+              {regenerating ? "Regenerating…" : "Regenerate this"}
+            </Button>
+          )}
           <Button variant="ghost" onClick={onSelect}>Select this</Button>
           <Button onClick={onUseForPost}>Use for post</Button>
         </div>

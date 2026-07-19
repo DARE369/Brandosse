@@ -16,7 +16,6 @@
 @import "./generate.css";
 @import "./GeneratePromptBar.css";
 @import "./GenerateV2.css";
-@import "./HelpPage.css";
 @import "./HelpPanel.css";
 @import "./MockPublish.css";
 @import "./Navbar.css";
@@ -28,7 +27,6 @@
 @import "../components/Shared/ThemeToggle.css";
 @import "../components/Shared/WorkspaceSwitcherMenu.css";
 @import "../components/video-engine/videoEngine.css";
-@import "../pages/AnalyticsPage/PersonalAnalyticsPage.css";
 @import "../pages/Auth/Auth.css";
 @import "../pages/Auth/AuthCallback.css";
 @import "../pages/ClientReview/ClientReview.css";

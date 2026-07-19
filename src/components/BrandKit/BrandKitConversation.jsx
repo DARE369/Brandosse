@@ -8,6 +8,7 @@ import {
   normalizeConversationResult,
 } from '../../services/brandKitConversation';
 import BrandKitLivePreview from './BrandKitLivePreview';
+import styles from './BrandKit.module.css';
 
 export default function BrandKitConversation({
   onComplete,
@@ -33,7 +34,8 @@ export default function BrandKitConversation({
       return `I already extracted some details from your document.\n\n${firstQuestion}`;
     }
     return firstQuestion;
-  }, [initialMissingFields, prefilled]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addAiMessage = (text) => setMessages((prev) => [...prev, { role: 'ai', text }]);
   const addUserMessage = (text) => setMessages((prev) => [...prev, { role: 'user', text }]);
@@ -94,14 +96,14 @@ export default function BrandKitConversation({
   };
 
   return (
-    <div className="bk-conversation-layout">
-      <div className="bk-chat-panel">
-        <div className="bk-chat-header">
-          <span className="bk-chat-section-label">
+    <div className={styles.convLayout}>
+      <div className={styles.chatPanel}>
+        <div className={styles.chatHeader}>
+          <span className={styles.chatSectionLabel}>
             Question {Math.min(questionIdx + 1, CONVERSATION_QUESTIONS.length)} of {CONVERSATION_QUESTIONS.length}
           </span>
           <button
-            className="bk-link bk-chat-manual-link"
+            className={styles.chatManualLink}
             onClick={() => onComplete?.(collectedData, confidenceMap)}
             type="button"
           >
@@ -110,20 +112,23 @@ export default function BrandKitConversation({
           </button>
         </div>
 
-        <div className="bk-chat-messages" role="log" aria-label="Brand Kit setup conversation">
+        <div className={styles.chatMessages} role="log" aria-label="Brand Kit setup conversation">
           {messages.map((msg, index) => (
-            <div key={`${msg.role}-${index}`} className={`bk-chat-bubble ${msg.role}`}>
+            <div
+              key={`${msg.role}-${index}`}
+              className={[styles.chatBubble, msg.role === 'user' ? styles.chatBubbleUser : ''].filter(Boolean).join(' ')}
+            >
               {msg.role === 'ai' && (
-                <div className="bk-chat-ai-avatar" aria-hidden="true"><Sparkles size={12} /></div>
+                <div className={styles.chatAvatar} aria-hidden="true"><Sparkles size={12} /></div>
               )}
-              <div className="bk-chat-bubble-text">{msg.text}</div>
+              <div className={styles.chatBubbleText}>{msg.text}</div>
             </div>
           ))}
 
           {isThinking && (
-            <div className="bk-chat-bubble ai">
-              <div className="bk-chat-ai-avatar" aria-hidden="true"><Sparkles size={12} /></div>
-              <div className="bk-chat-thinking" aria-label="AI is thinking">
+            <div className={styles.chatBubble}>
+              <div className={styles.chatAvatar} aria-hidden="true"><Sparkles size={12} /></div>
+              <div className={styles.chatThinking} aria-label="AI is thinking">
                 <span />
                 <span />
                 <span />
@@ -133,9 +138,9 @@ export default function BrandKitConversation({
           <div ref={chatEndRef} />
         </div>
 
-        <div className="bk-chat-input-area">
+        <div className={styles.chatInputArea}>
           <textarea
-            className="bk-chat-input"
+            className={styles.chatInput}
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
             onKeyDown={(event) => {
@@ -144,37 +149,37 @@ export default function BrandKitConversation({
                 handleSend();
               }
             }}
-            placeholder="Type your answer..."
-            rows={3}
+            placeholder="Type your answer…"
+            rows={2}
             disabled={isThinking}
             aria-label="Your answer"
           />
 
           <button
-            className="bk-chat-send-btn"
+            className={styles.chatSendBtn}
             onClick={handleSend}
             disabled={!inputValue.trim() || isThinking}
             aria-label="Send"
             type="button"
           >
-            {isThinking ? <Loader2 size={16} className="bk-spin" /> : <Send size={16} />}
+            {isThinking ? <Loader2 size={16} className={styles.spin} /> : <Send size={16} />}
           </button>
         </div>
 
-        <div className="bk-chat-progress" aria-label={`Question ${Math.min(questionIdx + 1, CONVERSATION_QUESTIONS.length)} of ${CONVERSATION_QUESTIONS.length}`}>
+        <div className={styles.chatProgress} aria-label={`Question ${Math.min(questionIdx + 1, CONVERSATION_QUESTIONS.length)} of ${CONVERSATION_QUESTIONS.length}`}>
           {CONVERSATION_QUESTIONS.map((question, index) => (
             <span
               key={question}
-              className={`bk-progress-dot ${index < questionIdx ? 'done' : index === questionIdx ? 'active' : ''}`}
+              className={[
+                styles.progressDot,
+                index < questionIdx ? styles.progressDotDone : index === questionIdx ? styles.progressDotActive : '',
+              ].filter(Boolean).join(' ')}
             />
           ))}
         </div>
       </div>
 
-      <div className="bk-conversation-preview">
-        <BrandKitLivePreview data={collectedData} confidenceMap={confidenceMap} />
-      </div>
+      <BrandKitLivePreview data={collectedData} confidenceMap={confidenceMap} />
     </div>
   );
 }
-

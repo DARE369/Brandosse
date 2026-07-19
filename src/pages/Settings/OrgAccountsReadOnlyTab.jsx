@@ -8,6 +8,8 @@ import {
   isOrgAdminRole,
   resolveOrgPermissions,
 } from '../../org/services/orgService';
+import { Card, Badge, EmptyState } from '../../ui-v2';
+import styles from './OrgAccountsReadOnlyTab.module.css';
 
 function getMemberDisplayName(member) {
   return member?.profile?.full_name || member?.profile?.email || 'Organization admin';
@@ -114,87 +116,74 @@ export default function OrgAccountsReadOnlyTab({ onToast }) {
   }, [accounts, orgMemberships]);
 
   return (
-    <section className="connected-accounts-tab org-accounts-readonly">
-      <header className="connected-accounts-header">
+    <div className={styles.wrap}>
+      <div className={styles.headRow}>
         <div>
-          <h1>Organization Accounts</h1>
-          <p>These shared destinations are managed by each organization admin. Access changes happen inside the org workspace.</p>
+          <div className={styles.title}>Organization Accounts</div>
+          <div className={styles.sub}>These shared destinations are managed by each organization admin. Access changes happen inside the org workspace.</div>
         </div>
-        <span className="connected-accounts-badge">{accounts.length} shared</span>
-      </header>
+        <Badge tone="accent">{accounts.length} shared</Badge>
+      </div>
 
-      <article className="org-accounts-readonly-banner">
-        <Building2 size={16} />
-        <div>
-          <strong>Shared social accounts</strong>
-          <p>Organization accounts are read-only here. Contact your org admin if you need access updates.</p>
+      <Card>
+        <div className={styles.banner}>
+          <Building2 size={16} aria-hidden="true" />
+          <div>
+            <strong>Shared social accounts</strong>
+            <p>Organization accounts are read-only here. Contact your org admin if you need access updates.</p>
+          </div>
         </div>
-      </article>
+      </Card>
 
       {loading ? (
-        <div className="connected-accounts-empty">Loading organization accounts...</div>
+        <Card><div className={styles.loading}>Loading organization accounts…</div></Card>
       ) : groups.length === 0 ? (
-        <div className="connected-accounts-empty">No organization accounts are shared with your memberships yet.</div>
+        <Card><EmptyState dashed title="No shared accounts" description="No organization accounts are shared with your memberships yet." /></Card>
       ) : (
-        <div className="org-accounts-readonly-groups">
-          {groups.map((group) => {
-            const membership = group.membership;
-            const orgName = membership?.organization?.name || 'Organization';
-            const managedBy = managerByOrg.get(group.organizationId) || 'Organization admin';
+        groups.map((group) => {
+          const membership = group.membership;
+          const orgName = membership?.organization?.name || 'Organization';
+          const managedBy = managerByOrg.get(group.organizationId) || 'Organization admin';
 
-            return (
-              <section key={group.organizationId} className="org-accounts-readonly-group">
-                <div className="org-accounts-readonly-group-heading">
-                  <div>
-                    <h2>{orgName}</h2>
-                    <p>Managed by {managedBy}</p>
-                  </div>
-                  <span>{group.accounts.length} shared account{group.accounts.length === 1 ? '' : 's'}</span>
+          return (
+            <Card key={group.organizationId}>
+              <div className={styles.groupHead}>
+                <div>
+                  <div className={styles.groupTitle}>{orgName}</div>
+                  <div className={styles.sub}>Managed by {managedBy}</div>
                 </div>
+                <span className={styles.groupCount}>{group.accounts.length} shared account{group.accounts.length === 1 ? '' : 's'}</span>
+              </div>
 
-                <div className="org-accounts-readonly-list">
-                  {group.accounts.map((account) => {
-                    const hasPostingAccess = canMemberUseAccount(account, membership, user?.id);
-                    return (
-                      <article key={account.id} className="org-accounts-readonly-card">
-                        <div className="org-accounts-readonly-card-main">
-                          <span className="org-accounts-readonly-card-platform">
-                            <PlatformIcon platform={account.platform} size="sm" />
-                          </span>
-                          <div>
-                            <div className="org-accounts-readonly-card-title">
-                              <strong>{account.display_name || account.account_name || account.username || account.platform}</strong>
-                              {account.username ? <span>@{account.username}</span> : null}
-                            </div>
-                            <div className="org-accounts-readonly-card-subtitle">
-                              <span>{account.platform_display_name || account.platform}</span>
-                              <span>{account.profile_type || 'Business'}</span>
-                              <span>Managed by {managedBy}</span>
-                            </div>
-                          </div>
+              <div className={styles.list}>
+                {group.accounts.map((account) => {
+                  const hasPostingAccess = canMemberUseAccount(account, membership, user?.id);
+                  return (
+                    <div key={account.id} className={styles.row}>
+                      <span className={styles.iconWrap}><PlatformIcon platform={account.platform} size="sm" /></span>
+                      <div className={styles.main}>
+                        <div className={styles.titleRow}>
+                          <strong>{account.display_name || account.account_name || account.username || account.platform}</strong>
+                          {account.username ? <span className={styles.handle}>@{account.username}</span> : null}
                         </div>
-
-                        <div className="org-accounts-readonly-card-badges">
-                          <span className="org-accounts-pill shared">
-                            <LockKeyhole size={12} />
-                            Organization Account
-                          </span>
-                          {hasPostingAccess ? (
-                            <span className="org-accounts-pill granted">
-                              <ShieldCheck size={12} />
-                              Posting Access Granted
-                            </span>
-                          ) : null}
+                        <div className={styles.metaRow}>
+                          <span>{account.platform_display_name || account.platform}</span>
+                          <span>{account.profile_type || 'Business'}</span>
+                          <span>Managed by {managedBy}</span>
                         </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+                      </div>
+                      <div className={styles.badges}>
+                        <Badge tone="accent"><LockKeyhole size={12} aria-hidden="true" /> Organization Account</Badge>
+                        {hasPostingAccess ? <Badge tone="success"><ShieldCheck size={12} aria-hidden="true" /> Posting Access Granted</Badge> : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          );
+        })
       )}
-    </section>
+    </div>
   );
 }

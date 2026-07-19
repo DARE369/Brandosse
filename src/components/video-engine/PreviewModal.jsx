@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { BookmarkPlus, Calendar as CalendarIcon, Check, Loader2 } from "lucide-react";
 import VideoPlayer from "./VideoPlayer";
 import { normalizeScore, scoreColor, formatDuration, SCORE_BAR_COLORS } from "./clip-utils";
+import { saveClipToLibrary, scheduleHandoffPathForAsset } from "./clipLibraryActions";
+import { useAppNavigation } from "../../Context/AppNavigationContext";
 
 function ScoreBar({ label, value, color }) {
   if (value === null || value === undefined) return null;
@@ -17,8 +20,43 @@ function ScoreBar({ label, value, color }) {
   );
 }
 
-export default function PreviewModal({ clip, onClose, onRefreshUrl }) {
+// Hook score gets a ring instead of a bar (see ClipPreviewPanel.jsx for the
+// same treatment on the split-view panel).
+function ScoreRing({ label, value, color, size = 34 }) {
+  if (value === null || value === undefined) return null;
+  const stroke = 3;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - value / 100);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+        <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-border-tertiary)" strokeWidth={stroke} />
+          <circle
+            cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+            strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+            style={{ transition: "stroke-dashoffset 0.4s ease" }}
+          />
+        </svg>
+        <span style={{
+          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 10, fontWeight: 700, color,
+        }}>
+          {value}
+        </span>
+      </div>
+      <span style={{ fontSize: 11, color: "var(--color-text-secondary)", fontWeight: 500 }}>{label} score</span>
+    </div>
+  );
+}
+
+export default function PreviewModal({ clip, onClose, onRefreshUrl, savedAssetId = null, onSaved }) {
+  const { navigate } = useAppNavigation();
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   // Close on Escape
   useEffect(() => {
@@ -33,6 +71,29 @@ export default function PreviewModal({ clip, onClose, onRefreshUrl }) {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = original; };
   }, []);
+
+  const handleSaveToLibrary = async () => {
+    if (savedAssetId || saving) return savedAssetId;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const assetId = await saveClipToLibrary(clip);
+      onSaved?.(clip.id, assetId);
+      return assetId;
+    } catch (err) {
+      setSaveError(err.message || "Could not save this clip to Library.");
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSchedule = async () => {
+    setScheduling(true);
+    const assetId = savedAssetId || (await handleSaveToLibrary());
+    setScheduling(false);
+    if (assetId) navigate(scheduleHandoffPathForAsset(assetId));
+  };
 
   if (!clip) return null;
 
@@ -196,7 +257,7 @@ export default function PreviewModal({ clip, onClose, onRefreshUrl }) {
 
               {(hook !== null || flow !== null || value !== null || trend !== null) && (
                 <div>
-                  <ScoreBar label="Hook"  value={hook}  color={SCORE_BAR_COLORS.Hook}  />
+                  <ScoreRing label="Hook" value={hook} color={SCORE_BAR_COLORS.Hook} />
                   <ScoreBar label="Flow"  value={flow}  color={SCORE_BAR_COLORS.Flow}  />
                   <ScoreBar label="Value" value={value} color={SCORE_BAR_COLORS.Value} />
                   <ScoreBar label="Trend" value={trend} color={SCORE_BAR_COLORS.Trend} />
@@ -267,6 +328,50 @@ export default function PreviewModal({ clip, onClose, onRefreshUrl }) {
                   {copied ? "✓ Copied" : "Copy caption"}
                 </button>
               </div>
+
+              <div style={{ display: "flex", gap: 7 }}>
+                <button
+                  onClick={handleSaveToLibrary}
+                  disabled={saving || Boolean(savedAssetId)}
+                  style={{
+                    flex:         1,
+                    display:      "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding:      "7px 10px",
+                    borderRadius: "var(--border-radius-md)",
+                    border:       `0.5px solid ${savedAssetId ? "var(--color-success-border)" : "var(--color-border-tertiary)"}`,
+                    background:   savedAssetId ? "var(--color-success-bg)" : "var(--color-background-primary)",
+                    color:        savedAssetId ? "var(--color-success-text)" : "var(--color-text-primary)",
+                    fontSize:     11,
+                    fontWeight:   500,
+                    cursor:       savedAssetId ? "default" : "pointer",
+                  }}
+                >
+                  {saving ? <Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> : savedAssetId ? <Check size={13} /> : <BookmarkPlus size={13} />}
+                  {saving ? "Saving…" : savedAssetId ? "Saved to Library" : "Save to Library"}
+                </button>
+                <button
+                  onClick={handleSchedule}
+                  disabled={scheduling || saving}
+                  style={{
+                    flex:         1,
+                    display:      "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding:      "7px 10px",
+                    borderRadius: "var(--border-radius-md)",
+                    border:       "0.5px solid var(--color-border-tertiary)",
+                    background:   "var(--color-background-primary)",
+                    color:        "var(--color-text-primary)",
+                    fontSize:     11,
+                    fontWeight:   500,
+                    cursor:       scheduling ? "default" : "pointer",
+                  }}
+                >
+                  {scheduling ? <Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> : <CalendarIcon size={13} />}
+                  {scheduling ? "Preparing…" : "Schedule"}
+                </button>
+              </div>
+              {saveError ? (
+                <div style={{ fontSize: 10, color: "var(--color-danger)" }}>{saveError}</div>
+              ) : null}
             </div>
           </div>
         )}

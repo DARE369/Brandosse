@@ -65,13 +65,21 @@ async function captionAuditData(body: CalendarAiBody) {
   const { caption = "", platform = "instagram", hashtags = [], mediaType = "image", brandVoice = null, brandKeywords = [], forbiddenPhrases = [] } = body;
 
   const system = `You are a social media caption quality auditor. Return ONLY valid JSON.
-Shape: { "score":<0-100>, "grade":"<Poor|Fair|Good|Great>", "issues":[{"type":"<warning|improvement|info>","message":"<string>"}], "fixedCaption":"<string>", "fixedHashtags":["<string>"], "explanation":"<string>" }`;
+Shape: { "score":<0-100>, "grade":"<Poor|Fair|Good|Great>", "issues":[{"type":"<warning|improvement|info>","message":"<string>"}], "fixedCaption":"<string>", "fixedHashtags":["<string>"], "explanation":"<string>", "variants":[{"label":"<Hook-first|Shorter|More brand voice>","caption":"<string>"}], "hashtagSuggestions":[{"tag":"<#tag>","reach":"<High|Medium|Niche>"}] }
+variants: exactly 3 alternate rewrites of the caption, one per label shown.
+hashtagSuggestions: up to 8 relevant hashtags (not already in the post's current hashtags) ranked best-first, each judged for its likely discovery reach on this platform.`;
 
   const limits: Record<string, string> = { x: "max 280 chars", instagram: "125-150 words, up to 30 hashtags", tiktok: "short hook, 3-5 hashtags", linkedin: "professional tone, 5-7 hashtags" };
-  const user = `Platform: ${platform} — ${limits[platform] || "standard"}\nMedia: ${mediaType}\nBrand voice: ${brandVoice || "neutral"}\nKeywords: ${brandKeywords.join(", ") || "none"}\nForbidden: ${forbiddenPhrases.join(", ") || "none"}\n\nCaption:\n"""\n${caption}\n"""\n\nHashtags: ${hashtags.join(", ") || "none"}\n\nAudit it and return improved version.`;
+  const user = `Platform: ${platform} — ${limits[platform] || "standard"}\nMedia: ${mediaType}\nBrand voice: ${brandVoice || "neutral"}\nKeywords: ${brandKeywords.join(", ") || "none"}\nForbidden: ${forbiddenPhrases.join(", ") || "none"}\n\nCaption:\n"""\n${caption}\n"""\n\nHashtags: ${hashtags.join(", ") || "none"}\n\nAudit it, return an improved version, 3 rewrite variants, and ranked new hashtag suggestions.`;
 
-  const r = await callLlm({ systemPrompt: system, messages: [{ role: "user", content: user }], preferredProvider: "groq", maxTokens: 1000, temperature: 0.4, jsonMode: true });
-  const p = safeParseJson(r.content, { score: 50, grade: "Fair", issues: [], fixedCaption: caption, fixedHashtags: hashtags, explanation: "" });
+  const r = await callLlm({ systemPrompt: system, messages: [{ role: "user", content: user }], preferredProvider: "groq", maxTokens: 1400, temperature: 0.4, jsonMode: true });
+  const p = safeParseJson(r.content, { score: 50, grade: "Fair", issues: [], fixedCaption: caption, fixedHashtags: hashtags, explanation: "", variants: [], hashtagSuggestions: [] });
+  const variants = Array.isArray(p.variants)
+    ? p.variants.filter((v: unknown) => v && typeof (v as { caption?: unknown }).caption === "string").slice(0, 3)
+    : [];
+  const hashtagSuggestions = Array.isArray(p.hashtagSuggestions)
+    ? p.hashtagSuggestions.filter((h: unknown) => h && typeof (h as { tag?: unknown }).tag === "string").slice(0, 8)
+    : [];
   return {
     score:        typeof p.score === "number" ? p.score : 50,
     grade:        typeof p.grade === "string" ? p.grade : "Fair",
@@ -79,6 +87,8 @@ Shape: { "score":<0-100>, "grade":"<Poor|Fair|Good|Great>", "issues":[{"type":"<
     fixedCaption: typeof p.fixedCaption === "string" ? p.fixedCaption : caption,
     fixedHashtags: Array.isArray(p.fixedHashtags) ? p.fixedHashtags : hashtags,
     explanation:  typeof p.explanation === "string" ? p.explanation : "",
+    variants,
+    hashtagSuggestions,
     provider: r.provider,
     model: r.model,
   };

@@ -1,0 +1,94 @@
+/* Legacy-token bridge: PersonalSettingsFoundationTab / ConnectedAccountsTab /
+   OrgAccountsReadOnlyTab still use the OLD design system's --color-* tokens
+   (Settings.css), which are only ever defined for the old ThemeContext-driven
+   root attribute — not UiV2ThemeProvider's. Left unmapped, those components
+   render solid white/light regardless of the ui-v2 theme choice. Rather than
+   rewrite their internals now (that's Phase 2b's job for Connected Accounts;
+   Profile/Preferences/Notifications aren't in scope for a visual rebuild this
+   phase), redefine the tokens they read to point at the equivalent uiv2
+   token, scoped to this shell only.
+*/
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--uiv2-bg-canvas);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+  line-height: var(--uiv2-leading-normal);
+
+  --color-bg-page: var(--uiv2-bg-canvas);
+  --color-bg-surface: var(--uiv2-bg-surface);
+  --color-bg-elevated: var(--uiv2-bg-surface);
+  --color-bg-subtle: var(--uiv2-bg-canvas);
+  --color-border: var(--uiv2-border);
+  --settings-border: var(--uiv2-border);
+  --settings-surface: var(--uiv2-bg-surface);
+  --color-text-primary: var(--uiv2-text-primary);
+  --color-text-secondary: var(--uiv2-text-secondary);
+  --public-dark-text: var(--uiv2-text-primary);
+  --color-primary: var(--uiv2-accent-solid);
+  --color-primary-subtle: var(--uiv2-accent-wash);
+  --color-primary-text: var(--uiv2-accent-text);
+  --dash-accent: var(--uiv2-accent-solid);
+  --dash-accent-light: var(--uiv2-accent-text);
+  --dash-accent-sub: var(--uiv2-accent-wash);
+  --color-success: var(--uiv2-success);
+  --color-success-bg: var(--uiv2-accent-wash);
+  --color-success-border: var(--uiv2-success);
+  --color-warning: var(--uiv2-warning);
+  --color-warning-bg: var(--uiv2-warning-wash);
+  --color-warning-border: var(--uiv2-warning-border);
+  --color-danger: var(--uiv2-danger);
+  --color-danger-bg: var(--uiv2-danger-wash);
+  --color-danger-border: var(--uiv2-danger-border);
+  --toast-bg: var(--uiv2-bg-surface);
+  --toast-border: var(--uiv2-border);
+  --toast-accent: var(--uiv2-accent-solid);
+}
+
+.main { flex: 1; padding: 20px 20px 64px; }
+@media (max-width: 640px) { .main { padding: 14px 12px 48px; } }
+.canvas { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+.headRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.title { font-family: var(--uiv2-font-display); font-weight: 700; font-size: var(--uiv2-text-3xl); letter-spacing: -0.02em; }
+.sub { color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-sm); margin-top: 4px; }
+
+.tabBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--uiv2-border);
+  padding-bottom: 2px;
+}
+.tabBtn {
+  border: none;
+  background: transparent;
+  color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-sm);
+  font-weight: 600;
+  padding: 9px 12px;
+  border-radius: var(--uiv2-radius-md) var(--uiv2-radius-md) 0 0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabBtnActive {
+  color: var(--uiv2-accent-text);
+  border-bottom-color: var(--uiv2-accent-solid);
+}
+
+.signInRequired { padding: 24px; text-align: center; color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-sm); }
+
+.toast {
+  padding: 10px 14px;
+  border-radius: var(--uiv2-radius-md);
+  border: 1px solid var(--uiv2-border);
+  background: var(--uiv2-bg-surface);
+  font-size: var(--uiv2-text-sm);
+}
+.toastError { border-color: var(--uiv2-danger-border); background: var(--uiv2-danger-wash); color: var(--uiv2-danger); }
+.toastSuccess { border-color: var(--uiv2-success); background: var(--uiv2-accent-wash); color: var(--uiv2-success); }

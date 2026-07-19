@@ -16,9 +16,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { supabase } from '../../services/supabaseClient';
-import { auditPostCaption, checkPublishReadiness } from '../../services/calendarAIService';
+import { auditPostCaption, checkPublishReadiness, getSlotSuggestions } from '../../services/calendarAIService';
 import { isLockedForReschedule } from '../../utils/postStatusMachine';
-import { formatInTimeZone, getZonedDateKey, getZonedParts, zonedDateTimeToUTC } from '../../utils/timezone';
+import {
+  addDaysToDateKey, formatDateKey, formatInTimeZone, getZonedDateKey, getZonedParts,
+  weekStartKeyFor, zonedDateTimeToUTC,
+} from '../../utils/timezone';
+
+const WEEKDAY_OFFSET = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
 import StatusPill from './StatusPill';
 
 const PLATFORM_CHAR_LIMITS = {
@@ -58,6 +63,7 @@ export default function PostDetailDrawer({
   onReschedule, // (post) => void — opens ScheduleModal
   onUnschedule, // (post) => Promise
   onDuplicate, // (post) => Promise
+  onPostNow, // (post) => void — opens the Post now confirm in CalendarPage
 }) {
   const posts = group?.posts || [];
   const [activePlatform, setActivePlatform] = useState(posts[0]?.platform || null);
@@ -68,6 +74,12 @@ export default function PostDetailDrawer({
   const [auditError, setAuditError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [bestTimes, setBestTimes] = useState(null);
+  const [bestTimesLoading, setBestTimesLoading] = useState(false);
+  const [bestTimesError, setBestTimesError] = useState(null);
+  const [aiTab, setAiTab] = useState('audit');
+  const [usedVariantLabel, setUsedVariantLabel] = useState(null);
+  const [addedTags, setAddedTags] = useState({});
 
   useEffect(() => {
     setActivePlatform(posts[0]?.platform || null);
@@ -75,6 +87,11 @@ export default function PostDetailDrawer({
     setAudit(null);
     setAuditError(null);
     setIsDirty(false);
+    setBestTimes(null);
+    setBestTimesError(null);
+    setAiTab('audit');
+    setUsedVariantLabel(null);
+    setAddedTags({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group?.groupKey]);
 
@@ -171,6 +188,50 @@ export default function PostDetailDrawer({
     patchEdited({ caption: fix.caption, hashtags: fix.hashtags });
   }
 
+  function handleUseVariant(variant) {
+    patchEdited({ caption: variant.caption });
+    setUsedVariantLabel(variant.label);
+  }
+
+  function handleAddSuggestedTag(tag) {
+    if (editedHashtags.includes(tag)) return;
+    patchEdited({ hashtags: [...editedHashtags, tag] });
+    setAddedTags((prev) => ({ ...prev, [tag]: true }));
+  }
+
+  // Real slot-scoring via the calendar-ai edge function's slot_suggestions
+  // action (same one week_plan/CommandBar already use) — not a fabricated
+  // heuristic. Manual trigger (rather than firing on every drawer open) to
+  // avoid a hidden LLM call each time a post is viewed.
+  async function handleSuggestTimes() {
+    setBestTimesLoading(true);
+    setBestTimesError(null);
+    try {
+      const weekStart = weekStartKeyFor(editedDate || getZonedDateKey(new Date().toISOString(), timezone));
+      const { suggestions } = await getSlotSuggestions({
+        weekStart,
+        platforms: [editedPlatform].filter(Boolean),
+        existingPosts: [],
+        brandKit,
+        contentType: activePost?.generations?.media_type || 'image',
+        count: 3,
+      });
+      setBestTimes(suggestions.slice(0, 3).map((s) => {
+        const offset = WEEKDAY_OFFSET[s.day] ?? 0;
+        const dateKey = addDaysToDateKey(weekStart, offset);
+        return { ...s, dateKey };
+      }));
+    } catch (err) {
+      setBestTimesError(err?.message || 'Could not load suggestions.');
+    } finally {
+      setBestTimesLoading(false);
+    }
+  }
+
+  function handlePickBestTime(slot) {
+    patchEdited({ date: slot.dateKey, time: slot.time });
+  }
+
   const isPublished = primary.status === 'published';
   const isFailed = primary.status === 'failed';
   const isLocked = isLockedForReschedule(primary.status);
@@ -252,12 +313,77 @@ export default function PostDetailDrawer({
                 {auditLoading ? (
                   <span className="ui-field-hint">Auditing caption…</span>
                 ) : audit ? (
-                  <div className="ui-field-hint">
-                    Score {audit.score} ({audit.grade})
-                    {audit.fixedCaption && audit.fixedCaption !== audit.originalCaption && (
-                      <button type="button" className="ui-button ui-button-ghost ui-button-sm" style={{ marginLeft: 8 }} onClick={() => handleApplyFix(audit)}>
-                        <Sparkles size={12} aria-hidden="true" /> Apply AI fix
-                      </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {['audit', 'rewrite', 'hashtags'].map((tab) => (
+                        <button
+                          key={tab}
+                          type="button"
+                          className={`ui-button ui-button-sm ${aiTab === tab ? 'ui-button-secondary' : 'ui-button-ghost'}`}
+                          onClick={() => setAiTab(tab)}
+                        >
+                          {tab === 'audit' ? 'Audit' : tab === 'rewrite' ? 'Rewrite' : 'Hashtags'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {aiTab === 'audit' && (
+                      <div className="ui-field-hint" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <span>Score {audit.score} ({audit.grade})</span>
+                        {audit.issues.map((issue, i) => (
+                          <div key={i}>&middot; {issue.message}</div>
+                        ))}
+                        {audit.fixedCaption && audit.fixedCaption !== editedCaption && (
+                          <button type="button" className="ui-button ui-button-ghost ui-button-sm" style={{ width: 'fit-content' }} onClick={() => handleApplyFix(audit)}>
+                            <Sparkles size={12} aria-hidden="true" /> Apply AI fix
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {aiTab === 'rewrite' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {audit.variants.length === 0 ? (
+                          <span className="ui-field-hint">No rewrite variants came back — try re-running the audit.</span>
+                        ) : audit.variants.map((v) => (
+                          <div key={v.label} className="ui-field-hint" style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>{v.label}</div>
+                            <div style={{ marginBottom: 8 }}>{v.caption}</div>
+                            {usedVariantLabel === v.label ? (
+                              <span style={{ color: 'var(--color-success-text, #1F8F5D)', fontWeight: 600 }}>In use — original kept as a revision</span>
+                            ) : (
+                              <button type="button" className="ui-button ui-button-ghost ui-button-sm" onClick={() => handleUseVariant(v)}>Use this one</button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {aiTab === 'hashtags' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {audit.hashtagSuggestions.length === 0 ? (
+                          <span className="ui-field-hint">No hashtag suggestions came back — try re-running the audit.</span>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {audit.hashtagSuggestions.map((h) => {
+                              const already = editedHashtags.includes(h.tag) || addedTags[h.tag];
+                              return (
+                                <button
+                                  key={h.tag}
+                                  type="button"
+                                  className="hashtag-chip"
+                                  disabled={already}
+                                  onClick={() => handleAddSuggestedTag(h.tag)}
+                                  style={{ cursor: already ? 'default' : 'pointer', border: 'none' }}
+                                >
+                                  {h.tag} <span className="ui-field-hint" style={{ margin: 0 }}>{h.reach}</span>{already ? ' ✓' : ''}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <span className="ui-field-hint">Ranked by likely discovery reach. Tap to add.</span>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -302,9 +428,34 @@ export default function PostDetailDrawer({
                 <span className="ui-field-hint">{timezone}</span>
               </div>
               {isLocked && <p className="ui-field-hint">{primary.status === 'publishing' ? 'Publishing now — can’t be rescheduled.' : 'Published posts can’t be rescheduled — duplicate to a new draft instead.'}</p>}
-              <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={() => onReschedule?.(activePost)} disabled={isLocked} style={{ width: 'fit-content' }}>
-                Open Schedule modal…
-              </button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={() => onReschedule?.(activePost)} disabled={isLocked} style={{ width: 'fit-content' }}>
+                  Open Schedule modal…
+                </button>
+                {!isLocked && (
+                  <button type="button" className="ui-button ui-button-ghost ui-button-sm" onClick={handleSuggestTimes} disabled={bestTimesLoading} style={{ width: 'fit-content' }}>
+                    <Sparkles size={12} aria-hidden="true" /> {bestTimesLoading ? 'Finding best times…' : 'Suggest best times'}
+                  </button>
+                )}
+              </div>
+              {bestTimesError && <p className="ui-field-error">{bestTimesError}</p>}
+              {bestTimes && bestTimes.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span className="ui-field-hint">Suggested times — from your audience activity</span>
+                  {bestTimes.map((slot, i) => (
+                    <button
+                      key={`${slot.day}-${slot.time}-${i}`}
+                      type="button"
+                      className="ui-button ui-button-secondary ui-button-sm"
+                      onClick={() => handlePickBestTime(slot)}
+                      style={{ justifyContent: 'space-between', width: '100%', textAlign: 'left' }}
+                    >
+                      <span>{formatDateKey(slot.dateKey, { weekday: 'short', month: 'short', day: 'numeric' })} at {slot.time}</span>
+                      <span className="ui-field-hint" style={{ margin: 0 }}>{slot.reason || `Score ${slot.score}`}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -330,6 +481,13 @@ export default function PostDetailDrawer({
         </div>
 
         <div className="post-drawer__footer">
+          {(primary.status === 'scheduled' || primary.status === 'failed') && (
+            <div className="post-drawer__footer-row">
+              <button type="button" className="ui-button ui-button-primary ui-button-md" onClick={() => onPostNow?.(activePost)} style={{ width: '100%' }}>
+                {primary.status === 'failed' ? 'Retry now' : 'Post now'}
+              </button>
+            </div>
+          )}
           <div className="post-drawer__footer-row">
             <button type="button" className="ui-button ui-button-secondary ui-button-md" onClick={handleSave} disabled={!isDirty || isSaving}>
               {isSaving ? 'Saving…' : isDirty ? 'Save changes' : readiness.canPublish ? 'Saved' : 'Incomplete'}

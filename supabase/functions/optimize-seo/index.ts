@@ -1,10 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import { callLlm } from "../_shared/llm.ts";
 import { readEnv } from "../_shared/env.ts";
+import { createHttpError } from "../_shared/org.ts";
+import { enforceRateLimit } from "../_shared/rateLimit.ts";
+import { persistSeoState, scoreContent } from "../_shared/seo.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 
+// WEEK 2 FIX 4: this function used to self-score its own optimized output
+// inline (its own copy of the discovery-score prompt + its own,
+// differently-normalized math) and the client would THEN make a second,
+// separate call to seo-score on the same content — two LLM scoring passes
+// for the same content, with two different normalization implementations,
+// that could disagree with each other. Now this function only optimizes
+// (one LLM call), then calls the shared scoreContent() from _shared/seo.ts
+// on the optimized result (one more LLM call, same canonical
+// normalization seo-score itself uses) — one client round trip, two
+// server-side LLM passes total (down from three: optimize's self-score +
+// optimize + the client's separate score call), one normalization.
 type OptimizeSeoRequest = {
+  content_id?: string | null;
+  post_id?: string | null;
   title?: string;
   caption: string;
   hashtags?: string[];
@@ -16,8 +32,19 @@ type OptimizeSeoRequest = {
 };
 
 function pickJson(raw: string) {
-  const text = String(raw || "").trim();
+  let text = String(raw || "").trim();
   if (!text) return "{}";
+  // Strip a ``` or ```json fence before brace-scanning — a bare
+  // indexOf("{")/lastIndexOf("}") scan can still leave the fence markers in
+  // place for a truncated response (cut off by maxTokens before the closing
+  // fence/brace ever arrives), which is exactly what reached JSON.parse as
+  // "```json\n{..." in production and threw instead of parsing.
+  const fenced = text.match(/^```[a-zA-Z]*\n?([\s\S]*?)\n?```\s*$/);
+  if (fenced) {
+    text = fenced[1].trim();
+  } else if (text.startsWith("```")) {
+    text = text.replace(/^```[a-zA-Z]*\n?/, "").trim();
+  }
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start >= 0 && end > start) return text.slice(start, end + 1);
@@ -40,88 +67,6 @@ function normalizeHashtags(value: unknown, platform: string) {
 function normalizeImprovements(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => String(entry || "").trim()).filter(Boolean).slice(0, 8);
-}
-
-function normalizeImprovementReport(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
-        const bullet = String(entry || "").trim();
-        return bullet ? { type: "info", bullet } : null;
-      }
-
-      const typedEntry = entry as Record<string, unknown>;
-      const bullet = String(typedEntry.bullet || typedEntry.message || "").trim();
-      if (!bullet) return null;
-
-      const type = String(typedEntry.type || "info").trim().toLowerCase();
-      return {
-        type: ["improvement", "warning", "info"].includes(type) ? type : "info",
-        bullet,
-      };
-    })
-    .filter(Boolean)
-    .slice(0, 10);
-}
-
-function normalizeBreakdown(value: unknown) {
-  const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const dimensions: Array<[string, number]> = [
-    ["readability", 100],
-    ["keywordRelevance", 100],
-    ["hashtagQuality", 100],
-    ["hookStrength", 100],
-    ["ctaStrength", 100],
-    ["platformFit", 100],
-    ["brandConsistency", 100],
-    ["visualCaptionAlignment", 100],
-    ["recommendationPotential", 100],
-  ];
-
-  return dimensions.reduce<Record<string, { score: number; max: number; rationale: string }>>((accumulator, [key, max]) => {
-    const entry = input[key];
-    const typedEntry = entry && typeof entry === "object" ? entry as Record<string, unknown> : {};
-    accumulator[key] = {
-      score: Math.max(0, Math.min(max, Number(typedEntry.score || 0))),
-      max,
-      rationale: String(typedEntry.rationale || "").trim(),
-    };
-    return accumulator;
-  }, {});
-}
-
-function parseScore(value: unknown) {
-  const score = Number(value);
-  if (Number.isNaN(score)) return null;
-  return score;
-}
-
-function normalizeSeoScore(value: number | null) {
-  if (value === null) return 0;
-  const normalized = value > 0 && value <= 10 ? value * 10 : value;
-  return Math.max(0, Math.min(100, Math.round(normalized)));
-}
-
-function normalizeHashtagSuggestions(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
-        const tag = String(entry || "").trim();
-        return tag ? { tag: tag.startsWith("#") ? tag : `#${tag}`, relevance: 0, reason: "" } : null;
-      }
-      const typedEntry = entry as Record<string, unknown>;
-      const tag = String(typedEntry.tag || typedEntry.hashtag || "").trim();
-      if (!tag) return null;
-      return {
-        tag: tag.startsWith("#") ? tag : `#${tag}`,
-        relevance: Math.max(0, Math.min(100, Math.round(Number(typedEntry.relevance || typedEntry.score || 0)))),
-        reason: String(typedEntry.reason || typedEntry.rationale || "").trim(),
-      };
-    })
-    .filter(Boolean)
-    .slice(0, 8);
 }
 
 function buildBrandContext(brandKit: Record<string, unknown> | undefined) {
@@ -149,18 +94,17 @@ serve(async (req) => {
 
   try {
     const authClient = createAuthClient(req.headers.get("Authorization"));
-    await requireUser(authClient);
+    const user = await requireUser(authClient);
+    await enforceRateLimit(authClient, user.id, "optimize-seo");
     const body = await parseJsonBody<OptimizeSeoRequest>(req);
 
     if (!readEnv("ANTHROPIC_API_KEY", false)) {
-      return jsonResponse({
-        error: "ANTHROPIC_API_KEY is required for Claude Social SEO optimization.",
-      }, 500);
+      throw createHttpError("ANTHROPIC_API_KEY is required for Claude Social SEO optimization.", 500);
     }
 
     const caption = String(body.caption || "").trim();
     if (!caption) {
-      return jsonResponse({ error: "caption is required" }, 400);
+      throw createHttpError("caption is required", 400);
     }
 
     const platform = String(body.platform || "instagram").trim().toLowerCase();
@@ -174,6 +118,8 @@ serve(async (req) => {
     const mediaType = String(body.mediaType || "image").trim().toLowerCase();
     const visualPrompt = String(body.visualPrompt || "").trim();
 
+    // Optimization-only system prompt — no scoring fields requested here
+    // anymore (cheaper, shorter prompt than before this fix).
     const systemPrompt = `You are Claude acting as a senior Social SEO and algorithmic discovery specialist. Optimize this title, caption, and hashtag set for discovery on the target social platform without making it sound robotic or inauthentic.
 Rules:
 - Keep the brand voice intact - do not change the personality
@@ -191,34 +137,16 @@ Return ONLY valid JSON:
   "optimizedTitle": "...",
   "optimizedCaption": "...",
   "optimizedHashtags": ["#tag1"],
-  "discoveryScore": 0,
-  "scoreCategory": "Poor|Ok|Good|Great",
-  "scoreBreakdown": {
-    "readability": { "score": 0, "rationale": "" },
-    "keywordRelevance": { "score": 0, "rationale": "" },
-    "hashtagQuality": { "score": 0, "rationale": "" },
-    "hookStrength": { "score": 0, "rationale": "" },
-    "ctaStrength": { "score": 0, "rationale": "" },
-    "platformFit": { "score": 0, "rationale": "" },
-    "brandConsistency": { "score": 0, "rationale": "" },
-    "visualCaptionAlignment": { "score": 0, "rationale": "" },
-    "recommendationPotential": { "score": 0, "rationale": "" }
-  },
-  "recommendations": ["what to improve next"],
-  "improvements": ["what changed and why"],
-  "benchmarkReport": [{ "benchmark": "First-line hook", "status": "Pass|Needs work", "note": "..." }],
-  "hashtagSuggestions": [{ "tag": "#example", "relevance": 90, "reason": "..." }]
-}
-
-Scoring output rules:
-- discoveryScore must be an integer from 0 to 100
-- Do not use 0-10 scale
-- Do not inflate the score unless the optimized copy satisfies the rubric`;
+  "improvements": ["what changed and why"]
+}`;
 
     const llmResult = await callLlm({
       preferredProvider: "anthropic",
       systemPrompt,
-      maxTokens: 1300,
+      // Was 900 — too tight for a full title+caption+hashtags+improvements
+      // rewrite on longer captions, causing the completion to truncate
+      // before the closing JSON brace and fail to parse.
+      maxTokens: 1400,
       temperature: 0.3,
       messages: [
         {
@@ -241,40 +169,65 @@ Scoring output rules:
     const optimizedTitle = String(parsed.optimizedTitle || parsed.optimized_title || title).trim();
     const optimizedCaption = String(parsed.optimizedCaption || caption).trim();
     const optimizedHashtags = normalizeHashtags(parsed.optimizedHashtags || hashtags, platform);
-    const seoScore = normalizeSeoScore(parseScore(parsed.discoveryScore ?? parsed.discovery_score ?? parsed.seoScore));
     const improvements = normalizeImprovements(parsed.improvements);
-    const scoreBreakdown = normalizeBreakdown(parsed.scoreBreakdown || parsed.score_breakdown);
-    const improvementReport = normalizeImprovementReport(parsed.improvementReport || parsed.improvement_report || parsed.benchmarkReport || parsed.benchmark_report || improvements);
-    const benchmarkReport = normalizeImprovementReport(parsed.benchmarkReport || parsed.benchmark_report || []);
-    const recommendations = normalizeImprovements(parsed.recommendations || improvements);
-    const hashtagSuggestions = normalizeHashtagSuggestions(parsed.hashtagSuggestions || parsed.hashtag_suggestions);
-    const scoreCategory = String(parsed.scoreCategory || parsed.score_category || (seoScore >= 80 ? "Great" : seoScore >= 60 ? "Good" : seoScore >= 40 ? "Ok" : "Poor")).trim() || "Poor";
+
+    // Score the OPTIMIZED content server-side via the same canonical
+    // scoring implementation seo-score itself uses — one more LLM call,
+    // same normalization, no second divergent code path.
+    const normalized = await scoreContent({
+      title: optimizedTitle,
+      caption: optimizedCaption,
+      hashtags: optimizedHashtags,
+      platform,
+      mediaType,
+      visualPrompt,
+    });
+
+    const contentId = body.content_id || body.post_id || null;
+    if (contentId) {
+      const adminClient = createAdminClient();
+      await persistSeoState(adminClient, contentId, normalized);
+    }
+
+    // Preserved for backward compatibility with src/org/services/
+    // orgDraftWorkflowService.js (a different, org-workspace consumer of
+    // this same function, outside this fix's scope), which reads
+    // improvementReport/improvement_report as {type,bullet} objects. No
+    // second LLM call involved — just re-shaping the one `improvements`
+    // list this function already produces.
+    const improvementReport = improvements.map((bullet) => ({ type: "info", bullet }));
 
     return jsonResponse({
       optimizedTitle,
       optimizedCaption,
       optimizedHashtags,
-      seoScore,
-      discoveryScore: seoScore,
-      discovery_score: seoScore,
-      improvements,
-      recommendations,
-      scoreCategory,
-      scoreBreakdown,
-      improvementReport,
-      benchmarkReport,
-      hashtagSuggestions,
       optimized_title: optimizedTitle,
       optimized_caption: optimizedCaption,
       optimized_hashtags: optimizedHashtags,
-      seo_score: seoScore,
-      score_category: scoreCategory,
-      score_breakdown: scoreBreakdown,
+      improvements,
+      improvementReport,
       improvement_report: improvementReport,
-      benchmark_report: benchmarkReport,
-      hashtag_suggestions: hashtagSuggestions,
-      provider: llmResult.provider,
-      model: llmResult.model,
+      // Score fields — identical shape/keys to seo-score's response, so
+      // the client can consume either function's response through the
+      // same read path.
+      overall: normalized.overall,
+      seoScore: normalized.overall,
+      seo_score: normalized.overall,
+      discoveryScore: normalized.overall,
+      discovery_score: normalized.overall,
+      breakdown: normalized.breakdown,
+      scoreBreakdown: normalized.breakdown,
+      score_breakdown: normalized.breakdown,
+      suggestions: normalized.suggestions,
+      recommendations: normalized.suggestions,
+      benchmarkReport: normalized.benchmarkReport,
+      benchmark_report: normalized.benchmarkReport,
+      hashtagSuggestions: normalized.hashtagSuggestions,
+      hashtag_suggestions: normalized.hashtagSuggestions,
+      scoreCategory: normalized.category,
+      score_category: normalized.category,
+      provider: normalized.provider,
+      model: normalized.model,
       provider_warning: null,
     });
   } catch (error) {

@@ -174,7 +174,7 @@ export default function AssetCard({
                 onClick={() => { setMenuOpen(false); onArchive?.(asset); }}
                 style={{ textAlign: "left", padding: "8px 10px", border: "none", background: "transparent", color: "var(--uiv2-text-primary)", fontSize: 13, borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}
               >
-                Archive
+                {asset.status === "archived" ? "Unarchive" : "Archive"}
               </button>
               <button
                 type="button"

@@ -1,5 +1,30 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
+import styles from './BrandKit.module.css';
+
+function PreviewField({ label, value, confidence }) {
+  const isEmpty = !value;
+  const isLow = confidence === 'low' || confidence === 'inferred';
+
+  return (
+    <div className={styles.previewField}>
+      <span className={styles.previewFieldLabel}>{label}</span>
+      <span className={styles.previewFieldValue}>
+        {isEmpty ? (
+          <span className={styles.previewFieldEmpty}>Not extracted yet</span>
+        ) : (
+          value
+        )}
+        {isLow && !isEmpty && (
+          <span className={styles.confidenceFlag} title="AI inferred this field. Please verify.">
+            <AlertTriangle size={10} />
+            Review
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 function buildSampleCaption(data) {
   if (!data?.brand_name && !data?.target_audience) return null;
@@ -18,38 +43,14 @@ function buildSampleCaption(data) {
   return voiceMap[voice] || `${name} is built to deliver consistent value.`;
 }
 
-function PreviewField({ label, value, confidence }) {
-  const isEmpty = !value;
-  const isLow = confidence === 'low' || confidence === 'inferred';
-
-  return (
-    <div className={`bk-preview-field ${isEmpty ? 'empty' : ''} ${isLow ? 'low-confidence' : ''}`}>
-      <span className="bk-preview-field-label">{label}</span>
-      <span className="bk-preview-field-value">
-        {isEmpty ? (
-          <span className="bk-preview-field-empty">Not extracted yet</span>
-        ) : (
-          value
-        )}
-        {isLow && !isEmpty && (
-          <span className="bk-confidence-flag" title="AI inferred this field. Please verify.">
-            <AlertTriangle size={11} />
-            Review
-          </span>
-        )}
-      </span>
-    </div>
-  );
-}
-
 export default function BrandKitLivePreview({ data = {}, confidenceMap = {} }) {
   const sampleCaption = buildSampleCaption(data);
 
   return (
-    <div className="bk-live-preview">
-      <div className="bk-preview-card">
-        <h3 className="bk-preview-card-title">Your Brand Kit</h3>
-        <div className="bk-preview-fields">
+    <div className={styles.previewPanel}>
+      <div className={styles.previewCard}>
+        <h3 className={styles.previewCardTitle}>Your Brand Kit</h3>
+        <div className={styles.previewFields}>
           <PreviewField label="Brand Name" value={data.brand_name} confidence={confidenceMap.brand_name} />
           <PreviewField label="Industry" value={data.industry} confidence={confidenceMap.industry} />
           <PreviewField label="Target Audience" value={data.target_audience} confidence={confidenceMap.target_audience} />
@@ -60,13 +61,13 @@ export default function BrandKitLivePreview({ data = {}, confidenceMap = {} }) {
             confidence={confidenceMap.visual_style_keywords}
           />
           {Array.isArray(data.color_palette) && data.color_palette.length > 0 && (
-            <div className="bk-preview-field">
-              <span className="bk-preview-field-label">Color Palette</span>
-              <div className="bk-preview-palette">
+            <div className={styles.previewField}>
+              <span className={styles.previewFieldLabel}>Color Palette</span>
+              <div className={styles.previewPalette}>
                 {data.color_palette.slice(0, 5).map((color, index) => (
                   <span
                     key={`${color.hex || ''}-${index}`}
-                    className="bk-preview-swatch"
+                    className={styles.previewSwatch}
                     style={{ background: color.hex || '#111420' }}
                     title={color.name || color.hex || 'Color'}
                   />
@@ -78,9 +79,9 @@ export default function BrandKitLivePreview({ data = {}, confidenceMap = {} }) {
       </div>
 
       {sampleCaption && (
-        <div className="bk-preview-caption-card">
-          <p className="bk-preview-caption-label">Sample caption preview</p>
-          <p className="bk-preview-caption-text">{sampleCaption}</p>
+        <div className={styles.previewCaptionCard}>
+          <p className={styles.previewCaptionLabel}>Sample caption preview</p>
+          <p className={styles.previewCaptionText}>{sampleCaption}</p>
         </div>
       )}
     </div>

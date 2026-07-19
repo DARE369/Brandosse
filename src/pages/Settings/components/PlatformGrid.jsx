@@ -1,31 +1,14 @@
 import React from 'react';
+import { ChevronRight } from 'lucide-react';
 import PlatformIcon from '../../../components/Shared/PlatformIcon';
+import { Badge } from '../../../ui-v2';
+import styles from './PlatformGrid.module.css';
 
-const DEFAULT_PLATFORM_ACCENT = 'var(--color-primary)';
-
-function PlatformBadge({ platform }) {
-  if (platform?.icon_url) {
-    return <img src={platform.icon_url} alt={platform.display_name} className="connected-platform-logo" />;
-  }
+export default function PlatformGrid({ platforms = [], connectedAccounts = [], onConnect }) {
+  const connectedPlatformMap = new Map(connectedAccounts.map((account) => [account.platform, account]));
 
   return (
-    <span className="connected-platform-logo connected-platform-logo-fallback" style={{ color: platform?.brand_color || DEFAULT_PLATFORM_ACCENT }}>
-      <PlatformIcon platform={platform?.platform_key} size="md" />
-    </span>
-  );
-}
-
-export default function PlatformGrid({
-  platforms = [],
-  connectedAccounts = [],
-  onConnect,
-}) {
-  const connectedPlatformMap = new Map(
-    connectedAccounts.map((account) => [account.platform, account]),
-  );
-
-  return (
-    <div className="connected-platform-grid" role="list" aria-label="Available platforms">
+    <div className={styles.grid} role="list" aria-label="Available platforms">
       {platforms.map((platform) => {
         const account = connectedPlatformMap.get(platform.platform_key);
         const isConnected = Boolean(account);
@@ -35,22 +18,24 @@ export default function PlatformGrid({
           <button
             key={platform.id || platform.platform_key}
             type="button"
-            className={`connected-platform-card ${isConnected ? 'is-connected' : ''} ${isSoon ? 'is-soon' : ''}`.trim()}
-            style={{ '--connected-platform-accent': platform.brand_color || DEFAULT_PLATFORM_ACCENT }}
+            className={styles.tile}
+            style={{ '--tile-accent': platform.brand_color }}
             onClick={() => !isSoon && onConnect?.(platform)}
             disabled={isSoon}
             role="listitem"
           >
-            <span className={`connected-platform-chip ${isConnected ? 'connected' : isSoon ? 'soon' : ''}`.trim()}>
-              {isConnected ? 'Connected' : isSoon ? 'Soon' : 'Connect'}
-            </span>
-
-            <PlatformBadge platform={platform} />
-
-            <div className="connected-platform-copy">
-              <strong>{platform.display_name}</strong>
-              <p>{platform.mock_login_description || `Connect ${platform.display_name} to SocialAI.`}</p>
+            <span className={styles.iconWrap}><PlatformIcon platform={platform.platform_key} size="md" /></span>
+            <div className={styles.copy}>
+              <strong className={styles.name}>{platform.display_name}</strong>
+              <p className={styles.desc}>{platform.mock_login_description || `Connect ${platform.display_name} to Brandosse.`}</p>
             </div>
+            {isConnected ? (
+              <Badge tone="success">Connected</Badge>
+            ) : isSoon ? (
+              <Badge tone="neutral">Soon</Badge>
+            ) : (
+              <ChevronRight size={15} className={styles.chevron} aria-hidden="true" />
+            )}
           </button>
         );
       })}

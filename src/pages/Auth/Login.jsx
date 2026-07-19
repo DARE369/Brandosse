@@ -6,8 +6,9 @@ import Link from "next/link";
 import { useAuth } from "../../Context/AuthContext";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import AuthLayout from "../../layouts/AuthLayout";
-import { APP_ROOT_PATH, resolvePostAuthPath } from "../../utils/authRouting";
+import { APP_ROOT_PATH, USER_HOME_PATH, resolvePostAuthPath } from "../../utils/authRouting";
 import { getPendingSignupIntent, SIGNUP_COMPLETION_PATH } from "../../services/signupIntentService";
+import { fetchOnboardingCompleted } from "../../services/userSettingsService";
 
 function GoogleIcon() {
   return (
@@ -99,12 +100,26 @@ export default function Login() {
     setLoading("email");
     try {
       const loginData = await login(email, password);
-      const access = await refreshAccess(loginData?.user || loginData?.session?.user || null);
+      const user = loginData?.user || loginData?.session?.user || null;
+      const access = await refreshAccess(user);
       const nextPath = resolvePostAuthPath({
         role: access?.adminRole || access?.role,
         intendedPath: getReturnPath(access?.workspaceRedirectPath),
       });
       sessionStorage.removeItem("socialai-redirect-after-login");
+
+      // Same onboarding intercept as AppHomeRedirect.jsx's /app-root gate —
+      // needed here too since email/password login navigates straight to
+      // nextPath without ever passing through /app root (Google login does,
+      // via AuthCallback.jsx -> APP_ROOT_PATH, so it doesn't need this).
+      if (nextPath === USER_HOME_PATH && user?.id) {
+        const completed = await fetchOnboardingCompleted(user.id).catch(() => true);
+        if (!completed) {
+          navigate("/app/onboarding", { replace: true });
+          return;
+        }
+      }
+
       navigate(nextPath, { replace: true });
     } catch (err) {
       setError(getLoginErrorMessage(err));

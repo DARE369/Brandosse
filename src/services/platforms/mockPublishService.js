@@ -43,5 +43,8 @@ export async function publishPost(postId, connectedAccountId, options = {}) {
     mockPostUrl: data?.platformPostUrl || null,
     failureReason: data?.success ? null : (data?.failureReason || 'publish_failed'),
     failureIsRetriable: false,
+    // Set when something was silently adjusted to fit a platform constraint
+    // (e.g. a caption auto-shortened for TikTok's photo-post title limit).
+    note: data?.note || null,
   };
 }

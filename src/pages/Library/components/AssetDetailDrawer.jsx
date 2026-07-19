@@ -52,6 +52,7 @@ export default function AssetDetailDrawer({
   onSchedule,
   onDelete,
   onDuplicate,
+  onArchive,
   usedInPosts = [],
   versionChain = [],
   onOpenVersion,
@@ -240,6 +241,9 @@ export default function AssetDetailDrawer({
         </div>
         <div className={styles.drawerFooterRow}>
           <Button variant="subtle" size="sm" onClick={() => onDuplicate?.(asset)}>Duplicate</Button>
+          <Button variant="subtle" size="sm" onClick={() => onArchive?.(asset)}>
+            {asset.status === "archived" ? "Unarchive" : "Archive"}
+          </Button>
           <Button variant="dangerSolid" size="sm" onClick={() => onDelete?.(asset)}>Delete</Button>
         </div>
       </div>

@@ -164,6 +164,7 @@ export function useDashboardData(userId, profile) {
   const [upcomingPosts, setUpcomingPosts] = useState([]);
   const [connectedAccounts, setConnectedAccounts] = useState([]);
   const [isFirstTime, setIsFirstTime] = useState(false);
+  const [hasBrandKit, setHasBrandKit] = useState(false);
 
   const credits = useCreditBalance(userId);
   const creditSpend = useCreditSpendByCategory(userId);
@@ -211,6 +212,7 @@ export function useDashboardData(userId, profile) {
         draftsPrevResult,
         clipsThisResult,
         clipsPrevResult,
+        brandKitResult,
       ] = await Promise.all([
         supabase.from("generations").select("*", { count: "exact", head: true }).eq("user_id", userId).is("organization_id", null),
         postCount(POST_STATUS.SCHEDULED),
@@ -219,7 +221,7 @@ export function useDashboardData(userId, profile) {
         postCount(POST_STATUS.FAILED),
         supabase.from("generations").select("id, session_id, prompt, storage_path, media_type, status, created_at, metadata, sessions(title)").eq("user_id", userId).is("organization_id", null).order("created_at", { ascending: false }).limit(RECENT_GENERATION_LIMIT),
         supabase.from("generations").select("id, session_id, prompt, status, created_at, metadata, sessions(title)").eq("user_id", userId).is("organization_id", null).order("created_at", { ascending: false }).limit(GENERATION_SEARCH_LIMIT),
-        supabase.from("posts").select("id, platform, title, caption, scheduled_at, status, generation_id, generations(storage_path, media_type)").eq("user_id", userId).is("organization_id", null).eq("status", POST_STATUS.SCHEDULED).order("scheduled_at", { ascending: true }).limit(UPCOMING_POST_LIMIT),
+        supabase.from("posts").select("id, platform, title, caption, scheduled_at, status, generation_id, account_id, generations(storage_path, media_type)").eq("user_id", userId).is("organization_id", null).eq("status", POST_STATUS.SCHEDULED).order("scheduled_at", { ascending: true }).limit(UPCOMING_POST_LIMIT),
         supabase.from("video_clips").select("*", { count: "exact", head: true }).eq("user_id", userId).eq("render_status", "complete"),
         supabase.from("connected_accounts_health_summary").select(`
             id, platform, platform_display_name, display_name, account_name, username,
@@ -234,6 +236,7 @@ export function useDashboardData(userId, profile) {
         postCountInWindow(POST_STATUS.DRAFT, "created_at", prevWindowStart, windowStart),
         clipsCountInWindow(windowStart),
         clipsCountInWindow(prevWindowStart, windowStart),
+        supabase.from("brand_kit").select("setup_completed").eq("user_id", userId).eq("is_active", true).maybeSingle(),
       ]);
 
       const withSessionTitle = (rows) =>
@@ -263,6 +266,7 @@ export function useDashboardData(userId, profile) {
       setUpcomingPosts(upcomingPostsResult.data ?? []);
       setConnectedAccounts(connected);
       setIsFirstTime(totalGenerations === 0 && connected.length === 0);
+      setHasBrandKit(brandKitResult?.data?.setup_completed === true);
     } catch (err) {
       console.error("Dashboard fetch error:", err);
       setError(true);
@@ -291,6 +295,7 @@ export function useDashboardData(userId, profile) {
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "connected_accounts" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "video_clips" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "brand_kit" }, scheduleRefresh)
       .subscribe();
 
     return () => {
@@ -330,6 +335,14 @@ export function useDashboardData(userId, profile) {
   }, [recentGenerations, normalizedSearchQuery]);
 
   const accountCards = useMemo(() => connectedAccounts.map(toAccountCard), [connectedAccounts]);
+  // Whether publishing is actually simulated, derived from real account data
+  // rather than a hardcoded label — a real (Zernio) connected account should
+  // never be blanket-labeled "Simulated".
+  const allAccountsMock = accountCards.length > 0 && accountCards.every((a) => a.isMock);
+  const nextPostAccount = nextPost ? accountCards.find((a) => a.id === nextPost.account_id) ?? null : null;
+  // Unknown (no matching account row) reads as mock — never claim "Live"
+  // without a confirmed real account behind it.
+  const nextPostIsMock = nextPostAccount ? nextPostAccount.isMock : true;
 
   return {
     loading,
@@ -341,6 +354,7 @@ export function useDashboardData(userId, profile) {
     isFirstTime,
     hasConnectedAccount,
     hasGeneration,
+    hasBrandKit,
     searchQuery,
     setSearchQuery,
     stats,
@@ -350,7 +364,9 @@ export function useDashboardData(userId, profile) {
     upcomingPosts,
     nextPost,
     nextCountdown,
+    nextPostIsMock,
     connectedAccounts: accountCards,
+    allAccountsMock,
     credits,
     creditSegments: creditSpend.segments,
     generationIndex,

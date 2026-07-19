@@ -17,6 +17,9 @@ import { createAdminClient, createAuthClient, requireUser } from "../_shared/sup
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { generateImageEdit, FAL_COST_USD, FAL_MODELS } from "../_shared/fal.service.ts";
 import { callPromptEngine } from "../_shared/llm.ts";
+import { createHttpError } from "../_shared/org.ts";
+import { enforceRateLimit } from "../_shared/rateLimit.ts";
+import { completeGeneration, findCachedGeneration, reserveCredits } from "../_shared/generationIdempotency.ts";
 
 const GENERATED_BUCKET = "generated_assets";
 const CREDITS_PER_EDIT = 3;
@@ -28,7 +31,9 @@ type EditImageBody = {
   aspectRatio?: string;
   enhance_prompt?: boolean;
   session_id?: string;
-  record_generation?: boolean;
+  request_id?: string;
+  request_slot?: number;
+  generation_id?: string;
 };
 
 function buildBrandContext(brandKit: Record<string, unknown> | undefined): string {
@@ -51,20 +56,40 @@ serve(async (req) => {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
+  let refundCreditsIfReserved: () => Promise<void> = async () => {};
+
   try {
     const authClient = createAuthClient(req.headers.get("Authorization"));
     const user = await requireUser(authClient);
     const adminClient = createAdminClient();
+    await enforceRateLimit(adminClient, user.id, "editImage");
 
     const body = await parseJsonBody<EditImageBody>(req);
     const rawPrompt = (body.prompt || "").trim();
     const sourceImageUrl = (body.sourceImageUrl || "").trim();
 
     if (!rawPrompt) {
-      return jsonResponse({ error: "Missing prompt" }, 400);
+      throw createHttpError("Missing prompt", 400);
     }
     if (!sourceImageUrl) {
-      return jsonResponse({ error: "Missing sourceImageUrl for edit mode" }, 400);
+      throw createHttpError("Missing sourceImageUrl for edit mode", 400);
+    }
+
+    const requestId   = body.request_id || null;
+    const requestSlot = Number.isFinite(body.request_slot) ? Number(body.request_slot) : 0;
+
+    const cached = await findCachedGeneration(adminClient, user.id, requestId, requestSlot);
+    if (cached) {
+      const meta = (cached.metadata && typeof cached.metadata === "object") ? cached.metadata as Record<string, unknown> : {};
+      return jsonResponse({
+        publicUrl: cached.output_url, storagePath: cached.storage_path,
+        generation_id: cached.id, status: "completed",
+        provider: cached.provider, providerModel: cached.provider_model, providerEndpoint: cached.provider_model,
+        generationTimeMs: 0, prompt: cached.enhanced_prompt || cached.prompt,
+        seed: meta.seed ?? null,
+        credits_used: 0,
+        replayed: true,
+      });
     }
 
     // ── Credit check (authoritative source: user_credits) ────────────────────
@@ -72,8 +97,24 @@ serve(async (req) => {
       .from("user_credits").select("balance").eq("user_id", user.id).maybeSingle();
     const currentCredits = creditRow?.balance ?? 0;
     if (currentCredits < CREDITS_PER_EDIT) {
-      return jsonResponse({ error: "Insufficient credits" }, 402);
+      throw createHttpError("Insufficient credits", 402);
     }
+
+    // ── Reserve credits BEFORE any provider work (atomic, refunded on failure) ──
+    await reserveCredits(adminClient, user.id, CREDITS_PER_EDIT, "edit", "Image edit");
+    let creditsReserved = true;
+    refundCreditsIfReserved = async () => {
+      if (!creditsReserved) return;
+      creditsReserved = false;
+      try {
+        await adminClient.rpc("refund_credits", {
+          p_user_id: user.id, p_amount: CREDITS_PER_EDIT, p_category: "edit",
+          p_description: "Refund: edit failed after credit reservation",
+        });
+      } catch (refundErr) {
+        console.error("[editImage] refund after failure also failed:", refundErr);
+      }
+    };
 
     // ── Prompt enhancement — Claude Haiku brand injection ─────────────────────
     let finalPrompt = rawPrompt;
@@ -123,43 +164,24 @@ Rules:
       .from(GENERATED_BUCKET)
       .getPublicUrl(fileName);
 
-    // ── Record generation + deduct credits ────────────────────────────────────
-    let generationId: string | null = null;
-    if (body.record_generation !== false) {
-      const { data: generation, error: insertError } = await adminClient
-        .from("generations")
-        .insert({
-          user_id:         user.id,
-          session_id:      body.session_id ?? null,
-          prompt:          rawPrompt,
-          enhanced_prompt: finalPrompt !== rawPrompt ? finalPrompt : null,
-          media_type:      "image",
-          status:          "completed",
-          output_url:      publicUrl,
-          storage_path:    publicUrl,
-          provider:        "fal-ai",
-          provider_model:  FAL_MODELS.imageEditKontext,
-          aspect_ratio:    body.aspectRatio ?? null,
-          metadata: {
-            seed:              result.seed ?? null,
-            source_image_url:  sourceImageUrl,
-            cost_usd:          FAL_COST_USD.imageEditKontext,
-          },
-        })
-        .select("id")
-        .single();
-      if (insertError) {
-        console.error("[editImage] failed to record generation:", insertError);
-        throw new Error(`Failed to record generation: ${insertError.message}`);
-      }
-      generationId = generation?.id ?? null;
-    }
-
-    await adminClient.rpc("deduct_credits", {
-      p_user_id:     user.id,
-      p_amount:      CREDITS_PER_EDIT,
-      p_category:    "edit",
-      p_description: "Image edit",
+    // ── Generation row ownership (see generateImage/index.ts for the full
+    // rationale) — generationPipeline.js owns creation/FAILED; this function
+    // owns writing COMPLETED onto the same row via generation_id. ─────────
+    const generationId = await completeGeneration(adminClient, body.generation_id, user.id, {
+      request_id:      requestId,
+      request_slot:    requestSlot,
+      prompt:          rawPrompt,
+      enhanced_prompt: finalPrompt !== rawPrompt ? finalPrompt : null,
+      output_url:      publicUrl,
+      storage_path:    publicUrl,
+      provider:        "fal-ai",
+      provider_model:  FAL_MODELS.imageEditKontext,
+      aspect_ratio:    body.aspectRatio ?? null,
+      metadata: {
+        seed:              result.seed ?? null,
+        source_image_url:  sourceImageUrl,
+        cost_usd:          FAL_COST_USD.imageEditKontext,
+      },
     });
 
     return jsonResponse({
@@ -176,6 +198,7 @@ Rules:
       credits_remaining: currentCredits - CREDITS_PER_EDIT,
     });
   } catch (error) {
+    await refundCreditsIfReserved();
     console.error("[editImage] error", error);
     return jsonResponse(toErrorPayload(error), mapErrorToStatusCode(error));
   }

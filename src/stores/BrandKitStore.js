@@ -1,4 +1,17 @@
 // src/stores/BrandKitStore.js
+//
+// Multi-kit refactor (docs/brand-kit-rebuild/AS_IS_AUDIT.md +
+// DECISIONS_LOG.md). An account can now hold multiple brand kits; exactly
+// one is ever `is_active` (enforced by a partial unique index on
+// public.brand_kit — see supabase/migrations/20260708140000_brand_kit_multi_kit.sql).
+// Studio's generation pipeline (src/services/brandKitLoader.js) always
+// reads the active kit, independent of whichever kit the user happens to
+// be *viewing* here (`currentKitId`).
+//
+// Backward-compat note: `loadBrandKit` and `brandKit` are kept as aliases
+// for `loadKits`/the active kit so existing consumers that only care about
+// kit-completeness status (UserSidebar's nav badge, BrandKitOnboardingModal)
+// keep working unchanged.
 
 import { create } from 'zustand';
 import { supabase } from '../services/supabaseClient';
@@ -77,9 +90,31 @@ async function uploadWithProgress(bucket, storagePath, file, onProgress) {
   });
 }
 
+function deriveStatus(kit) {
+  if (!kit) return BRAND_KIT_STATUS.MISSING;
+  if (kit.setup_completed) return BRAND_KIT_STATUS.CONFIGURED;
+  if (kit.brand_name) return BRAND_KIT_STATUS.PARTIAL;
+  return BRAND_KIT_STATUS.MISSING;
+}
+
+function pickActiveKit(kits = []) {
+  return kits.find((kit) => kit.is_active) || kits[0] || null;
+}
+
+// Recomputes the plain `brandKit`/`activeKit`/`status` fields from
+// `kits`/`currentKitId`. Call this inside every `set()` that changes
+// either of those two, since they are not live getters (see the note
+// above `status:` in the store's initial state).
+function deriveViewFields(kits, currentKitId) {
+  const activeKit = pickActiveKit(kits);
+  const brandKit = kits.find((kit) => kit.id === currentKitId) || activeKit;
+  return { brandKit, activeKit, status: deriveStatus(brandKit) };
+}
+
 const useBrandKitStore = create((set, get) => ({
   // State
-  brandKit: null,
+  kits: [],
+  currentKitId: null,
   assets: [],
   isLoading: false,
   loadingUserId: null,
@@ -91,40 +126,56 @@ const useBrandKitStore = create((set, get) => ({
   diffData: null,
   isDiffModalOpen: false,
 
-  // Derived
+  // Derived — NOT Zustand getters. `set()` shallow-merges via object
+  // spread, which would evaluate a `get x() {...}` accessor once and
+  // freeze the result as a plain stale property on the very next update.
+  // These are instead plain fields, recomputed explicitly by every action
+  // that touches `kits`/`currentKitId` (see `deriveViewFields` below).
   status: BRAND_KIT_STATUS.MISSING,
+  // The kit currently being viewed/edited (dashboard/review form) — not
+  // necessarily the same kit Studio generates from (see `activeKit`).
+  brandKit: null,
+  // The one kit Studio's generation pipeline reads from.
+  activeKit: null,
 
-  // Load the brand kit for the current user.
-  loadBrandKit: async (userId) => {
-    const { isLoading, loadingUserId, loadedUserId, brandKit } = get();
+  // Fetch every kit for this account. Does NOT auto-create an empty kit on
+  // first load anymore (the mockup's empty/landing state now owns that
+  // decision — see BrandKitPage.jsx's 'empty' screen).
+  loadKits: async (userId) => {
+    const { isLoading, loadingUserId, loadedUserId, kits } = get();
     if (!userId) return;
     if (isLoading && loadingUserId === userId) return;
-    if (loadedUserId === userId && brandKit?.user_id === userId) return;
+    if (loadedUserId === userId && kits.length > 0) return;
 
     set({ isLoading: true, error: null, loadingUserId: userId });
     try {
-      const { data: kit, error: kitErr } = await supabase
+      const { data: kitRows, error: kitErr } = await supabase
         .from('brand_kit')
-        .upsert({ user_id: userId }, { onConflict: 'user_id' })
-        .select('*')
-        .single();
-
-      if (kitErr) throw kitErr;
-
-      const { data: assets, error: assetsErr } = await supabase
-        .from('brand_assets')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (assetsErr) throw assetsErr;
+      if (kitErr) throw kitErr;
 
-      const status = deriveStatus(kit);
+      const active = pickActiveKit(kitRows || []);
+      const currentKitId = active?.id || null;
+
+      let assetRows = [];
+      if (currentKitId) {
+        const { data: assets, error: assetsErr } = await supabase
+          .from('brand_assets')
+          .select('*')
+          .eq('brand_kit_id', currentKitId)
+          .order('created_at', { ascending: false });
+        if (assetsErr) throw assetsErr;
+        assetRows = assets ?? [];
+      }
 
       set({
-        brandKit: kit ?? null,
-        assets: assets ?? [],
-        status,
+        kits: kitRows ?? [],
+        currentKitId,
+        assets: assetRows,
+        ...deriveViewFields(kitRows ?? [], currentKitId),
         isLoading: false,
         loadingUserId: null,
         loadedUserId: userId,
@@ -148,15 +199,119 @@ const useBrandKitStore = create((set, get) => ({
     }
   },
 
-  // Upsert brand kit fields.
-  saveBrandKit: async (userId, fields) => {
+  // Backward-compat alias — existing call sites (UserSidebar,
+  // BrandKitOnboardingModal) only need kit-completeness status.
+  loadBrandKit: async (userId) => get().loadKits(userId),
+
+  // Switch which kit is being viewed/edited (dashboard's kit switcher).
+  // Does NOT change which kit Studio generates from — see setActiveKit.
+  selectKit: async (kitId) => {
+    const { kits } = get();
+    const kit = kits.find((k) => k.id === kitId);
+    if (!kit) return;
+
+    set((state) => ({ currentKitId: kitId, isLoading: true, ...deriveViewFields(state.kits, kitId) }));
+    try {
+      const { data: assets, error } = await supabase
+        .from('brand_assets')
+        .select('*')
+        .eq('brand_kit_id', kitId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      set({ assets: assets ?? [], isLoading: false });
+    } catch (err) {
+      set({ error: err.message, isLoading: false });
+    }
+  },
+
+  // Mark one kit as the single active kit for the account (deactivate
+  // others first so the partial unique index never sees two active rows
+  // for the same user at once).
+  setActiveKit: async (userId, kitId) => {
+    set({ isSaving: true, error: null });
+    try {
+      const { error: deactivateErr } = await supabase
+        .from('brand_kit')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .neq('id', kitId);
+      if (deactivateErr) throw deactivateErr;
+
+      const { data, error: activateErr } = await supabase
+        .from('brand_kit')
+        .update({ is_active: true })
+        .eq('id', kitId)
+        .select()
+        .single();
+      if (activateErr) throw activateErr;
+
+      set((state) => {
+        const kits = state.kits.map((kit) => ({ ...kit, is_active: kit.id === kitId }));
+        return { kits, isSaving: false, ...deriveViewFields(kits, state.currentKitId) };
+      });
+      return data;
+    } catch (err) {
+      set({ error: err.message, isSaving: false });
+      throw err;
+    }
+  },
+
+  // Create a new, empty kit (mockup's "New brand kit" action / empty
+  // state's "Start from scratch"). The first kit an account ever creates
+  // becomes active by default; subsequent ones start inactive so the
+  // partial unique index never conflicts silently.
+  createKit: async (userId, fields = {}) => {
+    set({ isSaving: true, error: null });
+    try {
+      const isFirstKit = get().kits.length === 0;
+      const { data, error } = await supabase
+        .from('brand_kit')
+        .insert({
+          user_id: userId,
+          kit_name: fields.kit_name || 'New Brand Kit',
+          is_active: isFirstKit,
+          ...fields,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      set((state) => {
+        const kits = [data, ...state.kits];
+        return { kits, currentKitId: data.id, assets: [], isSaving: false, ...deriveViewFields(kits, data.id) };
+      });
+      return data;
+    } catch (err) {
+      set({ error: err.message, isSaving: false });
+      throw err;
+    }
+  },
+
+  deleteKit: async (kitId) => {
+    const { error } = await supabase.from('brand_kit').delete().eq('id', kitId);
+    if (error) throw error;
+
+    set((state) => {
+      const remaining = state.kits.filter((kit) => kit.id !== kitId);
+      const nextCurrent = state.currentKitId === kitId
+        ? (pickActiveKit(remaining)?.id || null)
+        : state.currentKitId;
+      return { kits: remaining, currentKitId: nextCurrent, ...deriveViewFields(remaining, nextCurrent) };
+    });
+  },
+
+  // Upsert brand kit fields onto a specific kit (defaults to whichever kit
+  // is currently being viewed/edited). Upserts by `id`, not `user_id` —
+  // the single-kit-per-user upsert this replaced no longer makes sense
+  // once an account can hold multiple kits.
+  saveBrandKit: async (userId, fields, kitIdOverride = null) => {
     set({ isSaving: true, error: null });
     try {
       const state = get();
-      const merged = {
-        ...(state.brandKit || {}),
-        ...(fields || {}),
-      };
+      const kitId = kitIdOverride || state.currentKitId;
+      const existing = state.kits.find((kit) => kit.id === kitId) || {};
+      const merged = { ...existing, ...(fields || {}) };
+
       const payload = {
         ...fields,
         user_id: userId,
@@ -164,23 +319,40 @@ const useBrandKitStore = create((set, get) => ({
         version_hash: computeVersionHash(merged),
       };
 
-      const { data, error } = await supabase
-        .from('brand_kit')
-        .upsert(
-          payload,
-          { onConflict: 'user_id' },
-        )
-        .select()
-        .single();
+      let data;
+      if (kitId) {
+        const { data: updated, error } = await supabase
+          .from('brand_kit')
+          .update(payload)
+          .eq('id', kitId)
+          .select()
+          .single();
+        if (error) throw error;
+        data = updated;
+      } else {
+        // No kit selected yet — create one (covers the manual/"Fill it
+        // myself" and conversational first-save paths).
+        const { data: inserted, error } = await supabase
+          .from('brand_kit')
+          .insert({ ...payload, is_active: state.kits.length === 0 })
+          .select()
+          .single();
+        if (error) throw error;
+        data = inserted;
+      }
 
-      if (error) throw error;
-
-      const status = deriveStatus(data);
-      set({
-        brandKit: data,
-        status,
-        isSaving: false,
-        loadedUserId: userId,
+      set((prevState) => {
+        const exists = prevState.kits.some((kit) => kit.id === data.id);
+        const kits = exists
+          ? prevState.kits.map((kit) => (kit.id === data.id ? data : kit))
+          : [data, ...prevState.kits];
+        return {
+          kits,
+          currentKitId: data.id,
+          isSaving: false,
+          loadedUserId: userId,
+          ...deriveViewFields(kits, data.id),
+        };
       });
       return data;
     } catch (err) {
@@ -244,7 +416,7 @@ const useBrandKitStore = create((set, get) => ({
 
     if (!userId) throw new Error('Missing user id for Brand Kit update');
 
-    const saved = await get().saveBrandKit(userId, mergedKit);
+    const saved = await get().saveBrandKit(userId, mergedKit, state.currentKitId);
     set({ isDiffModalOpen: false, diffData: null });
     return saved;
   },
@@ -348,12 +520,5 @@ const useBrandKitStore = create((set, get) => ({
     });
   },
 }));
-
-function deriveStatus(kit) {
-  if (!kit) return BRAND_KIT_STATUS.MISSING;
-  if (kit.setup_completed) return BRAND_KIT_STATUS.CONFIGURED;
-  if (kit.brand_name) return BRAND_KIT_STATUS.PARTIAL;
-  return BRAND_KIT_STATUS.MISSING;
-}
 
 export default useBrandKitStore;

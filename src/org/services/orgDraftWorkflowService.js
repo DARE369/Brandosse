@@ -89,7 +89,7 @@ async function invokeOrgEdgeFunction(functionName, body = {}) {
     if (isEdgeFunctionUnavailable(error)) {
       markEdgeFunctionUnavailable(functionName);
     }
-    throw normalizeEdgeFunctionError(error, functionName);
+    throw await normalizeEdgeFunctionError(error, functionName);
   }
 
   clearEdgeFunctionUnavailable(functionName);

@@ -1,0 +1,21 @@
+-- ============================================================================
+-- Migration: fix_connected_accounts_select_grant
+-- Purpose: live introspection (2026-07-12 QA pass) found `authenticated` and
+--   `anon` have INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER grants on
+--   public.connected_accounts, but NOT SELECT — a plain table-level grant
+--   gap (42501 permission denied), evaluated BEFORE RLS ever runs, not an
+--   RLS policy problem (the existing policies on this table are all correct
+--   ownership/org-scope checks, verified separately, untouched here). No
+--   real user could ever see their own connected accounts through the
+--   normal client until this is fixed. `service_role`/`postgres` already
+--   have SELECT (confirmed), so service-role-driven flows were unaffected.
+--
+--   Only granting SELECT — the other privileges these roles already hold
+--   are left exactly as they are; RLS (already correct) continues to gate
+--   which ROWS are visible, this just restores the table-level permission
+--   needed for RLS to be evaluated at all.
+--
+-- Rollback: REVOKE SELECT ON public.connected_accounts FROM authenticated, anon;
+-- ============================================================================
+
+GRANT SELECT ON public.connected_accounts TO authenticated, anon;

@@ -34,6 +34,11 @@ export interface PublishResult {
   platformPostUrl: string | null;
   failureReason: string | null;
   retriable: boolean;
+  // Set when the post still succeeded but something was silently adjusted
+  // to fit a platform constraint (e.g. a caption shortened for TikTok's
+  // photo-post title limit) — surfaced to the user so a modified caption is
+  // never a surprise.
+  note?: string | null;
 }
 
 export interface PublishInput {
@@ -158,37 +163,73 @@ export async function publishToZernio(input: PublishInput): Promise<PublishResul
     };
   }
 
-  // Zernio's own TikTok guide: "No text-only posts (media required)".
+  // Zernio's own TikTok guide: "No text-only posts (media required)" — both
+  // photo and video are supported (just not mixed in the same post).
   if (platform === "tiktok" && !mediaUrl) {
     return {
       success: false,
       platformPostId: null,
       platformPostUrl: null,
-      failureReason: "TikTok requires a video URL.",
+      failureReason: "TikTok requires an image or video.",
       retriable: false,
     };
   }
 
   const caption = String(post.caption || "");
   const hashtags = Array.isArray(post.hashtags) ? (post.hashtags as string[]).join(" ") : "";
-  const content = hashtags ? `${caption}\n\n${hashtags}` : caption;
+  let content = hashtags ? `${caption}\n\n${hashtags}` : caption;
+
+  const generationRow = Array.isArray(post.generations) ? post.generations[0] : post.generations;
+  const rawMediaType = String((generationRow as Record<string, unknown> | undefined)?.media_type || "image").toLowerCase();
+  const mediaType = rawMediaType.includes("video") ? "video" : "image";
+
+  // TikTok photo/slideshow posts reuse `content` as the post's title, which
+  // TikTok hard-caps at 90 characters (video posts have no such limit) —
+  // confirmed live via a real Zernio rejection. Rather than failing the
+  // publish outright, auto-fit it: drop hashtags first (least essential part
+  // of a 90-char title, and usually what pushes it over), then truncate the
+  // caption itself if it's still too long on its own. `publishNote` carries
+  // this back so a silently-shortened caption is never a surprise — surfaced
+  // in the publish result UI, not just swallowed.
+  const TIKTOK_PHOTO_TITLE_LIMIT = 90;
+  let publishNote: string | null = null;
+  if (platform === "tiktok" && mediaType === "image" && content.length > TIKTOK_PHOTO_TITLE_LIMIT) {
+    const originalLength = content.length;
+    content = caption.length > TIKTOK_PHOTO_TITLE_LIMIT
+      ? `${caption.slice(0, TIKTOK_PHOTO_TITLE_LIMIT - 1)}…`
+      : caption;
+    publishNote = `Caption shortened from ${originalLength} to ${content.length} characters to fit TikTok's ${TIKTOK_PHOTO_TITLE_LIMIT}-character photo-post title limit${hashtags ? " (hashtags dropped)" : ""}.`;
+  }
 
   const platformEntry: Record<string, unknown> = { platform, accountId };
-  // Best-effort TikTok defaults (mirrors publisher.service.ts's direct-TikTok
-  // publicTo-everyone default). Zernio's own docs give inconsistent field
-  // placement for TikTok settings across pages (top-level tiktokSettings vs.
-  // inlined per-platform fields) — inlined here per the official Python SDK's
-  // literal example (client.posts.create(..., platforms=[{"platform": "x",
-  // "accountId": "...", "<platform>Title": "..."}])). NOT yet confirmed
-  // against a live call — if a real publish fails on an "unknown field" or
-  // "missing field" error, adjust this block first.
+
+  // Confirmed 2026-07-17 against docs.zernio.com: TikTok is the one platform
+  // whose settings live in a top-level `tiktokSettings` object, not inlined
+  // on the platform entry and not under `platformSpecificData` (every other
+  // platform uses platformSpecificData) — this was previously guessed wrong
+  // (inlined on platformEntry), which is why real TikTok publishes failed
+  // with "tiktok posts require media content" even when media was attached:
+  // Zernio never saw a recognized media field at all (see below).
+  const body: Record<string, unknown> = {
+    content,
+    publishNow: true,
+    platforms: [platformEntry],
+    // Confirmed field name/shape: top-level `mediaItems`, each entry
+    // `{ type: "image" | "video", url }` — NOT `media_urls: [url]`, which
+    // Zernio silently didn't recognize (hence "requires media content" even
+    // with a valid media URL passed the old way).
+    ...(mediaUrl ? { mediaItems: [{ type: mediaType, url: mediaUrl }] } : {}),
+  };
+
   if (platform === "tiktok") {
-    platformEntry.privacy_level = "PUBLIC_TO_EVERYONE";
-    platformEntry.allow_comment = true;
-    platformEntry.allow_duet = true;
-    platformEntry.allow_stitch = true;
-    platformEntry.content_preview_confirmed = true;
-    platformEntry.express_consent_given = true;
+    body.tiktokSettings = {
+      privacy_level: "PUBLIC_TO_EVERYONE",
+      allow_comment: true,
+      allow_duet: true,
+      allow_stitch: true,
+      content_preview_confirmed: true,
+      express_consent_given: true,
+    };
   }
 
   const apiKey = getZernioKey();
@@ -196,14 +237,7 @@ export async function publishToZernio(input: PublishInput): Promise<PublishResul
     const res = await fetch(`${ZERNIO_BASE}/posts`, {
       method: "POST",
       headers: zernioHeaders(apiKey),
-      body: JSON.stringify({
-        content,
-        publishNow: true,
-        platforms: [platformEntry],
-        // Field name per the official Python SDK's literal example
-        // (media_urls=[...]) — same live-verification caveat as above.
-        ...(mediaUrl ? { media_urls: [mediaUrl] } : {}),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -228,6 +262,7 @@ export async function publishToZernio(input: PublishInput): Promise<PublishResul
       platformPostUrl: null,
       failureReason: null,
       retriable: false,
+      note: publishNote,
     };
   } catch (err) {
     return {

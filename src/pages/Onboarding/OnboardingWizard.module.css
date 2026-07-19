@@ -1,0 +1,74 @@
+.shell {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--uiv2-bg-canvas);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+  line-height: var(--uiv2-leading-normal);
+}
+
+.page { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 48px 16px; }
+.canvas { width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+.stepMeta { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.stepDots { display: flex; gap: 6px; }
+.stepDot { width: 7px; height: 7px; border-radius: 999px; background: var(--uiv2-border); }
+.stepDotActive { background: var(--uiv2-accent-solid); width: 18px; border-radius: 999px; }
+.stepDotDone { background: var(--uiv2-success); }
+.stepLabel { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.card {
+  width: 100%;
+  background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-lg); padding: 30px 28px;
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+}
+.iconLg {
+  width: 52px; height: 52px; border-radius: var(--uiv2-radius-lg);
+  background: var(--uiv2-accent-wash); color: var(--uiv2-accent-text);
+  display: flex; align-items: center; justify-content: center; margin-bottom: 4px;
+}
+.cardTitle { font-family: var(--uiv2-font-display); font-weight: 700; font-size: var(--uiv2-text-xl, var(--uiv2-text-lg)); }
+.cardSub { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); margin-bottom: 16px; max-width: 34ch; }
+
+.blockLabel { align-self: flex-start; font-size: var(--uiv2-text-sm); font-weight: 600; margin-bottom: 8px; }
+.chipRow { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; margin-bottom: 18px; }
+.chip {
+  border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-canvas); color: var(--uiv2-text-primary);
+  border-radius: 999px; padding: 7px 14px; font-size: var(--uiv2-text-sm); font-weight: 600; cursor: pointer;
+}
+.chipActive { border-color: var(--uiv2-accent-solid); background: var(--uiv2-accent-wash); color: var(--uiv2-accent-text); }
+
+.platformGrid { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.platformTile {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--uiv2-border); border-radius: var(--uiv2-radius-lg);
+  background: var(--uiv2-bg-canvas); padding: 12px; cursor: pointer; text-align: left;
+}
+.platformTile:hover { border-color: var(--tile-accent, var(--uiv2-accent-solid)); }
+.platformIconWrap {
+  width: 30px; height: 30px; border-radius: var(--uiv2-radius-md); flex-shrink: 0;
+  background: color-mix(in srgb, var(--tile-accent, var(--uiv2-accent-solid)) 14%, transparent);
+  color: var(--tile-accent, var(--uiv2-accent-solid));
+  display: flex; align-items: center; justify-content: center;
+}
+.platformName { font-size: var(--uiv2-text-sm); font-weight: 600; }
+
+.promptArea {
+  width: 100%; border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-canvas);
+  color: var(--uiv2-text-primary); border-radius: var(--uiv2-radius-md); padding: 10px 12px;
+  font-size: var(--uiv2-text-sm); font-family: inherit; resize: vertical; margin-bottom: 16px;
+}
+
+.skipLink {
+  background: none; border: none; color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-sm); font-weight: 600; cursor: pointer; margin-top: 12px;
+  text-decoration: underline;
+}
+
+.doneNote {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: none; color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-xs); cursor: pointer;
+}

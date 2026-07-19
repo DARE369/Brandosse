@@ -37,7 +37,7 @@ export async function searchOrganizationWorkspace({
   });
 
   if (error) {
-    throw normalizeEdgeFunctionError(error, 'org-global-search');
+    throw await normalizeEdgeFunctionError(error, 'org-global-search');
   }
 
   const groups = safeObject(data?.groups);

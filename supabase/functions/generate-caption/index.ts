@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAuthClient, requireUser } from "../_shared/supabase.ts";
 import { callLlm } from "../_shared/llm.ts";
 import { readEnv } from "../_shared/env.ts";
+import { createHttpError } from "../_shared/org.ts";
+import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 
 type GenerateCaptionRequest = {
@@ -70,18 +72,17 @@ serve(async (req) => {
 
   try {
     const authClient = createAuthClient(req.headers.get("Authorization"));
-    await requireUser(authClient);
+    const user = await requireUser(authClient);
+    await enforceRateLimit(authClient, user.id, "generate-caption");
     const body = await parseJsonBody<GenerateCaptionRequest>(req);
 
     if (!readEnv("ANTHROPIC_API_KEY", false)) {
-      return jsonResponse({
-        error: "ANTHROPIC_API_KEY is required for Claude caption generation.",
-      }, 500);
+      throw createHttpError("ANTHROPIC_API_KEY is required for Claude caption generation.", 500);
     }
 
     const imageDescription = String(body.imageDescription || "").trim();
     if (!imageDescription) {
-      return jsonResponse({ error: "imageDescription is required" }, 400);
+      throw createHttpError("imageDescription is required", 400);
     }
 
     const platform = String(body.platform || "instagram").trim().toLowerCase();

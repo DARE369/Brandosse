@@ -1,10 +1,18 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, Coins, Loader2, Send, Video, WifiOff } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Coins, Layers, Loader2, Send, Video, WifiOff } from "lucide-react";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
+import { useAuth } from "../../Context/AuthContext";
 import { VIDEO_ENGINE_CONSTANTS } from "../../lib/video-engine/constants";
 import { useWorkerHealth } from "../../hooks/video-engine/useWorkerHealth";
 import { submitVideoJob } from "../../services/videoEngineApi";
+import { fetchUserJobs } from "../../services/videoEngineData";
 import ClipSettingsPanel from "./ClipSettingsPanel";
+
+// Mirrors MAX_CONCURRENT_JOBS / activeStatuses in src/lib/video-engine/rate-limiter.ts
+// (the actual server-enforced limit) — kept in sync here only so the UI can
+// show real slot usage before submitting, not to duplicate the enforcement.
+const MAX_CONCURRENT_JOBS = 2;
+const ACTIVE_JOB_STATUSES = ["queued", "downloading", "transcribing", "analyzing", "rendering"];
 
 function getUrlParam() {
   try {
@@ -92,14 +100,25 @@ function prefsReducer(state, action) {
 
 export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
   const { navigate } = useAppNavigation();
+  const { user } = useAuth();
   const workerStatus = useWorkerHealth();
   const [url, setUrl] = useState(getUrlParam);
   const [debouncedUrl, setDebouncedUrl] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeJobsCount, setActiveJobsCount] = useState(0);
   const debounceRef = useRef(null);
 
   const [prefs, dispatchPrefs] = useReducer(prefsReducer, initialPrefs);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchUserJobs(user.id)
+      .then((jobs) => setActiveJobsCount(jobs.filter((j) => ACTIVE_JOB_STATUSES.includes(j.status)).length))
+      .catch(() => {});
+  }, [user?.id]);
+
+  const slotsFull = activeJobsCount >= MAX_CONCURRENT_JOBS;
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -109,7 +128,7 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
 
   const detected = useMemo(() => detectPlatform(debouncedUrl), [debouncedUrl]);
   const hasEnoughCredits = initialCredits >= VIDEO_ENGINE_CONSTANTS.MIN_CREDITS_REQUIRED;
-  const canSubmit = !isSubmitting && hasEnoughCredits && ["youtube", "twitter"].includes(detected);
+  const canSubmit = !isSubmitting && !slotsFull && hasEnoughCredits && ["youtube", "twitter"].includes(detected);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -189,9 +208,25 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
           <div className="ve-meta-row ve-meta-rate">
             <span>1 credit / minute of video</span>
           </div>
+          <div className="ve-meta-row">
+            <Layers size={16} aria-hidden="true" />
+            <span>
+              <strong>{activeJobsCount}</strong> of {MAX_CONCURRENT_JOBS} processing slots in use
+            </span>
+          </div>
         </div>
 
         <ClipSettingsPanel prefs={prefs} dispatch={dispatchPrefs} />
+
+        {slotsFull ? (
+          <div className="ve-inline-status ve-inline-warning" role="alert">
+            <AlertCircle size={16} aria-hidden="true" />
+            <span>
+              You already have {activeJobsCount} video{activeJobsCount === 1 ? "" : "s"} being processed. Wait for one
+              to finish before submitting another.
+            </span>
+          </div>
+        ) : null}
 
         {workerStatus === "unhealthy" ? (
           <div className="ve-inline-status ve-inline-warning" role="status">
@@ -223,7 +258,7 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
             <AlertCircle size={16} aria-hidden="true" />
             <span>
               You need at least {VIDEO_ENGINE_CONSTANTS.MIN_CREDITS_REQUIRED} credits to process a video.{" "}
-              <button type="button" onClick={() => navigate("/app/billing/credits")}>
+              <button type="button" onClick={() => navigate("/app/billing")}>
                 Buy credits
               </button>
             </span>

@@ -64,6 +64,7 @@ import CalendarListView from '../../calendar/components/CalendarListView';
 import UnscheduledRail from '../../calendar/components/UnscheduledRail';
 import PostDetailDrawer from '../../calendar/components/PostDetailDrawer';
 import ScheduleModal from '../../calendar/components/ScheduleModal';
+import ConfirmDialog from '../../calendar/components/ConfirmDialog';
 import QuickPostComposer from '../../calendar/components/QuickPostComposer';
 import CalendarCommandBar, { CalendarCommandBarInline } from '../../calendar/components/CalendarCommandBar';
 import CellCommandPalette from '../../calendar/components/CellCommandPalette';
@@ -71,7 +72,8 @@ import IntelligenceStrip from '../../calendar/components/IntelligenceStrip';
 import ToastStack, { TOAST_ICONS, useToastStack } from '../../calendar/components/ToastStack';
 
 import {
-  UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, Avatar, IconButton, MobileNavDrawer,
+  UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton, MobileNavDrawer,
+  NotificationBell, AvatarMenu,
 } from '../../ui-v2';
 import '../../calendar/calendar-engine-v2.css';
 import styles from './CalendarPage.module.css';
@@ -199,6 +201,9 @@ function CalendarBody({ brandKit }) {
   const [quickPostOpen, setQuickPostOpen] = useState(false);
   const [scheduleModalPost, setScheduleModalPost] = useState(null);
   const [cellPalette, setCellPalette] = useState(null); // { dayKey, label }
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
+  const [postNowTarget, setPostNowTarget] = useState(null);
+  const [postNowBusy, setPostNowBusy] = useState(false);
 
   // ── Schedule hand-off from the Library (LIBRARY_SPEC.md §7) ───────────────
   const [searchParams, setSearchParams] = useMutableSearchParams();
@@ -360,10 +365,16 @@ function CalendarBody({ brandKit }) {
     toast.success('Saved');
   }, [scope, refetch, refetchDrafts]);
 
-  const handleDeletePost = useCallback(async (post) => {
-    if (!window.confirm('Delete this post? This cannot be undone.')) return;
+  const handleDeletePost = useCallback((post) => {
+    setDeleteConfirmTarget(post);
+  }, []);
+
+  const confirmDeletePost = useCallback(async () => {
+    const post = deleteConfirmTarget;
+    if (!post) return;
     try {
       await deletePost(scope, post.id);
+      setDeleteConfirmTarget(null);
       setSelectedPostId(null);
       refetch();
       refetchDrafts();
@@ -371,7 +382,42 @@ function CalendarBody({ brandKit }) {
     } catch (err) {
       toast.error(err?.message || 'Failed to delete post');
     }
-  }, [scope, refetch, refetchDrafts, setSelectedPostId]);
+  }, [deleteConfirmTarget, scope, refetch, refetchDrafts, setSelectedPostId]);
+
+  // "Post now" — publishes immediately instead of waiting for scheduled_at,
+  // via the SAME simulated mock-publish edge function Studio's own publish
+  // flow already uses (executeMockPublishAttempts -> mock-publish edge fn),
+  // so behavior/status transitions (draft/scheduled -> publishing ->
+  // published|failed) are identical, not a second publish implementation.
+  const handlePostNow = useCallback((post) => {
+    setPostNowTarget(post);
+  }, []);
+
+  const confirmPostNow = useCallback(async () => {
+    const post = postNowTarget;
+    if (!post?.account_id) {
+      toast.error('This post has no target account to publish to.');
+      setPostNowTarget(null);
+      return;
+    }
+    setPostNowBusy(true);
+    try {
+      const { executeMockPublishAttempts } = await import('../../services/platforms/mockPublishWorkflow');
+      const { summary } = await executeMockPublishAttempts({
+        attempts: [{ postId: post.id, accountId: post.account_id, userId: user?.id }],
+        source: 'calendar-post-now',
+      });
+      setPostNowTarget(null);
+      refetch();
+      refetchDrafts();
+      if (summary.anyFailed) toast.error(summary.message);
+      else toast.success(summary.message);
+    } catch (err) {
+      toast.error(err?.message || 'Could not publish this post.');
+    } finally {
+      setPostNowBusy(false);
+    }
+  }, [postNowTarget, user?.id, refetch, refetchDrafts]);
 
   const handleUnschedulePost = useCallback(async (post) => {
     const result = await unschedulePost(post);
@@ -540,7 +586,8 @@ function CalendarBody({ brandKit }) {
               <CreditPill pct={`${creditPct}%`} label={`${credits.balance.toLocaleString()} cr`} />
             ) : null}
             <ThemeToggleButton />
-            <Avatar initials={userInitials || 'U'} onClick={() => navigate('/app/profile')} />
+            <NotificationBell userId={user?.id} onNavigate={navigate} />
+            <AvatarMenu initials={userInitials || 'U'} name={profile?.full_name} email={user?.email} onNavigate={navigate} />
           </>
         }
       />
@@ -693,6 +740,7 @@ function CalendarBody({ brandKit }) {
                 onReschedule={handleOpenScheduleModal}
                 onUnschedule={handleUnschedulePost}
                 onDuplicate={handleDuplicatePost}
+                onPostNow={handlePostNow}
               />
             )}
 
@@ -706,6 +754,27 @@ function CalendarBody({ brandKit }) {
                 onConfirm={handleConfirmScheduleModal}
               />
             )}
+
+            <ConfirmDialog
+              open={Boolean(deleteConfirmTarget)}
+              title="Delete this post?"
+              description="This can't be undone. The scheduled slot will be freed up."
+              confirmLabel="Delete post"
+              confirmTone="danger"
+              onConfirm={confirmDeletePost}
+              onClose={() => setDeleteConfirmTarget(null)}
+            />
+
+            <ConfirmDialog
+              open={Boolean(postNowTarget)}
+              title="Publish now?"
+              description="This posts immediately (simulated) instead of waiting for its scheduled time. Unlike a draft, this can't be undone from here."
+              confirmLabel="Post now"
+              confirmTone="primary"
+              busy={postNowBusy}
+              onConfirm={confirmPostNow}
+              onClose={() => setPostNowTarget(null)}
+            />
 
             {quickPostOpen && (
               <QuickPostComposer

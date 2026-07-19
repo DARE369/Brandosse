@@ -68,6 +68,19 @@ export function mapErrorToStatusCode(error: unknown): number {
   return 500;
 }
 
-export function toErrorPayload(error: unknown): { error: string } {
-  return { error: extractErrorMessage(error) };
+export function toErrorPayload(error: unknown): { error: string; retry_after_seconds?: number } {
+  const payload: { error: string; retry_after_seconds?: number } = { error: extractErrorMessage(error) };
+
+  // WEEK 2 FIX 5 (+ ADDENDUM UPGRADE 3): rate-limit errors carry a
+  // retry-after so the client can show/countdown an exact wait instead of
+  // guessing. Additive-only field — every existing consumer that only
+  // reads `.error` is unaffected.
+  if (error && typeof error === "object" && "retryAfterSeconds" in error) {
+    const retryAfterSeconds = (error as { retryAfterSeconds?: unknown }).retryAfterSeconds;
+    if (typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds)) {
+      payload.retry_after_seconds = retryAfterSeconds;
+    }
+  }
+
+  return payload;
 }

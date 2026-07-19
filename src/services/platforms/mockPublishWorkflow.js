@@ -7,24 +7,42 @@ function normalizeFailureReason(value) {
   return String(value || '').trim().toLowerCase() || 'publish_failed';
 }
 
+// Failure reasons range from short mock codes ("invalid_media_type") to full
+// real error sentences from a real provider ("Tiktok posts require media
+// content...", lowercased by normalizeFailureReason above) — this makes
+// either readable in a toast instead of leaving them as a raw code/lowercase
+// sentence fragment.
+function humanizeFailureReason(reason) {
+  if (!reason) return '';
+  const spaced = reason.includes('_') ? reason.replace(/_/g, ' ') : reason;
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 export function buildPublishSummary(attempts = []) {
   const total = attempts.length;
   const successCount = attempts.filter((attempt) => attempt.success).length;
   const failureCount = total - successCount;
   const allSucceeded = total > 0 && failureCount === 0;
   const anyFailed = failureCount > 0;
+  const failureReasons = [...new Set(attempts.filter((a) => !a.success).map((a) => a.failureReason).filter(Boolean))];
 
   let message = 'Publish complete.';
   if (total === 1 && allSucceeded) {
-    message = 'Post published successfully.';
+    message = attempts[0]?.note
+      ? `Post published successfully. ${attempts[0].note}`
+      : 'Post published successfully.';
   } else if (total === 1 && anyFailed) {
-    message = 'Post publishing failed.';
+    message = failureReasons[0]
+      ? `Post publishing failed: ${humanizeFailureReason(failureReasons[0])}`
+      : 'Post publishing failed.';
   } else if (allSucceeded) {
     message = `Published ${successCount} post${successCount === 1 ? '' : 's'}.`;
   } else if (successCount > 0) {
     message = `Published ${successCount} of ${total} post${total === 1 ? '' : 's'}.`;
   } else if (total > 0) {
-    message = `All ${total} publish attempt${total === 1 ? '' : 's'} failed.`;
+    message = failureReasons.length === 1
+      ? `All ${total} publish attempt${total === 1 ? '' : 's'} failed: ${humanizeFailureReason(failureReasons[0])}`
+      : `All ${total} publish attempt${total === 1 ? '' : 's'} failed.`;
   }
 
   return {
@@ -59,6 +77,7 @@ function normalizeAttemptResult(attempt, providerResult, fallbackError = null) {
       : normalizeFailureReason(providerResult?.failureReason || fallbackError?.message),
     failureIsRetriable: success ? false : Boolean(providerResult?.failureIsRetriable),
     providerError: !success && Boolean(fallbackError),
+    note: success ? (providerResult?.note || null) : null,
   };
 }
 

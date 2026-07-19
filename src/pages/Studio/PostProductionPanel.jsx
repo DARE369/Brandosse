@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Save, Calendar, Send, Sparkles } from "lucide-react";
+import { Save, Calendar, Send, Sparkles, RefreshCw } from "lucide-react";
 import { Card, Badge, Button, Dropdown } from "../../ui-v2";
 import styles from "./PostProductionPanel.module.css";
 
@@ -38,12 +38,17 @@ export default function PostProductionPanel({
   onOpenPublishConfirm,
   onClose,
   onGenerateAnother,
+  onRegenerateMetadata,
+  onRescore,
+  metadataRetryAfter = 0,
+  seoRetryAfter = 0,
 }) {
   const [tagValue, setTagValue] = useState("");
   const [accountOpen, setAccountOpen] = useState(false);
 
   const selectedAccountId = (postProduction.selectedPlatforms || [])[0] || null;
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || null;
+  const isSeoBusy = postProduction.seoStatus === "scoring" || postProduction.seoStatus === "optimizing";
 
   const addHashtag = () => {
     const t = tagValue.trim();
@@ -98,6 +103,29 @@ export default function PostProductionPanel({
         />
       </label>
 
+      {/* WEEK 2 FIX 3 (+ ADDENDUM UPGRADE 2): manual recovery control —
+          works whether the automatic publish-stage hydrate never ran, is
+          still running, or got stuck. metadataStatus is server-owned
+          (generate-post-metadata writes in_progress/completed/failed
+          itself) plus stale-'in_progress' rows get reconciled to 'failed'
+          on read, so this button is never permanently blocked. */}
+      <div className={styles.metadataActionRow}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRegenerateMetadata}
+          disabled={postProduction.metadataStatus === "in_progress" || metadataRetryAfter > 0}
+        >
+          <RefreshCw size={12} aria-hidden="true" />
+          {metadataRetryAfter > 0
+            ? `Retry in ${metadataRetryAfter}s`
+            : postProduction.metadataStatus === "in_progress" ? "Regenerating…" : "Regenerate caption & title"}
+        </Button>
+        {postProduction.metadataStatus === "failed" && metadataRetryAfter === 0 && (
+          <span className={styles.metadataFailedHint}>Last attempt failed — try again.</span>
+        )}
+      </div>
+
       <div className={styles.tagRow}>
         {(postProduction.hashtags || []).map((tag, i) => (
           <span key={`${tag}-${i}`} className={styles.tag}>
@@ -120,11 +148,37 @@ export default function PostProductionPanel({
       <div>
         <div className={styles.scoreRow}>
           <span className={styles.fieldLabel}>Discovery readiness</span>
-          <span className={styles.scoreValue} style={{ color: scoreColor(postProduction.seoScore || 0) }}>
-            {postProduction.seoStatus === "scoring" || postProduction.seoStatus === "optimizing" ? "…" : postProduction.seoScore ?? "—"}
-          </span>
+          {/* WEEK 2 FIX 3/4: "not scored yet" / "failed" must never look
+              like a real score of 0 — scoreColor(0) would otherwise render
+              a red "0" indistinguishable from a genuinely poor score. */}
+          {isSeoBusy ? (
+            <span className={styles.scoreValue}>…</span>
+          ) : postProduction.seoStatus === "failed" ? (
+            <span className={styles.scoreValue} style={{ color: "var(--uiv2-text-secondary)" }}>—</span>
+          ) : postProduction.seoStatus === "scored" ? (
+            <span className={styles.scoreValue} style={{ color: scoreColor(postProduction.seoScore || 0) }}>
+              {postProduction.seoScore ?? 0}
+            </span>
+          ) : (
+            <span className={styles.scoreValue} style={{ color: "var(--uiv2-text-secondary)" }}>—</span>
+          )}
         </div>
-        {postProduction.seoBreakdown && (
+        {postProduction.seoStatus === "failed" && (
+          <div className={styles.scoreFailedRow}>
+            <span className={styles.metadataFailedHint}>Scoring unavailable.</span>
+            <Button variant="ghost" size="sm" onClick={onRescore} disabled={isSeoBusy || seoRetryAfter > 0}>
+              <RefreshCw size={12} aria-hidden="true" /> {seoRetryAfter > 0 ? `Retry in ${seoRetryAfter}s` : "Retry"}
+            </Button>
+          </div>
+        )}
+        {!isSeoBusy && postProduction.seoStatus !== "failed" && (
+          <div className={styles.scoreFailedRow}>
+            <Button variant="ghost" size="sm" onClick={onRescore} disabled={isSeoBusy || seoRetryAfter > 0}>
+              <RefreshCw size={12} aria-hidden="true" /> {seoRetryAfter > 0 ? `Retry in ${seoRetryAfter}s` : "Re-score"}
+            </Button>
+          </div>
+        )}
+        {postProduction.seoStatus === "scored" && postProduction.seoBreakdown && (
           <div className={styles.scoreBars}>
             {SCORE_DIMS.map(([key, label]) => {
               const val = postProduction.seoBreakdown?.[key] ?? 0;

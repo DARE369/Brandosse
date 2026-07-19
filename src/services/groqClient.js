@@ -151,12 +151,6 @@ Fix ONLY the violations. Do not change unrelated fields.
 Return the corrected ContentPlan as valid JSON only. No preamble.
 `.trim();
 
-const ENHANCE_SYSTEM = `
-You are an expert prompt engineer for AI image generation.
-Enhance the user's prompt to produce cinematic, photorealistic, brand-consistent results.
-Return ONLY the enhanced prompt string. No explanation. No JSON. No preamble.
-`.trim();
-
 function hasGroq() {
   return Boolean(GROQ_TOKEN);
 }
@@ -324,40 +318,6 @@ export async function callGroqRevision(plan, violations, brandKit) {
     provider: data.provider || null,
     model: data.model || null,
   };
-}
-
-export async function enhancePromptWithBrand(rawPrompt, brandKit) {
-  const brandContext = brandKit?.configured
-    ? [
-        brandKit.raw?.visual_style_keywords?.length
-          ? `Brand visual style: ${brandKit.raw.visual_style_keywords.join(', ')}.` : '',
-        brandKit.raw?.photo_style_notes
-          ? `Photo style: ${brandKit.raw.photo_style_notes}.` : '',
-        brandKit.raw?.avoid_visual_elements?.length
-          ? `Avoid: ${brandKit.raw.avoid_visual_elements.join(', ')}.` : '',
-      ].filter(Boolean).join(' ')
-    : '';
-
-  const prompt = `
-Enhance this prompt for AI image generation.
-Original: "${rawPrompt}"
-${brandContext ? `\nBrand context:\n${brandContext}` : ''}
-
-Return only the enhanced prompt.
-`.trim();
-
-  const output = await callWithFailover({
-    messages: [
-      { role: 'system', content: ENHANCE_SYSTEM },
-      { role: 'user', content: prompt },
-    ],
-    temperature: 0.8,
-    maxTokens: 300,
-    jsonMode: false,
-    preferredProvider: 'groq',
-  });
-
-  return String(output).trim();
 }
 
 export async function callGroqJSON(

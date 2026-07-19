@@ -16,8 +16,8 @@ import {
   Calendar, FileImage, Filter, Grid3X3, List, RefreshCw, Search, Upload, X,
 } from "lucide-react";
 import {
-  UiV2ThemeProvider, useUiV2Theme, AppHeader, MobileNavDrawer, CreditPill, Avatar,
-  IconButton, Button, EmptyState, Skeleton,
+  UiV2ThemeProvider, useUiV2Theme, AppHeader, MobileNavDrawer, CreditPill,
+  IconButton, Button, EmptyState, Skeleton, NotificationBell, AvatarMenu, Modal,
 } from "../../ui-v2";
 import { useAuth } from "../../Context/AuthContext";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
@@ -132,6 +132,7 @@ function LibraryBody() {
     uploadAsset,
     updateAssetMetadata,
     archiveAsset,
+    unarchiveAsset,
     duplicateAsset,
     softDeleteAsset,
     fetchAssetById,
@@ -160,6 +161,7 @@ function LibraryBody() {
   const [drawerUsedIn, setDrawerUsedIn] = useState([]);
   const [versionChain, setVersionChain] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   // Trash is a full content-area page state per the approved mockup
@@ -294,12 +296,14 @@ function LibraryBody() {
   };
 
   const handleArchive = async (asset) => {
+    const wasArchived = asset.status === "archived";
     try {
-      await archiveAsset(asset.id);
-      toast.success("Archived");
+      if (wasArchived) await unarchiveAsset(asset.id);
+      else await archiveAsset(asset.id);
+      toast.success(wasArchived ? "Unarchived" : "Archived");
     } catch (err) {
-      console.error("Archive failed:", err);
-      toast.error("Failed to archive");
+      console.error("Archive toggle failed:", err);
+      toast.error(wasArchived ? "Failed to unarchive" : "Failed to archive");
     }
   };
 
@@ -404,7 +408,10 @@ function LibraryBody() {
   };
 
   const handleBulkArchive = () => runBulkAction((asset) => archiveAsset(asset.id), "Assets archived");
-  const handleBulkDelete = () => runBulkAction((asset) => softDeleteAsset(asset.id), "Assets moved to Trash");
+  const confirmBulkDelete = async () => {
+    setBulkDeleteConfirmOpen(false);
+    await runBulkAction((asset) => softDeleteAsset(asset.id), "Assets moved to Trash");
+  };
 
   const activeStatusLabel = statusRail
     ? STATUS_RAIL_ITEMS.find((i) => i.value === statusRail)?.label
@@ -469,7 +476,8 @@ function LibraryBody() {
               <Skeleton width="76px" height="26px" radius="999px" />
             )}
             <ThemeToggleButton />
-            <Avatar initials={userInitials || "U"} onClick={() => navigate("/app/profile")} />
+            <NotificationBell userId={user?.id} onNavigate={navigate} />
+            <AvatarMenu initials={userInitials || "U"} name={profile?.full_name} email={user?.email} onNavigate={navigate} />
           </>
         )}
       />
@@ -622,7 +630,7 @@ function LibraryBody() {
                         count={selectedAssets.length}
                         busy={bulkBusy}
                         onArchive={handleBulkArchive}
-                        onDelete={handleBulkDelete}
+                        onDelete={() => setBulkDeleteConfirmOpen(true)}
                         onClear={clearSelection}
                       />
                     </>
@@ -718,6 +726,7 @@ function LibraryBody() {
         onSchedule={handleSchedule}
         onDelete={(asset) => setDeleteTarget(asset)}
         onDuplicate={handleDuplicate}
+        onArchive={handleArchive}
         usedInPosts={drawerUsedIn}
         versionChain={versionChain}
         onOpenVersion={handleOpenVersion}
@@ -730,6 +739,22 @@ function LibraryBody() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
         busy={deleteBusy}
+      />
+
+      <Modal
+        open={bulkDeleteConfirmOpen}
+        onClose={() => setBulkDeleteConfirmOpen(false)}
+        size="sm"
+        title={`Delete ${selectedAssets.length} assets?`}
+        description="They move to Trash and can be restored for 30 days."
+        actions={(
+          <>
+            <Button variant="subtle" onClick={() => setBulkDeleteConfirmOpen(false)} disabled={bulkBusy}>Cancel</Button>
+            <Button variant="dangerSolid" onClick={confirmBulkDelete} disabled={bulkBusy}>
+              {bulkBusy ? "Moving…" : "Move to Trash"}
+            </Button>
+          </>
+        )}
       />
     </>
   );

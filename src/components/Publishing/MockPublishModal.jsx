@@ -150,6 +150,11 @@ export default function MockPublishModal() {
           <PostPreviewCard attempt={activeAttempt} />
 
           <section className="mock-publish-modal-details">
+            {activeAttempt.success && activeAttempt.note ? (
+              <div className="mock-publish-error-card" style={{ background: 'var(--uiv2-warning-wash, inherit)' }}>
+                <p style={{ margin: 0 }}>{activeAttempt.note}</p>
+              </div>
+            ) : null}
             {!activeAttempt.success ? (
               <div className="mock-publish-error-card">
                 <code>

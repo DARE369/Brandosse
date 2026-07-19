@@ -2,7 +2,7 @@
 
 // src/pages/GeneratePage/GeneratePageV2.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import useSessionStore from '../../stores/SessionStore';
 import { supabase } from '../../services/supabaseClient';
 import StudioPage from '../Studio/StudioPage';
@@ -64,9 +64,10 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
   const sessionId = sessionIdProp ?? getSessionIdFromPathname(location.pathname);
 
   const {
+    activeSession,
     activeGenerations,
     selectedGeneration,
-    subscribeToGenerations,
+    subscribeToSession,
     resetPostProduction,
     updatePostProduction,
     videoJobState,
@@ -79,6 +80,7 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
     selectGeneration,
     setSelectedGenerationId,
     setGenerationLineage,
+    setPromptSeed,
   } = useSessionStore();
 
   const brandKit = useBrandKitStore((s) => s.brandKit);
@@ -211,10 +213,18 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
     }
   }, [brandKit]);
 
+  // Session-scoped realtime subscription (Week 2 Fix 1) — keyed on
+  // activeSession?.id so React's own cleanup-before-rerun guarantees the
+  // previous session's channel is torn down before the new one is created,
+  // covering every action that changes activeSession (loadSession,
+  // createNewSession, clearActiveSession) without needing any of those
+  // actions to know about realtime. No session yet → subscribeToSession(null)
+  // is a deliberate no-op (see its own comment) — subscribes lazily the
+  // moment a session exists.
   useEffect(() => {
-    const unsubscribe = subscribeToGenerations();
+    const unsubscribe = subscribeToSession(activeSession?.id ?? null);
     return unsubscribe;
-  }, [subscribeToGenerations]);
+  }, [activeSession?.id, subscribeToSession]);
 
   useEffect(() => {
     if (selectedGeneration) {
@@ -332,6 +342,7 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
           if (mediaError) throw mediaError;
           if (!mediaAsset || mediaAsset.user_id !== user?.id) {
             if (!cancelled) {
+              toast.error("Couldn't load the item you selected — it may have been moved or deleted.");
               routeStateHandledRef.current = routeStateKey;
               clearRouteState();
             }
@@ -344,9 +355,17 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
           ).trim();
 
           if (seededPrompt) {
-            window.dispatchEvent(new CustomEvent('socialai:seed-prompt', {
-              detail: { prompt: seededPrompt },
-            }));
+            setPromptSeed({
+              text: seededPrompt,
+              source: 'library_media',
+              assetReference: {
+                id: mediaAsset.id,
+                name: mediaAsset.file_name || 'Library asset',
+                fileType: mediaAsset.file_type || 'image',
+                fileUrl: mediaAsset.public_url || null,
+                thumbnailUrl: mediaAsset.thumbnail_url || mediaAsset.public_url || null,
+              },
+            });
           }
 
           updatePostProduction({
@@ -392,11 +411,13 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
 
           if (templateError) throw templateError;
 
+          if (!template && !cancelled) {
+            toast.error("Couldn't load that template — it may have been moved or deleted.");
+          }
+
           const seededPrompt = String(template?.caption_format || '').trim();
           if (seededPrompt && !cancelled) {
-            window.dispatchEvent(new CustomEvent('socialai:seed-prompt', {
-              detail: { prompt: seededPrompt },
-            }));
+            setPromptSeed({ text: seededPrompt, source: 'template' });
           }
 
           if (!cancelled) {
@@ -428,6 +449,7 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
         if (postError) throw postError;
         if (!post?.generation_id) {
           if (!cancelled) {
+            toast.error("Couldn't load the post you selected — it may have been moved or deleted.");
             routeStateHandledRef.current = routeStateKey;
             clearRouteState();
           }
@@ -482,15 +504,12 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
 
           routeStateHandledRef.current = routeStateKey;
           if (activateEditMode) {
-            window.setTimeout(() => {
-              window.dispatchEvent(new CustomEvent('socialai:activate-generation-edit', {
-                detail: {
-                  generationId: post.generation_id,
-                  sourceImageUrl: generationFromState?.storage_path || fallbackGeneration?.storage_path || null,
-                  prompt: captionWithNoTags || post.generations?.prompt || '',
-                },
-              }));
-            }, 0);
+            setPromptSeed({
+              text: captionWithNoTags || post.generations?.prompt || '',
+              source: 'repurpose_edit',
+              activateEditMode: true,
+              sourceImageUrl: generationFromState?.storage_path || fallbackGeneration?.storage_path || null,
+            });
           }
           if (post.generation_id) {
             navigate(`${location.pathname}${location.search}#${post.generation_id}`, {
@@ -503,6 +522,9 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
         }
       } catch (error) {
         console.error('Failed to apply generate route state:', error);
+        if (!cancelled) {
+          toast.error("Couldn't load the item you selected — it may have been moved or deleted.");
+        }
       }
     };
 
@@ -520,6 +542,7 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
     loadSession,
     clearRouteState,
     setGenerationLineage,
+    setPromptSeed,
     location.pathname,
     location.search,
     location.hash,

@@ -18,8 +18,8 @@ function safeObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
-export function toEdgeFunctionError(error, functionName) {
-  throw normalizeEdgeFunctionError(error, functionName);
+export async function toEdgeFunctionError(error, functionName) {
+  throw await normalizeEdgeFunctionError(error, functionName);
 }
 
 function formatDateTime(value) {
@@ -109,7 +109,7 @@ export async function fetchOrgScheduleContext({
     if (isEdgeFunctionUnavailable(error)) {
       markEdgeFunctionUnavailable(SCHEDULE_CONTEXT_FUNCTION);
     }
-    toEdgeFunctionError(error, SCHEDULE_CONTEXT_FUNCTION);
+    await toEdgeFunctionError(error, SCHEDULE_CONTEXT_FUNCTION);
   }
 
   clearEdgeFunctionUnavailable(SCHEDULE_CONTEXT_FUNCTION);

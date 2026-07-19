@@ -1,41 +1,32 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Modal, Button } from '../../ui-v2';
+import styles from './BrandKit.module.css';
 
 export default function BrandKitSaveWarning({ missingFields = [], onComplete, onDismiss }) {
   return (
-    <div
-      className="bk-modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="bk-warning-title"
+    <Modal
+      open
+      onClose={onDismiss}
+      size="sm"
+      title="Some important fields are empty"
+      description="Without these fields, AI outputs may feel generic and less consistent with your brand."
+      actions={
+        <>
+          <Button variant="ghost" onClick={onComplete}>Save anyway →</Button>
+          <Button onClick={onDismiss}>Complete these fields</Button>
+        </>
+      }
     >
-      <div className="bk-modal bk-warning-modal">
-        <div className="bk-warning-icon" aria-hidden="true"><AlertTriangle size={20} /></div>
-        <h2 id="bk-warning-title" className="bk-modal-title">
-          Some important fields are empty
-        </h2>
-        <p className="bk-modal-body">
-          Without these fields, AI outputs may feel generic and less consistent with your brand.
-        </p>
-
-        <ul className="bk-warning-field-list">
-          {missingFields.map((field) => (
-            <li key={field.key} className="bk-warning-field-item">
-              <span className="bk-warning-field-dot" aria-hidden="true" />
-              {field.label}
-            </li>
-          ))}
-        </ul>
-
-        <div className="bk-modal-actions">
-          <button className="bk-btn-primary" onClick={onDismiss} type="button">
-            Complete these fields
-          </button>
-          <button className="bk-btn-ghost" onClick={onComplete} type="button">
-            Save anyway -&gt;
-          </button>
-        </div>
-      </div>
-    </div>
+      <span className={styles.warningIcon} aria-hidden="true"><AlertTriangle size={18} /></span>
+      <ul className={styles.warningFieldList}>
+        {missingFields.map((field) => (
+          <li key={field.key} className={styles.warningFieldItem}>
+            <span className={styles.warningFieldDot} aria-hidden="true" />
+            {field.label}
+          </li>
+        ))}
+      </ul>
+    </Modal>
   );
 }

@@ -82,7 +82,7 @@ export default function OrgGenerateComposer({
     activeSession,
     activeGenerations,
     selectedGeneration,
-    subscribeToGenerations,
+    subscribeToSession,
     resetPostProduction,
     updatePostProduction,
     videoJobState,
@@ -379,9 +379,16 @@ export default function OrgGenerateComposer({
 
   useEffect(() => {
     if (!open) return undefined;
-    const unsubscribe = subscribeToGenerations();
+    // Week 2 Fix 1 (session-scoped realtime): swapped from the removed
+    // subscribeToGenerations (whole-table, unfiltered postgres_changes) to
+    // the same session-scoped, RLS-authorized broadcast channel the
+    // personal Generate page now uses — this composer shares the same
+    // SessionStore action, so it gets the identical fix for the identical
+    // exposure. Not otherwise in scope for this pass; only this call site
+    // was touched.
+    const unsubscribe = subscribeToSession(activeSession?.id ?? null);
     return unsubscribe;
-  }, [open, subscribeToGenerations]);
+  }, [open, activeSession?.id, subscribeToSession]);
 
   useEffect(() => {
     if (!open) return;

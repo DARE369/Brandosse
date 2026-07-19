@@ -1,0 +1,21 @@
+{
+  "name": "generate-page-qa-kit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Live verification scripts for the Generate page fixes (Weeks 1-3). See RUNBOOK.md.",
+  "main": "index.js",
+  "scripts": {
+    "verify:realtime-payload": "node verify-realtime-payload.js",
+    "verify:realtime-authz": "node verify-realtime-authz.js",
+    "verify:trigger-ownership": "node verify-trigger-ownership.js",
+    "verify:rate-limit": "node verify-rate-limit.js",
+    "verify:credits": "node verify-credits.js",
+    "verify:video-jobs": "node verify-video-jobs.js",
+    "verify:scheduled-publish": "node verify-scheduled-publish.js",
+    "verify:metadata-reconcile": "node verify-metadata-reconcile.js",
+    "verify:all": "node verify-realtime-payload.js && node verify-realtime-authz.js && node verify-trigger-ownership.js && node verify-rate-limit.js && node verify-credits.js && node verify-scheduled-publish.js && node verify-metadata-reconcile.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.89.0"
+  }
+}

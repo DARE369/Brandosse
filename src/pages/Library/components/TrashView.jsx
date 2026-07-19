@@ -16,6 +16,15 @@ import { Button } from "../../../ui-v2";
 import { getItemTitle, formatDate } from "../libraryItemUtils";
 import styles from "../LibraryPage.module.css";
 
+const TRASH_RETENTION_DAYS = 30;
+
+function daysLeft(deletedAt) {
+  const deleted = new Date(deletedAt).getTime();
+  if (Number.isNaN(deleted)) return null;
+  const elapsedDays = Math.floor((Date.now() - deleted) / 86_400_000);
+  return Math.max(0, TRASH_RETENTION_DAYS - elapsedDays);
+}
+
 export default function TrashView({ trashedAssets, loading, onRestore }) {
   const [restoringId, setRestoringId] = useState(null);
 
@@ -49,7 +58,10 @@ export default function TrashView({ trashedAssets, loading, onRestore }) {
               <span className={styles.versionThumb} />
               <div className={styles.versionBody}>
                 <span className={styles.versionLabel}>{getItemTitle(asset)}</span>
-                <span className={styles.versionMeta}>Deleted {formatDate(asset.deleted_at || asset.updated_at)}</span>
+                <span className={styles.versionMeta}>
+                  Deleted {formatDate(asset.deleted_at || asset.updated_at)}
+                  {asset.deleted_at ? ` · ${daysLeft(asset.deleted_at)} days left` : ""}
+                </span>
               </div>
               <Button variant="subtle" size="sm" onClick={() => handleRestore(asset)} disabled={restoringId === asset.id}>
                 {restoringId === asset.id ? "Restoring…" : "Restore"}

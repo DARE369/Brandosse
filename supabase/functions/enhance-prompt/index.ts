@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callLlm } from "../_shared/llm.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { createHttpError } from "../_shared/org.ts";
+import { enforceRateLimit } from "../_shared/rateLimit.ts";
+import { createAuthClient, requireUser } from "../_shared/supabase.ts";
 
 type EnhancePromptRequest = {
   prompt: string;
@@ -136,6 +138,10 @@ serve(async (req) => {
   }
 
   try {
+    const authClient = createAuthClient(req.headers.get("Authorization"));
+    const user = await requireUser(authClient);
+    await enforceRateLimit(authClient, user.id, "enhance-prompt");
+
     const body = await parseJsonBody<EnhancePromptRequest>(req);
     const prompt = String(body.prompt || "").trim();
     const variantCount = clampVariantCount(body.variantCount);

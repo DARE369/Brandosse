@@ -251,6 +251,12 @@
 .filmCheckOn { background: var(--uiv2-accent-solid); border-color: var(--uiv2-accent-solid); }
 .filmCaption { text-align: center; font-family: var(--uiv2-font-mono); font-size: 10.5px; color: var(--uiv2-text-secondary); margin-top: 5px; }
 
+.regeneratingOverlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.45); border-radius: inherit; z-index: 1;
+}
+.regeneratingDot { width: 8px; height: 8px; border-radius: 50%; background: var(--uiv2-accent-solid); animation: uiv2-pulse-ring 1.1s ease-in-out infinite; }
+
 .loadingHead { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .loadingDot { width: 8px; height: 8px; border-radius: 50%; background: var(--uiv2-accent-solid); animation: uiv2-pulse-ring 1.3s ease-in-out infinite; }
 .loadingSub { margin-left: auto; font-family: var(--uiv2-font-mono); font-size: 12px; color: var(--uiv2-text-secondary); }
@@ -275,6 +281,18 @@
 .videoJobHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .videoJobBar { height: 4px; border-radius: 3px; background: var(--uiv2-border); overflow: hidden; margin-bottom: 8px; }
 .videoJobBarFill { height: 100%; background: var(--uiv2-warning); }
+/* The provider reports status only (queued/running), never a numeric
+   percentage — this is a deliberately indeterminate sweep, not a fake
+   progress value. */
+.videoJobBarTrack { height: 4px; border-radius: 3px; background: var(--uiv2-border); overflow: hidden; margin-bottom: 8px; position: relative; }
+.videoJobBarIndeterminate {
+  position: absolute; top: 0; bottom: 0; left: -40%; width: 40%;
+  background: var(--uiv2-warning); animation: uiv2-video-job-sweep 1.3s ease-in-out infinite;
+}
+@keyframes uiv2-video-job-sweep {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
 .statusDot { width: 6px; height: 6px; border-radius: 50%; }
 .videoIndicator {
   display: flex; align-items: center; gap: 7px; border: 1px solid var(--uiv2-warning-border);

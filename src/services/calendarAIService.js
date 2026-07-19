@@ -96,6 +96,8 @@ export async function getSlotSuggestions(params) {
 //   fixedCaption: string,
 //   fixedHashtags: string[],
 //   explanation: string,
+//   variants: { label: string, caption: string }[],
+//   hashtagSuggestions: { tag: string, reach: 'High'|'Medium'|'Niche' }[],
 // }
 export async function auditPostCaption(post, brandKit = null) {
   const data = await invokeCalendarAI({
@@ -116,6 +118,8 @@ export async function auditPostCaption(post, brandKit = null) {
     fixedCaption: data?.fixedCaption || post.caption || '',
     fixedHashtags: Array.isArray(data?.fixedHashtags) ? data.fixedHashtags : (post.hashtags || []),
     explanation: data?.explanation || '',
+    variants: Array.isArray(data?.variants) ? data.variants : [],
+    hashtagSuggestions: Array.isArray(data?.hashtagSuggestions) ? data.hashtagSuggestions : [],
   };
 }
 
@@ -257,7 +261,13 @@ export function checkPublishReadiness(post) {
     severity: 'error',
   });
 
-  const hasMedia = Boolean(post?.media_url || post?.thumbnail_url);
+  // Media lives on the joined `generations` row (storage_path), not on
+  // `posts` itself — posts has no media_url/thumbnail_url column. Supabase
+  // can return a to-one join as either an object or a single-element array
+  // depending on how the relationship was inferred, so handle both (same
+  // defensive unwrap publish-post's edge function uses).
+  const generationRow = Array.isArray(post?.generations) ? post.generations[0] : post?.generations;
+  const hasMedia = Boolean(post?.media_url || post?.thumbnail_url || generationRow?.storage_path || generationRow?.output_url);
   checks.push({
     id: 'media',
     label: 'Media attached',

@@ -15,7 +15,6 @@ import {
   useUiV2Theme,
   AppHeader,
   CreditPill,
-  Avatar,
   IconButton,
   Card,
   StatCard,
@@ -24,6 +23,8 @@ import {
   Button,
   Badge,
   MobileNavDrawer,
+  NotificationBell,
+  AvatarMenu,
 } from "../../ui-v2";
 import styles from "./PersonalDashboardPage.module.css";
 
@@ -62,10 +63,41 @@ function DashboardBody() {
 
   const {
     loading, error, handleRetry, userName, greeting, todayLabel,
-    isFirstTime, hasConnectedAccount, hasGeneration,
+    isFirstTime, hasConnectedAccount, hasGeneration, hasBrandKit,
     searchQuery, setSearchQuery, stats, trends, recentGenerations, hasSearch,
-    nextPost, nextCountdown, connectedAccounts, credits, creditSegments,
+    nextPost, nextCountdown, nextPostIsMock, connectedAccounts, allAccountsMock, credits, creditSegments,
   } = data;
+
+  // Persistent "finish setting up" checklist for RETURNING users (distinct
+  // from the isFirstTime 3-card grid below, which only ever shows to a
+  // brand-new user with zero generations/accounts). "Hide" is session-scoped
+  // per the mockup's own tooltip ("Hide until next visit") — it comes back
+  // next time rather than being dismissed forever.
+  const [checklistHidden, setChecklistHidden] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      setChecklistHidden(sessionStorage.getItem(`dash-checklist-hidden-${user.id}`) === "1");
+    } catch {
+      /* private mode — just show it every time */
+    }
+  }, [user?.id]);
+  const dismissChecklist = () => {
+    setChecklistHidden(true);
+    try {
+      if (user?.id) sessionStorage.setItem(`dash-checklist-hidden-${user.id}`, "1");
+    } catch {
+      /* noop */
+    }
+  };
+
+  const checklistItems = [
+    { id: "connect", label: "Connect a social account", done: hasConnectedAccount, path: "/app/settings" },
+    { id: "brand-kit", label: "Build your Brand Kit", done: hasBrandKit, path: "/app/settings/brand-kit" },
+    { id: "first-post", label: "Schedule your first post", done: stats.scheduledPosts > 0 || stats.publishedPosts > 0, path: "/app/generate" },
+  ];
+  const checklistDone = checklistItems.filter((c) => c.done).length;
+  const showChecklist = !isFirstTime && !loading && !checklistHidden && checklistDone < checklistItems.length;
 
   // "/" focuses search, "g" opens Studio — matches the v2 spec's kbd hints.
   useEffect(() => {
@@ -154,7 +186,8 @@ function DashboardBody() {
             <IconButton title="Settings" onClick={() => navigate("/app/settings")}>
               <Settings size={15} />
             </IconButton>
-            <Avatar initials={userInitials || "U"} onClick={() => navigate("/app/profile")} />
+            <NotificationBell userId={user?.id} onNavigate={navigate} />
+            <AvatarMenu initials={userInitials || "U"} name={profile?.full_name} email={user?.email} onNavigate={navigate} />
           </>
         }
       />
@@ -180,6 +213,61 @@ function DashboardBody() {
               <kbd className={styles.kbdChip}>G</kbd>
             </Button>
           </div>
+
+          {showChecklist && (
+            <Card>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontFamily: "var(--uiv2-font-display)", fontWeight: 600, fontSize: "var(--uiv2-text-md)" }}>
+                    Finish setting up
+                  </span>
+                  <span style={{ fontFamily: "var(--uiv2-font-mono)", fontSize: "var(--uiv2-text-xs)", color: "var(--uiv2-text-secondary)" }}>
+                    {checklistDone} of {checklistItems.length} done
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  title="Hide until next visit"
+                  onClick={dismissChecklist}
+                  style={{ background: "none", border: "none", color: "var(--uiv2-text-tertiary)", cursor: "pointer", fontSize: "var(--uiv2-text-xs)", textDecoration: "underline", fontFamily: "inherit" }}
+                >
+                  Hide
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {checklistItems.map((item) => (
+                  <a
+                    key={item.id}
+                    href={item.path}
+                    onClick={(e) => { e.preventDefault(); navigate(item.path); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "9px 11px",
+                      borderRadius: 7, border: "1px solid var(--uiv2-border)", textDecoration: "none",
+                      color: "var(--uiv2-text-primary)", background: "var(--uiv2-bg-inset)",
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                        border: `1.5px solid ${item.done ? "var(--uiv2-success, #2a9d5c)" : "var(--uiv2-border-strong)"}`,
+                        background: item.done ? "var(--uiv2-success, #2a9d5c)" : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}
+                    >
+                      {item.done && (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      )}
+                    </span>
+                    <span style={{ flex: 1, fontSize: "var(--uiv2-text-sm)", fontWeight: 500, textDecoration: item.done ? "line-through" : "none", color: item.done ? "var(--uiv2-text-secondary)" : "var(--uiv2-text-primary)" }}>
+                      {item.label}
+                    </span>
+                    {!item.done && <span style={{ fontSize: "var(--uiv2-text-xs)", fontWeight: 600, color: "var(--uiv2-accent-solid)" }}>Do it now</span>}
+                  </a>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {isFirstTime && !loading && (
             <Card>
@@ -225,7 +313,13 @@ function DashboardBody() {
               <Card>
                 <div className={styles.panelHead}>
                   <span className={styles.panelKicker}>Next scheduled post</span>
-                  <Badge tone="warning" dot>Simulated publish</Badge>
+                  {nextPost ? (
+                    nextPostIsMock ? (
+                      <Badge tone="warning" dot>Simulated publish</Badge>
+                    ) : (
+                      <Badge tone="success" dot>Live publish</Badge>
+                    )
+                  ) : null}
                 </div>
                 {loading ? (
                   <Skeleton height="120px" />
@@ -364,7 +458,7 @@ function DashboardBody() {
                     </div>
                   </>
                 )}
-                <Button variant="subtle" size="sm" onClick={() => navigate("/app/billing/credits")} style={{ width: "100%", marginTop: 6 }}>
+                <Button variant="subtle" size="sm" onClick={() => navigate("/app/billing")} style={{ width: "100%", marginTop: 6 }}>
                   View billing
                 </Button>
               </Card>
@@ -372,7 +466,7 @@ function DashboardBody() {
               <Card>
                 <div className={styles.panelHead}>
                   <span className={styles.panelKicker}>Connected accounts</span>
-                  <Badge tone="warning">Simulated</Badge>
+                  {allAccountsMock ? <Badge tone="warning">Simulated</Badge> : null}
                 </div>
                 {loading ? (
                   <Skeleton height="120px" />
@@ -384,7 +478,12 @@ function DashboardBody() {
                       <div key={a.id} className={styles.accountRow}>
                         <span className={styles.accountMark}>{a.mark}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className={styles.accountName}>{a.name}</div>
+                          <div className={styles.accountName}>
+                            {a.name}
+                            {a.isMock && !allAccountsMock ? (
+                              <span style={{ marginLeft: 6 }}><Badge tone="neutral">Demo</Badge></span>
+                            ) : null}
+                          </div>
                           <div className={styles.accountHandle}>{a.handle}</div>
                         </div>
                         <span className={styles.accountStatus}>

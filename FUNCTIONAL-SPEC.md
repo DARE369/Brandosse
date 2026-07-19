@@ -28,6 +28,8 @@ This is a content-operations platform for people and teams who produce social me
 
 **Where the product is deliberately not "real" yet — and why the design must say so clearly:** social platform connections and all publishing (scheduled or immediate) currently run through a simulated/mock publish mechanism rather than talking to real social networks. This is an intentional, permanent-for-now product decision, not a bug — but the interface must keep this honest and visible everywhere it's relevant (connecting an account, publishing, viewing publish history) rather than letting a redesign accidentally make mock behavior look indistinguishable from a live integration.
 
+**Scope of this document:** this version intentionally does not document the personal Dashboard, the Generate content-creation workspace, the personal Calendar, or the personal Library — those four screens are being handled separately and are out of scope here. Everything else is documented in full: account creation and sign-in, personal identity/brand/settings/analytics/support, the entire organization workspace (including its own calendar, asset library, and task management, which are in scope and unaffected by the exclusion above), organization administration, and the platform admin console. Where an in-scope screen connects to or is fed by one of the four excluded screens (for example, Settings linking to an account-health entry point, or a completed brand kit being consumed by content generation), that connection is named so the design team knows it exists, but its internal workings are not elaborated on here.
+
 ---
 
 ## 2. Roles & Permissions
@@ -38,8 +40,8 @@ There are three separate access "worlds" in this product, plus one link-only ext
 
 | Role | World | Core job | Primary screens |
 |---|---|---|---|
-| **Solo Creator** | Personal workspace | Generate, organize, and schedule content alone | Dashboard, Generate, Calendar, Library, Analytics, Settings, Brand Kit, Help |
-| **Small Business Owner** | Personal workspace, then Organization (as owner) | Keep brand content consistent while running a business, usually starting solo and growing into a team | Same as Solo Creator, plus Organization admin screens |
+| **Solo Creator** | Personal workspace | Generate, organize, and schedule content alone | Analytics, Settings, Brand Kit, Help (plus Dashboard, Generate, Calendar, and Library, which exist but are out of scope for this document) |
+| **Small Business Owner** | Personal workspace, then Organization (as owner) | Keep brand content consistent while running a business, usually starting solo and growing into a team | Same personal screens as Solo Creator, plus Organization admin screens |
 | **Org Contributor** | Organization (member) | Draft content and complete assigned tasks, then submit for review | My Workspace, My Office, Pipeline Board, Org Calendar, Asset Library, Common Room |
 | **Org Reviewer** | Organization (member) | Judge submitted content: approve, reject, or request changes | Same as Contributor, with review actions enabled; cannot generate (0 credit allowance by default) |
 | **Org Editor** | Organization (member) | Reviews content and can also publish/schedule it (with one extra required approval step) | Same as Contributor/Reviewer, plus scheduling/publishing/library-management/task-management |
@@ -91,9 +93,9 @@ Not a normal account. Reaches the product only via a private link containing a t
 
 ---
 
-## 3. Screen Inventory — Personal Workspace
+## 3. Screen Inventory — Personal Workspace (Account, Identity & Support)
 
-The personal workspace is where an individual manages their own account, brand identity, content generation, scheduling, asset library, and support. It is the default landing world for anyone without an organization role driving them elsewhere.
+The personal workspace is where an individual manages their own account, brand identity, and support. It is the default landing world for anyone without an organization role driving them elsewhere. *As noted in Section 1, the Dashboard, Generate (content-creation) workspace, Calendar, and Library screens that also live in this workspace are not documented in this version.*
 
 ### 3.1 Login
 
@@ -175,87 +177,7 @@ The personal workspace is where an individual manages their own account, brand i
 **Entry points:** automatically, post-sign-in, only for people with more than one workspace.
 **Exit points:** the personal dashboard, or the chosen organization's home screen (destination depends on role).
 
-### 3.7 Dashboard
-
-**Job:** the personal home screen — a snapshot of activity plus fast paths into the rest of the app.
-
-**Shown, ranked by importance:**
-1. A first-run onboarding checklist (create account / connect a social account / generate a first post) for brand-new users — replaces the rest of the dashboard's assumptions of familiarity.
-2. Core activity numbers: posts published (with trend), scheduled count, ready video clips, drafts — live, updating in real time as content changes anywhere in the account.
-3. "Next scheduled post" countdown, or a clear "nothing scheduled" state.
-4. A searchable list of the most recent generations, with thumbnails, linking straight back into the exact generation.
-5. A simple content-flow chart (drafted → scheduled → published, computed from the same live data).
-6. Connected-account health summary.
-7. Current AI-credit balance — shown as a raw number with **no breakdown of how it was spent** (a real gap; see UX Problems).
-
-**Actions:** search past generations by keyword (secondary, jumps straight to the match); start a new generation (primary); click through any card/list item to its detail (secondary, all read-only navigation — nothing destructive lives on this screen).
-
-**States:** loading (per-section skeletons); a section-level error with its own retry, rather than one page-wide failure; empty-first-use (onboarding checklist plus friendly "nothing yet" messages per section, each with its own call to action); empty-filtered-to-nothing (searching recent generations with no match).
-
-**Entry points:** default landing page after sign-in for personal-context users; the main navigation menu link from anywhere.
-**Exit points:** Generate (new, or resuming a specific session); Settings; Analytics.
-
-**Constraints:** the numbers on this page are computed from several independent live data feeds — a redesign should be aware that keeping every number perfectly consistent with what other screens show requires a single shared definition of each metric, which does not fully exist today.
-
-### 3.8 Generate — the Content Studio
-
-**Job:** the core creative workspace: describe what to make, produce image/video/carousel/edit variants, then turn a result into a real post (caption, hashtags, targeting, schedule or publish).
-
-**Shown, ranked by importance:**
-1. The generation canvas itself — in-progress placeholders, then result thumbnails, with progress and format details.
-2. The prompt (user-entered, up to 2,000 characters), with an optional guided/structured mode (subject, setting, style, mood) and an AI-assisted "enhance my prompt" helper.
-3. Mode choice (single image, carousel, text-to-video, image edit, animate-an-image), each with its own model options, cost, and format settings (aspect ratio, resolution, batch size or slide count, video duration/frame rate).
-4. A live credit-cost estimate that gates the generate action — a person cannot start a generation they can't afford; the button explains exactly how many credits are needed versus how many are available.
-5. Session history — prior sessions and generations, for resuming or reusing earlier work.
-6. Once a result exists: a post-production step for title, caption, hashtags, a computed discovery/readiness score across several dimensions (readability, hook strength, hashtag quality, brand consistency, and others), and platform/account targeting.
-7. A one-time nudge toward completing the brand identity setup, shown only to people who haven't finished it yet.
-
-**Actions:** generate (primary, gated by credit balance, not reversible in the sense that it spends credits, but re-generating is always available); enhance the prompt (secondary, reversible); edit an existing image with a new instruction (primary, within edit mode); retry a stuck or failed video job (secondary); save as draft, schedule, or publish immediately (primary — publishing is not cleanly undoable the way saving a draft is); resume or repurpose a past post from elsewhere in the app (secondary, prefills the studio).
-
-**States:** actively generating (placeholder cards sized to the chosen format, a progress indicator, and descriptive labels); video specifically runs a longer queued → processing → done/failed lifecycle that survives navigating away, with its own persistent status indicator; there is no visible "blank" first-visit state — a new working session is always created automatically; error (a brief on-screen notice for most failures; a dedicated failure state for video with a clear retry prompt); insufficient credits (the generate action is disabled in advance with an explanation, not failed after the fact).
-
-**Entry points:** the dashboard (recent generation, quick-start); the content library (repurpose/edit hand-off, and — separately — a working hand-off that seeds a prompt from a chosen media item); the calendar (prefill a date, repurpose an existing post); direct link to a specific past session.
-**Exit points:** the calendar (once scheduled); the library (once saved or published); the dashboard.
-
-**Constraints:** prompt cap 2,000 characters; image batches of 1–4; carousels of at least 2 slides (default 6); video runs 6–10 seconds depending on model, and the product's own copy tells people to expect **2–4 minutes** of real processing time; eight social platforms are registered as generation/targeting options, not all of which necessarily have a live account connection behind them yet; the search index over past generations only covers the most recent 120.
-
-### 3.9 Calendar
-
-**Job:** the scheduling board — see what's scheduled, published, or failed; manage everything not yet scheduled; move things around in time.
-
-**Shown, ranked by importance:**
-1. A month grid or list of posts by day (live), plus a separate rail of unscheduled drafts.
-2. A weekly summary strip: scheduled/published/failed counts, busiest day, top platforms, an overall health read (Healthy / Review / Issues / Empty), and one plain-language tip — all computed locally from the currently loaded posts, deliberately not styled as an AI feature.
-3. Per-post detail on demand: caption, hashtags, target account, schedule time, and a lock indicator once a post has begun publishing.
-
-**Actions:** compose and schedule/draft something in one step (primary); drag a post to a different day, or use a tap-based "move" mode as a non-drag alternative (primary, reversible); create a blank draft for a specific day (secondary); a natural-language command bar for things like "plan my week," "suggest the best times to post," "check this caption," or "reschedule anything that failed" — each surfaces an explicit confirmation step before anything changes, rather than acting silently (secondary); from a post's detail: edit, reschedule, unschedule back to a draft, duplicate, or delete (delete requires confirmation and is not reversible; the rest are).
-
-**States:** loading; error with a retry; empty (an inviting prompt to drag a draft onto the grid, and a matching message on the empty drafts rail); a scheduling conflict when a chosen time/account is already taken — the person must explicitly choose to schedule anyway, nothing is silently overwritten; a "this changed elsewhere" state if the same post was edited from another tab/device in the meantime — the view refreshes to the latest version and explains that the attempted change was not applied; a locked state for posts already mid-publish or published (cannot be rescheduled/deleted through the normal controls); a blocked-duplicate state when trying to create a second draft of the same asset on the same account (a real, enforced rule, not just a UI nicety).
-
-**Entry points:** the main navigation menu; dashboard deep links; Generate (once scheduled); the library's "schedule" action on any asset.
-**Exit points:** Generate (new, edit, or repurpose); Library.
-
-**Constraints:** defaults to a simpler list view on narrow screens; there is no week view today (only month and list); AI-suggested "best time to post" ghost-slots described in older product notes do not exist in the current build at all — if wanted, this needs to be scoped from scratch, not assumed partially built.
-
-### 3.10 Library
-
-**Job:** a single asset store for everything uploaded, generated, or produced as part of a post — with the ability to reuse or schedule any of it.
-
-**Shown, ranked by importance:**
-1. An asset grid or table (live), filterable by source (uploads / AI-generated / linked to a post), status (in-use / archived), type, and tag, with free-text search and an option to remember the last filter combination.
-2. Per-asset detail on demand: full metadata, which post(s) reference it, and a version chain if it supersedes/is superseded by another upload.
-3. A separate Trash view listing soft-deleted assets pending permanent removal.
-
-**Actions:** upload one or more files (primary; images, video, or documents up to 50MB each); bulk-select then archive or delete (secondary; delete is soft/recoverable, archive is reversible); per asset — open detail, hand off to the calendar's compose flow pre-filled with that asset ("Schedule"), archive, or delete with an explicit confirmation explaining a 30-day recovery window; restore from Trash (reversible until that window elapses); link an upload as a new version of an existing asset (offered automatically when a likely duplicate is detected); edit title/description/tags inline. A "duplicate this asset" control is visibly present but not actually implemented yet — clicking it just says so.
-
-**States:** loading; empty-first-use (an inviting prompt to upload or go generate something); empty-filtered-to-nothing; an empty Trash state; load errors surface as a brief notice rather than a full-page failure.
-
-**Entry points:** the main navigation menu.
-**Exit points:** Calendar (via schedule); Generate (only via the empty state's "go generate something" link — there's no per-asset "use this in a new generation" action from inside the library itself today, a real gap given how natural that hand-off sounds).
-
-**Constraints:** 50MB per file; 30-day soft-delete recovery window; this screen no longer owns any draft/scheduled/published pipeline concept — that all lives in the calendar now, this is purely an asset store.
-
-### 3.11 Personal Analytics
+### 3.7 Personal Analytics
 
 **Job:** a first read on a person's own app-side content activity, explicitly an early-stage feature ahead of real social-platform analytics.
 
@@ -273,7 +195,7 @@ The personal workspace is where an individual manages their own account, brand i
 **Exit points:** Generate.
 **Constraints:** each underlying data source is capped at 500 rows; updates arrive in the background without an obvious loading flicker on every refresh.
 
-### 3.12 Settings
+### 3.8 Settings
 
 **Job:** manage personal identity and preferences, plus connected publishing accounts; provides a read-only view into any organization-owned accounts.
 
@@ -293,7 +215,7 @@ The personal workspace is where an individual manages their own account, brand i
 
 **Constraints:** eight platforms are registered; connecting can go through either a real or a simulated flow depending on environment, and the interface is explicit about which is active.
 
-### 3.13 Brand Kit Settings
+### 3.9 Brand Kit Settings
 
 **Job:** capture a person's or brand's identity once so every generation reflects it automatically.
 
@@ -311,7 +233,7 @@ The personal workspace is where an individual manages their own account, brand i
 
 **Constraints:** document upload capped at 20MB (PDF/Word only); the document-extraction step currently returns a placeholder/fallback result rather than real document-derived intelligence — a redesign should not assume extraction quality the product can't currently deliver, and should design the review step accordingly (as something the person is expected to correct, not just confirm).
 
-### 3.14 Help & Support
+### 3.10 Help & Support
 
 **Job:** self-serve FAQ plus a support-ticket system with basic status tracking.
 
@@ -328,9 +250,9 @@ The personal workspace is where an individual manages their own account, brand i
 
 **Constraints:** title capped at 100 characters; description must be 20–1000 characters; screenshot optional, image only, up to 5MB; ticket category is a fixed list (content generation, publishing, scheduling & calendar, account & settings, credits & billing, platform connections, other).
 
-### 3.15 Redirect-only paths
+### 3.11 Redirect-only paths
 
-Two addresses exist purely to catch old bookmarks/links and forward straight to the current screen (a personal profile shortcut into Settings, and a legacy generate address into the current Generate screen). No independent design surface.
+Two addresses exist purely to catch old bookmarks/links and forward straight to the current screen: a personal profile shortcut into Settings, and a legacy address into the generation workspace (out of scope for this document). No independent design surface.
 
 ---
 
@@ -798,37 +720,24 @@ Twelve screens, all behind an "admin required" gate, reached from a persistent a
 
 ## 7. User Flows
 
-### Flow 1 — A new individual signs up and completes first setup
+### Flow 1 — A new individual signs up and completes account setup
 
 1. Person registers, choosing Individual, Organization, or Agency. Organization/Agency additionally requires a name and an auto-suggested, editable workspace address.
 2. Submits via email/password or Google. Email signups requiring confirmation are bounced to Login with a "check your email" notice. Google signups pass through the automatic callback step, which creates a profile and grants a starting credit allowance if one doesn't exist yet.
 3. **Decision point:** was this an organization/agency signup? If yes, an automatic provisioning step runs next. **Failure path:** if the organization name/address is rejected, there is no way to correct it from this step — the person must abandon and re-register from scratch.
-4. If the person belongs to more than one workspace, they choose one; otherwise they land directly on the personal dashboard.
-5. First-time dashboard shows an onboarding checklist: account created (done), connect a social account, generate a first post.
-6. Person connects a platform account (real or simulated, depending on environment) or skips straight to Generate.
-7. On first visit to Generate, if brand identity setup isn't complete, a one-time nudge points toward Brand Kit Settings.
-8. Person completes their brand kit via document upload (fast, though extraction quality is currently a placeholder), guided conversation, or manual form — landing on a review step they must explicitly save.
-9. The brand kit now informs every later generation; the person proceeds into Flow 2.
+4. If the person belongs to more than one workspace, they choose one; otherwise they land directly in the personal workspace (its home screen is out of scope for this document).
+5. The person is guided, through onboarding prompts surfaced elsewhere in the app, toward two setup steps: connecting a social platform account and completing their brand identity.
+6. Person connects a platform account via Settings (real or simulated, depending on environment).
+7. Person completes their brand kit via document upload (fast, though extraction quality is currently a placeholder), guided conversation, or manual form — landing on a review step they must explicitly save.
+8. The brand kit is now complete and ready to inform content creation, which happens in the generation workspace (out of scope for this document).
 
-### Flow 2 — A person generates content and gets it scheduled or published
+### Flow 2 — A person investigates and resolves a connected-account health issue
 
-1. Opens Generate, which automatically starts or resumes a working session.
-2. Picks a mode, model, and format settings; writes or refines a prompt (optionally guided, optionally AI-enhanced).
-3. The generate action is gated by a live credit-cost estimate versus their balance — if short, the button is disabled in advance with a clear explanation, not failed after the fact.
-4. Generation runs. Images/carousels complete inline; video runs a longer, separately-tracked queued → processing (2–4 real minutes) → done/failed lifecycle that survives navigating elsewhere. **Failure path:** video failures show a clear retry prompt; other failures surface as a brief notice.
-5. Person opens the post-production step on a finished result: writes/edits title, caption, hashtags, reviews a computed readiness score, picks target platform account(s).
-6. Chooses to save as a draft, schedule it (opens a date/time picker, lands it on the calendar as scheduled), or publish immediately (moves through a publishing state to published/failed per account). **Conflict path:** if the chosen time/account is already taken, the person must explicitly confirm scheduling anyway — nothing is silently overwritten. **Multi-account path:** each destination account gets its own outcome, summarized together.
-7. The result is now visible and manageable from the Calendar (if scheduled/published) and the Library (if it produced new media).
+1. In Settings, the person sees a health indicator per connected account and opens it for more detail.
+2. Available fixes are reconnect (re-runs the connection flow) or disconnect and reconnect from scratch, each with a plain confirmation before disconnecting.
+3. There is no separate diagnostic surface beyond this Settings view — whatever else in the app links to account health today points back to this same place.
 
-### Flow 3 — A person investigates why something failed
-
-**Failed generation:** the person sees an immediate notice (or, for video, a dedicated failure prompt). There is no dedicated failure log screen — the main recourse is retrying from the same session, or, if that keeps failing, manually opening Help and describing what happened (nothing pre-fills from the failure itself — a real gap).
-
-**Failed post/publish:** the Calendar shows a clear "failed" status and reflects it in its weekly health summary. A suggested command offers to reschedule failed posts to the next open slot in one step. Opening the post's detail lets the person manually reschedule, duplicate, or delete it. As with generation failures, there is no direct link from a failed post into a pre-filled support ticket.
-
-**Account/connection health issue:** Settings shows a health indicator per connected account with a detail view; available fixes are reconnect or disconnect-and-reconnect. The dashboard's account-health card links to this same place — there is no separate diagnostic surface beyond it.
-
-### Flow 4 — A person submits a help/support ticket
+### Flow 3 — A person submits a help/support ticket
 
 1. Opens Help, switches to "My Support Tickets."
 2. Starts a new ticket: category, title (under 100 characters), description (20–1000 characters), optional screenshot (image only, under 5MB).
@@ -837,14 +746,14 @@ Twelve screens, all behind an "admin required" gate, reached from a persistent a
 5. As support works it, status can move to "Under Review," then "Resolved" (with a resolution note and who closed it) or "Closed." If the ticket has any timeline entries, expanding it shows the status history and any support replies with timestamps.
 6. When resolved/closed, the person gets a notification; opening it clears the unread state.
 
-### Flow 5 — A new team member accepts an invitation and completes onboarding
+### Flow 4 — A new team member accepts an invitation and completes onboarding
 
 1. Receives an invitation link (typically shared manually, not auto-emailed) and opens it.
 2. **Failure paths, each a static dead end with no in-page recovery today:** the link has no token; the invitation was already used; it was revoked; it expired.
 3. If the invitation is valid: already signed in with a matching email auto-accepts with no further input; signed in with the wrong email requires signing out and reopening the link; not signed in with an existing account for that email redirects to a pre-filled sign-in; not signed in with no existing account shows a password-setup step (minimum 10 characters, must confirm-match).
 4. On success, ordinary members land on My Workspace; admins/owners land on Overview. **No first-run tour, checklist, or role-specific orientation exists after this point** — a real gap.
 
-### Flow 6 — A contributor drafts, submits, and gets content approved and scheduled
+### Flow 5 — A contributor drafts, submits, and gets content approved and scheduled
 
 1. Drafts content in My Office (or starts from My Workspace); it's saved privately, fully editable, visible to no one else yet.
 2. Submits it into review. **Failure path:** blocked with a specific, actionable message if no brand/project is assigned yet.
@@ -853,7 +762,7 @@ Twelve screens, all behind an "admin required" gate, reached from a persistent a
 5. Whoever has scheduling rights and can act on the item opens the schedule step from the calendar and sets a time, or publishes immediately. **Failure path:** can fail if the destination account isn't one they're authorized to post to, or on an internal scheduling-context problem.
 6. Once scheduled/published, it shows as such on the calendar — there is no explicit "notify the original drafter it went live" step documented.
 
-### Flow 7 — A reviewer/editor sends content back for changes, and the contributor resubmits
+### Flow 6 — A reviewer/editor sends content back for changes, and the contributor resubmits
 
 1. Reviewer/editor sees the item in a review view, scoped to what they're allowed to act on (everything for Editor/Admin/Owner, only their own assignments for a Reviewer).
 2. Chooses to reject or request changes. **A hard, enforced constraint:** this cannot proceed without a written comment.
@@ -862,7 +771,7 @@ Twelve screens, all behind an "admin required" gate, reached from a persistent a
 5. Contributor opens the flagged item, makes changes, and resubmits. **A real gap:** navigating away to fix something and back doesn't reliably preserve exactly which item was being worked on.
 6. The item re-enters review at the appropriate stage, and the cycle repeats until approved or rejected outright.
 
-### Flow 8 — An org admin invites a member, assigns a role, and configures the review pipeline
+### Flow 7 — An org admin invites a member, assigns a role, and configures the review pipeline
 
 1. Opens Members, chooses a role template (optionally scoping the invite to specific brand projects). Any prior pending invite for that same email is automatically revoked first. Delivery is typically a manually-shared link.
 2. Can copy, regenerate, revoke, or delete the invite while it's outstanding — deletion only once it's already revoked or expired.
@@ -870,15 +779,15 @@ Twelve screens, all behind an "admin required" gate, reached from a persistent a
 4. Visits Pipelines to define the review workflow: ordered stages, each with an assignment rule, an expected turnaround time, an escalation contact, whether it's optional, whether rejecting there needs a comment, and whether it should generate a client-review link. **Failure/edge case:** no warning is given about how many live items already use a configuration before it's edited or deleted, and changes to the active default apply immediately with no rollback.
 5. Once the invited person accepts (Flow 5), their effective permissions become: role defaults → any organization-specific template edits → any individual override the admin applies directly, which can happen at any time, independent of re-inviting.
 
-### Flow 9 — An external client reviews content via a tokenized link
+### Flow 8 — An external client reviews content via a tokenized link
 
-1. Receives a link containing a private review token (how they got it is not clearly documented on the internal side — see Section 8, UX Problems).
+1. Receives a link containing a private review token (how they got it is not clearly documented on the internal side — see Section 9, UX Problems).
 2. Opens it with no login required. The token's associated content preview loads. **Failure path:** an invalid/expired/bad token shows a plain "unavailable" state, dead end. **Already-used path:** shown a "this review has been completed" state, identical whether just-completed or revisited later.
 3. Reviews the preview, optionally types feedback, and chooses Approve or Request Changes. **No confirmation step exists before this commits** — the click is the commitment, with no undo.
 4. On submit, the token is marked used, the internal review state updates accordingly, and the client sees a completed confirmation. **Failure path:** a generic failure notice if the submission itself errors, with no further documented recovery guidance.
 5. The outcome feeds back into the organization's internal review state, but nothing tells the client what happens next, and no documented internal notification confirms to the team that a client decision just landed.
 
-### Flow 10 — An operator investigates a user (from an alert or complaint to resolution)
+### Flow 9 — An operator investigates a user (from an alert or complaint to resolution)
 
 1. **Trigger:** a high-severity risk notification naming a user, a complaint naming a user, or a direct directory search.
 2. Opens that user's detail record and reviews across tabs: profile, connected accounts, content and its quality scores, complaint history, existing notes.
@@ -888,7 +797,7 @@ Twelve screens, all behind an "admin required" gate, reached from a persistent a
 6. If complaint-related, can quick-update status or comment from the Complaints tab — **known failure path:** a quick comment always lands on the person's *newest* complaint, not necessarily the one under investigation, so operators should instead open that specific complaint's own detail screen directly (Flow-adjacent) to avoid misfiling.
 7. Records findings as an internal note (itself logged). Takes a resolving action: direct notification, password reset, suspend/unsuspend, or — rare and highest-impact — a deletion request with typed confirmation. **Failure path:** that request has no documented approval screen anywhere, making it a dead end beyond submission if scope or workflow requires one.
 
-### Flow 11 — An operator moderates content through to a force action
+### Flow 10 — An operator moderates content through to a force action
 
 1. Opens the moderation workspace (directly, embedded in a user's Posts tab, or deep-linked from a complaint pointing at specific content).
 2. Reviews the item: content, quality score, platform/account context, prior versions.
@@ -930,36 +839,24 @@ Realistic connected-account examples spanning consumer, creator, and B2B account
 - Threads — "Creator Lab" (@creatorlab), Creator profile, 32,000 followers, personal scope.
 - LinkedIn — "Acme B2B" (@acmeb2b), Business profile, 12,000 followers, category "Technology," organization scope.
 
-Realistic post/caption examples:
+Realistic post/caption examples (as seen in admin moderation views):
 - Instagram, caption "Exploring the beauty of Lagos ✨", hashtags "#travel #lagoslife", status "Pending Review."
 - TikTok, caption "My morning routine — no filter 😅", hashtags "#morningvibes #selfcare", status "Needs Modification."
-- A post with no title/caption yet displays as "Untitled" alongside its scheduled time (e.g., "12:00 AM / Untitled").
 
 Realistic platform-mix example (for a leaderboard/distribution chart): Instagram 46%, TikTok 30%, YouTube 14%, Facebook 10%.
 
 ### 8.4 Real error messages and toasts, by scenario
 
-**Generation:**
-- "Invalid prompt: prompt cannot be empty"
-- "LLM returned invalid JSON"
-
-**Publishing / scheduling:**
+**Connected accounts / publishing authorization:**
 - "Reconnect this account before publishing to it"
 - "Select an approval workflow first."
-- "Select at least one platform"
-- "Title is required before publishing to YouTube"
-- "Caption exceeds the {character limit} character limit"
 - "Sent for approval. Track progress in Pipeline." (success)
-- "Published posts can't be rescheduled" (business-rule error)
 - "You do not have posting access to this shared organization account."
 - "This content requires final approval before publishing."
-
-**Connected accounts:**
 - "{Platform name} is coming soon" (attempting to connect an unsupported platform)
 - "Sign in again before connecting a real platform account."
 
-**Library / assets:**
-- "You must be signed in to use the Library."
+**Organization asset library:**
 - "A folder with that path already exists."
 
 **Support / admin:**
@@ -1010,52 +907,48 @@ Realistic platform-mix example (for a leaderboard/distribution chart): Instagram
 These are open questions for the product and design team to resolve — not silent fixes to make during redesign, since some may reflect intentional phasing rather than oversight. Grouped by theme; each is phrased as a question.
 
 ### Consistency and terminology
-1. **The same underlying object is called by at least four different names depending on where you are:** "generation" while being produced, "draft" once saved, "post" once it has scheduling state, and "content" in moderation/review contexts — one continuum, several names. Should the redesign commit to one consistent word across the whole lifecycle?
+1. **The same underlying object is called by different names depending on where you are:** a "draft" once saved, a "post" once it has scheduling state, and "content" in moderation/review contexts. Should the redesign commit to one consistent word across the whole lifecycle?
 2. **"Complaint" (used throughout the data model and much of the internal language) vs. "ticket"/"support request" (used in the language shown to end users)** — even the ticket-status descriptions themselves say "ticket" while the category is called "complaint." Which word should be the one the product uses everywhere?
 3. **The word "admin" means different things in different places** — sometimes only the platform-wide operator, sometimes both the platform operator and an organization admin. This isn't just a copy issue; it affects who can enter the admin console at all (see Access, below).
-4. **The same review stage is described with different wording in different parts of the same calendar screen** (e.g. one description of the "draft" stage versus another, slightly different one, in a nearby filter control on the same page) — worth a full terminology pass across every surface that shows review/task state.
+4. **The same review stage is described with different wording in different parts of the same organization calendar screen** (e.g. one description of the "draft" stage versus another, slightly different one, in a nearby filter control on the same page) — worth a full terminology pass across every surface that shows review/task state.
 5. **Cross-page references use different identifier concepts for what is, to the user, "the same thing I was just looking at"** (a post address, a review-item address, a task address, an asset address) with no single shared "here's what I was looking at" concept — this is why so many deep links land on a general screen instead of the specific item (see below).
-6. Is a name like **"Generate"** (the product's own navigation label) or an alternate name used in a couple of places in its own empty-state copy the one the product should commit to?
 
 ### Deep links and navigation
-7. **Deep links routinely lose their destination.** Clicking through from team-chat references, library origin badges, draft-to-review links, and several admin cross-references mostly lands on the *general* destination screen rather than the *specific item* the person came from — this is the single most repeated gap across the whole organization workspace, and it also appears in the admin console (e.g., organization members/complaints don't link to their own detail screens; log rows don't link anywhere). Should every cross-page reference be expected to open a focused item, with a consistent "return to where I came from" pattern designed once?
-8. **The Pipeline Board shows status but currently has no working detail view or stage-action controls** — all real review actions happen inside the calendar's own modals instead. Should this screen gain real functionality, be folded into the calendar entirely, or be explicitly repositioned as a pure status overview?
-9. **"Team Activity" doesn't do what its name promises** — it shows only review-stage status changes, with nothing about tasks, scheduling, publishing, or team chat. Should it become a true cross-domain feed, or be renamed/repositioned so its scope is honest?
-10. **The external client-review link has no clear "generate/share" entry point anywhere a team member would naturally look**, even though the underlying capability exists. Where should "share this for client approval" live, and should members see the link's status (active/used/revoked) afterward?
+6. **Deep links routinely lose their destination.** Clicking through from team-chat references, asset-library origin badges, draft-to-review links, and several admin cross-references mostly lands on the *general* destination screen rather than the *specific item* the person came from — this is the single most repeated gap across the whole organization workspace, and it also appears in the admin console (e.g., organization members/complaints don't link to their own detail screens; log rows don't link anywhere). Should every cross-page reference be expected to open a focused item, with a consistent "return to where I came from" pattern designed once?
+7. **The Pipeline Board shows status but currently has no working detail view or stage-action controls** — all real review actions happen inside the organization calendar's own modals instead. Should this screen gain real functionality, be folded into the calendar entirely, or be explicitly repositioned as a pure status overview?
+8. **"Team Activity" doesn't do what its name promises** — it shows only review-stage status changes, with nothing about tasks, scheduling, publishing, or team chat. Should it become a true cross-domain feed, or be renamed/repositioned so its scope is honest?
+9. **The external client-review link has no clear "generate/share" entry point anywhere a team member would naturally look**, even though the underlying capability exists. Where should "share this for client approval" live, and should members see the link's status (active/used/revoked) afterward?
 
 ### Confirmations and destructive actions
-11. **Destructive and high-impact actions are guarded inconsistently.** Some (user deletion requests, some org-admin deletions) require typed or plain confirmation; others of comparable or greater consequence — force-disconnecting a shared account, force-publishing content externally, quick-transitioning a complaint's status, approving/rejecting external client-review actions — currently have **no confirmation step at all**. Was this a deliberate risk tradeoff, or should confirmation weight be redesigned deliberately, action by action?
-12. **Several "approval request" workflows (user deletion, content deletion) can be submitted but have no visible screen anywhere that approves or executes them** — a real dead end for anyone relying on that governance path today. Should these gain an approval queue, or should the submit action be removed/reframed until they do?
-13. **Two safety checks that matter (deleting a role template still in use; deleting a pipeline still in active use) rely on a count read at the moment the page loaded, not a guarantee enforced at the moment of deletion** — a real, if narrow, risk under concurrent admin use.
+10. **Destructive and high-impact actions are guarded inconsistently.** Some (user deletion requests, some org-admin deletions) require typed or plain confirmation; others of comparable or greater consequence — force-disconnecting a shared account, force-publishing content externally, quick-transitioning a complaint's status, approving/rejecting external client-review actions — currently have **no confirmation step at all**. Was this a deliberate risk tradeoff, or should confirmation weight be redesigned deliberately, action by action?
+11. **Several "approval request" workflows (user deletion, content deletion) can be submitted but have no visible screen anywhere that approves or executes them** — a real dead end for anyone relying on that governance path today. Should these gain an approval queue, or should the submit action be removed/reframed until they do?
+12. **Two safety checks that matter (deleting a role template still in use; deleting a pipeline still in active use) rely on a count read at the moment the page loaded, not a guarantee enforced at the moment of deletion** — a real, if narrow, risk under concurrent admin use.
 
 ### Trust, honesty, and mock-vs-real data
-14. **Social publishing (scheduled or immediate) is fully simulated today, not connected to real social networks**, and this is a permanent, intentional near-term decision rather than a bug — but nothing today visually or functionally distinguishes a simulated connection/publish from what a live one would look like. How should the redesign keep this honest without it reading as broken or unfinished?
-15. **The platform-admin Analytics screen mixes fully real, computed numbers with fully fabricated placeholder cards on the same screen, with no visual distinction between them today.** This is explicitly flagged as a decision-making risk. What is the honest, deliberate treatment for "this card is illustrative, not real"?
-16. **Settings toggles (notification types, some preferences, both in personal and platform-admin settings) can be switched and appear to persist, but do not change any actual delivered behavior anywhere in the product today.** Should these be built out to actually do something, or reframed so they don't imply control that doesn't exist?
-17. **A brand document upload appears to "extract" a brand kit, but the extraction step currently returns a placeholder/fallback result rather than genuinely reading the document.** The experience looks finished; the intelligence behind it is not. Should the review step that follows be redesigned to visibly invite correction rather than imply the result is already accurate?
-18. Calendar "ghost slot" / suggested-posting-time settings exist in some form but **nothing on the backend actually generates them today** — if this is still a wanted feature, does it need to be scoped as new work rather than assumed partially built?
+13. **Social publishing is fully simulated today, not connected to real social networks**, and this is a permanent, intentional near-term decision rather than a bug — but nothing today visually or functionally distinguishes a simulated connection/publish from what a live one would look like. How should the redesign keep this honest, in Settings, in the organization's shared-account admin, and in the organization calendar's publish actions, without it reading as broken or unfinished?
+14. **The platform-admin Analytics screen mixes fully real, computed numbers with fully fabricated placeholder cards on the same screen, with no visual distinction between them today.** This is explicitly flagged as a decision-making risk. What is the honest, deliberate treatment for "this card is illustrative, not real"?
+15. **Settings toggles (notification types, some preferences, both in personal and platform-admin settings) can be switched and appear to persist, but do not change any actual delivered behavior anywhere in the product today.** Should these be built out to actually do something, or reframed so they don't imply control that doesn't exist?
+16. **A brand document upload appears to "extract" a brand kit, but the extraction step currently returns a placeholder/fallback result rather than genuinely reading the document.** The experience looks finished; the intelligence behind it is not. Should the review step that follows be redesigned to visibly invite correction rather than imply the result is already accurate?
 
 ### Access and permissions
-19. **Whether an organization-scoped admin can enter the platform admin console at all is currently decided inconsistently** — the "let you in the door" rule and the "what do you see once inside" rule recognize different sets of people as admins. This needs one clear product decision before a redesign can safely assume either behavior.
-20. **The same underlying idea — "you don't have access to this" — is shown two completely different ways** depending on which admin screen you're on: a hard wall on some screens, invisible silent data-narrowing on others, with no stated rule for which pattern applies where. Should these be unified?
-21. **When an action is blocked by a permission or workflow rule, the interface frequently doesn't explain why** — across the calendar, the library, and elsewhere, people can hit a disabled control or a failed action with no explanation of whether they lack permission, need approval, or are in the wrong context. A consistent "here's why this is unavailable" pattern is a real, recurring gap.
-22. **There is no way today to suspend, reactivate, or remove an existing organization member** from the Members screen, even though the underlying account-state concept supports it — member lifecycle currently stops at "invite" and "edit permissions." Is this an intentional near-term scope limit, or should the redesign plan real estate for it?
-23. **Notification "read" state is tracked inconsistently across sources** (standard notifications vs. team-chat unread signals use different mechanisms to mark as read), which can make unread counts less trustworthy than they appear.
+17. **Whether an organization-scoped admin can enter the platform admin console at all is currently decided inconsistently** — the "let you in the door" rule and the "what do you see once inside" rule recognize different sets of people as admins. This needs one clear product decision before a redesign can safely assume either behavior.
+18. **The same underlying idea — "you don't have access to this" — is shown two completely different ways** depending on which admin screen you're on: a hard wall on some screens, invisible silent data-narrowing on others, with no stated rule for which pattern applies where. Should these be unified?
+19. **When an action is blocked by a permission or workflow rule, the interface frequently doesn't explain why** — across the organization calendar, the organization asset library, and elsewhere, people can hit a disabled control or a failed action with no explanation of whether they lack permission, need approval, or are in the wrong context. A consistent "here's why this is unavailable" pattern is a real, recurring gap.
+20. **There is no way today to suspend, reactivate, or remove an existing organization member** from the Members screen, even though the underlying account-state concept supports it — member lifecycle currently stops at "invite" and "edit permissions." Is this an intentional near-term scope limit, or should the redesign plan real estate for it?
+21. **Notification "read" state is tracked inconsistently across sources** (standard notifications vs. team-chat unread signals use different mechanisms to mark as read), which can make unread counts less trustworthy than they appear.
 
 ### Half-built or dead affordances (visible controls that don't work)
-24. **"Assign Reviewer" (in content moderation) and "Revoke publishing access" (on a user's security tab) are both visible controls that currently do nothing** — no supporting data model exists behind either. Each needs an explicit decision: build for real, or remove the affordance so it stops implying a capability that isn't there.
-25. **A "duplicate this asset" control in the personal library is visible but explicitly unimplemented** ("coming soon"), a small but real instance of the same problem.
-26. **A parallel, older set of admin-style screens/components appears to exist in the codebase alongside the current, in-use admin screens** — worth confirming with engineering whether any of it is still reachable before assuming it's fully retired, since it may represent a previous generation of the same idea.
+22. **"Assign Reviewer" (in content moderation) and "Revoke publishing access" (on a user's security tab) are both visible controls that currently do nothing** — no supporting data model exists behind either. Each needs an explicit decision: build for real, or remove the affordance so it stops implying a capability that isn't there.
+23. **A parallel, older set of admin-style screens/components appears to exist in the codebase alongside the current, in-use admin screens** — worth confirming with engineering whether any of it is still reachable before assuming it's fully retired, since it may represent a previous generation of the same idea.
 
 ### Scale and volume
-27. **Two investigation-critical admin screens (the support-complaint queue and the operations log) are hard-capped at a fixed number of rows with no pagination** — older records become silently invisible once that cap is exceeded, directly undermining the "find the truth" job both screens exist to do.
-28. **The organizations list has no search, filter, or sort at all** — the entire list loads at once regardless of how many tenants exist, which will not scale as the platform grows.
+24. **Two investigation-critical admin screens (the support-complaint queue and the operations log) are hard-capped at a fixed number of rows with no pagination** — older records become silently invisible once that cap is exceeded, directly undermining the "find the truth" job both screens exist to do.
+25. **The organizations list has no search, filter, or sort at all** — the entire list loads at once regardless of how many tenants exist, which will not scale as the platform grows.
 
 ### Miscellaneous inconsistencies worth resolving
-29. **Password minimum length is different in three different places** — general account registration, the password-reset flow, and the new-account path inside organization invitation acceptance all enforce different minimums. Worth standardizing to one rule.
-30. **There is no credits breakdown or history anywhere in the personal workspace** — both the dashboard and settings show a raw balance number, with no explanation of how or why it changed, even though the product's own help content admits credit accounting "is still evolving."
-31. **No error state anywhere (failed generation, failed post, unhealthy connected account) offers a direct hand-off into a pre-filled support ticket** — a person experiencing any of these has to manually navigate to Help and re-describe, from scratch, details the product already has on hand.
-32. **A quick-comment action on a user's complaint history always attaches to that person's newest complaint, with no way to choose which one** — a real risk of a note landing on the wrong case when someone has more than one open ticket.
+26. **Password minimum length is different in three different places** — general account registration, the password-reset flow, and the new-account path inside organization invitation acceptance all enforce different minimums. Worth standardizing to one rule.
+27. **No error state for an unhealthy connected account offers a direct hand-off into a pre-filled support ticket** — a person experiencing a connection problem has to manually navigate to Help and re-describe, from scratch, details (which account, what kind of failure) the product already has on hand.
+28. **A quick-comment action on a user's complaint history always attaches to that person's newest complaint, with no way to choose which one** — a real risk of a note landing on the wrong case when someone has more than one open ticket.
 
 ---
 
@@ -1067,35 +960,27 @@ These are not design decisions — they are real limits and timings the interfac
 - The organization-wide support complaint queue (platform admin) is hard-capped at the latest 100 rows with no pagination — anything beyond that is invisible today.
 - The platform operations log is hard-capped at 200 rows per source, with no pagination and no export.
 - The personal analytics screen caps each of its underlying data sources (posts, generations, accounts) at 500 rows.
-- Generation search only covers the 120 most recent generations.
 - The organizations list, user directory, and moderation queue are otherwise paginated (not single unbounded lists) — design should assume "more exists below" as the default, not the exception.
 
 **Timing and latency the interface must communicate honestly**
-- Video generation takes roughly 2–4 real minutes, and must be designed as a persistent, backgroundable process rather than a blocking wait — people are expected to navigate elsewhere while it finishes.
-- Image and carousel generation complete inline, without the same queued lifecycle.
 - Search fields (e.g., the admin user directory) apply a short deliberate delay before filtering — results should not be designed to feel instant on every keystroke.
 - Several admin consoles (connected-account maintenance, the complaints queue, complaint detail) do **not** update live — two people working the same screen will not see each other's changes without a manual refresh or their own next action. Other screens (most of the organization workspace, the admin overview, and moderation) **do** update live and can shift under a person's cursor mid-task — both patterns exist today and the design should acknowledge each explicitly rather than assuming uniform behavior.
 
 **Size and format limits (user-facing, worth stating in the interface itself)**
-- Personal library uploads: images/video/documents up to 50MB each.
 - Brand-kit document upload: PDF or Word, up to 20MB.
 - Support-ticket screenshot attachment: image only, up to 5MB.
 - Support-ticket title: up to 100 characters. Description: 20–1000 characters required.
-- Generation prompt: up to 2,000 characters.
-- Image generation batch size: 1–4 per request. Carousels: minimum 2 slides (default 6).
 
 **Credits and gating**
-- Every generation has a real, upfront, visible cost in credits, checked against balance before the action is allowed to start — this is a core gating mechanic the interface must always surface before commitment, not after failure.
-- A monthly per-person AI-credit allowance (organization context) can be set to exactly zero, which fully blocks that person from generating anything — distinct from the organization-wide credit pool, which is a separate, related lever.
+- A monthly per-person AI-credit allowance (set from the organization's Members/Roles/Credits screens) can be set to exactly zero, which fully blocks that person's ability to generate content elsewhere in the product — distinct from the organization-wide credit pool, which is a separate, related lever these admin screens must account for even though generation itself happens outside this document's scope.
 
 **Soft-delete and recovery windows**
-- Personal library deletions are recoverable for 30 days before being considered permanently gone.
 - Organization asset library deletions are archive/restore based, without a stated expiry.
 
 **Mixed real/placeholder data — must be labeled, not hidden**
 - The platform-admin analytics screen's "platform API" cards are entirely hard-coded placeholders with zero live data behind them; every other number on that screen is real. This distinction currently has no visual or functional treatment and must get one.
 - Native social-platform metrics (views/likes/comments/shares) in personal analytics are explicitly a future feature, shown locked/placeholder today — this should read as "coming soon," not "broken."
-- Social platform connections and all publishing (personal and organization) run through a simulated mechanism rather than live social-network APIs, by permanent product decision — this must stay honestly and consistently labeled everywhere it's relevant, not polished away as if it were live.
+- Social platform connections and all publishing run through a simulated mechanism rather than live social-network APIs, by permanent product decision — this must stay honestly and consistently labeled everywhere it's relevant (Settings, the organization's shared-account admin, the organization calendar's publish actions), not polished away as if it were live.
 
 **Multi-tenancy and scoping**
 - Nearly every screen in the organization and platform-admin worlds is scoped to a tenant (an organization) or a person's specific access — the interface must be designed to gracefully show "zero because you don't have access" versus "zero because there's genuinely nothing here" as two different situations, even in the many places today where that distinction isn't made clear to the user.

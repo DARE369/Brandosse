@@ -1,0 +1,99 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--uiv2-bg-canvas);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+  line-height: var(--uiv2-leading-normal);
+}
+
+.main { flex: 1; padding: 20px 20px 64px; }
+@media (max-width: 640px) { .main { padding: 14px 12px 48px; } }
+.canvas { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+.headRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.title { font-family: var(--uiv2-font-display); font-weight: 700; font-size: var(--uiv2-text-3xl); letter-spacing: -0.02em; }
+.sub { color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-sm); margin-top: 4px; }
+
+.tabBar { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--uiv2-border); padding-bottom: 2px; }
+.tabBtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; background: transparent; color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-sm); font-weight: 600; padding: 9px 12px;
+  border-radius: var(--uiv2-radius-md) var(--uiv2-radius-md) 0 0;
+  cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tabBtnActive { color: var(--uiv2-accent-text); border-bottom-color: var(--uiv2-accent-solid); }
+
+.stack { display: flex; flex-direction: column; gap: 12px; }
+
+.searchBar {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-surface);
+  border-radius: var(--uiv2-radius-md); padding: 10px 14px; color: var(--uiv2-text-secondary);
+}
+.searchBar input { border: none; background: transparent; color: var(--uiv2-text-primary); font-size: var(--uiv2-text-sm); flex: 1; outline: none; }
+
+.faqSectionTitle { font-weight: 700; font-size: var(--uiv2-text-base); margin-bottom: 8px; }
+.sectionSub { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); margin-top: 4px; margin-bottom: 12px; }
+
+.faqItem { border-top: 1px solid var(--uiv2-border); }
+.faqItem:first-of-type { border-top: none; }
+.faqQuestion {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; background: transparent; border: none; color: var(--uiv2-text-primary);
+  font-size: var(--uiv2-text-sm); font-weight: 600; padding: 12px 0; text-align: left; cursor: pointer;
+}
+.chevOpen { transform: rotate(180deg); }
+.faqAnswer { padding: 0 0 14px; color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-sm); line-height: 1.6; }
+
+.ctaRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ctaText { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); margin: 0; }
+
+.shortcutList { display: flex; flex-direction: column; gap: 2px; }
+.shortcutRow { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid var(--uiv2-border); }
+.shortcutRow:first-child { border-top: none; }
+.shortcutKeys { display: flex; gap: 4px; min-width: 90px; }
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; padding: 4px 8px; border-radius: 6px;
+  border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-canvas);
+  font-family: var(--uiv2-font-body); font-size: var(--uiv2-text-xs); font-weight: 700;
+}
+.shortcutDesc { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); }
+
+.ticketToolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+.form { display: flex; flex-direction: column; gap: 14px; }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .formGrid { grid-template-columns: 1fr; } }
+.fieldSpan { grid-column: 1 / -1; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: var(--uiv2-text-sm); font-weight: 600; }
+.field input, .field select, .field textarea {
+  border: 1px solid var(--uiv2-border); background: var(--uiv2-bg-canvas); color: var(--uiv2-text-primary);
+  border-radius: var(--uiv2-radius-md); padding: 9px 11px; font-size: var(--uiv2-text-sm); font-weight: 400;
+  font-family: inherit; resize: vertical;
+}
+.smallHint { font-weight: 400; color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-xs); }
+.formActions { display: flex; justify-content: flex-end; gap: 8px; }
+.formError { color: var(--uiv2-danger); font-size: var(--uiv2-text-sm); }
+.formSuccess { color: var(--uiv2-success); font-size: var(--uiv2-text-sm); }
+
+.complaintHead {
+  width: 100%; display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; background: transparent; border: none; cursor: pointer; text-align: left; color: var(--uiv2-text-primary);
+}
+.complaintMeta { display: flex; gap: 6px; margin-bottom: 6px; }
+.complaintTitle { font-weight: 600; font-size: var(--uiv2-text-sm); }
+.complaintDate { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); white-space: nowrap; }
+.complaintExpanded { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--uiv2-border); font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); display: flex; flex-direction: column; gap: 10px; }
+
+.resolutionNote { background: var(--uiv2-accent-wash); border-radius: var(--uiv2-radius-md); padding: 10px 12px; font-size: var(--uiv2-text-sm); }
+.resolutionNote strong { display: block; margin-bottom: 4px; color: var(--uiv2-text-primary); }
+
+.timeline strong { display: block; margin-bottom: 6px; color: var(--uiv2-text-primary); }
+.timelineItem { padding: 8px 0; border-top: 1px solid var(--uiv2-border); }
+.timelineHead { display: flex; justify-content: space-between; gap: 10px; font-size: var(--uiv2-text-xs); color: var(--uiv2-text-primary); font-weight: 600; }

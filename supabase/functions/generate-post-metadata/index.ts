@@ -1,7 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import {
   buildBrandKitSystemPrompt,
+  createHttpError,
   ensureBrandProjectAccess,
   fetchBrandProject,
   fetchDefaultBrandProject,
@@ -117,16 +119,16 @@ async function loadContext(
       .maybeSingle();
 
     if (postError) throw postError;
-    if (!post) throw new Error("Post not found.");
+    if (!post) throw createHttpError("Post not found.", 404);
 
     const organizationId = String(post.organization_id || "").trim() || null;
     if (organizationId) {
       const member = await requireActiveOrgMember(adminClient, organizationId, userId);
       if (!ensureBrandProjectAccess(member, String(post.brand_project_id || "").trim() || null)) {
-        throw new Error("You do not have access to this brand project.");
+        throw createHttpError("You do not have access to this brand project.", 403);
       }
     } else if (post.user_id !== userId) {
-      throw new Error("You do not have access to this draft.");
+      throw createHttpError("You do not have access to this draft.", 403);
     }
 
     const generation = Array.isArray(post.generations) ? post.generations[0] || null : post.generations || null;
@@ -151,16 +153,16 @@ async function loadContext(
       .maybeSingle();
 
     if (generationError) throw generationError;
-    if (!generation) throw new Error("Generation not found.");
+    if (!generation) throw createHttpError("Generation not found.", 404);
 
     const organizationId = String(generation.organization_id || request.organization_id || "").trim() || null;
     if (organizationId) {
       const member = await requireActiveOrgMember(adminClient, organizationId, userId);
       if (!ensureBrandProjectAccess(member, String(generation.brand_project_id || request.brand_project_id || "").trim() || null)) {
-        throw new Error("You do not have access to this brand project.");
+        throw createHttpError("You do not have access to this brand project.", 403);
       }
     } else if (generation.user_id !== userId) {
-      throw new Error("You do not have access to this generation.");
+      throw createHttpError("You do not have access to this generation.", 403);
     }
 
     return {
@@ -292,27 +294,58 @@ serve(async (req) => {
     const authClient = createAuthClient(req.headers.get("Authorization"));
     const user = await requireUser(authClient);
     const adminClient = createAdminClient();
+    await enforceRateLimit(adminClient, user.id, "generate-post-metadata");
     const body = await parseJsonBody<MetadataRequest>(req);
 
     if (!readEnv("ANTHROPIC_API_KEY", false)) {
-      return jsonResponse({
-        error: "ANTHROPIC_API_KEY is required for Claude post metadata generation.",
-      }, 500);
+      throw createHttpError("ANTHROPIC_API_KEY is required for Claude post metadata generation.", 500);
     }
 
     const context = await loadContext(adminClient, body, user.id);
     const prompt = String(context.prompt || "").trim();
     if (!prompt) {
-      return jsonResponse({ error: "A prompt or linked generation is required." }, 400);
+      throw createHttpError("A prompt or linked generation is required.", 400);
     }
 
     const fields = normalizeFields(body.fields);
-    const brand = await buildBrandPrompt(adminClient, context.organizationId, context.brandProjectId, context.userId);
-    const brandPrompt = brand.prompt;
-    const platform = String(body.platform || context.post?.platform || "instagram").trim().toLowerCase();
-    const mediaType = String(context.mediaType || "image").trim().toLowerCase();
 
-    const systemPrompt = `${brandPrompt}
+    // WEEK 2 FIX 3 (+ ADDENDUM UPGRADE 2): the server is now the single
+    // writer of workflow_state.metadata_status for the whole lifecycle —
+    // 'in_progress' (with metadata_started_at) here, before the LLM call;
+    // 'completed' or 'failed' below, always combined with whatever other
+    // field(s) that same write is making in ONE UPDATE statement, never a
+    // separate "write the content" + "write the status" pair. This closes
+    // the old gap where only the client optimistically wrote 'in_progress'
+    // (before invoking this function) and only this function's success
+    // path wrote 'completed' — a lost response, network drop, or closed
+    // tab left the row stuck in 'in_progress' forever with nothing server-
+    // side ever correcting it.
+    if (body.post_id && context.post) {
+      const startedAt = new Date().toISOString();
+      const startWorkflowState = {
+        ...safeObject(context.post?.workflow_state),
+        metadata_status: "in_progress",
+        metadata_error: null,
+        metadata_started_at: startedAt,
+        metadata_updated_at: startedAt,
+      };
+      const { error: startError } = await adminClient
+        .from("posts")
+        .update({ workflow_state: startWorkflowState, updated_at: startedAt })
+        .eq("id", body.post_id);
+      if (startError) throw startError;
+      // Keep in-memory context.post.workflow_state in sync so the
+      // completed/failed writes below merge against this, not a stale copy.
+      (context.post as Record<string, unknown>).workflow_state = startWorkflowState;
+    }
+
+    try {
+      const brand = await buildBrandPrompt(adminClient, context.organizationId, context.brandProjectId, context.userId);
+      const brandPrompt = brand.prompt;
+      const platform = String(body.platform || context.post?.platform || "instagram").trim().toLowerCase();
+      const mediaType = String(context.mediaType || "image").trim().toLowerCase();
+
+      const systemPrompt = `${brandPrompt}
 You are generating lightweight post-production metadata for a social media workflow.
 Return ONLY valid JSON with this exact shape:
 {
@@ -331,86 +364,115 @@ Rules:
 - If media_type is video, favor a hook-driven caption.
 - If platform is youtube, make the title especially clear and searchable.`;
 
-    const llmResult = await callLlm({
-      preferredProvider: "anthropic",
-      systemPrompt,
-      maxTokens: 800,
-      temperature: 0.45,
-      messages: [
-        {
-          role: "user",
-          content: [
-            `Platform: ${platform}`,
-            `Media type: ${mediaType}`,
-            `Requested fields: ${fields.join(", ")}`,
-            `Prompt:\n${prompt}`,
-          ].join("\n\n"),
-        },
-      ],
-    });
+      const llmResult = await callLlm({
+        preferredProvider: "anthropic",
+        systemPrompt,
+        maxTokens: 800,
+        temperature: 0.45,
+        messages: [
+          {
+            role: "user",
+            content: [
+              `Platform: ${platform}`,
+              `Media type: ${mediaType}`,
+              `Requested fields: ${fields.join(", ")}`,
+              `Prompt:\n${prompt}`,
+            ].join("\n\n"),
+          },
+        ],
+      });
 
-    const parsed = safeObject(JSON.parse(pickJson(llmResult.content)));
-    const title = String(parsed.title || fallbackTitleFromPrompt(prompt)).trim() || fallbackTitleFromPrompt(prompt);
-    const caption = String(parsed.caption || prompt).trim() || prompt;
-    const hashtags = normalizeHashtags(parsed.hashtags, brand.maxHashtags ?? 12);
-    const summary = String(parsed.summary || "").trim();
+      const parsed = safeObject(JSON.parse(pickJson(llmResult.content)));
+      const title = String(parsed.title || fallbackTitleFromPrompt(prompt)).trim() || fallbackTitleFromPrompt(prompt);
+      const caption = String(parsed.caption || prompt).trim() || prompt;
+      const hashtags = normalizeHashtags(parsed.hashtags, brand.maxHashtags ?? 12);
+      const summary = String(parsed.summary || "").trim();
 
-    if (body.post_id) {
-      const currentWorkflowState = safeObject(context.post?.workflow_state);
-      const nextWorkflowState = {
-        ...currentWorkflowState,
-        metadata_status: "completed",
-        metadata_generated_at: new Date().toISOString(),
-        metadata_provider: llmResult.provider,
-        metadata_model: llmResult.model,
-      };
+      if (body.post_id) {
+        const currentWorkflowState = safeObject(context.post?.workflow_state);
+        const nextWorkflowState = {
+          ...currentWorkflowState,
+          metadata_status: "completed",
+          metadata_error: null,
+          metadata_generated_at: new Date().toISOString(),
+          metadata_updated_at: new Date().toISOString(),
+          metadata_provider: llmResult.provider,
+          metadata_model: llmResult.model,
+        };
 
-      const updatePayload: Record<string, unknown> = {
-        workflow_state: nextWorkflowState,
-        updated_at: new Date().toISOString(),
-      };
+        // Metadata content (title/caption/hashtags) and the completed
+        // status live in this ONE update — a crash after this line commits
+        // cannot leave a half-written row, and a crash before it leaves the
+        // row exactly where the 'in_progress' write above put it (which the
+        // client's stale-reconciliation logic now treats as recoverable).
+        const updatePayload: Record<string, unknown> = {
+          workflow_state: nextWorkflowState,
+          updated_at: new Date().toISOString(),
+        };
 
-      if (fields.includes("title")) updatePayload.title = title;
-      if (fields.includes("caption")) updatePayload.caption = caption;
-      if (fields.includes("hashtags")) updatePayload.hashtags = hashtags;
+        if (fields.includes("title")) updatePayload.title = title;
+        if (fields.includes("caption")) updatePayload.caption = caption;
+        if (fields.includes("hashtags")) updatePayload.hashtags = hashtags;
 
-      const { error: postUpdateError } = await adminClient
-        .from("posts")
-        .update(updatePayload)
-        .eq("id", body.post_id);
+        const { error: postUpdateError } = await adminClient
+          .from("posts")
+          .update(updatePayload)
+          .eq("id", body.post_id);
 
-      if (postUpdateError) throw postUpdateError;
-    }
-
-    if (context.sessionId && title) {
-      const { data: session } = await adminClient
-        .from("sessions")
-        .select("id, title")
-        .eq("id", context.sessionId)
-        .maybeSingle();
-
-      const currentTitle = String(session?.title || "").trim();
-      const promptFallback = fallbackTitleFromPrompt(prompt);
-      if (!currentTitle || currentTitle === "New Session" || currentTitle === promptFallback) {
-        await adminClient
-          .from("sessions")
-          .update({ title, updated_at: new Date().toISOString() })
-          .eq("id", context.sessionId);
+        if (postUpdateError) throw postUpdateError;
       }
-    }
 
-    return jsonResponse({
-      title,
-      caption,
-      hashtags,
-      summary,
-      status: "completed",
-      generation_status: "completed",
-      fields,
-      provider: llmResult.provider,
-      model: llmResult.model,
-      provider_warning: null,
-    });
+      if (context.sessionId && title) {
+        const { data: session } = await adminClient
+          .from("sessions")
+          .select("id, title")
+          .eq("id", context.sessionId)
+          .maybeSingle();
+
+        const currentTitle = String(session?.title || "").trim();
+        const promptFallback = fallbackTitleFromPrompt(prompt);
+        if (!currentTitle || currentTitle === "New Session" || currentTitle === promptFallback) {
+          await adminClient
+            .from("sessions")
+            .update({ title, updated_at: new Date().toISOString() })
+            .eq("id", context.sessionId);
+        }
+      }
+
+      return jsonResponse({
+        title,
+        caption,
+        hashtags,
+        summary,
+        status: "completed",
+        generation_status: "completed",
+        fields,
+        provider: llmResult.provider,
+        model: llmResult.model,
+        provider_warning: null,
+      });
+    } catch (innerError) {
+      if (body.post_id && context.post) {
+        const failedAt = new Date().toISOString();
+        await adminClient
+          .from("posts")
+          .update({
+            workflow_state: {
+              ...safeObject(context.post?.workflow_state),
+              metadata_status: "failed",
+              metadata_error: innerError instanceof Error ? innerError.message : String(innerError),
+              metadata_updated_at: failedAt,
+            },
+            updated_at: failedAt,
+          })
+          .eq("id", body.post_id);
+        // Best-effort — if this secondary write itself fails, the row stays
+        // 'in_progress' with a stale timestamp, which the client's
+        // time-based reconciliation (hydratePostProductionFromGeneration)
+        // will independently treat as failed/stale anyway.
+      }
+      throw innerError;
+    }
   } catch (error) {
     console.error("[generate-post-metadata] error", error);
     return jsonResponse(toErrorPayload(error), mapErrorToStatusCode(error));

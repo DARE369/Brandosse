@@ -838,7 +838,7 @@ export async function publishOrgCalendarRecord(pipelineItemId) {
   });
 
   if (error) {
-    toEdgeFunctionError(error, 'org-calendar-publish');
+    await toEdgeFunctionError(error, 'org-calendar-publish');
   }
 
   const attempt = {

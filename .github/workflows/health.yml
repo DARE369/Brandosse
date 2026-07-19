@@ -15,6 +15,10 @@ jobs:
     steps:
       - name: Check Vercel (frontend)
         run: |
+          if [ -z "${{ secrets.NEXT_PUBLIC_APP_URL }}" ]; then
+            echo "::error::NEXT_PUBLIC_APP_URL secret is not set on this repo (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.NEXT_PUBLIC_APP_URL }}/login")
           echo "Vercel /login → $STATUS"
           if [ "$STATUS" != "200" ]; then
@@ -24,6 +28,10 @@ jobs:
 
       - name: Check Railway (video worker)
         run: |
+          if [ -z "${{ secrets.RAILWAY_WORKER_URL }}" ]; then
+            echo "::error::RAILWAY_WORKER_URL secret is not set on this repo (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RAILWAY_WORKER_URL }}/health")
           echo "Railway /health → $STATUS"
           if [ "$STATUS" != "200" ]; then

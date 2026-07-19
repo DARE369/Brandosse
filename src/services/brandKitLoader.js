@@ -1,4 +1,13 @@
 // src/services/brandKitLoader.js
+//
+// Multi-kit note (docs/brand-kit-rebuild/DECISIONS_LOG.md — "Active-kit
+// model for Studio"): an account can hold several brand kits, but Studio
+// always generates from exactly one — whichever kit has `is_active = true`
+// (enforced by a partial unique index, see
+// supabase/migrations/20260708140000_brand_kit_multi_kit.sql). This file is
+// the live bridge between Brand Kit data and content generation quality
+// (imported by SessionStore.js and generationPipeline.js) — treat any
+// further change here as a breaking-change review, not a routine edit.
 import { supabase } from '../services/supabaseClient';
 
 export async function loadBrandKit(userId) {
@@ -6,12 +15,20 @@ export async function loadBrandKit(userId) {
     .from('brand_kit')
     .select('*')
     .eq('user_id', userId)
+    .eq('is_active', true)
     .maybeSingle();
 
+  if (!kit) {
+    return condenseBrandKit(null, []);
+  }
+
+  // Assets are scoped to the active kit specifically, not every kit the
+  // account owns — a user with an inactive "Client B" kit's logo shouldn't
+  // leak into generations steered by the active "Client A" kit.
   const { data: assets } = await supabase
     .from('brand_assets')
     .select('name, asset_type, description, tags, usage_hints, alt_text, extracted_text, visual_summary, font_family')
-    .eq('user_id', userId)
+    .eq('brand_kit_id', kit.id)
     .eq('status', 'ready')
     .limit(20);
 
@@ -34,6 +51,8 @@ function condenseBrandKit(kit, assets) {
     kit.visual_style_keywords?.length && `Visual style: ${kit.visual_style_keywords.join(', ')}`,
     kit.photo_style_notes    && `Photo style: ${kit.photo_style_notes}`,
     kit.avoid_visual_elements?.length && `Avoid visually: ${kit.avoid_visual_elements.join(', ')}`,
+    kit.font_display?.family && `Display font: ${kit.font_display.family}${kit.font_display.style ? ` (${kit.font_display.style})` : ''}`,
+    kit.font_body?.family    && `Body font: ${kit.font_body.family}${kit.font_body.style ? ` (${kit.font_body.style})` : ''}`,
     kit.content_restrictions?.length && `Content restrictions: ${kit.content_restrictions.join(', ')}`,
     kit.legal_disclaimers    && `Required disclaimer: ${kit.legal_disclaimers}`,
     kit.emoji_usage          && `Emoji usage: ${kit.emoji_usage}`,

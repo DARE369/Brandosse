@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { BookmarkPlus, Check, Loader2 } from "lucide-react";
 import ClipListPanel from "./ClipListPanel";
 import ClipPreviewPanel from "./ClipPreviewPanel";
 import PreviewModal from "./PreviewModal";
 import { useSignedUrls } from "@/hooks/video-engine/useSignedUrls";
 import { normalizeScore, scoreColor, formatDuration, SCORE_BAR_COLORS } from "./clip-utils";
+import { saveClipToLibrary } from "./clipLibraryActions";
 
 function useLocalStorage(key, defaultValue) {
   const [value, setValue] = useState(() => {
@@ -225,6 +227,16 @@ export default function ClipsGallery({ clips: rawClips, job, jobTitle, jobId }) 
   const [layoutMode, setLayoutMode] = useLocalStorage("video-lab-layout-mode", "split");
   const [selectedClipId, setSelectedClipId] = useState(null);
   const [previewModalClip, setPreviewModalClip] = useState(null);
+  // clipId -> personal_assets id. Shared across the gallery, list/table
+  // rows, the split-view panel, and the modal so a clip saved from any one
+  // of those surfaces is immediately known-saved everywhere else — avoids
+  // uploadPersonalAsset creating a second Library row for the same clip.
+  const [savedClips, setSavedClips] = useState(() => new Map());
+  const handleClipSaved = useCallback((clipId, assetId) => {
+    setSavedClips((prev) => new Map(prev).set(clipId, assetId));
+  }, []);
+  const [savingAll, setSavingAll] = useState(false);
+  const [saveAllError, setSaveAllError] = useState("");
 
   // Keep completed and failed separate so failed clips fall to the bottom of
   // list/table views rather than being interleaved with scored clips.
@@ -275,6 +287,26 @@ export default function ClipsGallery({ clips: rawClips, job, jobTitle, jobId }) 
 
   const completedCount = completedClips.length;
   const failedCount    = failedClips.length;
+  const unsavedCount = sortedCompleted.filter((c) => !savedClips.has(c.id)).length;
+
+  const handleSaveAll = useCallback(async () => {
+    const targets = sortedCompleted.filter((c) => !savedClips.has(c.id));
+    if (targets.length === 0) return;
+    setSavingAll(true);
+    setSaveAllError("");
+    let failures = 0;
+    for (const clip of targets) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const assetId = await saveClipToLibrary(clip);
+        handleClipSaved(clip.id, assetId);
+      } catch {
+        failures += 1;
+      }
+    }
+    setSavingAll(false);
+    if (failures > 0) setSaveAllError(`${failures} clip${failures === 1 ? "" : "s"} could not be saved.`);
+  }, [sortedCompleted, savedClips, handleClipSaved]);
 
   if (clips.length === 0) {
     return (
@@ -323,6 +355,28 @@ export default function ClipsGallery({ clips: rawClips, job, jobTitle, jobId }) 
           </p>
         </div>
 
+        {completedCount > 0 ? (
+          <button
+            onClick={handleSaveAll}
+            disabled={savingAll || unsavedCount === 0}
+            title={unsavedCount === 0 ? "All clips saved to Library" : `Save ${unsavedCount} clip${unsavedCount === 1 ? "" : "s"} to Library`}
+            style={{
+              display:      "flex", alignItems: "center", gap: 6,
+              padding:      "0 12px", height: 28,
+              borderRadius: 7,
+              border:       "0.5px solid var(--color-border-tertiary)",
+              background:   "var(--color-background-primary)",
+              color:        unsavedCount === 0 ? "var(--color-text-secondary)" : "var(--color-text-primary)",
+              fontSize:     11, fontWeight: 500,
+              cursor:       unsavedCount === 0 ? "default" : "pointer",
+              whiteSpace:   "nowrap",
+            }}
+          >
+            {savingAll ? <Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> : unsavedCount === 0 ? <Check size={13} /> : <BookmarkPlus size={13} />}
+            {savingAll ? "Saving…" : unsavedCount === 0 ? "All saved" : `Save all (${unsavedCount})`}
+          </button>
+        ) : null}
+
         {/* Single-border group wrapping all three toggle buttons */}
         <div style={{
           display:      "flex",
@@ -362,6 +416,12 @@ export default function ClipsGallery({ clips: rawClips, job, jobTitle, jobId }) 
         </div>
       </div>
 
+      {saveAllError ? (
+        <div style={{ padding: "6px 16px", fontSize: 11, color: "var(--color-danger)", flexShrink: 0 }}>
+          {saveAllError}
+        </div>
+      ) : null}
+
       {/* ── Body ── */}
       <div style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
 
@@ -375,6 +435,8 @@ export default function ClipsGallery({ clips: rawClips, job, jobTitle, jobId }) 
             <ClipPreviewPanel
               clip={selectedClip}
               onRefreshUrl={handleRefreshUrl}
+              savedAssetId={selectedClip ? savedClips.get(selectedClip.id) || null : null}
+              onSaved={handleClipSaved}
             />
           </>
         )}
@@ -408,6 +470,8 @@ export default function ClipsGallery({ clips: rawClips, job, jobTitle, jobId }) 
           clip={previewModalClip}
           onClose={handleCloseModal}
           onRefreshUrl={handleRefreshUrl}
+          savedAssetId={savedClips.get(previewModalClip.id) || null}
+          onSaved={handleClipSaved}
         />
       )}
 

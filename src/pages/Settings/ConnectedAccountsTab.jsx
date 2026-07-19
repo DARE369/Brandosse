@@ -12,6 +12,8 @@ import PlatformGrid from './components/PlatformGrid';
 import MockOAuthScreen from './components/MockOAuthScreen';
 import ConnectedAccountCard from './components/ConnectedAccountCard';
 import AccountHealthModal from './components/AccountHealthModal';
+import { Card, Badge, Button, Modal, EmptyState } from '../../ui-v2';
+import styles from './ConnectedAccountsTab.module.css';
 
 export default function ConnectedAccountsTab({ onToast }) {
   const { navigate } = useAppNavigation();
@@ -19,9 +21,10 @@ export default function ConnectedAccountsTab({ onToast }) {
   const [loading, setLoading] = useState(true);
   const [platforms, setPlatforms] = useState([]);
   const [accounts, setAccounts] = useState([]);
-  const [selectedPlatform, setSelectedPlatform] = useState(null);
   const [editingAccount, setEditingAccount] = useState(null);
   const [healthAccountId, setHealthAccountId] = useState(null);
+  const [removeTarget, setRemoveTarget] = useState(null);
+  const [removing, setRemoving] = useState(false);
 
   const platformMap = useMemo(
     () => new Map(platforms.map((platform) => [platform.platform_key, platform])),
@@ -59,16 +62,18 @@ export default function ConnectedAccountsTab({ onToast }) {
     }
   };
 
-  const handleRemove = async (account) => {
-    const confirmed = window.confirm(`Disconnect ${account.display_name || account.account_name || account.platform}?`);
-    if (!confirmed) return;
-
+  const confirmRemove = async () => {
+    if (!removeTarget) return;
+    setRemoving(true);
     try {
-      await disconnectAccount(account.id, user?.id);
-      onToast?.(`${account.display_name || account.account_name} disconnected.`, 'success');
+      await disconnectAccount(removeTarget.id, user?.id);
+      onToast?.(`${removeTarget.display_name || removeTarget.account_name} disconnected.`, 'success');
+      setRemoveTarget(null);
       await loadData();
     } catch (error) {
       onToast?.(error?.message || 'Could not disconnect this account.', 'error');
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -82,47 +87,41 @@ export default function ConnectedAccountsTab({ onToast }) {
   };
 
   return (
-    <section className="connected-accounts-tab">
-      <header className="connected-accounts-header">
+    <div className={styles.wrap}>
+      <div className={styles.headRow}>
         <div>
-          <h1>Connected Accounts</h1>
-          <p>Connect social accounts for scheduling, publishing, and multi-user workflows.</p>
+          <div className={styles.title}>Connected Accounts</div>
+          <div className={styles.sub}>Connect social accounts for scheduling, publishing, and multi-user workflows.</div>
         </div>
-        <span className="connected-accounts-badge">{activeAccountCount} connected</span>
-      </header>
+        <Badge tone="accent">{activeAccountCount} connected</Badge>
+      </div>
 
       {Array.isArray(orgMemberships) && orgMemberships.length > 0 ? (
-        <div className="connected-account-org-banners">
-          {orgMemberships.map((membership) => (
-            <article key={membership.id} className="connected-account-org-banner">
-              <Link2 size={16} />
-              <div>
+        orgMemberships.map((membership) => (
+          <Card key={membership.id}>
+            <div className={styles.orgBanner}>
+              <Link2 size={16} aria-hidden="true" />
+              <div className={styles.orgBannerCopy}>
                 <strong>{membership.organization?.name || 'Organization workspace'}</strong>
                 <p>Organization accounts are managed inside the org workspace settings.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate(getOrgNavigationTarget(membership))}
-              >
-                {membership?.role === 'org_owner' || membership?.role === 'org_admin'
-                  ? 'View Org Accounts'
-                  : 'Open Workspace'}
-              </button>
-            </article>
-          ))}
-        </div>
+              <Button variant="subtle" size="sm" onClick={() => navigate(getOrgNavigationTarget(membership))}>
+                {membership?.role === 'org_owner' || membership?.role === 'org_admin' ? 'View Org Accounts' : 'Open Workspace'}
+              </Button>
+            </div>
+          </Card>
+        ))
       ) : null}
 
-      {loading ? <div className="connected-accounts-empty">Loading connected accounts...</div> : null}
+      {loading ? <Card><div className={styles.loading}>Loading connected accounts…</div></Card> : null}
 
       {!loading && accounts.length > 0 ? (
-        <section className="connected-account-section">
-          <div className="connected-account-section-heading">
-            <h2>Your Connected Accounts</h2>
-            <span>{accounts.length} total</span>
+        <Card>
+          <div className={styles.sectionHead}>
+            <span className={styles.sectionTitle}>Your Connected Accounts</span>
+            <span className={styles.sectionCount}>{accounts.length} total</span>
           </div>
-
-          <div className="connected-account-list">
+          <div className={styles.list}>
             {accounts.map((account) => (
               <ConnectedAccountCard
                 key={account.id}
@@ -131,49 +130,43 @@ export default function ConnectedAccountsTab({ onToast }) {
                 onViewHealth={(nextAccount) => setHealthAccountId(nextAccount.id)}
                 onReconnect={handleReconnect}
                 onEdit={(nextAccount) => setEditingAccount(nextAccount)}
-                onRemove={handleRemove}
+                onRemove={(nextAccount) => setRemoveTarget(nextAccount)}
               />
             ))}
           </div>
-        </section>
+        </Card>
+      ) : !loading ? (
+        <Card><EmptyState dashed title="No accounts connected yet" description="Connect a platform below to start scheduling and publishing." /></Card>
       ) : null}
 
       {!loading ? (
-        <section className="connected-account-section">
-          <div className="connected-account-section-heading">
-            <h2>Add an Account</h2>
-            <span>Live OAuth is used when configured; otherwise demo mode is available.</span>
+        <Card>
+          <div className={styles.sectionHead}>
+            <span className={styles.sectionTitle}>Add an Account</span>
+            <span className={styles.sectionHint}>Live OAuth is used when configured; otherwise demo mode is available.</span>
           </div>
           <PlatformGrid
             platforms={platforms}
             connectedAccounts={accounts}
-            onConnect={(platform) => {
-              setEditingAccount(null);
-              setSelectedPlatform(platform);
-            }}
+            onConnect={(platform) => navigate(`/app/settings/connect?platform=${encodeURIComponent(platform.platform_key)}`)}
           />
-        </section>
+        </Card>
       ) : null}
 
+      {/* New connections go through the dedicated /app/settings/connect flow
+          (see ConnectAccountFlow.jsx) — this modal now only handles editing
+          an already-connected account's details. */}
       <MockOAuthScreen
-        open={Boolean(selectedPlatform) || Boolean(editingAccount)}
-        platform={selectedPlatform || platformMap.get(editingAccount?.platform)}
+        open={Boolean(editingAccount)}
+        platform={platformMap.get(editingAccount?.platform)}
         account={editingAccount}
-        mode={editingAccount ? 'edit' : 'connect'}
+        mode="edit"
         userId={user?.id}
         onError={(message) => onToast?.(message, 'error')}
-        onClose={() => {
-          setSelectedPlatform(null);
-          setEditingAccount(null);
-        }}
+        onClose={() => setEditingAccount(null)}
         onSaved={async () => {
           await loadData();
-          onToast?.(
-            editingAccount
-              ? 'Connected account updated.'
-              : `${selectedPlatform?.display_name || 'Platform'} connected successfully.`,
-            'success',
-          );
+          onToast?.('Connected account updated.', 'success');
         }}
       />
 
@@ -182,6 +175,19 @@ export default function ConnectedAccountsTab({ onToast }) {
         accountId={healthAccountId}
         onClose={() => setHealthAccountId(null)}
       />
-    </section>
+
+      <Modal
+        open={Boolean(removeTarget)}
+        onClose={() => setRemoveTarget(null)}
+        title="Disconnect this account?"
+        description={removeTarget ? `${removeTarget.display_name || removeTarget.account_name || removeTarget.platform} will stop scheduling and publishing through Brandosse. You can reconnect it later.` : ''}
+        actions={(
+          <>
+            <Button variant="ghost" onClick={() => setRemoveTarget(null)} disabled={removing}>Cancel</Button>
+            <Button variant="dangerSolid" onClick={confirmRemove} disabled={removing}>{removing ? 'Disconnecting…' : 'Disconnect'}</Button>
+          </>
+        )}
+      />
+    </div>
   );
 }

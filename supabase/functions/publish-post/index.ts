@@ -259,6 +259,7 @@ serve(async (req) => {
         : null,
       failureReason: result.failureReason,
       mode: account.is_mock ? "mock" : "real",
+      note: account.is_mock ? null : (result.note ?? null),
     });
 
   } catch (error) {

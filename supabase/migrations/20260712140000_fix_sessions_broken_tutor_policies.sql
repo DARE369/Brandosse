@@ -1,0 +1,41 @@
+-- ============================================================================
+-- Migration: fix_sessions_broken_tutor_policies
+-- Purpose: public.sessions is shared with an unrelated tutoring-platform
+--   product (documented in 20260710090000_baseline_core_tables.sql:349-363,
+--   "MAJOR FLAG (2026-07-10 live introspection)"). Two of that product's RLS
+--   policies — "Tutors can read assigned sessions" and "Tutors can update
+--   assigned sessions" — call is_tutor_for_session(id), which internally
+--   queries public.tutors. That table does not exist on this live database
+--   (confirmed via live QA testing 2026-07-12: any SELECT on sessions as an
+--   authenticated user errors with `relation "public.tutors" does not
+--   exist`). Because Postgres RLS evaluates every applicable permissive
+--   policy for a query, this ONE broken policy's error aborts the ENTIRE
+--   query — including for rows this app's own, correct policies
+--   (workspace_scoped_sessions_access, etc.) would otherwise legitimately
+--   allow. This also transitively broke realtime private-channel
+--   subscription (session_broadcast_subscribe_access's USING clause does
+--   `SELECT 1 FROM sessions s WHERE ...`, which triggers sessions' own RLS).
+--
+--   Since is_tutor_for_session() cannot function at all without public.tutors
+--   existing, the tutoring product's tutor-facing session access is already
+--   completely broken today regardless of this migration — dropping these
+--   two policies does not remove any WORKING functionality from that
+--   product, it only removes two policies that currently do nothing but
+--   throw errors for everyone (including that product's own users, if any
+--   are still active). Every other pre-existing policy on `sessions`
+--   (Admins/Parents/Users/workspace_scoped_sessions_access) is left
+--   completely untouched — only the two error-raising tutor-update/read
+--   policies are removed.
+--
+-- Rollback: re-create the two dropped policies (their exact definitions are
+--   quoted below in comments) IF public.tutors and is_tutor_for_session()
+--   are restored/fixed first — re-creating them beforehand would just
+--   reintroduce the same fatal error for every session read.
+--   DROPPED "Tutors can read assigned sessions": FOR SELECT TO authenticated
+--     USING (is_tutor_for_session(id))
+--   DROPPED "Tutors can update assigned sessions": FOR UPDATE TO authenticated
+--     USING (is_tutor_for_session(id)) WITH CHECK (is_tutor_for_session(id))
+-- ============================================================================
+
+DROP POLICY IF EXISTS "Tutors can read assigned sessions" ON public.sessions;
+DROP POLICY IF EXISTS "Tutors can update assigned sessions" ON public.sessions;
