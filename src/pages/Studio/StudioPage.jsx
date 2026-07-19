@@ -67,6 +67,39 @@ function ThemeToggleButton() {
 
 const MODE_ICON = { image: "🖼", carousel: "▦", video: "▶", edit: "✎", "image-to-video": "✦" };
 
+// Credit cost of regenerating a single image — kept in sync with the cost
+// estimator (source of truth: mediaGenerationOptions.js) so the "Regenerate
+// (N cr)" label on a quality-flagged card never drifts from what's actually
+// charged. 2.2: a hard-failed image offers this as a one-click recovery; the
+// spend is the user's explicit choice, never automatic.
+const IMAGE_REGEN_COST = estimateGenerationCost({ mediaType: "image", contentType: "single", batchSize: 1 });
+
+// 2.1: renders a subtle quality indicator from metadata.quality (written by
+// the quality-gate edge fn). Only surfaces warn/fail — a clean "pass" shows
+// nothing, so good images stay uncluttered. Returns null until scored.
+function QualityFlag({ quality }) {
+  if (!quality || quality.verdict === "pass") return null;
+  const isFail = quality.verdict === "fail";
+  const title = (quality.flags && quality.flags.length)
+    ? quality.flags.join(" · ")
+    : (isFail ? "Quality check flagged issues — consider regenerating" : "Quality check found minor issues");
+  return (
+    <span
+      title={title}
+      style={{
+        position: "absolute", top: 6, left: 6, zIndex: 2,
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "2px 7px", borderRadius: 999, fontSize: 10.5, fontWeight: 600,
+        fontFamily: "var(--uiv2-font-mono)",
+        background: isFail ? "var(--uiv2-danger, #c0392b)" : "var(--uiv2-warning, #b98900)",
+        color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+      }}
+    >
+      {isFail ? "⚠ Low quality" : "⚠ Check"}
+    </span>
+  );
+}
+
 function StudioBody({ brandKit }) {
   const { navigate } = useAppNavigation();
   const { user, profile } = useAuth();
@@ -995,6 +1028,7 @@ function StudioBody({ brandKit }) {
                             ) : (
                               <span className={styles.variantLabel}>Slide {i + 1}</span>
                             )}
+                            <QualityFlag quality={g.metadata?.quality} />
                             <button
                               type="button"
                               className={[styles.filmCheck, slideSelection[g.id] ? styles.filmCheckOn : ""].join(" ")}
@@ -1051,6 +1085,7 @@ function StudioBody({ brandKit }) {
                         ) : (
                           <span className={styles.variantLabel}>V{i + 1}</span>
                         )}
+                        <QualityFlag quality={g.metadata?.quality} />
                         {selectedGenerationId === g.id && (
                           <span className={styles.variantBadge}>
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#17181B" strokeWidth="3"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -1073,6 +1108,24 @@ function StudioBody({ brandKit }) {
                             </button>
                           </span>
                         </div>
+                        {g.metadata?.quality?.verdict === "fail" && !regeneratingIds.includes(g.id) && (
+                          <button
+                            type="button"
+                            className={styles.qualityRegenBar}
+                            onClick={(e) => { e.stopPropagation(); handleRegenerateVariant(g); }}
+                            title={(g.metadata.quality.flags || []).join(" · ") || "Quality check flagged issues"}
+                            style={{
+                              position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 3,
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                              padding: "7px 10px", border: "none", cursor: "pointer",
+                              fontSize: 11.5, fontWeight: 600, color: "#fff",
+                              background: "linear-gradient(to top, rgba(192,57,43,0.96), rgba(192,57,43,0.82))",
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-7 3L3 8" strokeLinecap="round" strokeLinejoin="round" /><path d="M3 3v5h5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            Regenerate ({IMAGE_REGEN_COST} cr)
+                          </button>
+                        )}
                         {regeneratingIds.includes(g.id) && (
                           <div className={styles.regeneratingOverlay}><span className={styles.regeneratingDot} /></div>
                         )}

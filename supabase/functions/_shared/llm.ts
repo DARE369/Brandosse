@@ -178,6 +178,64 @@ export async function callLlm(options: {
   throw lastError || createHttpError("AI provider request failed.", 500);
 }
 
+// ── Specialist: Claude Haiku vision judge (2.1 visual quality gate) ──────────
+/**
+ * callVisionJudge — sends an IMAGE to Claude Haiku (vision-capable, cheap) with
+ * a strict-JSON rubric and returns the raw JSON string. Used by the
+ * quality-gate edge function to score a freshly-generated image. Anthropic is
+ * required here (Groq's OpenAI-compatible path in callLlm is text-only in this
+ * codebase); if ANTHROPIC_API_KEY is absent the caller should treat the gate
+ * as "unavailable" and skip scoring rather than fail the generation.
+ */
+export async function callVisionJudge(opts: {
+  systemPrompt: string;
+  userPrompt: string;
+  imageBase64: string;
+  imageMediaType: string; // e.g. "image/jpeg" | "image/png"
+  maxTokens?: number;
+}): Promise<string> {
+  const anthropicKey = readEnv("ANTHROPIC_API_KEY", false);
+  if (!anthropicKey) {
+    throw createHttpError("Vision quality gate requires ANTHROPIC_API_KEY.", 501);
+  }
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      system: opts.systemPrompt,
+      max_tokens: opts.maxTokens ?? 400,
+      temperature: 0,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: opts.imageMediaType, data: opts.imageBase64 },
+          },
+          { type: "text", text: opts.userPrompt },
+        ],
+      }],
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`Vision judge failed (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  return Array.isArray(data?.content)
+    ? data.content.map((c: { text?: string }) => c.text || "").join("").trim()
+    : "";
+}
+
 // ── Specialist: Claude Haiku for prompt engineering ──────────────────────────
 /**
  * callPromptEngine — always uses Claude Haiku.

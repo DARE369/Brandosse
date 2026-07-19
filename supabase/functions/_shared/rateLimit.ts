@@ -60,6 +60,11 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   generateImage: { max: 20, windowSeconds: 60 },
   editImage: { max: 12, windowSeconds: 60 },
   generateVideo: { max: 4, windowSeconds: 60 },
+  // quality-gate fires once per generated image (2.1). It's an uncredited
+  // vision call bundled into the image price, so it must have its OWN cap or
+  // it's an unmetered cost leak — 24/min comfortably covers a 4-image batch +
+  // a full carousel scored back-to-back, while blocking a tight-loop abuser.
+  "quality-gate": { max: 24, windowSeconds: 60 },
 };
 
 type CheckRateLimitRow = { allowed: boolean; retry_after_seconds: number };

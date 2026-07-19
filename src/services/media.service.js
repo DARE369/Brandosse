@@ -216,6 +216,24 @@ export async function generateImages({
   return images;
 }
 
+// Fire-and-forget visual quality gate (2.1). Called by the pipeline AFTER a
+// generation row is marked completed — never awaited in the render path, so it
+// can't delay first paint. The edge fn scores the image and writes
+// metadata.quality onto the row; the UI picks it up via realtime. Any failure
+// is swallowed here: a quality score is a nice-to-have, never a reason to
+// surface an error on an image that already rendered and was billed.
+export function triggerQualityGate(generationId) {
+  if (!generationId) return;
+  try {
+    // Deliberately not awaited.
+    supabase.functions
+      .invoke('quality-gate', { body: { generation_id: generationId } })
+      .catch((err) => console.warn('[quality-gate] trigger failed (non-fatal):', err?.message || err));
+  } catch (err) {
+    console.warn('[quality-gate] trigger threw (non-fatal):', err?.message || err);
+  }
+}
+
 export async function editImage({
   prompt,
   sourceImageUrl,

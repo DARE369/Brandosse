@@ -14,6 +14,7 @@ import { validateAndRepairPlan }   from './contentPlanValidator';
 import { runQualityGate }          from './qualityGate';
 import { loadBrandKit }            from './brandKitLoader';
 import { loadUserHistory }         from './historyLoader';
+import { triggerQualityGate }      from './media.service';
 
 let _generateImage = null;
 export function registerImageGenerator(fn) { _generateImage = fn; }
@@ -295,6 +296,8 @@ async function runSingleGeneration(
         ...generated.metadata,
       },
     }).eq('id', generation.id);
+    // 2.1: score the finished image asynchronously (never awaited).
+    triggerQualityGate(generation.id);
   } catch (err) {
     await supabase.from('generations').update({ status: GENERATION_STATUS.FAILED }).eq('id', generation.id);
     throw err;
@@ -394,6 +397,8 @@ async function runCarouselOrchestration(
           ...generated.metadata,
         },
       }).eq('id', row.id);
+      // 2.1: score each finished slide asynchronously (never awaited).
+      triggerQualityGate(row.id);
       outcomes.push({ id: row.id, index: idx, ok: true });
     } catch (err) {
       await supabase.from('generations').update({ status: GENERATION_STATUS.FAILED }).eq('id', row.id);
