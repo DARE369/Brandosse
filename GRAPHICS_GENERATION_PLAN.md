@@ -1,5 +1,14 @@
 # Graphics Generation — Staged Implementation Plan
 
+> **BUILD STATUS (2026-07-19, branch `feat/graphics-quality-core`):**
+> ✅ **Stage 0, 1, 2, 3, 4, 5 — fully built, verified (build green), committed.**
+> ⏸ **1.4** (show-prompt-before-spend) — folded into Stage 3 lightbox receipt; full pre-spend edit deferred (needs the plan/render split, which 5.2 now provides — easy follow-up).
+> ✅ **6.3** (quality-flagged bulk regenerate) + **6.4** (reproducibility receipts) — built.
+> ⏸ **6.1** (in-canvas inpainting) + **6.2** (brand-frame overlay templates) — DEFERRED. Both are heavy, interaction-canvas features that need a human visual-QA loop to build responsibly; not safe to build unattended. See end-of-session report.
+> **Not yet deployed:** `quality-gate` + `upscaleImage` edge functions need `supabase functions deploy` + `ANTHROPIC_API_KEY`. FLUX ref/upscale endpoints need a live smoke test. See report §"What you need to do."
+
+
+
 **Date:** 2026-07-19
 **Companion to:** [GRAPHICS_GENERATION_AUDIT.md](GRAPHICS_GENERATION_AUDIT.md)
 **Optimized for:** *Max quality, fast* — front-load the changes that make output stop looking like AI.
