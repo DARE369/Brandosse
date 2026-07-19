@@ -818,6 +818,9 @@ const useSessionStore = create((set, get) => ({
   // { storyboard, bundle, prompt, sessionId, userId } — held in memory only;
   // a refresh discards it (re-plan). null when no carousel is pending.
   pendingCarousel: null,
+  // 1.4: a planned-but-not-yet-approved single-image batch awaiting prompt
+  // review/edit before spend. { bundle, renderPrompt, variants, ...ctx }.
+  pendingGeneration: null,
   // Generation ids currently being redone in place via regenerateVariant/
   // regenerateSlides — lets the grid/filmstrip/lightbox show a per-item
   // spinner without touching the page-level isGenerating/studioStage
@@ -847,6 +850,9 @@ const useSessionStore = create((set, get) => ({
     // consistency; styleLock persists them across sessions ("match my feed").
     referenceImages: [],
     styleLock: false,
+    // 1.4: when on, single-image generation pauses to let the user review/edit
+    // the final render prompt BEFORE credits are spent. Off = unchanged fast path.
+    previewPrompt: false,
     resolution: '2k',
     duration: 6,
     fps: 25,
@@ -1379,6 +1385,42 @@ const useSessionStore = create((set, get) => ({
       });
 
       const requestedVariants = Math.max(1, Math.min(Number(settings.batchSize) || 1, 4));
+
+      // 1.4: preview-before-spend — plan ONCE (no render, no image credits),
+      // then hold the plan for the user to review/edit the render prompt. On
+      // approve, approveGeneration() renders all variants from this one shared
+      // plan. Only the plan LLM has run at this point (cheap); no image spend.
+      if (settings.previewPrompt) {
+        const bundle = await runGenerationPipeline({
+          userInput: prompt,
+          clarifications: pendingClarifications ?? {},
+          sessionId: session.id,
+          userId: user.id,
+          workspaceScope: getSessionScope(),
+          requestId,
+          cancelSignal: abortController.signal,
+          lineageMetadata: generationLineage,
+          settings: { ...settings, contentType: settings.contentType ?? 'single', mediaType: 'image' },
+          planOnly: true,
+          onProgress: (stage) => {
+            const mapped = mapStageProgress(stage);
+            set({ generationProgress: mapped.pct, progressLabel: mapped.label, generationStage: stage });
+          },
+        });
+        set({
+          pendingGeneration: {
+            bundle,
+            renderPrompt: bundle.renderPrompt || '',
+            requestedVariants,
+            sessionId: session.id,
+            userId: user.id,
+            lineageMetadata: generationLineage,
+            settingsSnapshot: { ...settings, contentType: settings.contentType ?? 'single', mediaType: 'image' },
+          },
+        });
+        return { pending: true, renderPrompt: bundle.renderPrompt || '' };
+      }
+
       const generationIds = [];
       const outcomes = [];
 
@@ -1506,6 +1548,129 @@ const useSessionStore = create((set, get) => ({
         generationStage: null,
         generationAbortController: null,
       });
+    }
+  },
+
+  // 1.4: discard a planned-but-unapproved single-image batch.
+  cancelPendingGeneration: () => set({ pendingGeneration: null }),
+
+  // 1.4: render the approved (optionally prompt-edited) single-image batch from
+  // the shared plan. Mints a fresh requestId; renders each variant via
+  // renderSingleFromPlan with the edited prompt as promptOverride. Same
+  // per-variant isolation + post-loop bookkeeping as startGeneration's inline
+  // path, just sourced from one shared plan instead of re-planning per variant.
+  approveGeneration: async (editedPrompt) => {
+    const pending = get().pendingGeneration;
+    if (!pending) return undefined;
+    const { bundle, requestedVariants, sessionId, userId, lineageMetadata, settingsSnapshot } = pending;
+    const promptOverride = String(editedPrompt ?? pending.renderPrompt ?? '').trim() || null;
+
+    const requestId = crypto.randomUUID();
+    const abortController = new AbortController();
+    set({
+      isGenerating: true, error: null, generationProgress: 10,
+      progressLabel: 'Rendering approved image...', generationStage: 'Generating image...',
+      generationAbortController: abortController, pendingGeneration: null, lastBatchOutcome: null,
+    });
+
+    const VARIANT_DIRECTIONS = [
+      '', 'a different camera angle and tighter composition',
+      'different lighting and mood, wider shot', 'an alternative composition with a fresh perspective',
+    ];
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const brandKit = await loadBrandKit(user.id);
+      const { registerImageGenerator, renderSingleFromPlan } = await import('../services/generationPipeline');
+
+      registerImageGenerator(async (promptText, aspectRatio, opts = {}) => {
+        const images = await generateImages({
+          prompt: promptText,
+          aspectRatio,
+          numImages: 1,
+          brandKit,
+          sessionId,
+          imageModel: opts.imageModel || settingsSnapshot.imageModel || 'ideogram',
+          referenceImageUrls: opts.referenceImages || undefined,
+          category: 'image',
+          requestId: opts.requestId,
+          slotOffset: opts.requestSlot ?? 0,
+          generationId: opts.generationId,
+          signal: opts.signal,
+        });
+        const first = images?.[0];
+        if (!first?.url) throw new Error('Image renderer returned no image URL');
+        return first;
+      });
+
+      const generationIds = [];
+      const outcomes = [];
+
+      for (let index = 0; index < requestedVariants; index += 1) {
+        if (abortController.signal.aborted) { outcomes.push({ index, ok: false, cancelled: true }); continue; }
+        // Per-variant direction hint appended to the (possibly edited) prompt so
+        // a multi-variant batch still explores rather than duplicating.
+        const variantHint = requestedVariants > 1 ? VARIANT_DIRECTIONS[index % VARIANT_DIRECTIONS.length] : '';
+        const variantPrompt = variantHint && promptOverride ? `${promptOverride}. Variation: ${variantHint}.` : promptOverride;
+        try {
+          const pipelineResult = await renderSingleFromPlan({
+            plan: bundle.plan,
+            contentPlanId: bundle.contentPlanId,
+            sessionId,
+            userId,
+            settings: settingsSnapshot,
+            brandKitHash: bundle.brandKitHash,
+            lineageMetadata: { ...(lineageMetadata || {}), variant_index: index + 1, variant_total: requestedVariants },
+            workspaceScope: bundle.workspaceScope,
+            resolvedImageModel: bundle.resolvedImageModel,
+            resolvedReferenceImages: bundle.resolvedReferenceImages,
+            promptOverride: variantPrompt,
+            requestId,
+            requestSlot: index,
+            cancelSignal: abortController.signal,
+            onProgress: (stage) => {
+              const mapped = mapStageProgress(stage);
+              const variantOffset = requestedVariants > 1 ? ((index / requestedVariants) * 100) : 0;
+              const variantPct = requestedVariants > 1 ? Math.min(98, Math.round(variantOffset + (mapped.pct / requestedVariants))) : mapped.pct;
+              set({ generationProgress: variantPct, progressLabel: requestedVariants > 1 ? `Variant ${index + 1}/${requestedVariants}: ${mapped.label}` : mapped.label, generationStage: stage });
+            },
+          });
+          if (Array.isArray(pipelineResult?.generationIds)) generationIds.push(...pipelineResult.generationIds);
+          outcomes.push({ index, ok: true });
+        } catch (variantErr) {
+          if (isAbortError(variantErr)) { outcomes.push({ index, ok: false, cancelled: true }); continue; }
+          console.error(`[approveGeneration] variant ${index + 1} failed:`, variantErr);
+          outcomes.push({ index, ok: false, error: variantErr?.message || 'Variant failed' });
+        }
+      }
+
+      const succeededCount = outcomes.filter((o) => o.ok).length;
+      if (requestedVariants > 1) {
+        set({
+          lastBatchOutcome: {
+            kind: 'image', succeededCount,
+            failedCount: outcomes.length - succeededCount, totalCount: outcomes.length,
+            failedSlots: outcomes.filter((o) => !o.ok && !o.cancelled).map((o) => o.index), requestId,
+          },
+        });
+        if (succeededCount === 0) throw new Error('All variants failed to generate.');
+      }
+
+      if (generationIds.length > 0) await syncOrgScopeToGenerations(generationIds);
+      for (const generationId of generationIds) await ensureDraftForGeneration({ userId, generationId });
+      await touchSession(sessionId);
+      await get().fetchGenerations(sessionId, { silent: true });
+      dispatchContentSync('generation-completed');
+      set({ error: null, generationProgress: 100, progressLabel: 'Done!', generationStage: 'Done!' });
+      return { ok: true };
+    } catch (err) {
+      if (isAbortError(err)) { set({ error: null }); return undefined; }
+      logGenerationFailure('approveGeneration error', err);
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isGenerating: false, generationProgress: 0, progressLabel: null, generationStage: null, generationAbortController: null });
     }
   },
 

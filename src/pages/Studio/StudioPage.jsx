@@ -109,7 +109,7 @@ function StudioBody({ brandKit }) {
   const {
     activeSession, activeGenerations, selectedGeneration, selectedGenerationId,
     isGenerating, generationProgress, progressLabel, error, settings, postProduction,
-    updateSettings, startGeneration, startCarouselGeneration, approveCarousel, cancelPendingCarousel, pendingCarousel, startEditGeneration,
+    updateSettings, startGeneration, approveGeneration, cancelPendingGeneration, pendingGeneration, startCarouselGeneration, approveCarousel, cancelPendingCarousel, pendingCarousel, startEditGeneration,
     startVideoGeneration, generateVideoFirstFrame, enhancePrompt, selectGeneration, hydratePostProductionFromGeneration,
     regeneratePostMetadata, optimizeSeo, scoreSeo, updatePostProduction, saveDraft, saveDraftPrompt, publishContent,
     videoJobState, dismissVideoJob, setVideoJobMinimized, promptSeed, consumePromptSeed,
@@ -173,6 +173,8 @@ function StudioBody({ brandKit }) {
   // (billed as video). null = no pending frame.
   const [pendingFrame, setPendingFrame] = useState(null); // { url }
   const [framePhase, setFramePhase] = useState("idle"); // idle | generating | review | animating
+  // 1.4: editable render prompt shown in the pre-spend preview modal.
+  const [editablePrompt, setEditablePrompt] = useState("");
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [sourcePickerItems, setSourcePickerItems] = useState([]);
   const [sourcePickerLoading, setSourcePickerLoading] = useState(false);
@@ -533,6 +535,22 @@ function StudioBody({ brandKit }) {
     setPendingFrame(null);
     setFramePhase("idle");
   }, []);
+
+  /* 1.4: seed the editable prompt whenever a new pending generation appears. */
+  useEffect(() => {
+    if (pendingGeneration) setEditablePrompt(pendingGeneration.renderPrompt || "");
+  }, [pendingGeneration]);
+
+  /* 1.4: approve the previewed prompt → render (spends image credits). The
+     edited prompt is passed through as the render override. Cancel = no spend. */
+  const handleApproveGeneration = useCallback(async () => {
+    try {
+      await approveGeneration(editablePrompt);
+      setStudioStage("results");
+    } catch (err) {
+      if (!applyRateLimit("generate", err)) toast.error(err?.message || "Could not render the image.");
+    }
+  }, [approveGeneration, editablePrompt, applyRateLimit]);
 
   /* 5.2: approve the carousel storyboard → render (this is where the slide
      credits are actually spent). Cancel discards the plan with no spend. */
@@ -1164,6 +1182,14 @@ function StudioBody({ brandKit }) {
                   <span className={styles.costLabel}>This generation</span>
                   <span className={styles.costValue} style={{ color: canAfford ? "var(--uiv2-text-primary)" : "var(--uiv2-danger)" }}>{cost} credits</span>
                 </div>
+                {selectedMode === "image" && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "2px 0 10px", cursor: "pointer" }} onClick={() => updateSettings({ previewPrompt: !settings.previewPrompt })}>
+                    <span className={styles.toggleTrack} style={{ transform: "scale(0.85)", background: settings.previewPrompt ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)" }}>
+                      <span className={styles.toggleKnob} style={{ left: settings.previewPrompt ? "18px" : "2px" }} />
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--uiv2-text-secondary)" }}>Review &amp; edit the prompt before spending</span>
+                  </label>
+                )}
                 {!canAfford && (
                   <div className={styles.errorBox} style={{ padding: "9px 10px", marginBottom: 10, gap: 8 }}>
                     <span className={styles.errorText}>Not enough credits — you need {cost} but have {availableCredits}.</span>
@@ -1762,6 +1788,34 @@ function StudioBody({ brandKit }) {
             <img src={pendingFrame.url} alt="First frame" style={{ maxWidth: "100%", maxHeight: "48vh", borderRadius: 8, objectFit: "contain" }} />
           ) : null}
         </div>
+      </Modal>
+
+      {/* 1.4: single-image prompt preview + edit before spend */}
+      <Modal
+        open={Boolean(pendingGeneration)}
+        onClose={cancelPendingGeneration}
+        size="lg"
+        title="Review the prompt before generating"
+        description={`This is exactly what will be sent to the image engine. Edit it if you like — ${cost} credits, only spent when you generate.`}
+        actions={
+          <>
+            <Button variant="ghost" onClick={cancelPendingGeneration}>Cancel</Button>
+            <Button onClick={handleApproveGeneration} disabled={isGenerating || !editablePrompt.trim()}>
+              {isGenerating ? "Generating…" : `Generate · ${cost} cr`}
+            </Button>
+          </>
+        }
+      >
+        <textarea
+          className={styles.textarea}
+          style={{ width: "100%", minHeight: 160 }}
+          value={editablePrompt}
+          onChange={(e) => setEditablePrompt(e.target.value)}
+          placeholder="The render prompt…"
+        />
+        <span style={{ fontSize: 11.5, color: "var(--uiv2-text-tertiary)", display: "block", marginTop: 6 }}>
+          Tip: the engine still applies a light model-specific pass on top of this.
+        </span>
       </Modal>
 
       {/* 5.2: carousel storyboard approval */}

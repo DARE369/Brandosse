@@ -225,6 +225,9 @@ export async function runGenerationPipeline({
       resolvedReferenceImages,
       workspaceScope: normalizedWorkspaceScope,
       aspectRatio: finalPlan.visual_prompt?.aspect_ratio ?? settings.aspectRatio ?? '1:1',
+      // 1.4: the render prompt that will actually be sent for a single image,
+      // surfaced so the user can review/edit it BEFORE spending credits.
+      renderPrompt: finalPlan.visual_prompt?.slides?.[0]?.full_prompt ?? finalPlan.visual_prompt?.global_style ?? '',
     };
   }
 
@@ -293,6 +296,43 @@ export async function renderCarouselFromPlan({
 }
 
 // ---------------------------------------------------------------------------
+// 1.4: render an already-planned + (optionally prompt-edited) single image.
+// Same plan/render split as renderCarouselFromPlan — the plan phase already
+// ran and stored its content_plans row; this only renders. promptOverride, if
+// given, is the user's edited render prompt from the pre-spend preview.
+// ---------------------------------------------------------------------------
+export async function renderSingleFromPlan({
+  plan,
+  contentPlanId,
+  sessionId,
+  userId,
+  settings = {},
+  brandKitHash = null,
+  lineageMetadata = null,
+  workspaceScope = {},
+  resolvedImageModel = null,
+  resolvedReferenceImages = [],
+  promptOverride = null,
+  onProgress = () => {},
+  requestId = null,
+  requestSlot = 0,
+  cancelSignal = null,
+}) {
+  return runSingleGeneration(
+    plan,
+    contentPlanId,
+    sessionId,
+    userId,
+    settings,
+    onProgress,
+    brandKitHash,
+    lineageMetadata,
+    normalizeWorkspaceScope(workspaceScope),
+    { requestId, requestSlot, cancelSignal, resolvedImageModel, resolvedReferenceImages, promptOverride },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Single image path
 // ---------------------------------------------------------------------------
 async function runSingleGeneration(
@@ -305,7 +345,7 @@ async function runSingleGeneration(
   brandKitHash = null,
   lineageMetadata = null,
   workspaceScope = {},
-  { requestId = null, requestSlot = 0, cancelSignal = null, resolvedImageModel = null, resolvedReferenceImages = [] } = {},
+  { requestId = null, requestSlot = 0, cancelSignal = null, resolvedImageModel = null, resolvedReferenceImages = [], promptOverride = null } = {},
 ) {
   // The content plan produces a strong model-agnostic full_prompt; the
   // generateImage edge fn then runs ONE model-aware render-prompt pass on it
@@ -315,7 +355,11 @@ async function runSingleGeneration(
   // de-tuning the plan's full_prompt to save the pass is a creative-core
   // change that needs before/after image A/B (see plan 1.3 risk) — a
   // follow-up, not this PR.
-  const basePrompt  = plan.visual_prompt?.slides?.[0]?.full_prompt ?? plan.visual_prompt?.global_style ?? '';
+  // 1.4: promptOverride is the user-edited render prompt from the pre-spend
+  // preview; when present it replaces the plan's full_prompt verbatim.
+  const basePrompt  = (typeof promptOverride === 'string' && promptOverride.trim())
+    ? promptOverride.trim()
+    : (plan.visual_prompt?.slides?.[0]?.full_prompt ?? plan.visual_prompt?.global_style ?? '');
   // 3.4: a per-variant direction hint (set by startGeneration for multi-variant
   // batches) nudges each variant toward a different angle/lighting/crop so the
   // batch isn't 4 near-dupes. Empty for single images and variant 0.
