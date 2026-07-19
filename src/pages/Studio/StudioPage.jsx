@@ -109,7 +109,7 @@ function StudioBody({ brandKit }) {
   const {
     activeSession, activeGenerations, selectedGeneration, selectedGenerationId,
     isGenerating, generationProgress, progressLabel, error, settings, postProduction,
-    updateSettings, startGeneration, startCarouselGeneration, startEditGeneration,
+    updateSettings, startGeneration, startCarouselGeneration, approveCarousel, cancelPendingCarousel, pendingCarousel, startEditGeneration,
     startVideoGeneration, generateVideoFirstFrame, enhancePrompt, selectGeneration, hydratePostProductionFromGeneration,
     regeneratePostMetadata, optimizeSeo, scoreSeo, updatePostProduction, saveDraft, saveDraftPrompt, publishContent,
     videoJobState, dismissVideoJob, setVideoJobMinimized, promptSeed, consumePromptSeed,
@@ -526,6 +526,17 @@ function StudioBody({ brandKit }) {
     setPendingFrame(null);
     setFramePhase("idle");
   }, []);
+
+  /* 5.2: approve the carousel storyboard → render (this is where the slide
+     credits are actually spent). Cancel discards the plan with no spend. */
+  const handleApproveCarousel = useCallback(async () => {
+    try {
+      await approveCarousel();
+      setStudioStage("results");
+    } catch (err) {
+      if (!applyRateLimit("generate", err)) toast.error(err?.message || "Could not render the carousel.");
+    }
+  }, [approveCarousel, applyRateLimit]);
 
   /* Cancel (Week 3 Fix 2 — honest cancel): for image/carousel/edit,
      cancelActiveGeneration() aborts the store's AbortController, which
@@ -1688,6 +1699,38 @@ function StudioBody({ brandKit }) {
           ) : pendingFrame?.url ? (
             <img src={pendingFrame.url} alt="First frame" style={{ maxWidth: "100%", maxHeight: "48vh", borderRadius: 8, objectFit: "contain" }} />
           ) : null}
+        </div>
+      </Modal>
+
+      {/* 5.2: carousel storyboard approval */}
+      <Modal
+        open={Boolean(pendingCarousel)}
+        onClose={cancelPendingCarousel}
+        size="lg"
+        title="Review your carousel plan"
+        description={`${pendingCarousel?.storyboard?.length || 0} slides · ${cost} credits to render. Approve to generate, or cancel — nothing is charged until you approve.`}
+        actions={
+          <>
+            <Button variant="ghost" onClick={cancelPendingCarousel}>Cancel</Button>
+            <Button onClick={handleApproveCarousel} disabled={isGenerating}>
+              {isGenerating ? "Rendering…" : `Approve & render · ${cost} cr`}
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "56vh", overflowY: "auto" }}>
+          {(pendingCarousel?.storyboard || []).map((slide) => (
+            <div key={slide.index} style={{ display: "flex", gap: 10, padding: "10px 12px", borderRadius: 8, background: "var(--uiv2-surface-sunken, rgba(255,255,255,0.03))", border: "1px solid var(--uiv2-border)" }}>
+              <span style={{ fontFamily: "var(--uiv2-font-mono)", fontSize: 12, color: "var(--uiv2-text-tertiary)", flexShrink: 0, width: 20 }}>{slide.index}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{slide.headline}</span>
+                  {slide.purpose && <span style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--uiv2-accent-solid, #d97757)" }}>{slide.purpose}</span>}
+                </div>
+                {slide.body && <div style={{ fontSize: 12, color: "var(--uiv2-text-secondary)", marginTop: 3 }}>{slide.body}</div>}
+              </div>
+            </div>
+          ))}
         </div>
       </Modal>
 

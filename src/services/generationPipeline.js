@@ -132,6 +132,7 @@ export async function runGenerationPipeline({
   requestId = null,
   requestSlot = 0,
   cancelSignal = null,
+  planOnly = false, // 5.2: return the plan without rendering (storyboard approval)
 }) {
   if (cancelSignal?.aborted) {
     const err = new Error('Generation cancelled before it started.');
@@ -207,6 +208,26 @@ export async function runGenerationPipeline({
     ? [...new Set(settings.referenceImages.filter(Boolean))].slice(0, 9)
     : [];
 
+  // 5.2: plan-only mode — return the resolved plan bundle WITHOUT rendering,
+  // so a caller (carousel storyboard approval) can show the plan and only
+  // render on approve via renderCarouselFromPlan(). The content_plans row is
+  // already written above; an un-approved preview leaves a harmless orphan
+  // plan row (intended — keeps the render path byte-for-byte unchanged). The
+  // render's idempotency key (requestId) is minted fresh at approve time, not
+  // reused from this preview, so nothing here touches credits/idempotency.
+  if (planOnly) {
+    return {
+      planOnly: true,
+      plan: finalPlan,
+      contentPlanId: storedPlan.id,
+      brandKitHash,
+      resolvedImageModel,
+      resolvedReferenceImages,
+      workspaceScope: normalizedWorkspaceScope,
+      aspectRatio: finalPlan.visual_prompt?.aspect_ratio ?? settings.aspectRatio ?? '1:1',
+    };
+  }
+
   // 8. Dispatch to image orchestrator
   if (settings.contentType === 'carousel') {
     return runCarouselOrchestration(
@@ -234,6 +255,41 @@ export async function runGenerationPipeline({
       { requestId, requestSlot, cancelSignal, resolvedImageModel, resolvedReferenceImages },
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// 5.2: render an already-planned + approved carousel. Takes the bundle from a
+// planOnly runGenerationPipeline() call and renders it unchanged via the same
+// orchestrator. requestId is minted fresh by the caller at approve time (the
+// render's idempotency key belongs to the render, not the preview). The
+// resolved model / references / aspect are carried from the plan bundle, NOT
+// recomputed, so the rendered carousel can't drift from the approved one.
+// ---------------------------------------------------------------------------
+export async function renderCarouselFromPlan({
+  plan,
+  contentPlanId,
+  sessionId,
+  userId,
+  brandKitHash = null,
+  lineageMetadata = null,
+  workspaceScope = {},
+  resolvedImageModel = null,
+  resolvedReferenceImages = [],
+  onProgress = () => {},
+  requestId = null,
+  cancelSignal = null,
+}) {
+  return runCarouselOrchestration(
+    plan,
+    contentPlanId,
+    sessionId,
+    userId,
+    onProgress,
+    brandKitHash,
+    lineageMetadata,
+    normalizeWorkspaceScope(workspaceScope),
+    { requestId, cancelSignal, resolvedImageModel, resolvedReferenceImages },
+  );
 }
 
 // ---------------------------------------------------------------------------

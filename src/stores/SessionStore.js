@@ -814,6 +814,10 @@ const useSessionStore = create((set, get) => ({
   // or carousel), for the partial-failure banner: { kind, succeededCount,
   // failedCount, totalCount, failedSlots, requestId }.
   lastBatchOutcome: null,
+  // 5.2: a planned-but-not-yet-approved carousel awaiting storyboard approval.
+  // { storyboard, bundle, prompt, sessionId, userId } — held in memory only;
+  // a refresh discards it (re-plan). null when no carousel is pending.
+  pendingCarousel: null,
   // Generation ids currently being redone in place via regenerateVariant/
   // regenerateSlides — lets the grid/filmstrip/lightbox show a per-item
   // spinner without touching the page-level isGenerating/studioStage
@@ -1728,7 +1732,10 @@ const useSessionStore = create((set, get) => ({
         return first;
       });
 
-      const pipelineResult = await runGenerationPipeline({
+      // 5.2: PLAN ONLY — get the slide plan without rendering, then hold it for
+      // storyboard approval. Rendering (and all credit spend) happens in
+      // approveCarousel(). The registered renderer above is reused there.
+      const bundle = await runGenerationPipeline({
         userInput: prompt,
         clarifications: {},
         sessionId: session.id,
@@ -1738,19 +1745,99 @@ const useSessionStore = create((set, get) => ({
         cancelSignal: abortController.signal,
         lineageMetadata: generationLineage,
         settings: pipelineSettings,
+        planOnly: true,
         onProgress: (stage) => {
           const mapped = mapStageProgress(stage);
-          set({
-            generationProgress: mapped.pct,
-            progressLabel: mapped.label,
-            generationStage: stage,
-          });
+          set({ generationProgress: mapped.pct, progressLabel: mapped.label, generationStage: stage });
         },
       });
 
-      const generationIds = Array.isArray(pipelineResult?.generationIds)
-        ? pipelineResult.generationIds
-        : [];
+      // Build a human-readable storyboard from the plan's slides.
+      const planSlides = bundle?.plan?.carousel?.slides ?? [];
+      const storyboard = planSlides.map((s, i) => ({
+        index: i + 1,
+        purpose: s.slide_purpose || '',
+        headline: s.headline || `Slide ${i + 1}`,
+        body: s.body_text || '',
+      }));
+
+      set({
+        pendingCarousel: {
+          storyboard,
+          bundle,
+          prompt,
+          sessionId: session.id,
+          userId: user.id,
+          lineageMetadata: generationLineage,
+        },
+      });
+      return { storyboard, pending: true };
+    } catch (err) {
+      if (isAbortError(err)) {
+        set({ error: null });
+        return undefined;
+      }
+      logGenerationFailure('startCarouselGeneration (plan) error', err);
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({
+        isGenerating: false,
+        generationProgress: 0,
+        progressLabel: null,
+        generationStage: null,
+        generationAbortController: null,
+      });
+    }
+  },
+
+  // 5.2: discard a planned-but-unapproved carousel.
+  cancelPendingCarousel: () => set({ pendingCarousel: null }),
+
+  // 5.2: render the approved carousel storyboard. Mints a FRESH requestId (the
+  // render's idempotency key belongs to the render, not the preview) and runs
+  // renderCarouselFromPlan with the carried resolved-model/references/aspect so
+  // the rendered carousel matches exactly what was approved. Then runs the same
+  // post-render bookkeeping the old inline path did.
+  approveCarousel: async () => {
+    const pending = get().pendingCarousel;
+    if (!pending) return undefined;
+    const { bundle, sessionId, userId, lineageMetadata } = pending;
+
+    const requestId = crypto.randomUUID();
+    const abortController = new AbortController();
+    set({
+      isGenerating: true,
+      error: null,
+      generationProgress: 15,
+      progressLabel: 'Rendering approved carousel...',
+      generationStage: 'Rendering slides...',
+      generationAbortController: abortController,
+      pendingCarousel: null,
+      lastBatchOutcome: null,
+    });
+
+    try {
+      const { renderCarouselFromPlan } = await import('../services/generationPipeline');
+      const pipelineResult = await renderCarouselFromPlan({
+        plan: bundle.plan,
+        contentPlanId: bundle.contentPlanId,
+        sessionId,
+        userId,
+        brandKitHash: bundle.brandKitHash,
+        lineageMetadata,
+        workspaceScope: bundle.workspaceScope,
+        resolvedImageModel: bundle.resolvedImageModel,
+        resolvedReferenceImages: bundle.resolvedReferenceImages,
+        requestId,
+        cancelSignal: abortController.signal,
+        onProgress: (stage) => {
+          const mapped = mapStageProgress(stage);
+          set({ generationProgress: mapped.pct, progressLabel: mapped.label, generationStage: stage });
+        },
+      });
+
+      const generationIds = Array.isArray(pipelineResult?.generationIds) ? pipelineResult.generationIds : [];
 
       if (Number.isFinite(pipelineResult?.totalCount) && pipelineResult.totalCount > 1) {
         set({
@@ -1765,42 +1852,24 @@ const useSessionStore = create((set, get) => ({
         });
       }
 
-      if (generationIds.length > 0) {
-        await syncOrgScopeToGenerations(generationIds);
-      }
+      if (generationIds.length > 0) await syncOrgScopeToGenerations(generationIds);
+      await touchSession(sessionId);
+      await get().fetchGenerations(sessionId, { silent: true });
 
-      await touchSession(session.id);
-
-      await get().fetchGenerations(session.id, { silent: true });
-
-      const generatedRows = generationIds.length > 0
-        ? await fetchSessionGenerations(session.id)
-        : [];
+      const generatedRows = generationIds.length > 0 ? await fetchSessionGenerations(sessionId) : [];
       const generatedById = new Map(generatedRows.map((row) => [row.id, row]));
-
       for (const generationId of generationIds) {
         const generationRow = generatedById.get(generationId);
         if (generationRow?.status !== GENERATION_STATUS.COMPLETED) continue;
-        await ensureDraftForGeneration({
-          userId: user.id,
-          generationId,
-        });
+        await ensureDraftForGeneration({ userId, generationId });
       }
 
       dispatchContentSync('carousel-completed');
-      set({ error: null });
-
-      set({
-        generationProgress: 100,
-        progressLabel: 'Done!',
-        generationStage: 'Done!',
-      });
+      set({ error: null, generationProgress: 100, progressLabel: 'Done!', generationStage: 'Done!' });
+      return pipelineResult;
     } catch (err) {
-      if (isAbortError(err)) {
-        set({ error: null });
-        return;
-      }
-      logGenerationFailure('startCarouselGeneration error', err);
+      if (isAbortError(err)) { set({ error: null }); return undefined; }
+      logGenerationFailure('approveCarousel error', err);
       set({ error: err.message });
       throw err;
     } finally {
