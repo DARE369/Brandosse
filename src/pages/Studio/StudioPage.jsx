@@ -202,11 +202,6 @@ function StudioBody({ brandKit }) {
   const [deleteSessionTarget, setDeleteSessionTarget] = useState(null);
   const [deleteProjectTarget, setDeleteProjectTarget] = useState(null);
   const [slideSelection, setSlideSelection] = useState({});
-  // Old generations from a since-removed image provider (Pollinations.ai)
-  // have URLs that no longer resolve — track which generation's publish
-  // preview failed to load so a placeholder renders instead of a
-  // permanently broken img/video element.
-  const [publishPreviewFailedId, setPublishPreviewFailedId] = useState(null);
   const [failedThumbIds, setFailedThumbIds] = useState(() => new Set());
   const markThumbFailed = useCallback((id) => {
     setFailedThumbIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
@@ -221,6 +216,7 @@ function StudioBody({ brandKit }) {
   const cancelRequestedRef = useRef(false);
   const promptRef = useRef(null);
   const automationRunRef = useRef(new Set());
+  const postProdRef = useRef(null);
 
   const selectedMode = useMemo(() => {
     if (settings.mediaType === "image-to-video") return "image-to-video";
@@ -242,6 +238,50 @@ function StudioBody({ brandKit }) {
     [activeGenerations]
   );
   const lightboxGeneration = completedGenerations[lightboxIndex] || null;
+  // The generation Post Production operates on. Mirrors the mockup
+  // (Studio.dc.html): the panel is visible the moment results exist and
+  // auto-targets the first variant until the user explicitly picks another —
+  // so an unselected results view still previews/publishes variant 1.
+  const effectiveGeneration = selectedGeneration || completedGenerations[0] || null;
+
+  // "Recent in this session" (mockup Studio.dc.html) — this session's most
+  // recent generations, newest first, with a compact IMG/CAR/VID/EDIT kind
+  // chip and a relative timestamp. Deduped so a 4-variant batch doesn't list
+  // four near-identical rows.
+  const recentItems = useMemo(() => {
+    const kindOf = (g) => {
+      if (g.media_type === "video") return "VID";
+      if (g.media_type === "edit") return "EDIT";
+      if (g.content_type === "carousel") return "CAR";
+      return "IMG";
+    };
+    const rel = (iso) => {
+      if (!iso) return "";
+      const diff = Date.now() - new Date(iso).getTime();
+      const m = Math.round(diff / 60000);
+      if (m < 1) return "just now";
+      if (m < 60) return `${m}m ago`;
+      const h = Math.round(m / 60);
+      if (h < 24) return `${h}h ago`;
+      return `${Math.round(h / 24)}d ago`;
+    };
+    const seen = new Set();
+    return [...completedGenerations]
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+      .filter((g) => {
+        const key = g.batch_id || g.request_id || g.id;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5)
+      .map((g) => ({
+        id: g.id,
+        kind: kindOf(g),
+        title: (g.prompt || "Untitled generation").slice(0, 60),
+        time: rel(g.created_at),
+      }));
+  }, [completedGenerations]);
   // 6.3: generations the quality gate hard-flagged — offer a one-click bulk
   // regenerate ("regenerate the losers"). Each regen is charged (uses the same
   // per-variant regenerate path).
@@ -280,21 +320,30 @@ function StudioBody({ brandKit }) {
      a previously-stuck row is now both recoverable automatically on
      re-entry AND recoverable manually via the Regenerate/Re-score buttons
      below at any time. */
+  // Clear the once-per-entry automation guard whenever there is nothing to
+  // publish (brief with no results, or mid-generation) — so returning to a
+  // results view always gets one fresh automatic hydrate attempt, exactly as
+  // re-entering the old publish stage used to.
+  const hasResults = completedGenerations.length > 0;
   useEffect(() => {
-    if (studioStage !== "publish") {
+    if (!hasResults || isGenerating) {
       automationRunRef.current.clear();
     }
-  }, [studioStage]);
+  }, [hasResults, isGenerating]);
 
-  /* Auto-hydrate captions when entering publish stage — same automation the old orchestrator ran. */
+  /* Auto-hydrate captions the moment results exist (mockup: Post Production is
+     inline and populated as soon as the grid renders), targeting the
+     effective generation — the user's pick or variant 1 by default. Same
+     automation the old publish-stage entry ran, just triggered one step
+     earlier so captions/score are ready when the panel first appears. */
   useEffect(() => {
-    if (studioStage !== "publish" || !selectedGeneration?.id) return;
-    const key = `pub_${selectedGeneration.id}`;
+    if (isGenerating || !effectiveGeneration?.id) return;
+    const key = `pub_${effectiveGeneration.id}`;
     if (automationRunRef.current.has(key)) return;
     automationRunRef.current.add(key);
     (async () => {
       try {
-        await hydratePostProductionFromGeneration(selectedGeneration.id);
+        await hydratePostProductionFromGeneration(effectiveGeneration.id);
         const pp = useSessionStore.getState().postProduction;
         if (!String(pp.caption || "").trim()) {
           await regeneratePostMetadata(["title", "caption", "hashtags"]);
@@ -304,7 +353,7 @@ function StudioBody({ brandKit }) {
         /* captions/scoring are optional — generation still usable without them */
       }
     })();
-  }, [studioStage, selectedGeneration?.id, hydratePostProductionFromGeneration, regeneratePostMetadata, optimizeSeo]);
+  }, [isGenerating, effectiveGeneration?.id, hydratePostProductionFromGeneration, regeneratePostMetadata, optimizeSeo]);
 
   useEffect(() => {
     const el = promptRef.current;
@@ -586,10 +635,13 @@ function StudioBody({ brandKit }) {
     setStudioStage("brief");
   }, [isVideoMode, videoJobState.status, dismissVideoJob, cancelActiveGeneration]);
 
+  // Post production is inline now — "use this for a post" just makes the pick
+  // and scrolls the panel into view (no separate publish stage).
   const handleGoToPublish = useCallback(
     (gen) => {
       if (gen) selectGeneration(gen);
-      setStudioStage("publish");
+      setStudioStage("results");
+      setTimeout(() => postProdRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     },
     [selectGeneration]
   );
@@ -1334,7 +1386,7 @@ function StudioBody({ brandKit }) {
                 </Card>
               )}
 
-              {(studioStage === "brief" || studioStage === "results") && completedGenerations.length > 0 && (
+              {studioStage !== "generating" && studioStage !== "published" && completedGenerations.length > 0 && (
                 isCarousel ? (
                   <Card>
                     <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginBottom: 12 }}>
@@ -1388,7 +1440,15 @@ function StudioBody({ brandKit }) {
                           ? `Retry in ${getRateLimitRemaining("generate")}s`
                           : `Regenerate whole carousel · ${cost} credits`}
                       </Button>
-                      <Button style={{ marginLeft: "auto" }} onClick={() => handleGoToPublish(completedGenerations[0])}>Use this carousel</Button>
+                      <Button
+                        style={{ marginLeft: "auto" }}
+                        onClick={() => {
+                          selectGeneration(completedGenerations[0]);
+                          postProdRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }}
+                      >
+                        Use this carousel
+                      </Button>
                     </div>
                   </Card>
                 ) : (
@@ -1469,62 +1529,58 @@ function StudioBody({ brandKit }) {
                 )
               )}
 
-              {studioStage !== "generating" && completedGenerations.length > 0 && studioStage !== "publish" && studioStage !== "published" && (
-                <Button onClick={() => handleGoToPublish(selectedGeneration || completedGenerations[0])} style={{ alignSelf: "flex-start" }}>
-                  Continue to post production →
-                </Button>
-              )}
-
-              {completedGenerations.length === 0 && studioStage === "brief" && (
+              {completedGenerations.length === 0 && studioStage !== "generating" && (
                 <EmptyState title="Nothing generated yet" description="Describe what you want on the left, then hit Generate." dashed />
               )}
 
-              {(studioStage === "publish" || studioStage === "published") && (selectedGeneration || completedGenerations[0]) && (
-                <Card padding="none" style={{ overflow: "hidden" }}>
-                  {(() => {
-                    const gen = selectedGeneration || completedGenerations[0];
-                    const src = gen?.storage_path || gen?.output_url || gen?.thumbnail_url;
-                    const failed = gen && publishPreviewFailedId === gen.id;
-                    if (!src || failed) {
-                      return (
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "64px 24px", color: "var(--uiv2-text-secondary)", fontSize: 13, textAlign: "center" }}>
-                          {src ? "This media is no longer available" : "No media for this generation"}
-                        </div>
-                      );
-                    }
-                    return gen.media_type === "video" ? (
-                      <video src={src} controls style={{ width: "100%", maxHeight: 480, display: "block", background: "#000" }} onError={() => setPublishPreviewFailedId(gen.id)} />
-                    ) : (
-                      <img src={src} alt="Selected generation" style={{ width: "100%", maxHeight: 480, objectFit: "contain", display: "block" }} onError={() => setPublishPreviewFailedId(gen.id)} />
-                    );
-                  })()}
+              {/* Post production — inline, directly under the results grid, the
+                  moment results exist (mockup Studio.dc.html: showPostProd =
+                  phase === "results"). Targets the effective generation (the
+                  user's pick, or variant 1 by default). The "published" success
+                  state swaps this panel for the confirmation body. */}
+              {(studioStage === "published" || (completedGenerations.length > 0 && studioStage !== "generating")) && effectiveGeneration && (
+                <div ref={postProdRef}>
+                  <PostProductionPanel
+                    published={studioStage === "published"}
+                    selectedGeneration={effectiveGeneration}
+                    postProduction={postProduction}
+                    updatePostProduction={updatePostProduction}
+                    publishing={publishing}
+                    accounts={accounts}
+                    onSaveDraft={handleSaveDraft}
+                    onOpenSchedule={() => setScheduleOpen(true)}
+                    onOpenPublishConfirm={() => setPublishConfirmOpen(true)}
+                    onClose={() => setStudioStage("results")}
+                    onGenerateAnother={() => setStudioStage("brief")}
+                    onRegenerateMetadata={handleRegenerateMetadata}
+                    onRescore={handleRescore}
+                    metadataRetryAfter={getRateLimitRemaining("regenerateMetadata")}
+                    seoRetryAfter={getRateLimitRemaining("rescore")}
+                  />
+                </div>
+              )}
+
+              {/* Recent in this session (mockup: always present at the bottom
+                  of the canvas column). Shows this session's recent generations
+                  with a type chip, title, and relative time. */}
+              {recentItems.length > 0 && (
+                <Card>
+                  <div className={styles.sectionLabel}>Recent in this session</div>
+                  <div className={styles.recentList}>
+                    {recentItems.map((it) => (
+                      <div key={it.id} className={styles.recentRow}>
+                        <span className={styles.recentKind}>{it.kind}</span>
+                        <span className={styles.recentTitle}>{it.title}</span>
+                        <span className={styles.recentTime}>{it.time}</span>
+                      </div>
+                    ))}
+                  </div>
                 </Card>
               )}
             </div>
           </div>
         </div>
       </main>
-
-      {/* Post production / publish */}
-      {(studioStage === "publish" || studioStage === "published") && (
-        <PostProductionPanel
-          published={studioStage === "published"}
-          selectedGeneration={selectedGeneration || completedGenerations[0]}
-          postProduction={postProduction}
-          updatePostProduction={updatePostProduction}
-          publishing={publishing}
-          accounts={accounts}
-          onSaveDraft={handleSaveDraft}
-          onOpenSchedule={() => setScheduleOpen(true)}
-          onOpenPublishConfirm={() => setPublishConfirmOpen(true)}
-          onClose={() => setStudioStage("results")}
-          onGenerateAnother={() => setStudioStage("brief")}
-          onRegenerateMetadata={handleRegenerateMetadata}
-          onRescore={handleRescore}
-          metadataRetryAfter={getRateLimitRemaining("regenerateMetadata")}
-          seoRetryAfter={getRateLimitRemaining("rescore")}
-        />
-      )}
 
       {/* Schedule dialog */}
       <Modal

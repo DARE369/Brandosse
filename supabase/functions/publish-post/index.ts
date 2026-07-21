@@ -78,7 +78,7 @@ serve(async (req) => {
     const { data: post, error: postErr } = await adminClient
       .from("posts")
       .select(`
-        id, user_id, organization_id, caption, platform, status,
+        id, user_id, organization_id, title, caption, platform, status,
         scheduled_at, hashtags, workflow_state,
         generations ( storage_path, media_type, output_url )
       `)

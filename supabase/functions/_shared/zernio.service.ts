@@ -21,6 +21,11 @@
 
 import type { DatabaseClient } from "./supabase.ts";
 import { readEnv } from "./env.ts";
+import {
+  getPlatformCaptionSpec,
+  normalizeMediaType,
+  platformNeedsTitle,
+} from "./platformCaptionSpecs.ts";
 
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 
@@ -176,49 +181,83 @@ export async function publishToZernio(input: PublishInput): Promise<PublishResul
   }
 
   const caption = String(post.caption || "");
+  const title = String(post.title || "").trim();
   const hashtags = Array.isArray(post.hashtags) ? (post.hashtags as string[]).join(" ") : "";
-  let content = hashtags ? `${caption}\n\n${hashtags}` : caption;
+  // The full caption body as published (caption + hashtags), used for
+  // caption-only platforms and as the description on title+description ones.
+  const captionBody = hashtags ? `${caption}\n\n${hashtags}` : caption;
 
   const generationRow = Array.isArray(post.generations) ? post.generations[0] : post.generations;
   const rawMediaType = String((generationRow as Record<string, unknown> | undefined)?.media_type || "image").toLowerCase();
-  const mediaType = rawMediaType.includes("video") ? "video" : "image";
+  const mediaType = normalizeMediaType(rawMediaType);
 
-  // TikTok photo/slideshow posts reuse `content` as the post's title, which
-  // TikTok hard-caps at 90 characters (video posts have no such limit) —
-  // confirmed live via a real Zernio rejection. Rather than failing the
-  // publish outright, auto-fit it: drop hashtags first (least essential part
-  // of a 90-char title, and usually what pushes it over), then truncate the
-  // caption itself if it's still too long on its own. `publishNote` carries
-  // this back so a silently-shortened caption is never a surprise — surfaced
-  // in the publish result UI, not just swallowed.
-  const TIKTOK_PHOTO_TITLE_LIMIT = 90;
-  let publishNote: string | null = null;
-  if (platform === "tiktok" && mediaType === "image" && content.length > TIKTOK_PHOTO_TITLE_LIMIT) {
-    const originalLength = content.length;
-    content = caption.length > TIKTOK_PHOTO_TITLE_LIMIT
-      ? `${caption.slice(0, TIKTOK_PHOTO_TITLE_LIMIT - 1)}…`
-      : caption;
-    publishNote = `Caption shortened from ${originalLength} to ${content.length} characters to fit TikTok's ${TIKTOK_PHOTO_TITLE_LIMIT}-character photo-post title limit${hashtags ? " (hashtags dropped)" : ""}.`;
+  const spec = getPlatformCaptionSpec(platform);
+
+  // Hard-cap enforcement: NO silent auto-shortening. If the copy exceeds a
+  // platform's real limit we FAIL with a clear, actionable error instead of
+  // quietly trimming (which previously chopped TikTok captions on delivery).
+  // The UI's per-platform fit strip is expected to catch this before publish;
+  // this is the server-side backstop.
+  const overCapField = (label: string, len: number, max: number) =>
+    `${label} is ${len} characters but ${spec.label} allows at most ${max}. Shorten it and try again.`;
+
+  // ── Resolve which text goes in which field, per platform + media ──────────
+  // Default (caption-only platforms: Instagram/Facebook/LinkedIn/X/Threads,
+  // and TikTok video): `content` = caption body.
+  let content = captionBody;
+  const platformEntry: Record<string, unknown> = { platform, accountId };
+  const platformSpecificData: Record<string, unknown> = {};
+  let tiktokDescription: string | null = null;
+
+  const needsTitle = platformNeedsTitle(platform, mediaType);
+
+  if (needsTitle && spec.titleTarget === "platformSpecificData") {
+    // YouTube / Pinterest: real title in platformSpecificData, caption body as
+    // the description in `content`.
+    const resolvedTitle = title || caption.split("\n")[0] || "Untitled";
+    if (spec.titleMax && [...resolvedTitle].length > spec.titleMax) {
+      return { success: false, platformPostId: null, platformPostUrl: null, retriable: false,
+        failureReason: overCapField("Title", [...resolvedTitle].length, spec.titleMax) };
+    }
+    if ([...captionBody].length > spec.captionMax) {
+      return { success: false, platformPostId: null, platformPostUrl: null, retriable: false,
+        failureReason: overCapField("Description", [...captionBody].length, spec.captionMax) };
+    }
+    platformSpecificData.title = resolvedTitle;
+    content = captionBody;
+  } else if (needsTitle && platform === "tiktok") {
+    // TikTok PHOTO/carousel: `content` is the 90-char title, the full caption
+    // moves to tiktokSettings.description (this is the field we previously
+    // never set — the fix for shortened TikTok captions).
+    const resolvedTitle = title || caption.split("\n")[0] || caption;
+    if (spec.titleMax && [...resolvedTitle].length > spec.titleMax) {
+      return { success: false, platformPostId: null, platformPostUrl: null, retriable: false,
+        failureReason: overCapField("TikTok photo title", [...resolvedTitle].length, spec.titleMax) };
+    }
+    content = resolvedTitle;
+    tiktokDescription = captionBody;
+  } else {
+    // Caption-only (incl. TikTok video). Enforce the caption cap.
+    if ([...captionBody].length > spec.captionMax) {
+      return { success: false, platformPostId: null, platformPostUrl: null, retriable: false,
+        failureReason: overCapField("Caption", [...captionBody].length, spec.captionMax) };
+    }
+    content = captionBody;
   }
 
-  const platformEntry: Record<string, unknown> = { platform, accountId };
+  const publishNote: string | null = null;
 
-  // Confirmed 2026-07-17 against docs.zernio.com: TikTok is the one platform
-  // whose settings live in a top-level `tiktokSettings` object, not inlined
-  // on the platform entry and not under `platformSpecificData` (every other
-  // platform uses platformSpecificData) — this was previously guessed wrong
-  // (inlined on platformEntry), which is why real TikTok publishes failed
-  // with "tiktok posts require media content" even when media was attached:
-  // Zernio never saw a recognized media field at all (see below).
+  // Confirmed 2026-07-17 against docs.zernio.com: TikTok settings live in a
+  // top-level `tiktokSettings` object; every other platform uses
+  // platformSpecificData.
   const body: Record<string, unknown> = {
     content,
     publishNow: true,
     platforms: [platformEntry],
+    ...(Object.keys(platformSpecificData).length ? { platformSpecificData } : {}),
     // Confirmed field name/shape: top-level `mediaItems`, each entry
-    // `{ type: "image" | "video", url }` — NOT `media_urls: [url]`, which
-    // Zernio silently didn't recognize (hence "requires media content" even
-    // with a valid media URL passed the old way).
-    ...(mediaUrl ? { mediaItems: [{ type: mediaType, url: mediaUrl }] } : {}),
+    // `{ type: "image" | "video", url }`.
+    ...(mediaUrl ? { mediaItems: [{ type: mediaType === "video" ? "video" : "image", url: mediaUrl }] } : {}),
   };
 
   if (platform === "tiktok") {
@@ -229,6 +268,9 @@ export async function publishToZernio(input: PublishInput): Promise<PublishResul
       allow_stitch: true,
       content_preview_confirmed: true,
       express_consent_given: true,
+      // Photo posts carry the full caption here (video posts leave it unset —
+      // their caption is already the top-level `content`).
+      ...(tiktokDescription ? { description: tiktokDescription } : {}),
     };
   }
 

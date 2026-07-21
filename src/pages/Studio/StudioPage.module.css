@@ -277,6 +277,28 @@
 
 .searchRow { display: flex; align-items: center; gap: 9px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--uiv2-border); flex-wrap: wrap; }
 
+/* Recent in this session (mockup Studio.dc.html) */
+.recentList { display: flex; flex-direction: column; }
+.recentRow {
+  display: flex; align-items: center; gap: 12px; padding: 9px 0;
+  border-bottom: 1px solid var(--uiv2-border);
+}
+.recentRow:last-child { border-bottom: none; }
+.recentKind {
+  width: 34px; height: 34px; flex: 0 0 34px; border-radius: 6px;
+  background: var(--uiv2-bg-inset); border: 1px solid var(--uiv2-border);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--uiv2-font-mono); font-size: 9px; color: var(--uiv2-text-secondary);
+}
+.recentTitle {
+  flex: 1; min-width: 0; font-size: 12.5px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.recentTime {
+  font-family: var(--uiv2-font-mono); font-size: 11px; color: var(--uiv2-text-secondary);
+  flex-shrink: 0;
+}
+
 .videoJobRow { border: 1px solid var(--uiv2-border); border-radius: 9px; padding: 12px 13px; }
 .videoJobHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .videoJobBar { height: 4px; border-radius: 3px; background: var(--uiv2-border); overflow: hidden; margin-bottom: 8px; }

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Save, Calendar, Send, Sparkles, RefreshCw } from "lucide-react";
 import { Card, Badge, Button, Dropdown } from "../../ui-v2";
+import { platformNeedsTitle, getPlatformSpec } from "../../services/platforms/platformCaptionSpecs";
+import PlatformFitStrip from "./PlatformFitStrip";
 import styles from "./PostProductionPanel.module.css";
 
 const SCORE_DIMS = [
@@ -46,9 +48,65 @@ export default function PostProductionPanel({
   const [tagValue, setTagValue] = useState("");
   const [accountOpen, setAccountOpen] = useState(false);
 
-  const selectedAccountId = (postProduction.selectedPlatforms || [])[0] || null;
+  const selectedIds = postProduction.selectedPlatforms || [];
+  const selectedAccountId = selectedIds[0] || null;
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || null;
   const isSeoBusy = postProduction.seoStatus === "scoring" || postProduction.seoStatus === "optimizing";
+
+  const mediaType = selectedGeneration?.media_type || "image";
+
+  // One entry per selected account, for the per-platform fit strip. Deduped by
+  // platform so two Instagram accounts don't show two identical fit chips.
+  const selectedPlatformList = useMemo(() => {
+    const seen = new Set();
+    return selectedIds
+      .map((id) => accounts.find((a) => a.id === id))
+      .filter(Boolean)
+      .filter((a) => {
+        const key = String(a.platform || "").toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((a) => ({ id: a.id, platform: a.platform, label: getPlatformSpec(a.platform).label }));
+  }, [selectedIds, accounts]);
+
+  // Any selected platform that wants a separate title (YouTube/Pinterest, or
+  // TikTok when this is a photo post) → the Title field is shown. Otherwise
+  // it's hidden (Instagram/X/etc. are caption-only).
+  const showTitleField = selectedPlatformList.some((p) => platformNeedsTitle(p.platform, mediaType));
+
+  const toggleAccount = (id) => {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    updatePostProduction({ selectedPlatforms: next });
+  };
+
+  const handleAutoFit = (platformKey, trimmed) => {
+    // v1: one base caption. Auto-fit trims the base to the tightest selected
+    // platform's cap. (Per-platform overrides are the deferred v2.)
+    updatePostProduction({ caption: trimmed });
+  };
+
+  // Pre-publish guard: does the current caption/title overrun any selected
+  // platform's hard cap? Surfaced on the Publish button so the user fixes it
+  // before delivery instead of the server rejecting it (or silently trimming).
+  const overLimitPlatforms = useMemo(() => {
+    const caption = postProduction.caption || "";
+    const tags = postProduction.hashtags || [];
+    const title = postProduction.title || "";
+    const body = [caption, tags.join(" ")].filter(Boolean).join("\n\n");
+    return selectedPlatformList.filter((p) => {
+      const spec = getPlatformSpec(p.platform);
+      const capOver = [...body].length > spec.captionMax;
+      const needsTitle = platformNeedsTitle(p.platform, mediaType);
+      const titleOver = needsTitle && spec.titleMax && [...title].length > spec.titleMax;
+      const titleMissing = needsTitle && !title.trim();
+      return capOver || titleOver || titleMissing;
+    });
+  }, [postProduction.caption, postProduction.hashtags, postProduction.title, selectedPlatformList, mediaType]);
+  const hasBlockingFit = overLimitPlatforms.length > 0;
 
   const addHashtag = () => {
     const t = tagValue.trim();
@@ -85,14 +143,19 @@ export default function PostProductionPanel({
         <Badge tone="warning">Simulated publish</Badge>
       </div>
 
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>Title</span>
-        <input
-          className={styles.input}
-          value={postProduction.title || ""}
-          onChange={(e) => updatePostProduction({ title: e.target.value })}
-        />
-      </label>
+      {/* Title only shows when a selected platform actually uses one
+          (YouTube/Pinterest always; TikTok for photo posts). Caption-only
+          platforms (Instagram/X/LinkedIn/Facebook/Threads) hide it. */}
+      {showTitleField && (
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Title</span>
+          <input
+            className={styles.input}
+            value={postProduction.title || ""}
+            onChange={(e) => updatePostProduction({ title: e.target.value })}
+          />
+        </label>
+      )}
 
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Caption</span>
@@ -102,6 +165,17 @@ export default function PostProductionPanel({
           onChange={(e) => updatePostProduction({ caption: e.target.value })}
         />
       </label>
+
+      {selectedPlatformList.length > 0 && (
+        <PlatformFitStrip
+          platforms={selectedPlatformList}
+          caption={postProduction.caption || ""}
+          hashtags={postProduction.hashtags || []}
+          title={postProduction.title || ""}
+          mediaType={mediaType}
+          onAutoFit={handleAutoFit}
+        />
+      )}
 
       {/* WEEK 2 FIX 3 (+ ADDENDUM UPGRADE 2): manual recovery control —
           works whether the automatic publish-stage hydrate never ran, is
@@ -197,7 +271,7 @@ export default function PostProductionPanel({
       </div>
 
       <div className={styles.field}>
-        <span className={styles.fieldLabel}>Target account</span>
+        <span className={styles.fieldLabel}>Target accounts <span style={{ color: "var(--uiv2-text-tertiary)" }}>— posts to every selected account</span></span>
         <Dropdown
           open={accountOpen}
           onClose={() => setAccountOpen(false)}
@@ -205,7 +279,13 @@ export default function PostProductionPanel({
           width="100%"
           trigger={
             <button type="button" className={styles.dropdownBtn} onClick={() => setAccountOpen((o) => !o)}>
-              <span>{selectedAccount ? (selectedAccount.display_name || selectedAccount.account_name || selectedAccount.platform) : "Choose an account"}</span>
+              <span>
+                {selectedIds.length === 0
+                  ? "Choose accounts"
+                  : selectedIds.length === 1
+                    ? (selectedAccount?.display_name || selectedAccount?.account_name || selectedAccount?.platform || "1 account")
+                    : `${selectedIds.length} accounts selected`}
+              </span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: accountOpen ? "rotate(180deg)" : "none" }}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           }
@@ -213,19 +293,29 @@ export default function PostProductionPanel({
           {accounts.length === 0 ? (
             <div style={{ padding: "8px 9px", fontSize: 12.5, color: "var(--uiv2-text-secondary)" }}>No connected accounts</div>
           ) : (
-            accounts.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={styles.dropdownItem}
-                onClick={() => { updatePostProduction({ selectedPlatforms: [a.id] }); setAccountOpen(false); }}
-              >
-                {a.display_name || a.account_name || a.platform}
-                {selectedAccountId === a.id && (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--uiv2-accent-solid)" strokeWidth="2.6"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                )}
-              </button>
-            ))
+            accounts.map((a) => {
+              const on = selectedIds.includes(a.id);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={styles.dropdownItem}
+                  onClick={() => toggleAccount(a.id)}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{
+                      width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+                      border: `1.5px solid ${on ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)"}`,
+                      background: on ? "var(--uiv2-accent-solid)" : "transparent",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                    </span>
+                    {a.display_name || a.account_name || a.platform}
+                  </span>
+                </button>
+              );
+            })
           )}
         </Dropdown>
       </div>
@@ -237,8 +327,16 @@ export default function PostProductionPanel({
         <Button variant="subtle" onClick={onOpenSchedule} disabled={publishing}>
           <Calendar size={13} aria-hidden="true" /> Schedule…
         </Button>
-        <Button onClick={onOpenPublishConfirm} disabled={publishing || !selectedAccountId} style={{ marginLeft: "auto" }}>
-          <Send size={13} aria-hidden="true" /> Publish now
+        <Button
+          onClick={onOpenPublishConfirm}
+          disabled={publishing || selectedIds.length === 0 || hasBlockingFit}
+          title={hasBlockingFit ? `Fix the caption for ${overLimitPlatforms.map((p) => p.label).join(", ")} first` : undefined}
+          style={{ marginLeft: "auto" }}
+        >
+          <Send size={13} aria-hidden="true" />
+          {hasBlockingFit
+            ? `${overLimitPlatforms.length} platform${overLimitPlatforms.length > 1 ? "s" : ""} need${overLimitPlatforms.length > 1 ? "" : "s"} attention`
+            : "Publish now"}
         </Button>
       </div>
     </Card>
