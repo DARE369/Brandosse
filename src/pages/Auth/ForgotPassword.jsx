@@ -4,12 +4,18 @@ import React, { useState } from "react";
 import Link from "next/link";
 import AuthLayout from "../../layouts/AuthLayout";
 import { useAuth } from "../../Context/AuthContext";
+import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
 
 export default function ForgotPassword() {
   const { requestPasswordReset } = useAuth();
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // A signed-in user does not need the "email me a reset link" flow — they can
+  // change their password from settings. Suspended mid-submit so a request
+  // already in flight still completes and shows its confirmation.
+  useAuthenticatedRedirect({ enabled: !submitting });
   const [sent, setSent] = useState(false);
 
   const handleSubmit = async (event) => {

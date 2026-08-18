@@ -1,15 +1,52 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AuthLayout from "../../layouts/AuthLayout";
 import { useAuth } from "../../Context/AuthContext";
+import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { supabase } from "../../services/supabaseClient";
+
+/**
+ * Does this page load carry a password-recovery link?
+ *
+ * This MUST be read on the first render. bootstrapRecoverySession below both
+ * consumes the code (exchangeCodeForSession) and strips the hash from the URL
+ * via replaceState, so the evidence is gone by the time any later effect runs.
+ */
+function hasRecoveryLinkParams() {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("code")) return true;
+
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    return Boolean(hashParams.get("access_token") || hashParams.get("type") === "recovery");
+  } catch {
+    // Unparseable URL: assume a recovery attempt. Failing "open" here keeps a
+    // real reset working; failing closed would redirect the user away from the
+    // only page where they can set a new password.
+    return true;
+  }
+}
 
 export default function ResetPassword() {
   const { navigate } = useAppNavigation();
   const { updatePassword } = useAuth();
+
+  /* Recovery links AUTHENTICATE you — bootstrapRecoverySession calls
+     exchangeCodeForSession/setSession below, so arriving here with a valid
+     link makes `user` truthy within moments. Redirecting on that would bounce
+     the user to the dashboard and leave them permanently unable to set a new
+     password, breaking the reset flow entirely.
+
+     So the redirect is enabled ONLY when no recovery link is present, i.e.
+     someone already signed in navigated to /reset-password directly — for
+     them the dashboard (and the password control in settings) is right. */
+  const isRecoveryFlow = useMemo(() => hasRecoveryLinkParams(), []);
+  useAuthenticatedRedirect({ enabled: !isRecoveryFlow });
   const [checkingLink, setCheckingLink] = useState(true);
   const [validRecovery, setValidRecovery] = useState(false);
   const [password, setPassword] = useState("");

@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "../../Context/AuthContext";
+import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import AuthLayout from "../../layouts/AuthLayout";
 import { APP_ROOT_PATH } from "../../utils/authRouting";
@@ -86,6 +87,10 @@ export default function Register() {
 
   const { register, loginWithGoogle } = useAuth();
   const { navigate } = useAppNavigation();
+
+  // Already signed in? Nothing to register. Disabled mid-submit so it cannot
+  // race this page's own post-signup navigation.
+  useAuthenticatedRedirect({ enabled: !loading });
 
   const passwordValid = password.length >= 6;
   const busy = !!loading;
