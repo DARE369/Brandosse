@@ -295,8 +295,13 @@ function StudioBody({ brandKit }) {
   }, [isGenerating]);
 
   useEffect(() => {
-    if (!isGenerating && completedGenerations.length > 0 && studioStage === "generating" && !cancelRequestedRef.current) {
-      setStudioStage("results");
+    if (!isGenerating && studioStage === "generating" && !cancelRequestedRef.current) {
+      // Graceful failure: if nothing completed (total failure, not just a
+      // partial batch), don't leave the loading card frozen on-screen behind
+      // the error box — fall back to "brief" so the error/retry affordance is
+      // the only thing shown. A partial success (completedGenerations > 0)
+      // still goes to "results" so what DID succeed is visible immediately.
+      setStudioStage(completedGenerations.length > 0 ? "results" : "brief");
     }
     if (!isGenerating) cancelRequestedRef.current = false;
   }, [isGenerating, completedGenerations.length, studioStage]);

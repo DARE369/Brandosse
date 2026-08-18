@@ -705,19 +705,96 @@ async function ensureDraftForGeneration({ userId, generationId }) {
   return draft;
 }
 
-const STAGE_PROGRESS = {
-  'Loading brand kit...': { pct: 5, label: 'Loading brand kit...' },
-  'Planning content...': { pct: 15, label: 'Planning your content...' },
-  'Generating content plan...': { pct: 30, label: 'Generating content plan...' },
-  'Quality check...': { pct: 40, label: 'Checking brand guardrails...' },
-  'Generating image...': { pct: 60, label: 'Creating your image...' },
+// Weighted step model — weights are rough relative-duration estimates (not
+// arbitrary display percentages), so progress math composes correctly across
+// a single item, a multi-variant batch, and a multi-slide carousel instead of
+// each needing its own hand-tuned constants. "Generating image..." carries
+// the heaviest weight because it's the fal.ai-bound step that actually
+// dominates wall-clock time (see GRAPHICS build report); every other step is
+// comparatively fast (DB reads/local checks) or a lighter LLM call.
+const PIPELINE_STEPS = [
+  { key: 'brand_kit',    match: (s) => s === 'Loading brand kit...' || s.startsWith('Skipping brand kit'), weight: 1, label: 'Loading brand kit...' },
+  { key: 'plan',         match: (s) => s === 'Planning content...', weight: 1, label: 'Planning your content...' },
+  { key: 'content_plan', match: (s) => s === 'Generating content plan...', weight: 2, label: 'Generating content plan...' },
+  { key: 'quality',      match: (s) => s === 'Quality check...', weight: 1, label: 'Checking brand guardrails...' },
+  { key: 'render',       match: (s) => s === 'Generating image...' || s.startsWith('Generating slide'), weight: 5, label: null },
+  { key: 'upload',       match: (s) => s === 'Uploading to Supabase storage...', weight: 1, label: 'Uploading to Supabase storage...' },
+];
+const SETUP_WEIGHT = PIPELINE_STEPS
+  .filter((s) => s.key !== 'render')
+  .reduce((sum, s) => sum + s.weight, 0);
+const RENDER_WEIGHT = PIPELINE_STEPS.find((s) => s.key === 'render').weight;
+
+function stepForStage(stage = '') {
+  return PIPELINE_STEPS.find((s) => s.match(stage)) || null;
+}
+
+// Carousel slide stages arrive as a single string ("Generating slide 2 of
+// 6...") rather than a separate (index, stage) pair like the batch-variant
+// loop provides — the pipeline orchestrates all slides internally in one
+// call (runCarouselOrchestration). Parse the slide index out so the same
+// weighted tracker can drive carousel progress too.
+function parseSlideStage(stage = '') {
+  const match = /^Generating slide (\d+) of (\d+)\.\.\.$/.exec(stage);
+  if (!match) return null;
+  return { index: Number(match[1]) - 1, total: Number(match[2]) };
+}
+
+// mapStageProgress: single-item convenience wrapper over the weighted steps
+// (used by paths that only ever render one item, so no aggregation is
+// needed). Kept for call sites that haven't been migrated to
+// createBatchProgressTracker below.
+const mapStageProgress = (stage = '') => {
+  const step = stepForStage(stage);
+  const totalWeight = SETUP_WEIGHT + RENDER_WEIGHT;
+  if (!step) return { pct: 50, label: stage || 'Generating...' };
+  const stepIndex = PIPELINE_STEPS.indexOf(step);
+  const completedWeight = PIPELINE_STEPS.slice(0, stepIndex).reduce((sum, s) => sum + s.weight, 0);
+  const pct = Math.min(98, Math.round((completedWeight / totalWeight) * 100));
+  return { pct, label: step.label || stage };
 };
 
-const mapStageProgress = (stage = '') => {
-  if (STAGE_PROGRESS[stage]) return STAGE_PROGRESS[stage];
-  if (stage.startsWith('Generating slide')) return { pct: 62, label: stage };
-  return { pct: 50, label: stage || 'Generating...' };
-};
+// createBatchProgressTracker — tracks weighted progress across N items
+// (batch variants or carousel slides) sharing one 0-100 bar. Each item
+// contributes `itemWeight` (setup steps run once per item in this pipeline,
+// so we weight the whole item uniformly rather than re-deriving per-stage
+// splits) to a running total; a failed/cancelled item's weight is credited
+// as "attempted" so the bar keeps moving forward and never stalls or
+// reverses — it just stops crediting that item's remaining sub-steps.
+function createBatchProgressTracker(itemCount, { onUpdate } = {}) {
+  const totalItemWeight = SETUP_WEIGHT + RENDER_WEIGHT;
+  const totalWeight = totalItemWeight * Math.max(1, itemCount);
+  let completedWeight = 0;
+
+  return {
+    // stage: the onProgress(stage) string from the pipeline for the item
+    // currently in flight. index: 0-based item index.
+    reportStage(index, stage) {
+      const step = stepForStage(stage);
+      const stepIndex = step ? PIPELINE_STEPS.indexOf(step) : PIPELINE_STEPS.length;
+      const withinItemWeight = PIPELINE_STEPS.slice(0, stepIndex).reduce((sum, s) => sum + s.weight, 0);
+      const priorItemsWeight = index * totalItemWeight;
+      completedWeight = Math.max(completedWeight, priorItemsWeight + withinItemWeight);
+      const pct = Math.min(98, Math.round((completedWeight / totalWeight) * 100));
+      const label = itemCount > 1
+        ? `Item ${index + 1}/${itemCount}: ${step?.label || stage}`
+        : (step?.label || stage);
+      onUpdate?.({ pct, label, stage });
+      return pct;
+    },
+    // Call when an item finishes (success OR failure/cancel) — credits its
+    // full weight as "attempted" so the next item starts from a clean
+    // baseline and the bar never stalls waiting on a step that won't fire
+    // for a failed item (e.g. a failure before "Uploading..." would
+    // otherwise freeze progress mid-item forever).
+    reportItemSettled(index) {
+      completedWeight = Math.max(completedWeight, (index + 1) * totalItemWeight);
+      const pct = Math.min(99, Math.round((completedWeight / totalWeight) * 100));
+      return pct;
+    },
+    finalPct: () => Math.round((completedWeight / totalWeight) * 100),
+  };
+}
 
 async function fetchSessionGenerations(sessionId) {
   if (!sessionId) return [];
@@ -1435,12 +1512,17 @@ const useSessionStore = create((set, get) => ({
         'an alternative composition with a fresh perspective',
       ];
 
+      const progressTracker = createBatchProgressTracker(requestedVariants, {
+        onUpdate: ({ pct, label, stage }) => set({ generationProgress: pct, progressLabel: label, generationStage: stage }),
+      });
+
       for (let index = 0; index < requestedVariants; index += 1) {
         // Store-level cancellation check (not just a UI stage guard): a
         // variant not yet started when Cancel fires is skipped entirely —
         // it never gets a request sent to the provider, never gets billed.
         if (abortController.signal.aborted) {
           outcomes.push({ index, ok: false, cancelled: true });
+          progressTracker.reportItemSettled(index);
           continue;
         }
 
@@ -1467,18 +1549,7 @@ const useSessionStore = create((set, get) => ({
               // for single-image runs, so those are unchanged).
               variantHint: requestedVariants > 1 ? VARIANT_DIRECTIONS[index % VARIANT_DIRECTIONS.length] : '',
             },
-            onProgress: (stage) => {
-              const mapped = mapStageProgress(stage);
-              const variantOffset = requestedVariants > 1 ? ((index / requestedVariants) * 100) : 0;
-              const variantPct = requestedVariants > 1
-                ? Math.min(98, Math.round(variantOffset + (mapped.pct / requestedVariants)))
-                : mapped.pct;
-              set({
-                generationProgress: variantPct,
-                progressLabel: requestedVariants > 1 ? `Variant ${index + 1}/${requestedVariants}: ${mapped.label}` : mapped.label,
-                generationStage: stage,
-              });
-            },
+            onProgress: (stage) => progressTracker.reportStage(index, stage),
           });
 
           if (Array.isArray(pipelineResult?.generationIds)) {
@@ -1495,6 +1566,11 @@ const useSessionStore = create((set, get) => ({
           // Isolate the failure — continue to the next variant instead of
           // aborting the whole batch (mirrors the carousel path's existing
           // per-slide isolation in generationPipeline.js).
+        } finally {
+          // Credit this item's weight as attempted whether it succeeded,
+          // failed, or was cancelled, so the bar always advances past it —
+          // a failure never leaves the bar stalled mid-item.
+          progressTracker.reportItemSettled(index);
         }
       }
 
@@ -1607,8 +1683,12 @@ const useSessionStore = create((set, get) => ({
       const generationIds = [];
       const outcomes = [];
 
+      const progressTracker = createBatchProgressTracker(requestedVariants, {
+        onUpdate: ({ pct, label, stage }) => set({ generationProgress: pct, progressLabel: label, generationStage: stage }),
+      });
+
       for (let index = 0; index < requestedVariants; index += 1) {
-        if (abortController.signal.aborted) { outcomes.push({ index, ok: false, cancelled: true }); continue; }
+        if (abortController.signal.aborted) { outcomes.push({ index, ok: false, cancelled: true }); progressTracker.reportItemSettled(index); continue; }
         // Per-variant direction hint appended to the (possibly edited) prompt so
         // a multi-variant batch still explores rather than duplicating.
         const variantHint = requestedVariants > 1 ? VARIANT_DIRECTIONS[index % VARIANT_DIRECTIONS.length] : '';
@@ -1629,12 +1709,7 @@ const useSessionStore = create((set, get) => ({
             requestId,
             requestSlot: index,
             cancelSignal: abortController.signal,
-            onProgress: (stage) => {
-              const mapped = mapStageProgress(stage);
-              const variantOffset = requestedVariants > 1 ? ((index / requestedVariants) * 100) : 0;
-              const variantPct = requestedVariants > 1 ? Math.min(98, Math.round(variantOffset + (mapped.pct / requestedVariants))) : mapped.pct;
-              set({ generationProgress: variantPct, progressLabel: requestedVariants > 1 ? `Variant ${index + 1}/${requestedVariants}: ${mapped.label}` : mapped.label, generationStage: stage });
-            },
+            onProgress: (stage) => progressTracker.reportStage(index, stage),
           });
           if (Array.isArray(pipelineResult?.generationIds)) generationIds.push(...pipelineResult.generationIds);
           outcomes.push({ index, ok: true });
@@ -1642,6 +1717,8 @@ const useSessionStore = create((set, get) => ({
           if (isAbortError(variantErr)) { outcomes.push({ index, ok: false, cancelled: true }); continue; }
           console.error(`[approveGeneration] variant ${index + 1} failed:`, variantErr);
           outcomes.push({ index, ok: false, error: variantErr?.message || 'Variant failed' });
+        } finally {
+          progressTracker.reportItemSettled(index);
         }
       }
 
@@ -1984,6 +2061,11 @@ const useSessionStore = create((set, get) => ({
 
     try {
       const { renderCarouselFromPlan } = await import('../services/generationPipeline');
+      const slideCount = Math.max(1, bundle?.plan?.carousel?.slides?.length || 1);
+      const progressTracker = createBatchProgressTracker(slideCount, {
+        onUpdate: ({ pct, label, stage }) => set({ generationProgress: pct, progressLabel: label, generationStage: stage }),
+      });
+      const settledSlides = new Set();
       const pipelineResult = await renderCarouselFromPlan({
         plan: bundle.plan,
         contentPlanId: bundle.contentPlanId,
@@ -1997,10 +2079,27 @@ const useSessionStore = create((set, get) => ({
         requestId,
         cancelSignal: abortController.signal,
         onProgress: (stage) => {
-          const mapped = mapStageProgress(stage);
-          set({ generationProgress: mapped.pct, progressLabel: mapped.label, generationStage: stage });
+          const slide = parseSlideStage(stage);
+          if (slide) {
+            // A new "Generating slide N..." means the PREVIOUS slide (if any)
+            // just settled — credit its weight now so a failed slide doesn't
+            // stall the bar before the next one's stage message arrives.
+            for (let i = 0; i < slide.index; i += 1) {
+              if (!settledSlides.has(i)) { settledSlides.add(i); progressTracker.reportItemSettled(i); }
+            }
+            progressTracker.reportStage(slide.index, 'Generating image...');
+          } else {
+            const mapped = mapStageProgress(stage);
+            set({ generationProgress: mapped.pct, progressLabel: mapped.label, generationStage: stage });
+          }
         },
       });
+      // Credit every slide as settled once the whole carousel call returns,
+      // so the bar reaches its natural ceiling even if the final slide
+      // failed/never emitted a "next slide" stage to trigger settlement.
+      for (let i = 0; i < slideCount; i += 1) {
+        if (!settledSlides.has(i)) { settledSlides.add(i); progressTracker.reportItemSettled(i); }
+      }
 
       const generationIds = Array.isArray(pipelineResult?.generationIds) ? pipelineResult.generationIds : [];
 
