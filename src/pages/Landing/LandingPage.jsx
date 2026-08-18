@@ -3,6 +3,8 @@
 // src/pages/Landing/LandingPage.jsx
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
+import AuthLoadingOverlay from "../../components/Shared/AuthLoadingOverlay";
 import { BarChart3, CalendarDays, LayoutDashboard, Minus, Plus, Settings, Sparkles } from "lucide-react";
 const FEATURES = [
   {
@@ -145,6 +147,14 @@ export default function LandingPage() {
   const [visible, setVisible] = useState({});
   const observerRef = useRef(null);
 
+  /* Someone already signed in who opens the site root belongs in their
+     dashboard, not on the marketing page. Previously only /login did this, so
+     the app effectively required a detour through the login page to get back
+     in. `redirecting` is true from the first paint when stored credentials
+     exist, so a returning user never sees the hero flash before the redirect;
+     anonymous visitors have no token and get the landing page immediately. */
+  const { redirecting } = useAuthenticatedRedirect();
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 24);
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -167,6 +177,15 @@ export default function LandingPage() {
     );
     return () => observerRef.current?.disconnect();
   }, []);
+
+  if (redirecting) {
+    return (
+      <AuthLoadingOverlay
+        title="Welcome back"
+        description="Opening your dashboard."
+      />
+    );
+  }
 
   return (
     <div className="lp-root">

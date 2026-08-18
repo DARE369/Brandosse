@@ -1,9 +1,10 @@
 "use client";
 
 // src/pages/Auth/Login.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "../../Context/AuthContext";
+import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import AuthLayout from "../../layouts/AuthLayout";
 import { APP_ROOT_PATH, USER_HOME_PATH, resolvePostAuthPath } from "../../utils/authRouting";
@@ -82,7 +83,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState("");
 
-  const { user, loading: authLoading, login, loginWithGoogle, refreshAccess } = useAuth();
+  const { login, loginWithGoogle, refreshAccess } = useAuth();
   const infoMessage = location.state?.message || "";
 
   const getReturnPath = (fallbackPath = APP_ROOT_PATH) => {
@@ -97,24 +98,16 @@ export default function Login() {
   /* An already-authenticated user can land here when a transient hiccup during
      startup makes getSession() come back empty: the access gate redirects to
      /login, and a moment later onAuthStateChange restores the session from
-     storage anyway. Without this guard nothing navigates back, so a fully
-     valid session sits behind a login form and the user re-enters their
-     password for no reason — which is exactly the reported "closed the browser
-     and had to log in again" behaviour, observed with a token that had ~59
-     minutes of life left and two getUser calls returning 200.
+     storage anyway. Without this, a fully valid session sits behind a login
+     form and the user re-enters their password for no reason.
 
-     Skipped while a submit is in flight: handleEmailSubmit/handleGoogle do
+     Shared with the landing page rather than reimplemented per route — every
+     public page can be rendered to a signed-in user, and the one that forgets
+     to handle it is the one that strands them.
+
+     Disabled while a submit is in flight: handleEmailSubmit/handleGoogle do
      their own post-login navigation and must not race this. */
-  const autoReturnedRef = useRef(false);
-  useEffect(() => {
-    if (authLoading || !user || loading) return;
-    if (autoReturnedRef.current) return;
-
-    autoReturnedRef.current = true;
-    navigate(getReturnPath(), { replace: true });
-    // getReturnPath reads refs/storage rather than reactive state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user, loading, navigate]);
+  useAuthenticatedRedirect({ enabled: !loading });
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();

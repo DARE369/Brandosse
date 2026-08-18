@@ -134,6 +134,19 @@ function readStoredAuthToken() {
   }
 }
 
+/**
+ * Synchronous "is someone probably signed in?" check, for deciding what to
+ * paint on the FIRST render — before the async auth restore has resolved.
+ * Public pages use it to show a redirect overlay instead of flashing marketing
+ * content at a user who is about to be sent to their dashboard.
+ *
+ * Intentionally not proof of a valid session (it does not verify or decode the
+ * token). Never gate access on this — only presentation.
+ */
+export function hasStoredAuthSession() {
+  return Boolean(readStoredAuthToken());
+}
+
 async function clearLocalAuthSession(reason = 'invalid session') {
   resetUserProfileRoleCache();
 
