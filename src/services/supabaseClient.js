@@ -35,6 +35,25 @@ function setRefreshSuppressUntil(value) {
   }
 }
 
+// Refresh failures are the one auth event we cannot debug after the fact: they
+// happen during page load, supabase-js deletes the stored session when the
+// error is non-retryable (GoTrueClient _callRefreshToken -> _removeSession),
+// and by the time anyone opens the console the evidence is gone. Record the
+// status + server message to localStorage so the reason survives the reload.
+// Read it with: localStorage.getItem('socialai-auth-last-refresh-failure')
+const AUTH_REFRESH_FAILURE_KEY = 'socialai-auth-last-refresh-failure';
+
+function recordRefreshFailure(detail) {
+  try {
+    globalThis.localStorage?.setItem(
+      AUTH_REFRESH_FAILURE_KEY,
+      JSON.stringify({ at: new Date().toISOString(), ...detail }),
+    );
+  } catch {
+    // Storage unavailable (private mode) — diagnostics are best-effort only.
+  }
+}
+
 function getRequestUrl(resource) {
   if (typeof resource === 'string') return resource;
   if (resource instanceof URL) return resource.toString();
@@ -119,12 +138,43 @@ async function supabaseFetch(resource, options = {}) {
 
     if (refreshRequest && response.ok) {
       setRefreshSuppressUntil(0);
+      try {
+        globalThis.localStorage?.removeItem(AUTH_REFRESH_FAILURE_KEY);
+      } catch {
+        // best-effort cleanup only
+      }
+    }
+
+    // A non-OK refresh is the case that silently destroys the session: anything
+    // outside supabase-js's retryable set (502/503/504/520-530) causes
+    // _removeSession(), which deletes the stored token and forces a real
+    // re-login. Capture the server's reason before that happens — a 400
+    // "Invalid Refresh Token: Already Used" means token rotation stranded the
+    // stored token, which is a project-settings problem, not a client bug.
+    if (refreshRequest && !response.ok) {
+      let body = '';
+      try {
+        body = (await response.clone().text()).slice(0, 500);
+      } catch {
+        body = '<unreadable>';
+      }
+      recordRefreshFailure({ status: response.status, body, kind: 'http' });
+      console.warn(
+        `[supabaseClient] token refresh failed (${response.status}). `
+        + 'If this is a 4xx, supabase-js will delete the stored session and force a re-login. '
+        + `Reason recorded in localStorage['${AUTH_REFRESH_FAILURE_KEY}']:`,
+        body,
+      );
     }
 
     return response;
   } catch (_error) {
     if (refreshRequest) {
       setRefreshSuppressUntil(Date.now() + AUTH_REFRESH_RETRY_COOLDOWN_MS);
+      // Network-level failure. This path is SAFE for the session — it returns a
+      // 503, which supabase-js classifies as retryable, so the token survives.
+      // Recorded anyway so a repeated-timeout pattern is visible.
+      recordRefreshFailure({ status: 0, body: String(_error?.message || _error), kind: 'network' });
     }
 
     return authUnavailableResponse(
