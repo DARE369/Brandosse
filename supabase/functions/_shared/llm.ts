@@ -24,6 +24,17 @@ function estimateTokens(value: string) {
   return Math.max(1, Math.ceil(String(value || "").length / 4));
 }
 
+// Groq's response_format: json_object (callOpenAiCompatible above) enforces
+// raw JSON server-side, but there is no equivalent constraint for Anthropic
+// — callAnthropic has no strict-JSON option, so Claude is free to wrap JSON
+// replies in a ```json ... ``` markdown fence even when explicitly asked for
+// raw JSON. Every jsonMode:true caller expects clean JSON in `content`, so
+// strip a wrapping fence here once, centrally, rather than in every caller.
+function stripJsonFence(content: string) {
+  const match = /^```[a-zA-Z]*\s*\n?([\s\S]*?)\n?```$/.exec(content.trim());
+  return match ? match[1].trim() : content;
+}
+
 function resolveProviders(preferredProvider?: string | null) {
   const groqKey      = readEnv("GROQ_API_KEY",      false);
   const anthropicKey = readEnv("ANTHROPIC_API_KEY", false);
@@ -164,8 +175,10 @@ export async function callLlm(options: {
         ? await callAnthropic(provider, allMessages, maxTokens, temperature)
         : await callOpenAiCompatible(provider, allMessages, maxTokens, temperature, jsonMode);
 
+      const content = jsonMode ? stripJsonFence(result.content) : result.content;
+
       return {
-        content: result.content,
+        content,
         model: provider.model,
         provider: provider.provider,
         totalTokens: result.totalTokens || estimateTokens(result.content),

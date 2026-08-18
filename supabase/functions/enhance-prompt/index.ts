@@ -65,8 +65,18 @@ function normalizeBrandContext(brandKit: unknown) {
   };
 }
 
+// Claude (unlike Groq's response_format: json_object) has no enforced JSON
+// mode through callLlm, so it commonly wraps its reply in a ```json ... ```
+// markdown fence even when explicitly asked for raw JSON. Strip that before
+// parsing so a fenced response doesn't fall through to the line-splitter
+// below and leak the fence marker itself as a "suggestion".
+function stripCodeFence(content: string) {
+  const match = /^```[a-zA-Z]*\s*\n?([\s\S]*?)\n?```$/.exec(content.trim());
+  return match ? match[1].trim() : content;
+}
+
 function parseSuggestions(content: string, fallbackPrompt: string, count: number) {
-  const trimmed = String(content || "").trim();
+  const trimmed = stripCodeFence(String(content || "").trim());
   if (!trimmed) return [fallbackPrompt];
 
   try {
@@ -91,6 +101,7 @@ function parseSuggestions(content: string, fallbackPrompt: string, count: number
     .split(/\n+/)
     .map((line) => line.replace(/^\s*[-*\d.)]+\s*/, "").trim())
     .filter(Boolean)
+    .filter((line) => !/^```/.test(line))
     .slice(0, count);
 
   return lineSuggestions.length > 0 ? lineSuggestions : [fallbackPrompt];
