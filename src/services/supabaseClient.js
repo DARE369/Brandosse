@@ -186,6 +186,60 @@ async function supabaseFetch(resource, options = {}) {
   }
 }
 
+// supabase-js logs every internal auth decision when debug is on — including
+// the exact reason it removes a session, which is the one thing our own
+// instrumentation cannot see from outside the library. Gated on a localStorage
+// flag rather than NODE_ENV so it can be turned on against production without
+// a redeploy:
+//   localStorage.setItem('socialai-auth-debug', '1')  // then reload
+// Logs are also mirrored into a ring buffer that survives the reload, because
+// the interesting events happen during page load and are easy to miss live:
+//   JSON.parse(localStorage.getItem('socialai-auth-debug-log'))
+const AUTH_DEBUG_FLAG_KEY = 'socialai-auth-debug';
+const AUTH_DEBUG_LOG_KEY = 'socialai-auth-debug-log';
+const AUTH_DEBUG_LOG_LIMIT = 80;
+
+function authDebugEnabled() {
+  try {
+    return globalThis.localStorage?.getItem(AUTH_DEBUG_FLAG_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function appendAuthDebugLog(message, ...args) {
+  console.debug('[supabase-auth]', message, ...args);
+
+  try {
+    const storage = globalThis.localStorage;
+    if (!storage) return;
+
+    const existing = JSON.parse(storage.getItem(AUTH_DEBUG_LOG_KEY) || '[]');
+    const entries = Array.isArray(existing) ? existing : [];
+    entries.push({
+      at: new Date().toISOString(),
+      message: String(message),
+      // Arguments are stringified defensively: they routinely contain Errors
+      // and session objects that JSON.stringify would drop or choke on.
+      detail: args.map((arg) => {
+        try {
+          if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
+          return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+        } catch {
+          return '<unserializable>';
+        }
+      }),
+    });
+
+    storage.setItem(
+      AUTH_DEBUG_LOG_KEY,
+      JSON.stringify(entries.slice(-AUTH_DEBUG_LOG_LIMIT)),
+    );
+  } catch {
+    // Diagnostics must never break auth.
+  }
+}
+
 export const supabase = createClient(
   isSupabaseConfigured ? supabaseUrl : fallbackSupabaseUrl,
   isSupabaseConfigured ? supabaseAnonKey : fallbackSupabaseAnonKey,
@@ -198,6 +252,7 @@ export const supabase = createClient(
       persistSession: true,
       detectSessionInUrl: true,
       storageKey: 'socialai-auth',
+      ...(authDebugEnabled() ? { debug: appendAuthDebugLog } : {}),
     },
   },
 );
