@@ -120,6 +120,20 @@ function isInvalidStoredSessionError(error) {
   );
 }
 
+// Presence of stored credentials distinguishes "this user is signed out" from
+// "this user is signed in but we could not reach auth to prove it right now".
+// supabase-js deletes this key itself when a session is definitively revoked,
+// so if it is still here the session is worth recovering rather than dumping
+// the user on the login page.
+function readStoredAuthToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage?.getItem(AUTH_STORAGE_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
 async function clearLocalAuthSession(reason = 'invalid session') {
   resetUserProfileRoleCache();
 
@@ -481,40 +495,85 @@ export const AuthProvider = ({ children }) => {
       // getSession normally just reads storage, but it transparently attempts a
       // token refresh when the access token has expired — which is exactly the
       // case after the browser has been closed for a while, and exactly when a
-      // cold start makes that refresh slow. One retry keeps a slow-but-valid
-      // refresh from presenting a login screen to an already-authenticated user.
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      // cold start makes that refresh slow.
+      //
+      // CRITICAL: getSession RESOLVES with { data: { session: null }, error }
+      // when that refresh fails — it does not throw. Destructuring only
+      // data.session treated a recoverable refresh failure as "signed out",
+      // while supabase-js had deliberately KEPT the token in storage (a
+      // retryable failure skips _removeSession). That combination is exactly
+      // the reported bug: socialai-auth still present in localStorage, user
+      // staring at the login page. Both the resolved error and a thrown one
+      // must be handled.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const backoffMs = 600 * (attempt + 1);
         try {
-          ({
-            data: { session: activeSession },
-          } = await withAuthTimeout(
+          const { data, error } = await withAuthTimeout(
             supabase.auth.getSession(),
             'Session check',
             AUTH_SESSION_TIMEOUT_MS,
-          ));
+          );
+
+          if (error) {
+            sessionCheckError = error;
+            if (attempt < 2 && isRecoverableAuthAvailabilityError(error)) {
+              await new Promise((resolve) => globalThis.setTimeout(resolve, backoffMs));
+              continue;
+            }
+            break;
+          }
+
+          activeSession = data?.session ?? null;
           sessionCheckError = null;
           break;
         } catch (error) {
           sessionCheckError = error;
           // Only a recoverable (timeout/network) failure is worth retrying; a
           // definitively invalid token will fail identically the second time.
-          if (attempt === 0 && isRecoverableAuthAvailabilityError(error)) {
-            await new Promise((resolve) => globalThis.setTimeout(resolve, 750));
+          if (attempt < 2 && isRecoverableAuthAvailabilityError(error)) {
+            await new Promise((resolve) => globalThis.setTimeout(resolve, backoffMs));
             continue;
           }
           break;
         }
       }
 
+      // Last resort before showing a login page to someone who is actually
+      // signed in: stored credentials still exist but getSession could not
+      // produce a session. That means the refresh failed transiently rather
+      // than the session being revoked (a revoked one is removed from storage
+      // by supabase-js). Force one explicit refresh instead of giving up.
+      if (!activeSession && readStoredAuthToken()) {
+        try {
+          const { data, error } = await withAuthTimeout(
+            supabase.auth.refreshSession(),
+            'Session recovery refresh',
+            AUTH_SESSION_TIMEOUT_MS,
+          );
+
+          if (!error && data?.session?.user) {
+            activeSession = data.session;
+            sessionCheckError = null;
+          } else if (error) {
+            sessionCheckError = error;
+          }
+        } catch (recoveryError) {
+          sessionCheckError = recoveryError;
+        }
+      }
+
       if (sessionCheckError) {
         const error = sessionCheckError;
-        // Still failing after the retry. Note this never clears stored
-        // credentials for a recoverable error — the token stays on disk so a
-        // later reconcile (or the next reload) can still recover the session.
+        // Still failing after 3 attempts AND an explicit refreshSession. Note
+        // this never clears stored credentials for a recoverable error — the
+        // token stays on disk so a later reconcile (autoRefreshToken firing
+        // TOKEN_REFRESHED) or the next reload can still recover the session.
         if (isRecoverableAuthAvailabilityError(error)) {
-          warnAuthOnce(
-            'session-check-auth-unavailable',
-            '[AuthContext] Supabase session check is temporarily unavailable.',
+          console.warn(
+            '[AuthContext] Could not restore the session after retries + an explicit refresh. '
+            + 'Stored credentials were preserved'
+            + (readStoredAuthToken() ? ' (token still present)' : ' (no token found)')
+            + '. Reason:',
             error?.message || error,
           );
         } else if (isInvalidStoredSessionError(error)) {
