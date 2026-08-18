@@ -27,6 +27,11 @@ import { requestOrgDraftMetadata } from '../org/services/orgDraftWorkflowService
 import { generateSessionTitle } from '../services/sessionTitleService';
 import { executeMockPublishAttempts } from '../services/platforms/mockPublishWorkflow';
 import { normalizeEdgeFunctionError, getEdgeStatus } from '../services/edgeFunctionClient';
+import {
+  createDebouncedPrefWriter,
+  readPref,
+  writePref,
+} from '../services/persistentPrefs';
 
 export { GENERATION_STATUS, POST_STATUS } from '../constants/statuses';
 
@@ -864,6 +869,65 @@ async function clearSessionDraftPrompt(sessionId) {
   }
 }
 
+// Extracted from the store's inline initial state so resetSettingsToDefaults
+// has a single source of truth to restore from.
+const DEFAULT_GENERATION_SETTINGS = {
+  mediaType: 'image', // image | video | edit | image-to-video
+  aspectRatio: '1:1',
+  batchSize: 1,
+  contentType: 'single',
+  slideCount: 'auto',
+  model: 'realism',
+  // 'auto' → route by the content plan's render_intent (1.1). A concrete
+  // value ('flux'|'ideogram'|'recraft') is the advanced override (1.2) and
+  // wins over intent. Was hardcoded 'ideogram', which sent every image
+  // through the text-rendering engine regardless of what it needed.
+  imageModel: 'auto',
+  // 4.1/4.2: reference images that condition generation for brand/subject
+  // consistency; styleLock persists them across sessions ("match my feed").
+  referenceImages: [],
+  styleLock: false,
+  // 1.4: when on, single-image generation pauses to let the user review/edit
+  // the final render prompt BEFORE credits are spent. Off = unchanged fast path.
+  previewPrompt: false,
+  resolution: '2k',
+  duration: 6,
+  fps: 25,
+  generateAudio: false,
+  referenceImageUrl: '',
+};
+
+// Generation settings that should survive a reload, as an explicit ALLOWLIST.
+// A denylist would be wrong here: handleGenerate writes transient values into
+// settings before each run (brandKit — a large object that would bloat
+// localStorage and go stale, plus referenceImageUrl/negativePrompt which are
+// per-attempt), and any future addition would be persisted by accident.
+const PERSISTED_SETTING_KEYS = [
+  'mediaType',
+  'contentType',
+  'aspectRatio',
+  'batchSize',
+  'slideCount',
+  'model',
+  'imageModel',
+  'styleLock',
+  'previewPrompt',
+  'resolution',
+  'duration',
+  'fps',
+  'generateAudio',
+];
+const SETTINGS_PREF_SCOPE = 'studio.settings';
+const writeSettingsPref = createDebouncedPrefWriter(500);
+
+function pickPersistableSettings(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  return PERSISTED_SETTING_KEYS.reduce((acc, key) => {
+    if (source[key] !== undefined) acc[key] = source[key];
+    return acc;
+  }, {});
+}
+
 const useSessionStore = create((set, get) => ({
   // -- STATE ------------------------------------------------------------------
   sessions: [],
@@ -911,31 +975,7 @@ const useSessionStore = create((set, get) => ({
   // background_jobs, not in-memory-only state.
   videoJobs: [],
 
-  settings: {
-    mediaType: 'image', // image | video | edit | image-to-video
-    aspectRatio: '1:1',
-    batchSize: 1,
-    contentType: 'single',
-    slideCount: 'auto',
-    model: 'realism',
-    // 'auto' → route by the content plan's render_intent (1.1). A concrete
-    // value ('flux'|'ideogram'|'recraft') is the advanced override (1.2) and
-    // wins over intent. Was hardcoded 'ideogram', which sent every image
-    // through the text-rendering engine regardless of what it needed.
-    imageModel: 'auto',
-    // 4.1/4.2: reference images that condition generation for brand/subject
-    // consistency; styleLock persists them across sessions ("match my feed").
-    referenceImages: [],
-    styleLock: false,
-    // 1.4: when on, single-image generation pauses to let the user review/edit
-    // the final render prompt BEFORE credits are spent. Off = unchanged fast path.
-    previewPrompt: false,
-    resolution: '2k',
-    duration: 6,
-    fps: 25,
-    generateAudio: false,
-    referenceImageUrl: '',
-  },
+  settings: { ...DEFAULT_GENERATION_SETTINGS },
 
   postProduction: { ...DEFAULT_POST_PRODUCTION },
   generationLineage: null,
@@ -1119,6 +1159,63 @@ const useSessionStore = create((set, get) => ({
     }));
 
     return { success: true, session: { ...session, metadata: nextMetadata } };
+  },
+
+  // Autosave counterpart to saveDraftPrompt. Differences that matter:
+  //   - never throws on an empty prompt; clearing the box is a real state that
+  //     must be persisted, otherwise a reload resurrects deleted text
+  //   - never CREATES a session (saveDraftPrompt calls ensureSession). Typing
+  //     with no active session must not spawn junk session rows on every
+  //     keystroke — there is nothing to attach a draft to yet, so we no-op
+  //   - stores the wider brief-panel state, not just the prompt, so returning
+  //     to a session restores what you were actually composing
+  // Fire-and-forget: a failed autosave must never interrupt typing.
+  autosaveSessionDraft: async (draft = {}) => {
+    const { activeSession } = get();
+    if (!activeSession?.id) return { skipped: 'no-active-session' };
+
+    const existingMetadata = activeSession.metadata && typeof activeSession.metadata === 'object'
+      ? activeSession.metadata
+      : {};
+
+    const nextMetadata = {
+      ...existingMetadata,
+      draft_prompt: String(draft.prompt ?? '').slice(0, 5000),
+      draft_brief: {
+        negativePrompt: String(draft.negativePrompt ?? '').slice(0, 2000),
+        sourceImageUrl: String(draft.sourceImageUrl ?? '').slice(0, 2000),
+        applyBrandKit: draft.applyBrandKit !== false,
+        guided: Boolean(draft.guided),
+        guidedFields: draft.guidedFields && typeof draft.guidedFields === 'object'
+          ? draft.guidedFields
+          : null,
+      },
+      draft_settings: pickPersistableSettings(get().settings),
+      draft_saved_at: new Date().toISOString(),
+    };
+
+    try {
+      const { error } = await applySessionScope(
+        supabase.from('sessions').update({ metadata: nextMetadata }),
+      ).eq('id', activeSession.id);
+      if (error) throw error;
+
+      // Keep the in-memory session in sync so a subsequent loadSession of the
+      // same session restores from the same values rather than a stale row.
+      set((state) => ({
+        activeSession: state.activeSession?.id === activeSession.id
+          ? { ...state.activeSession, metadata: nextMetadata }
+          : state.activeSession,
+        sessions: state.sessions.map((item) => (
+          item.id === activeSession.id ? { ...item, metadata: nextMetadata } : item
+        )),
+      }));
+
+      return { success: true };
+    } catch (err) {
+      console.warn('[SessionStore] autosaveSessionDraft failed (non-fatal):', err?.message || err);
+      return { success: false };
+    }
   },
 
   createSession: async (title = 'New Session') => {
@@ -1305,13 +1402,25 @@ const useSessionStore = create((set, get) => ({
       // would otherwise take priority. Reuses the same one-shot promptSeed
       // mechanism Week 1 Fix 3 built for cross-page handoffs, rather than a
       // second seeding path.
+      // Previously gated on activeGenerations.length === 0, which meant that
+      // once a session had produced anything, returning to it never restored
+      // what you were typing. Since the draft is now autosaved continuously
+      // (autosaveSessionDraft) rather than written once by a manual button,
+      // the stored value always reflects the last thing in the brief panel —
+      // so restoring it is correct whether or not generations exist.
       const draftPrompt = String(session?.metadata?.draft_prompt || '').trim();
-      if (draftPrompt && get().activeGenerations.length === 0) {
+      if (draftPrompt) {
         get().setPromptSeed({
           text: draftPrompt,
           source: 'session_draft',
           settingsSnapshot: session?.metadata?.draft_settings && typeof session.metadata.draft_settings === 'object'
             ? session.metadata.draft_settings
+            : null,
+          // Wider brief state written by autosaveSessionDraft — negative
+          // prompt, source image, brand-kit toggle and guided fields, so the
+          // panel comes back as it was rather than just the prompt text.
+          briefSnapshot: session?.metadata?.draft_brief && typeof session.metadata.draft_brief === 'object'
+            ? session.metadata.draft_brief
             : null,
         });
       }
@@ -1423,7 +1532,11 @@ const useSessionStore = create((set, get) => ({
 
     try {
       const session = await ensureSession(get, prompt);
-      void clearSessionDraftPrompt(session?.id);
+      // Deliberately NOT clearing the session draft here anymore. Clearing on
+      // generate meant the prompt box still showed your text while the stored
+      // draft was empty, so a reload silently lost it. autosaveSessionDraft now
+      // keeps the stored draft in sync with the panel, including when you clear
+      // it yourself.
       const { pendingClarifications } = get();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -1940,7 +2053,11 @@ const useSessionStore = create((set, get) => ({
     try {
       const { settings, generationLineage } = get();
       const session = await ensureSession(get, prompt);
-      void clearSessionDraftPrompt(session?.id);
+      // Deliberately NOT clearing the session draft here anymore. Clearing on
+      // generate meant the prompt box still showed your text while the stored
+      // draft was empty, so a reload silently lost it. autosaveSessionDraft now
+      // keeps the stored draft in sync with the panel, including when you clear
+      // it yourself.
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -2177,7 +2294,11 @@ const useSessionStore = create((set, get) => ({
 
     try {
       const session = await ensureSession(get, prompt);
-      void clearSessionDraftPrompt(session?.id);
+      // Deliberately NOT clearing the session draft here anymore. Clearing on
+      // generate meant the prompt box still showed your text while the stored
+      // draft was empty, so a reload silently lost it. autosaveSessionDraft now
+      // keeps the stored draft in sync with the panel, including when you clear
+      // it yourself.
       const { settings, generationLineage } = get();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -2359,7 +2480,11 @@ const useSessionStore = create((set, get) => ({
 
     try {
       const session = await ensureSession(get, prompt);
-      void clearSessionDraftPrompt(session?.id);
+      // Deliberately NOT clearing the session draft here anymore. Clearing on
+      // generate meant the prompt box still showed your text while the stored
+      // draft was empty, so a reload silently lost it. autosaveSessionDraft now
+      // keeps the stored draft in sync with the panel, including when you clear
+      // it yourself.
       const { settings } = get();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -3656,10 +3781,53 @@ const useSessionStore = create((set, get) => ({
   },
 
   // -- SETTINGS ---------------------------------------------------------------
+  // Namespace owner for persisted settings. Null until hydrate runs, which is
+  // what keeps updateSettings from writing anon-scoped values before we know
+  // who the user is (and then leaking them into the next account on this
+  // browser).
+  settingsPersistUserId: null,
+  settingsHydrated: false,
+
+  // Called once the authenticated user is known (see GeneratePageV2). Merges
+  // stored settings OVER the defaults rather than replacing them, so a setting
+  // added after the user's last visit still gets its default instead of
+  // becoming undefined.
+  hydratePersistedSettings: (userId) => {
+    const stored = readPref(SETTINGS_PREF_SCOPE, userId, null);
+
+    set((state) => ({
+      settingsPersistUserId: userId || null,
+      settingsHydrated: true,
+      settings: stored && typeof stored === 'object'
+        ? { ...state.settings, ...pickPersistableSettings(stored) }
+        : state.settings,
+    }));
+  },
+
   updateSettings: (updates) => {
     set((state) => ({
       settings: { ...state.settings, ...updates },
     }));
+
+    // Persist outside the set() updater — a state reducer should stay free of
+    // side effects. Only writes once we know whose settings these are.
+    const { settings, settingsHydrated, settingsPersistUserId } = get();
+    if (settingsHydrated) {
+      writeSettingsPref(SETTINGS_PREF_SCOPE, settingsPersistUserId, pickPersistableSettings(settings));
+    }
+  },
+
+  // Escape hatch for the "my settings are stuck in a weird state" case, which
+  // persistence makes possible for the first time — before this, a reload was
+  // the reset.
+  resetSettingsToDefaults: () => {
+    const { settingsPersistUserId } = get();
+    const defaults = pickPersistableSettings(DEFAULT_GENERATION_SETTINGS);
+
+    set((state) => ({
+      settings: { ...state.settings, ...defaults },
+    }));
+    writePref(SETTINGS_PREF_SCOPE, settingsPersistUserId, defaults);
   },
 
   setClarifications: (clarifications) => {

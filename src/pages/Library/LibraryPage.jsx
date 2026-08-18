@@ -20,6 +20,7 @@ import {
   IconButton, Button, EmptyState, Skeleton, NotificationBell, AvatarMenu, Modal,
 } from "../../ui-v2";
 import { useAuth } from "../../Context/AuthContext";
+import usePersistentState from "../../hooks/usePersistentState";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useCreditBalance } from "../../hooks/useCreditBalance";
 import useLibraryStore from "../../stores/LibraryStore";
@@ -149,10 +150,14 @@ function LibraryBody() {
   const [search, setSearch] = useState(cachedPrefs?.remember ? (cachedPrefs?.search || "") : "");
   const [sourceFilter, setSourceFilter] = useState(cachedPrefs?.remember ? (cachedPrefs?.sourceFilter || "all") : "all");
   const [statusRail, setStatusRail] = useState(null); // null | 'unused' | 'archived'
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [tagFilter, setTagFilter] = useState("all");
+  // These three reset on every visit before, unlike search/sourceFilter above
+  // which had their own opt-in "remember" toggle. They are view preferences
+  // rather than a transient query, so they persist automatically (per user,
+  // per device) — the existing remember-toggle behavior above is untouched.
+  const [typeFilter, setTypeFilter] = usePersistentState("library.typeFilter", "all", { userId: user?.id ?? null, enabled: Boolean(user?.id) });
+  const [tagFilter, setTagFilter] = usePersistentState("library.tagFilter", "all", { userId: user?.id ?? null, enabled: Boolean(user?.id) });
   const [unusedChipActive, setUnusedChipActive] = useState(false);
-  const [viewMode, setViewMode] = useState("grid");
+  const [viewMode, setViewMode] = usePersistentState("library.viewMode", "grid", { userId: user?.id ?? null, enabled: Boolean(user?.id) });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
 

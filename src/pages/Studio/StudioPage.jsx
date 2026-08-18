@@ -111,7 +111,7 @@ function StudioBody({ brandKit }) {
     isGenerating, generationProgress, progressLabel, error, settings, postProduction,
     updateSettings, startGeneration, approveGeneration, cancelPendingGeneration, pendingGeneration, startCarouselGeneration, approveCarousel, cancelPendingCarousel, pendingCarousel, startEditGeneration,
     startVideoGeneration, generateVideoFirstFrame, enhancePrompt, selectGeneration, hydratePostProductionFromGeneration,
-    regeneratePostMetadata, optimizeSeo, scoreSeo, updatePostProduction, saveDraft, saveDraftPrompt, publishContent,
+    regeneratePostMetadata, optimizeSeo, scoreSeo, updatePostProduction, saveDraft, saveDraftPrompt, autosaveSessionDraft, publishContent,
     videoJobState, dismissVideoJob, setVideoJobMinimized, promptSeed, consumePromptSeed,
     cancelActiveGeneration, lastBatchOutcome, retryFailedVariants,
     regenerateVariant, regenerateSlides, regeneratingIds, checkScheduleConflict,
@@ -414,7 +414,67 @@ function StudioBody({ brandKit }) {
     if (seed.settingsSnapshot) {
       updateSettings(seed.settingsSnapshot);
     }
+
+    // Wider brief state (autosaveSessionDraft). Restored only for a real
+    // session-draft seed — a library/template handoff seed deliberately
+    // carries only prompt text and must not resurrect an unrelated session's
+    // negative prompt or source image.
+    if (seed.source === "session_draft" && seed.briefSnapshot) {
+      const brief = seed.briefSnapshot;
+      if (typeof brief.negativePrompt === "string") setNegativePrompt(brief.negativePrompt);
+      if (typeof brief.sourceImageUrl === "string" && brief.sourceImageUrl) {
+        setSourceImageUrl(brief.sourceImageUrl);
+      }
+      if (typeof brief.applyBrandKit === "boolean") setApplyBrandKit(brief.applyBrandKit);
+      if (brief.guided && brief.guidedFields && typeof brief.guidedFields === "object") {
+        setGuidedFields((current) => ({ ...current, ...brief.guidedFields }));
+        setGuided(true);
+      }
+    }
   }, [promptSeed, consumePromptSeed, handleModeChange, updateSettings]);
+
+  /* Autosave the brief panel to the active session (debounced). Replaces the
+     old manual-only "save draft" button as the thing that makes a reload or a
+     session switch non-destructive.
+
+     Deliberately skipped while a seed is pending: consuming a seed sets prompt
+     state, and autosaving mid-restore would race the restore and write a
+     half-applied brief back over the stored one. Also skipped with no active
+     session — autosaveSessionDraft no-ops there rather than creating junk
+     sessions, but there is no reason to schedule the call at all. */
+  const autosaveSkipRef = useRef(true);
+  useEffect(() => {
+    if (!activeSession?.id || promptSeed) return undefined;
+
+    // Skip the first pass after mount/session-change: at that point the state
+    // still holds either defaults or a just-restored draft, and writing it
+    // back adds nothing.
+    if (autosaveSkipRef.current) {
+      autosaveSkipRef.current = false;
+      return undefined;
+    }
+
+    const timeoutId = setTimeout(() => {
+      void autosaveSessionDraft({
+        prompt,
+        negativePrompt,
+        sourceImageUrl,
+        applyBrandKit,
+        guided,
+        guidedFields,
+      });
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    activeSession?.id, promptSeed, autosaveSessionDraft,
+    prompt, negativePrompt, sourceImageUrl, applyBrandKit, guided, guidedFields,
+  ]);
+
+  // A different session means the next autosave pass is a restore, not an edit.
+  useEffect(() => {
+    autosaveSkipRef.current = true;
+  }, [activeSession?.id]);
 
   useEffect(() => {
     const hasActive = Object.values(rateLimitedUntil).some((until) => until > Date.now());

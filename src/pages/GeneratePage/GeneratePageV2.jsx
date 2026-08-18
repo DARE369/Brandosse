@@ -81,6 +81,7 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
     setSelectedGenerationId,
     setGenerationLineage,
     setPromptSeed,
+    hydratePersistedSettings,
   } = useSessionStore();
 
   const brandKit = useBrandKitStore((s) => s.brandKit);
@@ -108,6 +109,16 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
       loadBrandKit(user.id);
     }
   }, [user?.id, loadBrandKit]);
+
+  /* Restore generation settings (aspect ratio, model, batch size, mode...)
+     from localStorage under this user's namespace. Runs on user change too, so
+     switching accounts on one browser loads that account's settings rather
+     than inheriting the previous one's. Until this runs, updateSettings does
+     not persist — see settingsHydrated in SessionStore. */
+  useEffect(() => {
+    if (!user?.id) return;
+    hydratePersistedSettings(user.id);
+  }, [user?.id, hydratePersistedSettings]);
 
   const loadSearchIndex = useCallback(async () => {
     if (!user?.id) {
