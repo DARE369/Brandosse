@@ -451,7 +451,7 @@ function StudioBody({ brandKit }) {
     setEnhancing(true);
     try {
       const result = await enhancePrompt(src);
-      if (result?.enhanced) setPrompt(result.enhanced.slice(0, PROMPT_LIMIT));
+      if (result?.enhancedPrompt) setPrompt(result.enhancedPrompt.slice(0, PROMPT_LIMIT));
     } catch (err) {
       if (!applyRateLimit("enhance", err)) {
         toast.error(err?.message || "Could not enhance prompt.");
