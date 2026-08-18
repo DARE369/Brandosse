@@ -1273,6 +1273,13 @@ const useSessionStore = create((set, get) => ({
       const currentState = get();
       const isSameSession = currentState.activeSession?.id === sessionId;
       const hasCached = isSameSession && currentState.activeGenerations.length > 0;
+      // A generation attempt in flight for the active session owns error/
+      // activeGenerations until it settles (its own try/catch/finally clears
+      // them). loadSession re-firing mid-attempt (route re-sync, realtime
+      // resubscribe, a stale sessionId param) must not silently swallow an
+      // error the attempt just set — previously error:null fired unconditionally
+      // here even when isSameSession was true and a generation was running.
+      const hasActiveGenerationForSession = currentState.isGenerating && isSameSession;
 
       set((state) => ({
         sessions: state.sessions.some((item) => item.id === session.id)
@@ -1286,7 +1293,7 @@ const useSessionStore = create((set, get) => ({
               selectedGeneration: null,
               selectedGenerationId: null,
             }),
-        error: null,
+        ...(hasActiveGenerationForSession ? {} : { error: null }),
       }));
 
       await get().fetchGenerations(sessionId, { silent: hasCached });
@@ -2568,11 +2575,27 @@ const useSessionStore = create((set, get) => ({
         console.warn('[SessionStore] enhancePrompt context fallback:', contextError?.message || contextError);
       }
 
+      // Only pass signals that are stable at type-time and change what "good"
+      // means (vocabulary), not ones the user is likely to change after
+      // enhancing (aspect ratio, platform) — those would go stale and bake
+      // wrong context into the enhanced text. contentType/mediaType tell the
+      // LLM whether this needs in-image text (carousel slide, graphic) vs. a
+      // pure photo; imageModel is only sent when the user has EXPLICITLY
+      // overridden it away from 'auto' — an explicit choice is a stronger,
+      // still-stable signal than asking the LLM to guess render_intent itself.
+      const { settings } = get();
+      const generationContext = {
+        contentType: settings?.contentType === 'carousel' ? 'carousel' : 'single',
+        mediaType: settings?.mediaType || 'image',
+        ...(settings?.imageModel && settings.imageModel !== 'auto' ? { imageModel: settings.imageModel } : {}),
+      };
+
       const edgeResponse = await supabase.functions.invoke('enhance-prompt', {
         body: {
           prompt: cleanPrompt,
           variantCount: 3,
           ...promptContext,
+          ...generationContext,
         },
       });
 

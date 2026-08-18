@@ -10,7 +10,32 @@ type EnhancePromptRequest = {
   variantCount?: number;
   brandKit?: Record<string, unknown> | null;
   previousPrompts?: string[] | null;
+  // Stable-at-type-time generation context (NOT aspect ratio / platform —
+  // those change after enhancing and would bake stale assumptions into the
+  // text). contentType/mediaType tell the model whether this is a single
+  // image, carousel slide, video first-frame, or edit instruction; imageModel
+  // is only present when the user explicitly overrode the engine away from
+  // "auto", which is a stronger signal than asking the model to guess intent.
+  contentType?: string;
+  mediaType?: string;
+  imageModel?: string;
 };
+
+// Mirrors generationPipeline.js's INTENT_TO_MODEL — an explicit imageModel
+// override tells us which visual vocabulary to steer toward even before the
+// content-plan step runs its own render_intent classification.
+const MODEL_TO_VOCABULARY: Record<string, string> = {
+  flux: "a photorealistic image (real scene, lighting, camera framing) — favor photography vocabulary: lighting direction/quality, lens/camera angle, depth of field, realistic materials and textures.",
+  ideogram: "a graphic with legible text baked into the image (flyer, poster, quote card, promo) — favor layout vocabulary: exact headline wording in quotes, typography style, hierarchy, background/backdrop, color contrast for readability.",
+  recraft: "a vector/flat design (logo, icon, badge, illustration) — favor design vocabulary: flat color palette, line weight, iconography style, composition/symmetry, negative space.",
+};
+
+function mediaTypeLabel(mediaType?: string, contentType?: string) {
+  if (contentType === "carousel") return "one slide in a multi-slide carousel — keep it visually consistent with a cohesive series, not a one-off image";
+  if (mediaType === "video" || mediaType === "image-to-video") return "the first frame of a short video — describe a scene with a clear focal subject that has obvious room to move/animate";
+  if (mediaType === "edit") return "an edit instruction applied to an existing image — describe the CHANGE, not a whole new scene";
+  return "a single standalone image";
+}
 
 function clampVariantCount(value: unknown) {
   const parsed = Number(value);
@@ -158,16 +183,24 @@ serve(async (req) => {
     const variantCount = clampVariantCount(body.variantCount);
     const previousPrompts = normalizePromptList(body.previousPrompts);
     const brandContext = normalizeBrandContext(body.brandKit);
+    const contentType = typeof body.contentType === "string" ? body.contentType : undefined;
+    const mediaType = typeof body.mediaType === "string" ? body.mediaType : undefined;
+    const imageModel = typeof body.imageModel === "string" ? body.imageModel : undefined;
 
     if (!prompt) {
       throw createHttpError("Prompt is required.", 400);
     }
+
+    const targetDescription = mediaTypeLabel(mediaType, contentType);
+    const vocabularyHint = imageModel ? MODEL_TO_VOCABULARY[imageModel] : null;
 
     const llmUserPayload = {
       prompt,
       variant_count: variantCount,
       previous_prompts: previousPrompts,
       brand_context: brandContext,
+      target: targetDescription,
+      ...(vocabularyHint ? { engine_hint: vocabularyHint } : {}),
     };
 
     let suggestions: string[] = [];
@@ -177,11 +210,20 @@ serve(async (req) => {
     try {
       const response = await callLlm({
         systemPrompt: [
-          "You improve short visual generation prompts for social media content.",
-          "Respect the provided brand context and keep output concise and vivid.",
+          "You improve short, often vague, visual generation prompts for social media content so the resulting image is specific rather than generic.",
+          "The user's `prompt` is the starting point. `target` tells you what kind of visual this is for. `engine_hint`, when present, tells you which visual vocabulary to favor because the rendering engine is already fixed — use it.",
+          "For each suggestion, check the ORIGINAL prompt against these dimensions, and add concrete, specific detail ONLY for dimensions it leaves vague — never invent a subject, setting, or detail that contradicts what the user actually wrote:",
+          "1. Subject — is WHO/WHAT specific? (e.g. \"a woman\" -> \"a woman in her 30s wearing a linen apron\")",
+          "2. Setting/environment — where is this happening? (backdrop, location, time of day)",
+          "3. Lighting — what kind, and from where? (soft window light, golden hour, studio softbox, neon)",
+          "4. Composition/framing — camera angle, distance, focal point (close-up, wide shot, eye-level, overhead)",
+          "5. Style/medium — photographic vs illustrated vs flat design, and any texture/finish",
+          "6. Mood/color — the emotional tone and dominant palette",
+          "If `target` says this needs legible in-image text (a graphic/flyer), the exact words that must appear go in quotes inside the suggestion.",
+          "Respect the provided brand context (voice, tone, preferred hashtags are NOT restated in the prompt itself, only the visual style should reflect brand voice) and keep every suggestion concise — one or two sentences, not a paragraph.",
           "Return strict JSON with shape: {\"suggestions\":[\"...\"]}.",
-          "Each suggestion must be a single prompt string, no hashtags, no markdown.",
-          "Do not repeat the same wording across suggestions.",
+          "Each suggestion must be a single prompt string, no hashtags, no markdown, no meta-commentary about what you changed.",
+          "Do not repeat the same wording across suggestions — vary which specific angle (setting vs lighting vs composition) each one leans into.",
         ].join(" "),
         messages: [
           {
