@@ -34,8 +34,14 @@ import {
 } from '../services/userSettingsService';
 
 const AuthContext = createContext();
-const AUTH_REQUEST_TIMEOUT_MS = 8_000;
-const AUTH_SESSION_TIMEOUT_MS = 6_000;
+// These MUST stay above supabaseClient's AUTH_FETCH_TIMEOUT_MS (12s). That
+// fetch wrapper already caps every auth request and converts a failure into a
+// clean `auth_unavailable` 503 that supabase-js understands. If the timeout
+// here fires first it aborts that handling and surfaces a generic timeout
+// Error instead — which used to escalate a slow-but-fine request (common on a
+// cold start) into a full signed-out state. Outer guard = last resort only.
+const AUTH_REQUEST_TIMEOUT_MS = 15_000;
+const AUTH_SESSION_TIMEOUT_MS = 15_000;
 const AUTH_STORAGE_KEY = 'socialai-auth';
 const AUTH_WARNING_DEDUPE_MS = 30_000;
 const authWarningTimestamps = new Map();
@@ -425,6 +431,39 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (!data?.user?.id) {
+        // getUser resolved with no error but no user. That *usually* means the
+        // session is genuinely dead — but it also happens during a flaky
+        // refresh window, and clearLocalAuthSession() below deletes the stored
+        // token, which is unrecoverable (the user must log in again). Confirm
+        // with one retry before destroying anything: a transient blip resolves
+        // here, a genuinely dead session returns empty twice.
+        let confirmed = null;
+        try {
+          await new Promise((resolve) => globalThis.setTimeout(resolve, 750));
+          confirmed = await withAuthTimeout(
+            supabase.auth.getUser(),
+            `${source} validation retry`,
+            AUTH_SESSION_TIMEOUT_MS,
+          );
+        } catch (retryError) {
+          // Could not reach auth to confirm — keep the token and let the next
+          // reconcile decide rather than logging the user out on a blip.
+          if (isRecoverableAuthAvailabilityError(retryError)) {
+            warnAuthOnce(
+              `${source}-missing-user-unconfirmed`,
+              `[AuthContext] ${source} could not confirm the session; keeping stored credentials.`,
+            );
+            throw retryError;
+          }
+        }
+
+        if (confirmed?.data?.user?.id) {
+          return {
+            ...candidateSession,
+            user: confirmed.data.user,
+          };
+        }
+
         await clearLocalAuthSession(`${source} missing user`);
         return null;
       }
@@ -437,17 +476,41 @@ export const AuthProvider = ({ children }) => {
 
     const checkSession = async () => {
       let activeSession = null;
-      try {
-        ({
-          data: { session: activeSession },
-        } = await withAuthTimeout(
-          supabase.auth.getSession(),
-          'Session check',
-          AUTH_SESSION_TIMEOUT_MS,
-        ));
-      } catch (error) {
-        // getSession itself failed (timeout / unavailable). Treat as signed out
-        // for the first paint; onAuthStateChange reconciles if a session exists.
+      let sessionCheckError = null;
+
+      // getSession normally just reads storage, but it transparently attempts a
+      // token refresh when the access token has expired — which is exactly the
+      // case after the browser has been closed for a while, and exactly when a
+      // cold start makes that refresh slow. One retry keeps a slow-but-valid
+      // refresh from presenting a login screen to an already-authenticated user.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          ({
+            data: { session: activeSession },
+          } = await withAuthTimeout(
+            supabase.auth.getSession(),
+            'Session check',
+            AUTH_SESSION_TIMEOUT_MS,
+          ));
+          sessionCheckError = null;
+          break;
+        } catch (error) {
+          sessionCheckError = error;
+          // Only a recoverable (timeout/network) failure is worth retrying; a
+          // definitively invalid token will fail identically the second time.
+          if (attempt === 0 && isRecoverableAuthAvailabilityError(error)) {
+            await new Promise((resolve) => globalThis.setTimeout(resolve, 750));
+            continue;
+          }
+          break;
+        }
+      }
+
+      if (sessionCheckError) {
+        const error = sessionCheckError;
+        // Still failing after the retry. Note this never clears stored
+        // credentials for a recoverable error — the token stays on disk so a
+        // later reconcile (or the next reload) can still recover the session.
         if (isRecoverableAuthAvailabilityError(error)) {
           warnAuthOnce(
             'session-check-auth-unavailable',
@@ -476,7 +539,14 @@ export const AuthProvider = ({ children }) => {
 
         runBackgroundTask(async () => {
           try {
-            const verifiedSession = await validateStoredSession(activeSession, 'initial session');
+            // allowTimeoutFallback matches the other two call sites (auth
+            // state initial session / token refresh). Without it, a slow
+            // validation here threw and fell through to applySignedOutState
+            // below, signing the user out of an otherwise-valid session.
+            const verifiedSession = await validateStoredSession(activeSession, 'initial session', {
+              allowTimeoutFallback: true,
+              fallbackUser: activeSession?.user || null,
+            });
             if (verifiedSession?.user) {
               setSession(verifiedSession);
               setUser(verifiedSession.user);
