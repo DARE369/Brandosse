@@ -43,6 +43,16 @@ function setRefreshSuppressUntil(value) {
 // Read it with: localStorage.getItem('socialai-auth-last-refresh-failure')
 const AUTH_REFRESH_FAILURE_KEY = 'socialai-auth-last-refresh-failure';
 
+// Declared up here because both the fetch wrapper (below) and the debug logger
+// (bottom of file) redact with them. supabase-js hands FULL session objects to
+// its debug hook (GoTrueClient's "detected session in URL" passes `session`
+// directly), and a token endpoint can return credentials in a body — and both
+// of those get written to localStorage precisely so they can be read out and
+// pasted into a bug report. Redact before storing, never after.
+const SENSITIVE_KEY_PATTERN = /(access_token|refresh_token|provider_token|provider_refresh_token|id_token|token|password|secret|api[_-]?key|authorization)/i;
+// Any JWT-shaped string, wherever it appears (including inside a URL hash).
+const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]+/g;
+
 function recordRefreshFailure(detail) {
   try {
     globalThis.localStorage?.setItem(
@@ -154,7 +164,10 @@ async function supabaseFetch(resource, options = {}) {
     if (refreshRequest && !response.ok) {
       let body = '';
       try {
-        body = (await response.clone().text()).slice(0, 500);
+        // Redacted before storage: a token endpoint response can carry
+        // credentials even on some non-2xx paths, and this value is written to
+        // localStorage specifically so it can be read out and shared.
+        body = (await response.clone().text()).slice(0, 500).replace(JWT_PATTERN, '<redacted-jwt>');
       } catch {
         body = '<unreadable>';
       }
@@ -207,8 +220,41 @@ function authDebugEnabled() {
   }
 }
 
+function redactAuthValue(value, depth = 0) {
+  if (value === null || value === undefined) return value;
+
+  if (typeof value === 'string') {
+    return value.replace(JWT_PATTERN, '<redacted-jwt>');
+  }
+
+  if (typeof value !== 'object' || depth > 4) {
+    return typeof value === 'object' ? '<depth-limited>' : value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((entry) => redactAuthValue(entry, depth + 1));
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      SENSITIVE_KEY_PATTERN.test(key) ? '<redacted>' : redactAuthValue(entry, depth + 1),
+    ]),
+  );
+}
+
 function appendAuthDebugLog(message, ...args) {
-  console.debug('[supabase-auth]', message, ...args);
+  const safeArgs = args.map((arg) => {
+    try {
+      if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
+      if (typeof arg === 'object' && arg !== null) return JSON.stringify(redactAuthValue(arg));
+      return redactAuthValue(String(arg));
+    } catch {
+      return '<unserializable>';
+    }
+  });
+
+  console.debug('[supabase-auth]', message, ...safeArgs);
 
   try {
     const storage = globalThis.localStorage;
@@ -219,16 +265,7 @@ function appendAuthDebugLog(message, ...args) {
     entries.push({
       at: new Date().toISOString(),
       message: String(message),
-      // Arguments are stringified defensively: they routinely contain Errors
-      // and session objects that JSON.stringify would drop or choke on.
-      detail: args.map((arg) => {
-        try {
-          if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
-          return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
-        } catch {
-          return '<unserializable>';
-        }
-      }),
+      detail: safeArgs,
     });
 
     storage.setItem(
