@@ -116,7 +116,8 @@ function StudioBody({ brandKit }) {
     cancelActiveGeneration, lastBatchOutcome, retryFailedVariants,
     regenerateVariant, regenerateSlides, regeneratingIds, checkScheduleConflict,
     videoJobs, fetchVideoJobs, subscribeToBackgroundJobs, cancelVideoJob,
-    sessions, projects, activeProject, createNewSession, updateSessionTitle, deleteSession,
+    sessions, projects, activeProject, updateSessionTitle, deleteSession,
+    clearActiveSession, saveTempDraft, clearTempDraft,
     fetchSessions, fetchProjects, createProject, renameProject, deleteProject, reorderProjects,
     sessionsLoading, projectsLoading,
   } = useSessionStore();
@@ -439,12 +440,16 @@ function StudioBody({ brandKit }) {
 
      Deliberately skipped while a seed is pending: consuming a seed sets prompt
      state, and autosaving mid-restore would race the restore and write a
-     half-applied brief back over the stored one. Also skipped with no active
-     session — autosaveSessionDraft no-ops there rather than creating junk
-     sessions, but there is no reason to schedule the call at all. */
+     half-applied brief back over the stored one.
+
+     No longer skipped when there is no active session: autosaveSessionDraft
+     now routes to the single temporary draft slot in that case. That is the
+     whole point of the slot — composing without a session used to be the one
+     state nothing persisted, which is why a session had to be created up
+     front just to have somewhere to write. */
   const autosaveSkipRef = useRef(true);
   useEffect(() => {
-    if (!activeSession?.id || promptSeed) return undefined;
+    if (promptSeed) return undefined;
 
     // Skip the first pass after mount/session-change: at that point the state
     // still holds either defaults or a just-restored draft, and writing it
@@ -1342,8 +1347,10 @@ function StudioBody({ brandKit }) {
                         await saveDraft();
                         toast.success("Saved as draft");
                       } else {
-                        await saveDraftPrompt(prompt);
-                        toast.success("Draft saved to this session");
+                        const saved = await saveDraftPrompt(prompt);
+                        toast.success(saved?.target === "temp-draft"
+                          ? "Draft saved — it'll be here when you come back"
+                          : "Draft saved to this session");
                       }
                     } catch (err) {
                       toast.error(err?.message || "Could not save draft");
@@ -1789,11 +1796,30 @@ function StudioBody({ brandKit }) {
           navigate(`/app/generate/${s.id}`);
           setHistoryOpen(false);
         }}
-        onNewSession={async (projectId) => {
-          const created = await createNewSession("New session", { projectId });
+        onNewSession={(projectId) => {
+          // Starting a new session no longer inserts a row — it just returns
+          // to an empty composer. The session is created at generation
+          // kickoff, so backing out of a "new session" leaves nothing behind.
+          // The chosen project rides along in the temp draft and is applied
+          // when that session is eventually created.
+          clearActiveSession();
+          // The composer is local state — clearing the session does not empty
+          // it. Reset it here or the previous session's prompt stays in the box
+          // and autosave immediately writes it straight back into the slot we
+          // are about to blank.
+          setPrompt("");
+          setNegativePrompt("");
+          setSourceImageUrl("");
+          setApplyBrandKit(true);
+          setGuided(false);
+          setGuidedFields({ subject: "", setting: "", style: "", mood: "" });
+          // saveTempDraft merges, so blank the slot first — "new session"
+          // means an empty composer, not the previous draft with a new project.
+          clearTempDraft();
+          saveTempDraft({ projectId: projectId ?? null });
           setHistoryOpen(false);
           setStudioStage("brief");
-          if (created?.id) navigate(`/app/generate/${created.id}`);
+          navigate("/app/generate");
         }}
         onRenameSession={(id, title) => updateSessionTitle(id, title)}
         onRequestDeleteSession={(s) => setDeleteSessionTarget(s)}

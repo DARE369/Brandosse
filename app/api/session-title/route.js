@@ -1,10 +1,18 @@
 // app/api/session-title/route.js
-// Generates a short creative session title from a user prompt using Groq.
+// Generates a short creative session title from a user prompt.
+//
+// Provider order is Groq first, Anthropic second. Titles are the "cheap model"
+// tier in the cost plan (3-5 words, no judgment compounding), so the premium
+// provider is only ever the failover — not the default.
+//
+// A provider with no configured key is skipped rather than attempted, so a
+// half-configured environment still names sessions via whichever key exists.
 
 import { NextResponse } from 'next/server';
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const FALLBACK_TITLE = 'Untitled Session';
+const MAX_TOKENS = 32;
+const TEMPERATURE = 0.5;
 
 const SYSTEM_PROMPT =
   'You are a session title generator for a social media content platform. ' +
@@ -19,12 +27,62 @@ function normalizeTitle(raw = '') {
     .trim();
 }
 
-export async function POST(request) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'GROQ_API_KEY not configured' }, { status: 503 });
+async function callGroq(key, prompt) {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      temperature: TEMPERATURE,
+      max_tokens: MAX_TOKENS,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Prompt: "${prompt}"` },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`GROQ request failed (${response.status}): ${await response.text()}`);
   }
 
+  const payload = await response.json();
+  return String(payload?.choices?.[0]?.message?.content || '');
+}
+
+async function callAnthropic(key, prompt) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      // Pinned to Haiku deliberately: this is cost-controlled work, never
+      // worth Sonnet/Opus. Same reasoning as callPromptEngine in _shared/llm.ts.
+      model: process.env.ANTHROPIC_TITLE_MODEL || 'claude-haiku-4-5-20251001',
+      system: SYSTEM_PROMPT,
+      max_tokens: MAX_TOKENS,
+      temperature: TEMPERATURE,
+      messages: [{ role: 'user', content: `Prompt: "${prompt}"` }],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`ANTHROPIC request failed (${response.status}): ${await response.text()}`);
+  }
+
+  const payload = await response.json();
+  return Array.isArray(payload?.content)
+    ? payload.content.map((entry) => entry?.text || '').join('\n')
+    : '';
+}
+
+export async function POST(request) {
   let prompt = '';
   try {
     const body = await request.json();
@@ -34,36 +92,33 @@ export async function POST(request) {
   }
 
   if (!prompt) {
-    return NextResponse.json({ title: 'Untitled Session' });
+    return NextResponse.json({ title: FALLBACK_TITLE, source: 'empty-prompt' });
   }
 
-  try {
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature: 0.5,
-        max_tokens: 20,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Prompt: "${prompt}"` },
-        ],
-      }),
-    });
+  const providers = [
+    { name: 'groq', key: process.env.GROQ_API_KEY, call: callGroq },
+    { name: 'anthropic', key: process.env.ANTHROPIC_API_KEY, call: callAnthropic },
+  ].filter((provider) => Boolean(provider.key));
 
-    if (!response.ok) {
-      return NextResponse.json({ title: 'Untitled Session' }, { status: 200 });
+  if (providers.length === 0) {
+    console.error('[session-title] no LLM provider key configured (GROQ_API_KEY / ANTHROPIC_API_KEY)');
+    return NextResponse.json({ title: FALLBACK_TITLE, source: 'unconfigured' });
+  }
+
+  for (const provider of providers) {
+    try {
+      const title = normalizeTitle(await provider.call(provider.key, prompt));
+      if (title) {
+        return NextResponse.json({ title, source: provider.name });
+      }
+      console.warn(`[session-title] ${provider.name} returned an empty title; trying next provider`);
+    } catch (error) {
+      // Falls through to the next provider. Logged rather than swallowed so a
+      // silently-dead key shows up in the server logs instead of only as a
+      // wall of generic session names.
+      console.warn(`[session-title] ${provider.name} failed; trying next provider.`, error);
     }
-
-    const data = await response.json();
-    const raw = data?.choices?.[0]?.message?.content ?? '';
-    const title = normalizeTitle(raw) || 'Untitled Session';
-    return NextResponse.json({ title });
-  } catch {
-    return NextResponse.json({ title: 'Untitled Session' });
   }
+
+  return NextResponse.json({ title: FALLBACK_TITLE, source: 'all-providers-failed' });
 }

@@ -198,7 +198,7 @@ The product combines AI generation, media generation/editing, SEO/caption optimi
 | SEO scoring/optimization | SEO score, optimization suggestions, apply suggestions, org draft SEO. | `src/services/ApiService.js`, `src/org/services/orgDraftWorkflowService.js`, `supabase/functions/seo-score/index.ts`, `supabase/functions/optimize-seo/index.ts` |
 | Brand consistency | Brand-aware prompt building and consistency checks. | `src/services/brandKitLoader.js`, `src/services/briefBuilder.js`, `src/services/llmClient.js`, `supabase/functions/ai-brand-consistency-check/index.ts` |
 | Content plans and validation | Content plan extraction/validation, quality gate support. | `src/services/contentPlanValidator.js`, `src/services/intentExtractor.js`, `src/services/qualityGate.js` |
-| Session titles | Auto-generation of generation session titles. | `src/services/sessionTitleService.js`, `supabase/functions/generate-session-title/index.ts` |
+| Session titles | Auto-generation of generation session titles. | `src/services/sessionTitleService.js`, `app/api/session-title/route.js` |
 | Mock publishing | Mock OAuth, publish workflow, platform registry, post preview, mock-publish Edge Function. | `src/services/platforms/*`, `src/components/Publishing/*`, `supabase/functions/mock-publish/index.ts` |
 | Account health | Connection events, failure detection, health views, admin/org/personal health cards. | `src/services/platforms/connectionService.js`, `src/components/Dashboard/AccountHealthCard.jsx`, `src/org/components/OrgAccountHealthCard.jsx`, `supabase/functions/detect-account-failures/index.ts` |
 
@@ -334,7 +334,6 @@ Purpose is inferred from function name and client usage.
 | `extractBrandKit` | Brand kit extraction from uploaded materials. |
 | `generate-caption` | Caption generation. |
 | `generate-post-metadata` | Post metadata generation. |
-| `generate-session-title` | Session title generation. |
 | `generateCarouselPlan` | Carousel plan generation. |
 | `generateContent` | General content generation. |
 | `generateImage` | Image generation. |

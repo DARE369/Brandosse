@@ -18,6 +18,12 @@
 // This is for PREFERENCES (device-local, instant, survives reload/close).
 // In-progress work that should follow the user across devices belongs in the
 // DB instead — see sessions.metadata.draft_* (SessionStore.saveDraftPrompt).
+//
+// One deliberate exception: the Studio temporary draft (scope 'studio.draft').
+// Before a generation runs there is no session row to attach a draft to, and
+// creating one just to hold it is the junk-session problem we removed. So
+// pre-session composing is device-local here, and is migrated onto the session
+// row by SessionStore.adoptTempDraftIntoSession the moment a session is born.
 
 const NAMESPACE = 'socialai';
 const SCHEMA_VERSION = 1;
@@ -116,6 +122,26 @@ export function createDebouncedPrefWriter(delayMs = DEFAULT_DEBOUNCE_MS) {
       writePref(entry.scope, entry.userId, entry.value);
     });
     pending.clear();
+  };
+
+  // Drop pending writes instead of committing them — the counterpart to
+  // flush(). Needed whenever a value is deliberately cleared: without this a
+  // debounced write still in flight lands after the clear and resurrects what
+  // was just removed. Omit scope/userId to cancel every pending write.
+  write.cancel = (scope, userId) => {
+    if (!isBrowser()) return;
+
+    if (scope === undefined) {
+      pending.forEach((entry) => window.clearTimeout(entry.timerId));
+      pending.clear();
+      return;
+    }
+
+    const key = buildPrefKey(scope, userId);
+    const entry = pending.get(key);
+    if (!entry) return;
+    window.clearTimeout(entry.timerId);
+    pending.delete(key);
   };
 
   return write;

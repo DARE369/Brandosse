@@ -75,8 +75,8 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
     dismissVideoJob,
     startVideoGeneration,
     loadSession,
-    createNewSession,
     clearActiveSession,
+    restoreTempDraft,
     selectGeneration,
     setSelectedGenerationId,
     setGenerationLineage,
@@ -93,8 +93,12 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
   const [generationIndex, setGenerationIndex] = useState([]);
-  const creatingSessionRef = useRef(false);
   const routeStateHandledRef = useRef(null);
+  // The temp draft is restored once per "composer with no session" episode, not
+  // on every re-run of the init effect — that effect also re-fires whenever
+  // location.state changes (clearRouteState does exactly that), and re-seeding
+  // there would drop a stale draft on top of a template/library prefill.
+  const tempDraftRestoredRef = useRef(false);
   const skipNextPostResetRef = useRef(false);
 
   const clearRouteState = useCallback(() => {
@@ -228,7 +232,7 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
   // activeSession?.id so React's own cleanup-before-rerun guarantees the
   // previous session's channel is torn down before the new one is created,
   // covering every action that changes activeSession (loadSession,
-  // createNewSession, clearActiveSession) without needing any of those
+  // ensureSession, clearActiveSession) without needing any of those
   // actions to know about realtime. No session yet → subscribeToSession(null)
   // is a deliberate no-op (see its own comment) — subscribes lazily the
   // moment a session exists.
@@ -252,12 +256,24 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
     }
   }, [selectedGeneration?.id, resetPostProduction, updatePostProduction, prefillScheduleDate]);
 
+  /* No session is created on entry any more — not even for the post/template/
+     library hand-offs, which used to pre-create a 'Draft Session' before they
+     had anything to put in it. That scaffold was pure waste: the post-based
+     branches resolve the post's OWN session further down (see the prefill
+     effect) and navigate there, orphaning the row that was just inserted, and
+     the template/library branches only ever needed a prompt seed.
+
+     A session is now born exactly once, inside ensureSession, at generation
+     kickoff. Until then the work lives in the single temporary draft slot. */
   useEffect(() => {
     if (!user?.id) return;
 
     let cancelled = false;
+
     const routeState = location.state || {};
-    const requiresPersistedSession = Boolean(
+    // A hand-off carries its own content and must win over whatever was last
+    // composed; the prefill effect below seeds it.
+    const hasPrefill = Boolean(
       routeState.repurposeFromPostId
       || routeState.editPostId
       || routeState.templateId
@@ -267,35 +283,28 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
 
     const initSession = async () => {
       if (sessionId) {
-        creatingSessionRef.current = false;
+        tempDraftRestoredRef.current = false;
         const loadedSession = await loadSession(sessionId);
         if (cancelled) return;
 
+        // A session id that no longer resolves (deleted, or another account's)
+        // drops back to the composer rather than fabricating a replacement.
         if (!loadedSession) {
-          if (requiresPersistedSession) {
-            const fallbackSession = await createNewSession('Draft Session');
-            if (!cancelled && fallbackSession?.id) {
-              navigate(`/app/generate/${fallbackSession.id}`, { replace: true, state: location.state ?? {} });
-            }
-          } else {
-            clearActiveSession();
-            navigate('/app/generate', { replace: true, state: location.state ?? {} });
-          }
+          clearActiveSession();
+          navigate('/app/generate', { replace: true, state: location.state ?? {} });
         }
         return;
       }
 
-      if (!requiresPersistedSession) {
-        creatingSessionRef.current = false;
-        clearActiveSession();
-        return;
-      }
+      clearActiveSession();
+      if (cancelled) return;
 
-      if (creatingSessionRef.current) return;
-      creatingSessionRef.current = true;
-      const nextSession = await createNewSession('Draft Session');
-      if (!cancelled && nextSession?.id) {
-        navigate(`/app/generate/${nextSession.id}`, { replace: true, state: location.state ?? {} });
+      // Composer with no session: bring back whatever was being composed. Runs
+      // after hydratePersistedSettings (separate effect, same user gate) so the
+      // draft's own settings snapshot wins over the persisted defaults.
+      if (!hasPrefill && !tempDraftRestoredRef.current) {
+        tempDraftRestoredRef.current = true;
+        restoreTempDraft();
       }
     };
 
@@ -304,7 +313,17 @@ export default function GeneratePageV2({ sessionId: sessionIdProp = null }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, sessionId, loadSession, createNewSession, clearActiveSession, navigate, location.state]);
+  }, [user?.id, sessionId, loadSession, clearActiveSession, restoreTempDraft, navigate, location.state]);
+
+  /* Keep the URL in step with a session created mid-flight. ensureSession can
+     mint a session at generation kickoff while the URL is still bare
+     /app/generate; without this the address bar never catches up, so a reload
+     or a shared link loses the very session that was just created. replace:
+     true — this is the same page, not a new history entry. */
+  useEffect(() => {
+    if (!activeSession?.id || sessionId) return;
+    navigate(`/app/generate/${activeSession.id}`, { replace: true, state: location.state ?? {} });
+  }, [activeSession?.id, sessionId, navigate, location.state]);
 
   useEffect(() => {
     const prefillDateRaw = location.state?.prefillDate;

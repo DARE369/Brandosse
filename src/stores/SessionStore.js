@@ -28,6 +28,7 @@ import { generateSessionTitle } from '../services/sessionTitleService';
 import { executeMockPublishAttempts } from '../services/platforms/mockPublishWorkflow';
 import { normalizeEdgeFunctionError, getEdgeStatus } from '../services/edgeFunctionClient';
 import {
+  clearPref,
   createDebouncedPrefWriter,
   readPref,
   writePref,
@@ -819,54 +820,58 @@ async function ensureSession(get, userInput) {
   const { activeSession, ensureSessionFromPromptInput, createNewSession } = get();
   if (activeSession?.id) return activeSession;
   const prompt = String(userInput || '').trim();
+
+  // A draft carries the project it was started under (the history drawer's
+  // per-project "+ New session" records it there now that the button no longer
+  // creates a row). Pass it explicitly when present so the session lands in the
+  // right project; with no draft, createNewSession falls back to activeProject
+  // as before.
+  const pendingDraft = readTempDraft(get().settingsPersistUserId);
+  const projectOption = pendingDraft && Object.prototype.hasOwnProperty.call(pendingDraft, 'projectId')
+    ? { projectId: pendingDraft.projectId ?? null }
+    : {};
+
+  let session = null;
   if (prompt) {
-    const seededSession = await ensureSessionFromPromptInput(prompt);
-    if (seededSession?.id) return seededSession;
+    session = await ensureSessionFromPromptInput(prompt, projectOption);
   }
 
-  const autoTitle = getTitleFromPrompt(prompt);
-  return createNewSession(autoTitle, {
-    metadata: {
-      draft_prompt: prompt || null,
-      title_source: 'fallback',
-    },
-  });
+  if (!session?.id) {
+    const autoTitle = getTitleFromPrompt(prompt);
+    session = await createNewSession(autoTitle, {
+      ...projectOption,
+      metadata: {
+        draft_prompt: prompt || null,
+        title_source: 'fallback',
+      },
+    });
+  }
+
+  // This is the moment the temporary draft becomes a real session. Hand its
+  // wider brief state (negative prompt, reference image, guided fields,
+  // settings) onto the row before clearing the slot — the session creation
+  // paths above only carry the prompt text, so without this a reload right
+  // after a failed generation would come back with half the brief missing.
+  if (session?.id) await get().adoptTempDraftIntoSession(session.id);
+
+  return session;
 }
 
-// ADDENDUM UPGRADE 4: a generation starting from a session "uses up" that
-// session's saved prompt draft — the prompt is now embodied in a real
-// generation, so the draft that was standing in for it is cleared. Clearing
-// rule (deliberately chosen and documented, per the addendum's own
-// instruction to decide and document it): clear the moment a generation
-// STARTS against that session, not on success/completion — attempting a
-// generation is the point the user "used" the draft, regardless of whether
-// that particular attempt succeeds or fails. Fire-and-forget/best-effort:
-// failing to clear it is not worth blocking or failing a generation over.
-async function clearSessionDraftPrompt(sessionId) {
-  if (!sessionId) return;
+// The temporary draft slot. Read/write/clear are module-level so ensureSession
+// (also module-level) can consume the draft without reaching through the store.
+//
+// Note the asymmetry with sessions.metadata.draft_*: once a session EXISTS its
+// draft belongs on the row, so it follows the user across devices. Before a
+// session exists there is nothing to attach a row to, and creating one would be
+// the junk-session bug this slot was built to remove — so pre-session work is
+// deliberately device-local.
+function readTempDraft(userId) {
+  const stored = readPref(DRAFT_PREF_SCOPE, userId, null);
+  return stored && typeof stored === 'object' ? stored : null;
+}
 
-  try {
-    const { data: row, error: readError } = await applySessionScope(
-      supabase.from('sessions').select('metadata').eq('id', sessionId),
-    ).maybeSingle();
-    if (readError) throw readError;
-
-    const metadata = row?.metadata && typeof row.metadata === 'object' ? { ...row.metadata } : {};
-    if (!('draft_prompt' in metadata) && !('draft_settings' in metadata) && !('draft_saved_at' in metadata)) {
-      return;
-    }
-
-    delete metadata.draft_prompt;
-    delete metadata.draft_settings;
-    delete metadata.draft_saved_at;
-
-    const { error: updateError } = await applySessionScope(
-      supabase.from('sessions').update({ metadata }),
-    ).eq('id', sessionId);
-    if (updateError) throw updateError;
-  } catch (err) {
-    console.warn('Failed to clear session draft prompt:', err?.message || err);
-  }
+function clearTempDraftPref(userId) {
+  clearPref(DRAFT_PREF_SCOPE, userId);
 }
 
 // Extracted from the store's inline initial state so resetSettingsToDefaults
@@ -919,6 +924,17 @@ const PERSISTED_SETTING_KEYS = [
 ];
 const SETTINGS_PREF_SCOPE = 'studio.settings';
 const writeSettingsPref = createDebouncedPrefWriter(500);
+
+// The single temporary draft. Composing on the Generate page no longer creates
+// a session row up front — the work lives here until a generation actually
+// starts, at which point ensureSession turns it into a real session and
+// clearTempDraft consumes it.
+//
+// "Only one temporary session" is enforced by the key itself: persistentPrefs
+// namespaces as socialai:v<n>:<userId>:<scope>, so a user has exactly one slot
+// and a second draft can only overwrite the first, never accumulate.
+const DRAFT_PREF_SCOPE = 'studio.draft';
+const writeDraftPref = createDebouncedPrefWriter(500);
 
 function pickPersistableSettings(settings) {
   const source = settings && typeof settings === 'object' ? settings : {};
@@ -1104,18 +1120,23 @@ const useSessionStore = create((set, get) => ({
     }
   },
 
-  ensureSessionFromPromptInput: async (promptText) => {
+  ensureSessionFromPromptInput: async (promptText, options = {}) => {
     const prompt = String(promptText || '').trim();
     if (!prompt) return get().activeSession;
 
     const { activeSession } = get();
     if (activeSession?.id) return activeSession;
 
-    const generatedTitle = await generateSessionTitle(prompt);
-    return get().createNewSession(generatedTitle, {
+    // title_source records what actually named this session: a provider name
+    // on success, or 'pending' when every provider failed. 'pending' is the
+    // marker a later backfill uses to find sessions still stuck on the generic
+    // placeholder — it is never inferred from the prompt text.
+    const { title, source } = await generateSessionTitle(prompt);
+    return get().createNewSession(title, {
+      ...options,
       metadata: {
         draft_prompt: prompt,
-        title_source: 'groq',
+        title_source: source,
       },
     });
   },
@@ -1132,10 +1153,16 @@ const useSessionStore = create((set, get) => ({
       throw new Error('Type a prompt before saving a draft.');
     }
 
-    const session = await ensureSession(get, trimmed);
-    if (!session?.id) {
-      throw new Error('Could not create a session for this draft.');
+    // Explicitly saving a brief is not a generation, so it must not create a
+    // session — the button is labelled "save as draft WITHOUT generating".
+    // With no session the draft goes to the same temporary slot autosave uses.
+    const { activeSession: sessionForDraft } = get();
+    if (!sessionForDraft?.id) {
+      get().saveTempDraft({ prompt: trimmed });
+      return { success: true, target: 'temp-draft' };
     }
+
+    const session = sessionForDraft;
 
     const { settings } = get();
     const draftSavedAt = new Date().toISOString();
@@ -1172,7 +1199,15 @@ const useSessionStore = create((set, get) => ({
   // Fire-and-forget: a failed autosave must never interrupt typing.
   autosaveSessionDraft: async (draft = {}) => {
     const { activeSession } = get();
-    if (!activeSession?.id) return { skipped: 'no-active-session' };
+
+    // No session yet: the work goes to the single temporary draft slot instead
+    // of creating a row. This is the inversion of the old behaviour, which
+    // no-opped here precisely because the only alternative back then was to
+    // spawn a junk session on every keystroke.
+    if (!activeSession?.id) {
+      get().saveTempDraft(draft);
+      return { success: true, target: 'temp-draft' };
+    }
 
     const existingMetadata = activeSession.metadata && typeof activeSession.metadata === 'object'
       ? activeSession.metadata
@@ -1214,6 +1249,127 @@ const useSessionStore = create((set, get) => ({
       return { success: true };
     } catch (err) {
       console.warn('[SessionStore] autosaveSessionDraft failed (non-fatal):', err?.message || err);
+      return { success: false };
+    }
+  },
+
+  // -- TEMPORARY DRAFT -------------------------------------------------------
+  // One slot per user (see DRAFT_PREF_SCOPE). Holds what is being composed
+  // before any session exists, so a reload or a failed generation never loses
+  // it and no session row is created until a generation actually starts.
+
+  saveTempDraft: (draft = {}) => {
+    const { settingsPersistUserId, settingsHydrated } = get();
+    // Before hydration we do not yet know whose draft this is; writing it would
+    // risk filing it under the wrong user on a shared browser.
+    if (!settingsHydrated) return { skipped: 'not-hydrated' };
+
+    // MERGE, don't replace. The autosave path passes the whole brief and
+    // relies on explicit '' to clear a field the user emptied (''  is not
+    // nullish, so it still wins). Partial callers pass undefined and keep
+    // what is stored. A caller that genuinely wants a blank slate calls
+    // clearTempDraft() first.
+    const existing = readTempDraft(settingsPersistUserId) || {};
+
+    writeDraftPref(DRAFT_PREF_SCOPE, settingsPersistUserId, {
+      prompt: String(draft.prompt ?? existing.prompt ?? '').slice(0, 5000),
+      negativePrompt: String(draft.negativePrompt ?? existing.negativePrompt ?? '').slice(0, 2000),
+      sourceImageUrl: String(draft.sourceImageUrl ?? existing.sourceImageUrl ?? '').slice(0, 2000),
+      applyBrandKit: (draft.applyBrandKit ?? existing.applyBrandKit) !== false,
+      guided: Boolean(draft.guided ?? existing.guided),
+      guidedFields: (draft.guidedFields ?? existing.guidedFields) && typeof (draft.guidedFields ?? existing.guidedFields) === 'object'
+        ? (draft.guidedFields ?? existing.guidedFields)
+        : null,
+      settings: pickPersistableSettings(get().settings),
+      projectId: draft.projectId ?? existing.projectId ?? get().activeProject?.id ?? null,
+      savedAt: new Date().toISOString(),
+    });
+
+    return { success: true };
+  },
+
+  // Feeds the stored draft back through the SAME one-shot promptSeed mechanism
+  // loadSession uses for sessions.metadata.draft_*, so the composer has exactly
+  // one restore path to honour rather than two.
+  restoreTempDraft: () => {
+    const { settingsPersistUserId } = get();
+    const draft = readTempDraft(settingsPersistUserId);
+    if (!draft) return null;
+
+    const hasContent = String(draft.prompt || '').trim()
+      || String(draft.negativePrompt || '').trim()
+      || String(draft.sourceImageUrl || '').trim()
+      || (draft.guided && draft.guidedFields);
+    if (!hasContent) return null;
+
+    get().setPromptSeed({
+      text: String(draft.prompt || ''),
+      source: 'session_draft',
+      settingsSnapshot: draft.settings && typeof draft.settings === 'object' ? draft.settings : null,
+      briefSnapshot: {
+        negativePrompt: draft.negativePrompt ?? '',
+        sourceImageUrl: draft.sourceImageUrl ?? '',
+        applyBrandKit: draft.applyBrandKit !== false,
+        guided: Boolean(draft.guided),
+        guidedFields: draft.guidedFields ?? null,
+      },
+    });
+
+    return draft;
+  },
+
+  clearTempDraft: () => {
+    const { settingsPersistUserId } = get();
+    // Cancel any debounced write still in flight, otherwise it lands AFTER the
+    // clear and resurrects the draft we just consumed.
+    writeDraftPref.cancel?.(DRAFT_PREF_SCOPE, settingsPersistUserId);
+    clearTempDraftPref(settingsPersistUserId);
+  },
+
+  // Called by ensureSession the moment a draft becomes a real session: merge
+  // the brief/settings onto the row, then consume the slot.
+  adoptTempDraftIntoSession: async (sessionId) => {
+    const { settingsPersistUserId } = get();
+    const draft = readTempDraft(settingsPersistUserId);
+    get().clearTempDraft();
+    if (!sessionId || !draft) return { skipped: 'nothing-to-adopt' };
+
+    try {
+      const { data: row, error: readError } = await applySessionScope(
+        supabase.from('sessions').select('metadata').eq('id', sessionId),
+      ).maybeSingle();
+      if (readError) throw readError;
+
+      const metadata = row?.metadata && typeof row.metadata === 'object' ? { ...row.metadata } : {};
+      const nextMetadata = {
+        ...metadata,
+        draft_prompt: String(draft.prompt ?? metadata.draft_prompt ?? ''),
+        draft_settings: draft.settings ?? metadata.draft_settings ?? null,
+        draft_brief: {
+          negativePrompt: draft.negativePrompt ?? '',
+          sourceImageUrl: draft.sourceImageUrl ?? '',
+          applyBrandKit: draft.applyBrandKit !== false,
+          guided: Boolean(draft.guided),
+          guidedFields: draft.guidedFields ?? null,
+        },
+        draft_saved_at: new Date().toISOString(),
+      };
+
+      const { error: updateError } = await applySessionScope(
+        supabase.from('sessions').update({ metadata: nextMetadata }),
+      ).eq('id', sessionId);
+      if (updateError) throw updateError;
+
+      set((state) => ({
+        activeSession: state.activeSession?.id === sessionId
+          ? { ...state.activeSession, metadata: nextMetadata }
+          : state.activeSession,
+      }));
+
+      return { success: true };
+    } catch (err) {
+      // Best-effort: losing the carried-over brief must never fail a generation.
+      console.warn('[SessionStore] adoptTempDraftIntoSession failed (non-fatal):', err?.message || err);
       return { success: false };
     }
   },
@@ -1408,7 +1564,15 @@ const useSessionStore = create((set, get) => ({
       // (autosaveSessionDraft) rather than written once by a manual button,
       // the stored value always reflects the last thing in the brief panel —
       // so restoring it is correct whether or not generations exist.
-      const draftPrompt = String(session?.metadata?.draft_prompt || '').trim();
+      // Never re-seed the composer while a generation is running against this
+      // session. ensureSession now creates the session mid-flight and writes
+      // the adopted draft onto it, which makes the URL sync re-enter
+      // loadSession moments later — without this guard that would fire a
+      // promptSeed into the brief panel in the middle of the very generation
+      // it just started, reverting settings the user changed after kickoff.
+      const draftPrompt = hasActiveGenerationForSession
+        ? ''
+        : String(session?.metadata?.draft_prompt || '').trim();
       if (draftPrompt) {
         get().setPromptSeed({
           text: draftPrompt,

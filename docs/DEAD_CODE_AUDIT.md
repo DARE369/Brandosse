@@ -38,7 +38,7 @@ Repo-wide dormant-code scan (grep-verified reference counts). Active entry = Nex
 ## B. INVESTIGATE (zero live JS imports but referenced by lint scripts/CSS, or invoked outside the repo)
 
 - Admin moderation/analytics: `ContentModeration/ModerationQueue.jsx`, `PublicationModal.jsx`, `AnalyticsPagination/Pagination.jsx`, `ScoreCard/ScoreCard.jsx`, `admin/utils/apiService.js`, `mockAnalytics.js` — confirm the admin moderation/analytics screens don't lazy-load them.
-- Edge functions possibly run by cron/dashboard/uptime: `credit-monthly-reset`, `detect-account-failures`, `generate-session-title`, `healthCheck`, `org-setup`, `score-generation` — verify Supabase scheduled triggers before deleting.
+- Edge functions possibly run by cron/dashboard/uptime: `credit-monthly-reset`, `detect-account-failures`, `healthCheck`, `org-setup`, `score-generation` — verify Supabase scheduled triggers before deleting.
 - `scripts/ui-audit.cjs`, `render_markdown_pdf.py`, `seed-mock-connected-accounts.mjs` — one-off tooling.
 - `CalendarV2.css` still imported in app-entry; its component tree is gone → prune classes (low priority).
 
