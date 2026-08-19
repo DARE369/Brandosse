@@ -321,7 +321,6 @@ Purpose is inferred from function name and client usage.
 | `admin-list-posts` | Admin moderation list endpoint with filters/pagination. |
 | `admin-notify-user` | Sends admin-to-user notifications. |
 | `admin-seed-connected-account` | Seeds mock connected account data. |
-| `adminStats` | Admin stats endpoint. |
 | `ai-brand-consistency-check` | Checks content against brand kit. |
 | `ai-generate-brief` | Generates AI brief content. |
 | `ai-org-chat` | Common Room AI assistant replies. |
