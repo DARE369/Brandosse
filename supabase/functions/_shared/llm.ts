@@ -30,7 +30,7 @@ function estimateTokens(value: string) {
 // replies in a ```json ... ``` markdown fence even when explicitly asked for
 // raw JSON. Every jsonMode:true caller expects clean JSON in `content`, so
 // strip a wrapping fence here once, centrally, rather than in every caller.
-function stripJsonFence(content: string) {
+export function stripJsonFence(content: string) {
   const match = /^```[a-zA-Z]*\s*\n?([\s\S]*?)\n?```$/.exec(content.trim());
   return match ? match[1].trim() : content;
 }
@@ -247,6 +247,87 @@ export async function callVisionJudge(opts: {
   return Array.isArray(data?.content)
     ? data.content.map((c: { text?: string }) => c.text || "").join("").trim()
     : "";
+}
+
+// ── Specialist: Claude PDF document reader ───────────────────────────────────
+/**
+ * callAnthropicWithDocument — sends a PDF directly to Claude as a `document`
+ * content block instead of pre-extracting text ourselves. Claude's own PDF
+ * understanding (layout + text) is far more reliable than a regex scrape of
+ * raw PDF bytes, which only ever finds text sitting in uncompressed
+ * text-show operators — most real PDFs use FlateDecode-compressed content
+ * streams that a byte scrape can't see at all, silently starving the
+ * extraction prompt of any real source text (extractBrandKit 2026-08-19
+ * incident — documents "extracted" almost nothing).
+ * Anthropic-only (same constraint as callVisionJudge — Groq's
+ * OpenAI-compatible path in this codebase is text-only, no document input).
+ */
+export async function callAnthropicWithDocument(opts: {
+  systemPrompt: string;
+  userPrompt: string;
+  documentBase64: string;
+  documentMediaType: string; // e.g. "application/pdf"
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<LlmResult> {
+  const anthropicKey = readEnv("ANTHROPIC_API_KEY", false);
+  if (!anthropicKey) {
+    throw createHttpError("Document extraction requires ANTHROPIC_API_KEY.", 501);
+  }
+
+  const model = readEnv("ANTHROPIC_MODEL", false) || "claude-3-5-sonnet-latest";
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+      // PDF/document content blocks were gated behind this beta flag when
+      // the feature launched; harmless to send even once a given account/
+      // model no longer requires it, and cheap insurance against a silent
+      // "unsupported content type" rejection from Anthropic otherwise.
+      "anthropic-beta": "pdfs-2024-09-25",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      system: opts.systemPrompt,
+      max_tokens: opts.maxTokens ?? 1600,
+      temperature: opts.temperature ?? 0.1,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: { type: "base64", media_type: opts.documentMediaType, data: opts.documentBase64 },
+          },
+          { type: "text", text: opts.userPrompt },
+        ],
+      }],
+    }),
+    // Generous timeout: reading + reasoning over a real PDF plus a fuller
+    // (4096-token) structured JSON response takes noticeably longer than a
+    // short text prompt — the previous 45s cap fired mid-generation once
+    // maxTokens was raised (extractBrandKit 2026-08-19 incident).
+    signal: AbortSignal.timeout(100_000),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => response.statusText);
+    throw new Error(`ANTHROPIC document request failed (${response.status}): ${text}`);
+  }
+
+  const payload = await response.json();
+  const content = Array.isArray(payload?.content)
+    ? payload.content.map((entry: { text?: string }) => entry.text || "").join("\n").trim()
+    : "";
+
+  return {
+    content: stripJsonFence(content),
+    model,
+    provider: "anthropic",
+    totalTokens: Number(payload?.usage?.input_tokens || 0) + Number(payload?.usage?.output_tokens || 0),
+  };
 }
 
 // ── Specialist: Claude Haiku for prompt engineering ──────────────────────────

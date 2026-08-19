@@ -196,7 +196,13 @@ async function generatePlan(brief: Record<string, unknown>) {
     systemPrompt: CONTENT_PLAN_SYSTEM_PROMPT,
     messages: [{ role: "user", content: buildPlanUserMessage(brief) }],
     preferredProvider: "groq",
-    maxTokens: 3500,
+    // 3500 truncated mid-JSON on richer outputs (e.g. an 8-slide carousel:
+    // each slide needs two >=40-word prompts, plus full SEO score
+    // breakdown + rationale, platform-override hashtag sets, etc. — this
+    // schema is the largest in the codebase). Same failure class as the
+    // extractBrandKit truncation (2026-08-19): the LLM was cut off by
+    // max_tokens before closing its JSON, not actually malfunctioning.
+    maxTokens: 6000,
     temperature: 0.7,
     jsonMode: true,
   });
@@ -219,7 +225,13 @@ async function revisePlan(
     systemPrompt: REVISION_SYSTEM_PROMPT,
     messages: [{ role: "user", content: buildRevisionUserMessage(plan, violations, brandKit) }],
     preferredProvider: "groq",
-    maxTokens: 3500,
+    // 3500 truncated mid-JSON on richer outputs (e.g. an 8-slide carousel:
+    // each slide needs two >=40-word prompts, plus full SEO score
+    // breakdown + rationale, platform-override hashtag sets, etc. — this
+    // schema is the largest in the codebase). Same failure class as the
+    // extractBrandKit truncation (2026-08-19): the LLM was cut off by
+    // max_tokens before closing its JSON, not actually malfunctioning.
+    maxTokens: 6000,
     temperature: 0.4,
     jsonMode: true,
   });

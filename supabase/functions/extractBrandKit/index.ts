@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
-import { callLlm } from "../_shared/llm.ts";
+import { callLlm, callAnthropicWithDocument } from "../_shared/llm.ts";
 import { corsHeaders, handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 
 // Source can be a previously-uploaded brand_assets document, or a live
@@ -324,7 +324,7 @@ async function runExtraction(sourceText: string, brandNameHint: string) {
     systemPrompt: EXTRACTION_SYSTEM_PROMPT,
     jsonMode: true,
     temperature: 0.1,
-    maxTokens: 1600,
+    maxTokens: 4096,
     messages: [
       {
         role: "user",
@@ -339,6 +339,43 @@ async function runExtraction(sourceText: string, brandNameHint: string) {
   return {
     ...normalized,
     extractionPromptVersion: "extractBrandKit.v3",
+    provider: llmResponse.provider,
+    model: llmResponse.model,
+  };
+}
+
+// Chunked byte->base64 encode (Deno's global `btoa` needs a binary string;
+// spreading a large Uint8Array directly into String.fromCharCode can blow
+// the call-stack argument limit on multi-MB PDFs, so this feeds it in
+// bounded chunks instead).
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+// PDF documents go straight to Claude as a native `document` content block
+// instead of through the regex byte-scrape `decodeDocumentText` uses for
+// other formats — see callAnthropicWithDocument's doc comment for why.
+async function runExtractionFromPdf(fileBytes: Uint8Array, brandNameHint: string) {
+  const llmResponse = await callAnthropicWithDocument({
+    systemPrompt: EXTRACTION_SYSTEM_PROMPT,
+    userPrompt: "Read the attached brand document and return the final JSON now.",
+    documentBase64: bytesToBase64(fileBytes),
+    documentMediaType: "application/pdf",
+    maxTokens: 4096,
+    temperature: 0.1,
+  });
+
+  const parsed = JSON.parse(pickJsonString(llmResponse.content));
+  const normalized = normalizeExtraction(parsed, brandNameHint);
+
+  return {
+    ...normalized,
+    extractionPromptVersion: "extractBrandKit.v3-pdf-native",
     provider: llmResponse.provider,
     model: llmResponse.model,
   };
@@ -403,15 +440,14 @@ serve(async (req: Request) => {
     }
 
     // -- Stored-document source (existing upload flow) --
-    const { data: ownedAsset, error: assetError } = await admin
-      .from("brand_assets")
-      .select("id, user_id, storage_path, file_name, mime_type")
-      .eq("user_id", user.id)
-      .eq("storage_path", storagePath)
-      .maybeSingle();
-
-    if (assetError) throw assetError;
-    if (!ownedAsset) {
+    // The client uploads this document straight to the `brand_assets`
+    // storage bucket (src/components/BrandKit/BrandKitExtractLoader.jsx) as
+    // a transient extraction source, not a row in the `brand_assets` DB
+    // table — so ownership is verified from the path itself (client always
+    // writes `${user.id}/brand_docs/...`), not a table lookup. A table
+    // lookup here always returned zero rows and 403'd every document
+    // extraction (see docs/brand-kit-rebuild — 2026-08-19 incident).
+    if (!storagePath.startsWith(`${user.id}/`)) {
       return jsonResponse({ error: "Forbidden" }, 403);
     }
 
@@ -427,14 +463,18 @@ serve(async (req: Request) => {
       throw new Error(`Could not fetch document bytes (${fileResponse.status})`);
     }
     const fileBytes = new Uint8Array(await fileResponse.arrayBuffer());
-    const detectedMime = mimeType || ownedAsset.mime_type || fileResponse.headers.get("content-type") || "";
-    const detectedName = fileName || ownedAsset.file_name || storagePath;
-    const extractedText = decodeDocumentText(fileBytes, detectedMime, detectedName).slice(0, 24000);
+    const detectedMime = mimeType || fileResponse.headers.get("content-type") || "";
+    const detectedName = fileName || storagePath;
+    const isPdf = detectedMime.toLowerCase().includes("pdf") || detectedName.toLowerCase().endsWith(".pdf");
 
-    const result = await runExtraction(extractedText, detectedName);
+    const result = isPdf
+      ? await runExtractionFromPdf(fileBytes, detectedName)
+      : await runExtraction(decodeDocumentText(fileBytes, detectedMime, detectedName).slice(0, 24000), detectedName);
+
     return jsonResponse({ ...result, sourceType: "document" });
   } catch (error) {
     const status = mapErrorToStatusCode(error);
+    console.error("extractBrandKit failed:", error instanceof Error ? error.message : String(error));
     return new Response(JSON.stringify(toErrorPayload(error)), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
