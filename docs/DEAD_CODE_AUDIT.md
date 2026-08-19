@@ -31,7 +31,7 @@ Repo-wide dormant-code scan (grep-verified reference counts). Active entry = Nex
 - **Repo-root stale dirs:** `pages/404.jsx`, `functions/start-generation/` (stale duplicate of `supabase/functions/start-generation/`)
 - `scripts/fix-moderation-empty-state.cjs` + `.mjs`
 
-**Edge functions (zero client invocations):** `adminStats`, `generateCarouselPlan`
+**Edge functions (zero client invocations):** ~~`adminStats`~~ (REMOVED 2026-08-19 — deleted from the Supabase project and from this repo; its `index.ts` had been empty since the initial commit, so the deployed build had no `serve()` handler at all), `generateCarouselPlan` (already absent from the deployed function list)
 
 **Dependencies (no import anywhere):** `@chakra-ui/react`, `@emotion/react`, `@emotion/styled`, `@radix-ui/react-dialog`, `@dnd-kit/sortable`, `axios`, `framer-motion`, `groq-sdk`, `react-type-animation` (also drop from `next.config.mjs` `optimizePackageImports`). Add `xstate` + `@xstate/react` once `src/legacy/` is gone. → biggest bundle win.
 
