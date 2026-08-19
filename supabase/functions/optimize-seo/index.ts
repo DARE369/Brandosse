@@ -186,7 +186,24 @@ Return ONLY valid JSON:
     const contentId = body.content_id || body.post_id || null;
     if (contentId) {
       const adminClient = createAdminClient();
-      await persistSeoState(adminClient, contentId, normalized);
+      // persistSeoState writes through the admin client (RLS bypassed) with no
+      // ownership check of its own, so contentId must be confirmed to belong
+      // to this user HERE, before it ever reaches that call. Without this, any
+      // authenticated caller could pass an arbitrary post UUID (not secret —
+      // they appear in URLs/API responses) and overwrite another user's
+      // seo_state/workflow_state (IDOR, found in a security audit).
+      const { data: ownedPost } = await adminClient
+        .from("posts")
+        .select("id")
+        .eq("id", contentId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (ownedPost) {
+        await persistSeoState(adminClient, contentId, normalized);
+      } else {
+        console.warn(`[optimize-seo] content_id ${contentId} not owned by user ${user.id}; skipping persist`);
+      }
     }
 
     // Preserved for backward compatibility with src/org/services/

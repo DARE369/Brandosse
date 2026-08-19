@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import { readEnv } from "../_shared/env.ts";
-import { createHttpError } from "../_shared/org.ts";
+import { createHttpError, requireActiveOrgMember } from "../_shared/org.ts";
 import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import { persistSeoState, scoreContent } from "../_shared/seo.ts";
 import {
@@ -59,10 +59,46 @@ serve(async (req) => {
     // workflow_state.seo_status (previously the client wrote this itself
     // after receiving the response) — server owns its own writes, same
     // philosophy as Fix 3's metadata lifecycle.
+    //
+    // SECURITY: persistSeoState writes through the admin client (RLS
+    // bypassed) with no ownership check of its own, and contentId is
+    // client-supplied and not secret (post ids appear in URLs/API
+    // responses). Without a check here, any authenticated caller could
+    // overwrite ANY user's or ANY org's post seo_state/workflow_state
+    // (IDOR, found in a security audit — same defect as optimize-seo).
+    // This is called from both the personal Studio path (SessionStore.js
+    // optimizeSeo, no organization_id) and the org draft workflow
+    // (orgDraftWorkflowService.scoreOrgDraftSeo, organization_id set), so
+    // both ownership models are checked here — mirrors the pattern
+    // generate-post-metadata already uses for the same two callers.
     const contentId = body.content_id || body.post_id || null;
     if (contentId) {
       const adminClient = createAdminClient();
-      await persistSeoState(adminClient, contentId, normalized);
+      const { data: ownedPost } = await adminClient
+        .from("posts")
+        .select("id, user_id, organization_id")
+        .eq("id", contentId)
+        .maybeSingle();
+
+      let authorized = false;
+      if (ownedPost) {
+        if (ownedPost.organization_id) {
+          try {
+            await requireActiveOrgMember(adminClient, ownedPost.organization_id, user.id);
+            authorized = true;
+          } catch {
+            authorized = false;
+          }
+        } else {
+          authorized = ownedPost.user_id === user.id;
+        }
+      }
+
+      if (authorized) {
+        await persistSeoState(adminClient, contentId, normalized);
+      } else {
+        console.warn(`[seo-score] content_id ${contentId} not accessible to user ${user.id}; skipping persist`);
+      }
     }
 
     return jsonResponse({

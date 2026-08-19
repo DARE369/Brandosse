@@ -36,6 +36,34 @@ SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
+-- SECURITY DECISION (recorded 2026-08-19, security audit): public=true here
+-- is deliberate, not an oversight — do not "fix" it without reading this.
+--
+-- Supabase serves a public bucket at /storage/v1/object/public/... which
+-- bypasses RLS entirely, so the generated_assets_select_own policy below
+-- protects the authenticated API path only; it does nothing for the public
+-- URL every image/video actually gets served from. In effect: anyone holding
+-- a URL can view that file, indefinitely, with no login — this is a
+-- capability-URL model, not per-user access control.
+--
+-- What makes this an acceptable default for THIS product: paths are
+-- {user_id}/{timestamp}_....ext — UUID-prefixed and unguessable, so there is
+-- no enumeration risk, only a "this exact URL leaked" risk. That fits a
+-- content-generation tool where output is normally meant to be shared or
+-- published anyway, and gets CDN caching / no signed-URL-expiry management
+-- for free.
+--
+-- What it costs: a leaked link (browser sync, referrer header, a screenshot
+-- shared elsewhere, server logs) is PERMANENT, unrevocable access — there is
+-- no way to cut it off short of deleting the file. If some generated content
+-- is ever meant to stay genuinely private (not just unlisted), this bucket is
+-- the wrong storage for it.
+--
+-- Switching to signed URLs later is a real migration, not a config flip:
+-- every already-shared/stored URL in the wild breaks, and every read path in
+-- the app needs to request a fresh signed URL instead of using the stored
+-- path directly. See docs/DEAD_CODE_AUDIT.md / security audit notes for the
+-- full tradeoff writeup.
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'generated_assets',
