@@ -116,6 +116,35 @@ export async function finalizeFailed(adminClient: DatabaseClient, job: Backgroun
  * has no webhook body to work from) and for any webhook delivery whose
  * body doesn't match this expected shape.
  */
+// `payload_error` is fal.ai's documented field for the ERROR case, but it's
+// not the only shape seen in practice — some models report failures as a
+// FastAPI-style validation payload instead (`payload.detail`, either a
+// string or an array of `{ msg, ... }` objects), or a plain `payload.error`/
+// `payload.message` string. Try each before giving up, and always log the
+// raw body either way — the generic "fal.ai reported ERROR via webhook"
+// string this replaces gave zero signal for actually diagnosing a failure
+// (2026-08-19 incident: a job failed with no usable reason surfaced anywhere).
+function extractFalErrorReason(webhookBody: { payload?: unknown; payload_error?: string }): string {
+  if (webhookBody.payload_error) return webhookBody.payload_error;
+
+  const payload = webhookBody.payload;
+  if (payload && typeof payload === "object") {
+    const p = payload as Record<string, unknown>;
+    if (typeof p.detail === "string") return p.detail;
+    if (Array.isArray(p.detail)) {
+      return p.detail
+        .map((entry) => (entry && typeof entry === "object" && "msg" in entry
+          ? String((entry as Record<string, unknown>).msg)
+          : JSON.stringify(entry)))
+        .join("; ");
+    }
+    if (typeof p.error === "string") return p.error;
+    if (typeof p.message === "string") return p.message;
+  }
+
+  return "fal.ai reported ERROR via webhook (no reason field present — see raw body in function logs)";
+}
+
 export async function finalizeFromWebhookPayload(
   adminClient: DatabaseClient,
   job: BackgroundJobRow,
@@ -129,7 +158,8 @@ export async function finalizeFromWebhookPayload(
   }
 
   if (webhookBody.status === "ERROR") {
-    const won = await finalizeFailed(adminClient, job, webhookBody.payload_error || "fal.ai reported ERROR via webhook");
+    console.error("[videoJobFinalize] fal.ai ERROR webhook body for job", job.id, ":", JSON.stringify(webhookBody).slice(0, 3000));
+    const won = await finalizeFailed(adminClient, job, extractFalErrorReason(webhookBody));
     return { status: "failed", won };
   }
 
