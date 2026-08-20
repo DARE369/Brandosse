@@ -21,7 +21,7 @@
   flex: 1; min-width: 0; background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-accent-solid);
   border-radius: 5px; padding: 5px 7px; color: var(--uiv2-text-primary); font-size: 12.5px; font-family: inherit; outline: none;
 }
-.titleText { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.titleText { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--uiv2-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .iconBtn {
   background: none; border: none; color: var(--uiv2-text-secondary); cursor: pointer; flex-shrink: 0;
   padding: 6px; display: flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; border-radius: 6px;
@@ -36,7 +36,7 @@
 }
 .sectionHead:hover { background: var(--uiv2-bg-inset); }
 .sectionDot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.sectionName { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sectionName { font-size: 13px; font-weight: 600; color: var(--uiv2-text-primary); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sectionCount { font-family: var(--uiv2-font-mono); font-size: 11px; color: var(--uiv2-text-secondary); flex-shrink: 0; }
 .sectionChevron { flex-shrink: 0; transition: transform 0.12s; color: var(--uiv2-text-secondary); }
 .sectionChevronOpen { transform: rotate(180deg); }
@@ -52,7 +52,7 @@
   border: 1px solid var(--uiv2-border); display: flex; align-items: center; justify-content: center;
   font-family: var(--uiv2-font-mono); font-size: 9px; color: var(--uiv2-text-secondary);
 }
-.pastTitle { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pastTitle { font-size: 12.5px; font-weight: 500; color: var(--uiv2-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pastMeta { font-size: 11px; color: var(--uiv2-text-secondary); margin-top: 1px; }
 .deleteBtn {
   background: none; border: none; color: var(--uiv2-text-tertiary); cursor: pointer; flex-shrink: 0;

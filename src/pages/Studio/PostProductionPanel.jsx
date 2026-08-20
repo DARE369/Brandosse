@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Save, Calendar, Send, Sparkles, RefreshCw } from "lucide-react";
-import { Card, Badge, Button, Dropdown } from "../../ui-v2";
+import { Card, Button, Dropdown } from "../../ui-v2";
 import { platformNeedsTitle, getPlatformSpec } from "../../services/platforms/platformCaptionSpecs";
 import PlatformFitStrip from "./PlatformFitStrip";
 import styles from "./PostProductionPanel.module.css";
@@ -123,7 +123,7 @@ export default function PostProductionPanel({
     return (
       <Card className={styles.panel}>
         <div className={styles.publishedBox}>
-          <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Published (simulated)</div>
+          <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Published</div>
           <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginBottom: 16 }}>
             "{postProduction.title || selectedGeneration?.prompt?.slice(0, 40) || "Your post"}" was queued to{" "}
             {selectedAccount ? (selectedAccount.display_name || selectedAccount.account_name) : "your account"}.
@@ -140,7 +140,6 @@ export default function PostProductionPanel({
     <Card className={styles.panel}>
       <div className={styles.head}>
         <span className={styles.kicker}>Post production</span>
-        <Badge tone="warning">Simulated publish</Badge>
       </div>
 
       {/* Title only shows when a selected platform actually uses one

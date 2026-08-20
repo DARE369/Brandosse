@@ -117,7 +117,7 @@ function StudioBody({ brandKit }) {
     regenerateVariant, regenerateSlides, regeneratingIds, checkScheduleConflict,
     videoJobs, fetchVideoJobs, subscribeToBackgroundJobs, cancelVideoJob,
     sessions, projects, activeProject, updateSessionTitle, deleteSession,
-    clearActiveSession, saveTempDraft, clearTempDraft,
+    clearActiveSession, saveTempDraft, clearTempDraft, composerResetToken,
     fetchSessions, fetchProjects, createProject, renameProject, deleteProject, reorderProjects,
     sessionsLoading, projectsLoading,
   } = useSessionStore();
@@ -169,6 +169,12 @@ function StudioBody({ brandKit }) {
 
   const [prompt, setPrompt] = useState("");
   const [sourceImageUrl, setSourceImageUrl] = useState("");
+  // Shell-style prompt recall — every prompt actually submitted (not every
+  // keystroke) is pushed here; Up/Down in the textarea cycles through them.
+  // historyIndex -1 means "live draft, not browsing history".
+  const [promptHistory, setPromptHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const draftBeforeHistoryRef = useRef("");
   // 5.1: first-frame approval for text-to-video — hold the candidate frame
   // (a still, billed as an image) until the user approves it, then animate
   // (billed as video). null = no pending frame.
@@ -281,6 +287,12 @@ function StudioBody({ brandKit }) {
         kind: kindOf(g),
         title: (g.prompt || "Untitled generation").slice(0, 60),
         time: rel(g.created_at),
+        thumbSrc: g.storage_path || g.output_url || g.thumbnail_url || null,
+        isVideo: g.media_type === "video",
+        // Kept so a row click can reopen the exact same lightbox the main
+        // results grid uses (openLightbox expects the full generation row,
+        // not this trimmed-down summary).
+        generation: g,
       }));
   }, [completedGenerations]);
   // 6.3: generations the quality gate hard-flagged — offer a one-click bulk
@@ -559,6 +571,69 @@ function StudioBody({ brandKit }) {
     return "";
   }, [prompt, needsSourceImage, sourceImageUrl, canAfford, cost, availableCredits]);
 
+  // Records a just-submitted prompt for Up/Down recall. Skips exact repeats
+  // of the immediately-preceding entry so mashing Generate on the same text
+  // doesn't pad the history with duplicates.
+  const pushPromptHistory = useCallback((text) => {
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return;
+    setPromptHistory((prev) => (prev[prev.length - 1] === trimmed ? prev : [...prev, trimmed].slice(-50)));
+    setHistoryIndex(-1);
+  }, []);
+
+  // What clears when a generation is sent, and what a "new session" resets —
+  // deliberately NOT settings/toggles/negative prompt (per-session config
+  // persists), and NOT promptHistory (recall should survive a fresh session).
+  const resetComposerFields = useCallback(() => {
+    setPrompt("");
+    setSourceImageUrl("");
+    setHistoryIndex(-1);
+  }, []);
+
+  // Up/Down recall — only hijacks the arrow when the caret sits at the very
+  // start (Up) or very end (Down) of the textarea, so normal multi-line
+  // cursor movement inside a long prompt is never intercepted.
+  const handlePromptKeyDown = useCallback((e) => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    const el = promptRef.current;
+    if (!el || promptHistory.length === 0) return;
+    const atStart = el.selectionStart === 0 && el.selectionEnd === 0;
+    const atEnd = el.selectionStart === prompt.length && el.selectionEnd === prompt.length;
+
+    if (e.key === "ArrowUp" && atStart) {
+      e.preventDefault();
+      if (historyIndex === -1) draftBeforeHistoryRef.current = prompt;
+      const nextIdx = historyIndex === -1 ? promptHistory.length - 1 : Math.max(0, historyIndex - 1);
+      setHistoryIndex(nextIdx);
+      setPrompt(promptHistory[nextIdx]);
+    } else if (e.key === "ArrowDown" && atEnd && historyIndex !== -1) {
+      e.preventDefault();
+      const nextIdx = historyIndex + 1;
+      if (nextIdx >= promptHistory.length) {
+        setHistoryIndex(-1);
+        setPrompt(draftBeforeHistoryRef.current);
+      } else {
+        setHistoryIndex(nextIdx);
+        setPrompt(promptHistory[nextIdx]);
+      }
+    }
+  }, [prompt, promptHistory, historyIndex]);
+
+  // Cross-component "clear the composer in place" signal — see
+  // composerResetToken's doc comment in SessionStore.js. Only the top nav's
+  // "+ Generate" button fires this, and only when there's no active session
+  // to abandon (StudioPage's own onNewSession handles the has-a-session
+  // case directly, with no need for this indirection). Skips the initial
+  // mount so page load doesn't wipe a restored draft.
+  const composerResetMountedRef = useRef(false);
+  useEffect(() => {
+    if (!composerResetMountedRef.current) {
+      composerResetMountedRef.current = true;
+      return;
+    }
+    resetComposerFields();
+  }, [composerResetToken, resetComposerFields]);
+
   const handleGenerate = useCallback(async () => {
     const err = validatePreflight();
     if (err) {
@@ -573,17 +648,41 @@ function StudioBody({ brandKit }) {
       negativePrompt,
       brandKit: applyBrandKit ? brandKit : null,
     });
+
+    const submittedPrompt = prompt.trim();
+    const submittedSourceImage = sourceImageUrl.trim();
+    // Clears the box the instant a generation is actually sent, so the next
+    // prompt can be typed right away; restored below if the submission
+    // fails. Params/toggles are untouched — only the prompt + attached
+    // source image are per-generation content, not per-session config.
+    const clearComposer = () => {
+      pushPromptHistory(submittedPrompt);
+      setPrompt("");
+      setSourceImageUrl("");
+    };
+    const restoreComposer = () => {
+      setPrompt(submittedPrompt);
+      setSourceImageUrl(submittedSourceImage);
+    };
+
     try {
-      if (isCarousel) await startCarouselGeneration(prompt.trim(), settings.slideCount || 6);
-      else if (selectedMode === "edit") await startEditGeneration(sourceImageUrl.trim(), prompt.trim());
-      else if (selectedMode === "video" && !sourceImageUrl.trim()) {
+      if (isCarousel) {
+        clearComposer();
+        await startCarouselGeneration(submittedPrompt, settings.slideCount || 6);
+      } else if (selectedMode === "edit") {
+        clearComposer();
+        await startEditGeneration(submittedSourceImage, submittedPrompt);
+      } else if (selectedMode === "video" && !submittedSourceImage) {
         // 5.1: text-to-video → generate a still first frame for approval before
         // spending the (expensive) animate credits. The frame is billed as an
         // image; the animate step is billed separately when the user approves.
+        // The prompt stays in the box through this step — handleApproveFrame
+        // reuses it for the animate call, and only clears it once that
+        // second, final submission actually goes out.
         setFramePhase("generating");
         setPendingFrame(null);
         try {
-          const frame = await generateVideoFirstFrame(prompt.trim());
+          const frame = await generateVideoFirstFrame(submittedPrompt);
           setPendingFrame(frame);
           setFramePhase("review");
         } catch (frameErr) {
@@ -597,14 +696,19 @@ function StudioBody({ brandKit }) {
       else if (isVideoMode) {
         // image-to-video (source already provided) OR any remaining video path:
         // submits-and-returns; the job lives in the persistent Video Jobs drawer.
-        await startVideoGeneration(prompt.trim());
+        clearComposer();
+        await startVideoGeneration(submittedPrompt);
         setStudioStage("brief");
         setVideoJobsOpen(true);
         toast("Video queued — rendering in the background. Track it in Video jobs.");
         return;
       }
-      else await startGeneration(prompt.trim());
+      else {
+        clearComposer();
+        await startGeneration(submittedPrompt);
+      }
     } catch (genErr) {
+      restoreComposer();
       if (!cancelRequestedRef.current) {
         // WEEK 2 FIX 5: a 429 here still uses the standard error box (per
         // this fix's own instruction — "the standard error box + Retry is
@@ -616,27 +720,35 @@ function StudioBody({ brandKit }) {
         toast.error(msg);
       }
     }
-  }, [validatePreflight, isCarousel, selectedMode, isVideoMode, prompt, sourceImageUrl, negativePrompt, applyBrandKit, brandKit, settings, updateSettings, startGeneration, startCarouselGeneration, startEditGeneration, startVideoGeneration, applyRateLimit]);
+  }, [validatePreflight, isCarousel, selectedMode, isVideoMode, prompt, sourceImageUrl, negativePrompt, applyBrandKit, brandKit, settings, updateSettings, startGeneration, startCarouselGeneration, startEditGeneration, startVideoGeneration, applyRateLimit, pushPromptHistory]);
 
   /* 5.1: approve the reviewed first frame → animate it (image-to-video). The
      frame was already billed as an image; this is the separate video charge. */
   const handleApproveFrame = useCallback(async () => {
     if (!pendingFrame?.url) return;
     setFramePhase("animating");
+    // This is the real, final submission for the text-to-video flow — the
+    // prompt was deliberately left in the box through the frame-review step
+    // (see handleGenerate) since it's reused here. Clears now, restored if
+    // the animate call fails.
+    const submittedPrompt = prompt.trim();
+    pushPromptHistory(submittedPrompt);
+    setPrompt("");
     try {
       updateSettings({ mediaType: "image-to-video", referenceImageUrl: pendingFrame.url });
       // startVideoGeneration reads settings.referenceImageUrl for the source.
-      await startVideoGeneration(prompt.trim());
+      await startVideoGeneration(submittedPrompt);
       setPendingFrame(null);
       setFramePhase("idle");
       setStudioStage("brief");
       setVideoJobsOpen(true);
       toast("Frame approved — animating in the background. Track it in Video jobs.");
     } catch (err) {
+      setPrompt(submittedPrompt);
       setFramePhase("review");
       if (!applyRateLimit("generate", err)) toast.error(err?.message || "Could not start the animation.");
     }
-  }, [pendingFrame, prompt, updateSettings, startVideoGeneration, applyRateLimit]);
+  }, [pendingFrame, prompt, updateSettings, startVideoGeneration, applyRateLimit, pushPromptHistory]);
 
   const handleRegenerateFrame = useCallback(async () => {
     setFramePhase("generating");
@@ -724,6 +836,60 @@ function StudioBody({ brandKit }) {
       setLightboxOpen(true);
     },
     [selectGeneration, completedGenerations]
+  );
+
+  // Fetches one generation's media and triggers a browser download for it.
+  // `slideIndex` (0-based), when given, is only used to number the
+  // filename for a carousel's individual slides.
+  const downloadOneFile = useCallback(async (generation, slideIndex) => {
+    const src = generation?.storage_path || generation?.output_url || generation?.thumbnail_url;
+    if (!src) return;
+    try {
+      const response = await fetch(src);
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      const extension = blob.type.includes("png") ? "png" : blob.type.includes("video") ? "mp4" : "jpg";
+      const suffix = slideIndex != null ? `_slide-${slideIndex + 1}` : "";
+      link.download = `generation_${generation.id?.slice(0, 8) ?? Date.now()}${suffix}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error("Download failed:", err);
+      throw err;
+    }
+  }, []);
+
+  // Single image/video downloads directly; a carousel downloads every slide
+  // in the same batch (earliest-created first, matching the filmstrip's own
+  // slide order) as separate files, one small delay apart so the browser
+  // doesn't drop rapid-fire downloads.
+  const handleDownloadGeneration = useCallback(
+    async (generation) => {
+      if (!generation) return;
+      setDownloadingId(generation.id);
+      try {
+        if (generation.content_type === "carousel" && generation.batch_id) {
+          const slides = completedGenerations
+            .filter((g) => g.batch_id === generation.batch_id)
+            .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+          for (let i = 0; i < slides.length; i += 1) {
+            await downloadOneFile(slides[i], i);
+            if (i < slides.length - 1) await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          return;
+        }
+        await downloadOneFile(generation);
+      } catch (err) {
+        toast.error("Could not download this media.");
+      } finally {
+        setDownloadingId(null);
+      }
+    },
+    [completedGenerations, downloadOneFile]
   );
 
   const handleRegenerateVariant = useCallback(
@@ -817,6 +983,7 @@ function StudioBody({ brandKit }) {
      Swaps the row's stored image to the higher-res one, then refreshes so the
      grid/lightbox show it. */
   const [upscalingId, setUpscalingId] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
   const handleUpscale = useCallback(async (generation) => {
     const src = generation?.storage_path || generation?.output_url;
     if (!src) { toast.error("This image is no longer available."); return; }
@@ -1070,6 +1237,7 @@ function StudioBody({ brandKit }) {
                     placeholder="Describe the post you want — subject, setting, mood."
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value.slice(0, PROMPT_LIMIT))}
+                    onKeyDown={handlePromptKeyDown}
                   />
                 )}
                 <div className={styles.promptFoot}>
@@ -1634,14 +1802,41 @@ function StudioBody({ brandKit }) {
 
               {/* Recent in this session (mockup: always present at the bottom
                   of the canvas column). Shows this session's recent generations
-                  with a type chip, title, and relative time. */}
+                  with an actual thumbnail, title, and relative time — clicking
+                  a row opens the same lightbox the main results grid uses, so
+                  "recent" is browsable, not just a text log of activity. */}
               {recentItems.length > 0 && (
                 <Card>
                   <div className={styles.sectionLabel}>Recent in this session</div>
                   <div className={styles.recentList}>
                     {recentItems.map((it) => (
-                      <div key={it.id} className={styles.recentRow}>
-                        <span className={styles.recentKind}>{it.kind}</span>
+                      <div
+                        key={it.id}
+                        className={styles.recentRow}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openLightbox(it.generation)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openLightbox(it.generation);
+                          }
+                        }}
+                      >
+                        <span className={styles.recentThumb}>
+                          {it.thumbSrc && !failedThumbIds.has(it.id) ? (
+                            it.isVideo ? (
+                              <video className={styles.recentThumbMedia} src={it.thumbSrc} muted onError={() => markThumbFailed(it.id)} />
+                            ) : (
+                              <img className={styles.recentThumbMedia} src={it.thumbSrc} alt="" onError={() => markThumbFailed(it.id)} />
+                            )
+                          ) : (
+                            <span className={styles.recentThumbFallback}>{it.kind}</span>
+                          )}
+                          {it.thumbSrc && !failedThumbIds.has(it.id) && (
+                            <span className={styles.recentThumbBadge}>{it.kind}</span>
+                          )}
+                        </span>
                         <span className={styles.recentTitle}>{it.title}</span>
                         <span className={styles.recentTime}>{it.time}</span>
                       </div>
@@ -1797,12 +1992,6 @@ function StudioBody({ brandKit }) {
           setHistoryOpen(false);
         }}
         onNewSession={(projectId) => {
-          // Starting a new session no longer inserts a row — it just returns
-          // to an empty composer. The session is created at generation
-          // kickoff, so backing out of a "new session" leaves nothing behind.
-          // The chosen project rides along in the temp draft and is applied
-          // when that session is eventually created.
-          clearActiveSession();
           // The composer is local state — clearing the session does not empty
           // it. Reset it here or the previous session's prompt stays in the box
           // and autosave immediately writes it straight back into the slot we
@@ -1813,11 +2002,25 @@ function StudioBody({ brandKit }) {
           setApplyBrandKit(true);
           setGuided(false);
           setGuidedFields({ subject: "", setting: "", style: "", mood: "" });
+          setHistoryIndex(-1);
           // saveTempDraft merges, so blank the slot first — "new session"
           // means an empty composer, not the previous draft with a new project.
           clearTempDraft();
           saveTempDraft({ projectId: projectId ?? null });
           setHistoryOpen(false);
+
+          // No session to abandon — you're already on a blank, unsaved
+          // composer (a session is only ever born at generation kickoff), so
+          // there's nothing to navigate away from. Reuse it in place instead
+          // of leaving an identical empty session behind.
+          if (!activeSession) return;
+
+          // Starting a new session no longer inserts a row — it just returns
+          // to an empty composer. The session is created at generation
+          // kickoff, so backing out of a "new session" leaves nothing behind.
+          // The chosen project rides along in the temp draft and is applied
+          // when that session is eventually created.
+          clearActiveSession();
           setStudioStage("brief");
           navigate("/app/generate");
         }}
@@ -2051,8 +2254,10 @@ function StudioBody({ brandKit }) {
           onAnimate={() => handleUseAsSource(lightboxGeneration, "image-to-video")}
           onAddReference={() => handleAddAsReference(lightboxGeneration)}
           onUpscale={() => handleUpscale(lightboxGeneration)}
+          onDownload={() => handleDownloadGeneration(lightboxGeneration)}
           upscaling={upscalingId === lightboxGeneration.id}
           regenerating={regeneratingIds.includes(lightboxGeneration.id)}
+          downloading={downloadingId === lightboxGeneration.id}
         />
       )}
     </>

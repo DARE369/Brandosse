@@ -280,15 +280,28 @@
 /* Recent in this session (mockup Studio.dc.html) */
 .recentList { display: flex; flex-direction: column; }
 .recentRow {
-  display: flex; align-items: center; gap: 12px; padding: 9px 0;
-  border-bottom: 1px solid var(--uiv2-border);
+  display: flex; align-items: center; gap: 12px; padding: 9px 10px; margin: 0 -10px;
+  border-bottom: 1px solid var(--uiv2-border); border-radius: 8px;
+  cursor: pointer; transition: background 0.12s;
 }
 .recentRow:last-child { border-bottom: none; }
-.recentKind {
-  width: 34px; height: 34px; flex: 0 0 34px; border-radius: 6px;
+.recentRow:hover, .recentRow:focus-visible {
+  background: var(--uiv2-bg-inset); outline: none;
+}
+.recentRow:focus-visible { box-shadow: inset 0 0 0 2px var(--uiv2-accent-solid); }
+.recentThumb {
+  width: 34px; height: 34px; flex: 0 0 34px; border-radius: 6px; position: relative;
   background: var(--uiv2-bg-inset); border: 1px solid var(--uiv2-border);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.recentThumbMedia { width: 100%; height: 100%; object-fit: cover; display: block; }
+.recentThumbFallback {
   font-family: var(--uiv2-font-mono); font-size: 9px; color: var(--uiv2-text-secondary);
+}
+.recentThumbBadge {
+  position: absolute; bottom: 1px; right: 1px; padding: 1px 3px; border-radius: 3px;
+  background: rgba(14,15,17,0.75); color: #F5F5F4; font-family: var(--uiv2-font-mono);
+  font-size: 7px; line-height: 1.4; letter-spacing: 0.02em;
 }
 .recentTitle {
   flex: 1; min-width: 0; font-size: 12.5px; font-weight: 500;

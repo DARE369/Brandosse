@@ -12,6 +12,7 @@ import {
 } from "../../constants/statuses";
 import useHelpStore from "../../stores/HelpStore";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
+import useSessionStore from "../../stores/SessionStore";
 import ProfileMenu from "./ProfileMenu";
 const NOTIFICATION_STORAGE_KEY = "socialai-notification-seen";
 const GENERATION_NOTIFICATION_STATUSES = [
@@ -626,7 +627,28 @@ export default function UserNavbar({
 
         <button
           className="navbar-create-btn"
-          onClick={() => navigate("/app/generate")}
+          onClick={() => {
+            // A bare navigate("/app/generate") used to just bounce straight
+            // back to whatever session was still active in the store — a
+            // route effect in GeneratePageV2 re-syncs the URL to
+            // activeSession.id whenever the URL has no session id but the
+            // store still thinks one is active, which is exactly what a
+            // stale activeSession here triggers. Clearing it (and the temp
+            // draft, so the fresh composer doesn't restore the old prompt)
+            // before navigating is what actually starts a new session —
+            // same sequence StudioPage's own "New session" button uses.
+            const store = useSessionStore.getState();
+            store.clearTempDraft();
+            store.saveTempDraft({});
+            if (store.activeSession) {
+              store.clearActiveSession();
+              navigate("/app/generate");
+            } else {
+              // Already on an empty, session-less composer — nothing to
+              // navigate away from. Ask it to clear the box in place.
+              store.requestComposerReset();
+            }
+          }}
           aria-label="Create new content"
           type="button"
         >

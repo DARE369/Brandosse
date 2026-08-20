@@ -948,6 +948,13 @@ const useSessionStore = create((set, get) => ({
   // -- STATE ------------------------------------------------------------------
   sessions: [],
   activeSession: null,
+  // Bumped by requestComposerReset() so a component with no direct access to
+  // StudioPage's local composer state (e.g. the top nav's "+ Generate"
+  // button) can still ask it to clear the prompt box in place, for the case
+  // where there's no active session to abandon (nothing to navigate to —
+  // see StudioPage's onNewSession for the counterpart used when a session
+  // DOES exist).
+  composerResetToken: 0,
   projects: [],
   activeProject: null,
   projectsLoading: false,
@@ -1497,6 +1504,10 @@ const useSessionStore = create((set, get) => ({
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', window.location.pathname);
     }
+  },
+
+  requestComposerReset: () => {
+    set((state) => ({ composerResetToken: state.composerResetToken + 1 }));
   },
 
   loadSession: async (sessionId) => {

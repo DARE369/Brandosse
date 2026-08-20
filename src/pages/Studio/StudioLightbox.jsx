@@ -13,7 +13,7 @@ function modelLabel(meta) {
   return MODEL_LABELS[m] || (meta?.provider_model ? String(meta.provider_model).split("/").pop() : null);
 }
 
-export default function StudioLightbox({ generation, index, count, onClose, onPrev, onNext, onSelect, onUseForPost, onRegenerate, onEdit, onAnimate, onAddReference, onUpscale, upscaling = false, regenerating = false }) {
+export default function StudioLightbox({ generation, index, count, onClose, onPrev, onNext, onSelect, onUseForPost, onRegenerate, onEdit, onAnimate, onAddReference, onUpscale, onDownload, upscaling = false, regenerating = false, downloading = false }) {
   const [mediaFailed, setMediaFailed] = useState(false);
 
   useEffect(() => {
@@ -102,6 +102,11 @@ export default function StudioLightbox({ generation, index, count, onClose, onPr
             <Button variant="ghost" onClick={onUpscale} disabled={upscaling}>{upscaling ? "Upscaling…" : "Upscale"}</Button>
           )}
           {meta.upscaled && <span className={styles.shotTag}>upscaled</span>}
+          {onDownload && (
+            <Button variant="ghost" onClick={onDownload} disabled={downloading}>
+              {downloading ? "Downloading…" : "Download"}
+            </Button>
+          )}
           <Button variant="ghost" onClick={onSelect}>Select this</Button>
           <Button onClick={onUseForPost}>Use for post</Button>
         </div>
