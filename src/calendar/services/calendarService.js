@@ -173,6 +173,28 @@ export async function updatePost(scope, postId, updates, currentStatus = null) {
 }
 
 /**
+ * Fetch a single post by id, regardless of status or scheduled_at — used for
+ * deep links into a specific post (e.g. Library's "Used in" list) that may
+ * point at a draft or a post scheduled outside the calendar's currently
+ * loaded month range, neither of which fetchPosts()/fetchDrafts() would
+ * necessarily have already loaded. Returns null if not found or not owned.
+ */
+export async function fetchPostById(scope, postId) {
+  const userId = assertPersonalScope(scope, 'fetchPostById');
+  if (!postId) return null;
+
+  const { data, error } = await supabase
+    .from('posts')
+    .select(POST_SELECT_COLUMNS)
+    .eq('id', postId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+/**
  * Delete a post outright. NOTE: per CALENDAR_SPEC.md §5, "Unschedule" is a
  * different, non-destructive action (returns a post to draft) implemented
  * via updatePost(), not this function — deletePost() is reserved for actual

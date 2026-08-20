@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Save, Calendar, Send, Sparkles, RefreshCw } from "lucide-react";
 import { Card, Button, Dropdown } from "../../ui-v2";
 import { platformNeedsTitle, getPlatformSpec } from "../../services/platforms/platformCaptionSpecs";
-import PlatformFitStrip from "./PlatformFitStrip";
+import PlatformFitStrip from "../../components/PostProduction/PlatformFitStrip";
 import styles from "./PostProductionPanel.module.css";
 
 const SCORE_DIMS = [

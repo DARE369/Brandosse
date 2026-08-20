@@ -1,8 +1,13 @@
 "use client";
 
-// PlatformFitStrip — the free, deterministic per-platform "fit" check for the
-// Post Production panel (see the product-design-critic v1: base caption + a
-// compact per-platform status strip, NOT tabs, NOT AI per-platform rewriting).
+// PlatformFitStrip — the free, deterministic per-platform "fit" check shared
+// by every post-production surface (Studio, Calendar's PostDetailDrawer,
+// Library's post-production drawer). Moved here from src/pages/Studio/ (its
+// original, Studio-only home) because it has no Studio dependency — it only
+// needs platformCaptionSpecs.js and --uiv2-* CSS custom properties, both of
+// which are available on any page wrapped in UiV2ThemeProvider (Studio,
+// Library, and Calendar's page shell all are) — so it's genuinely portable,
+// not just copy-pasted.
 //
 // For each selected platform it shows one chip with a live fit indicator
 // against that platform's real caption/title/hashtag limits. Compliant

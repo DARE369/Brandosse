@@ -55,7 +55,7 @@ import { isLockedForReschedule } from '../../utils/postStatusMachine';
 import useCalendarUiStore from '../../calendar/stores/calendarUiStore';
 import { useCalendarDrafts, useCalendarPosts } from '../../calendar/hooks/useCalendarPosts';
 import { useScheduleAction } from '../../calendar/hooks/useScheduleAction';
-import { createPost, createQuickPost, deletePost, updatePost } from '../../calendar/services/calendarService';
+import { createPost, createQuickPost, deletePost, fetchPostById, updatePost } from '../../calendar/services/calendarService';
 import { useMutableSearchParams } from '../../next/useMutableSearchParams';
 import { fetchAssetForHandoff, toQuickPostAssetShape } from '../../services/assetLibraryService';
 
@@ -188,12 +188,24 @@ function CalendarBody({ brandKit }) {
   const { schedulePost, reschedulePost, unschedulePost, scheduleAnyway, isSubmitting } = useScheduleAction(scope);
   const toastStack = useToastStack();
 
+  // Holds a single fetched-on-demand post + synthetic one-post group for the
+  // postId deep link (see the effect below) — not part of the normal
+  // month-range/drafts data set.
+  const [deepLinkedGroup, setDeepLinkedGroup] = useState(null);
+
   // ── Selected group (drives PostDetailDrawer) ──────────────────────────────
   const allGroups = useMemo(() => [...groups, ...draftGroups], [groups, draftGroups]);
-  const selectedGroup = useMemo(
-    () => allGroups.find((g) => g.posts.some((p) => p.id === selectedPostId)) || null,
-    [allGroups, selectedPostId],
-  );
+  // deepLinkedGroup (below) covers a post that fetchPosts()/fetchDrafts()
+  // haven't loaded — e.g. scheduled outside the current month range, or
+  // arrived via Library's "Used in" deep link — and is only consulted as a
+  // fallback so a normally-loaded post (which stays live-synced via
+  // useCalendarPosts' realtime subscription) always wins once available.
+  const selectedGroup = useMemo(() => {
+    const loaded = allGroups.find((g) => g.posts.some((p) => p.id === selectedPostId));
+    if (loaded) return loaded;
+    if (deepLinkedGroup?.posts?.some((p) => p.id === selectedPostId)) return deepLinkedGroup;
+    return null;
+  }, [allGroups, selectedPostId, deepLinkedGroup]);
 
   // ── ⌘K / Quick Post / Schedule modal local UI state ───────────────────────
   const [cmdBarOpen, setCmdBarOpen] = useState(false);
@@ -237,6 +249,42 @@ function CalendarBody({ brandKit }) {
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Deep link to a specific post (Library's AssetDetailDrawer "Used in"
+  // list) ─────────────────────────────────────────────────────────────────
+  // Fetches the post directly rather than waiting for it to appear in the
+  // month-range/drafts queries, since it may be scheduled outside the
+  // currently-visible month or be a draft beyond the drafts rail's fetch
+  // limit. Waits on `scope` (resolves once auth/userId is ready) rather than
+  // running unconditionally on mount, since fetchPostById requires a scope.
+  useEffect(() => {
+    const deepLinkPostId = searchParams.get('postId');
+    if (!deepLinkPostId || !scope) return undefined;
+
+    let mounted = true;
+    fetchPostById(scope, deepLinkPostId)
+      .then((post) => {
+        if (!mounted) return;
+        if (!post) {
+          toast.error('Could not find that post — it may have been deleted.');
+          return;
+        }
+        setDeepLinkedGroup({ groupKey: `post:${post.id}`, generationId: post.generation_id || null, posts: [post] });
+        setSelectedPostId(post.id);
+      })
+      .catch((err) => {
+        console.error('[CalendarPage] Could not load deep-linked post:', err);
+        toast.error(err?.message || 'Could not open that post.');
+      });
+
+    setSearchParams((params) => {
+      params.delete('postId');
+      return params;
+    }, { replace: true });
+
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope]);
 
   // ── ⌘K shortcut ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -734,7 +782,7 @@ function CalendarBody({ brandKit }) {
                 group={selectedGroup}
                 timezone={timezone}
                 brandKit={brandKit}
-                onClose={() => setSelectedPostId(null)}
+                onClose={() => { setSelectedPostId(null); setDeepLinkedGroup(null); }}
                 onSavePost={handleSavePost}
                 onDeletePost={handleDeletePost}
                 onReschedule={handleOpenScheduleModal}

@@ -13,10 +13,31 @@
 // Personal scope only: no pipeline-approval-history section is rendered
 // (spec says that's org-only) — a short scope note explains why, matching
 // the approved mockup's `.scope-note` treatment exactly.
+//
+// POST-PRODUCTION CONSOLIDATION (this task): the caption/hashtag AI section
+// used to run through auditPostCaption() (calendar-ai edge function's
+// 'caption_audit' action — score/grade/issues/rewrite-variants/hashtag-
+// suggestions). That's been replaced with the same discovery-score system
+// Studio's PostProductionPanel uses (generate-post-metadata / seo-score /
+// optimize-seo, via src/services/postProduction.service.js) so both surfaces
+// share one scoring model instead of two divergent ones. "Suggest best
+// times" (getSlotSuggestions) and the local-only readiness checklist
+// (checkPublishReadiness) are untouched — they have no Studio equivalent and
+// stay as Calendar-only value. Platform character limits now come from the
+// shared platformCaptionSpecs.js (via PlatformFitStrip) instead of this
+// file's own separate, previously-duplicated PLATFORM_CHAR_LIMITS map.
 import { useEffect, useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { supabase } from '../../services/supabaseClient';
-import { auditPostCaption, checkPublishReadiness, getSlotSuggestions } from '../../services/calendarAIService';
+import { checkPublishReadiness, getSlotSuggestions } from '../../services/calendarAIService';
+import {
+  regeneratePostMetadata,
+  scorePostSeo,
+  optimizePostSeo,
+  DEFAULT_DISCOVERY_SCORE,
+} from '../../services/postProduction.service';
+import { platformNeedsTitle } from '../../services/platforms/platformCaptionSpecs';
+import PlatformFitStrip from '../../components/PostProduction/PlatformFitStrip';
 import { isLockedForReschedule } from '../../utils/postStatusMachine';
 import {
   addDaysToDateKey, formatDateKey, formatInTimeZone, getZonedDateKey, getZonedParts,
@@ -26,9 +47,6 @@ import {
 const WEEKDAY_OFFSET = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
 import StatusPill from './StatusPill';
 
-const PLATFORM_CHAR_LIMITS = {
-  x: 280, instagram: 2200, tiktok: 2200, linkedin: 3000, youtube: 5000, facebook: 63206,
-};
 const PLATFORM_LABELS = {
   instagram: 'Instagram', tiktok: 'TikTok', linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', facebook: 'Facebook', pinterest: 'Pinterest',
 };
@@ -38,6 +56,20 @@ const PLATFORM_VARS = {
 };
 
 function platformVar(p) { return `var(${PLATFORM_VARS[p] || '--color-text-tertiary'})`; }
+
+const SCORE_DIMS = [
+  ['readability', 'Readability'],
+  ['hookStrength', 'Hook strength'],
+  ['hashtagQuality', 'Hashtag quality'],
+  ['brandConsistency', 'Brand consistency'],
+  ['platformFit', 'Platform fit'],
+];
+
+function scoreColor(v) {
+  if (v >= 85) return 'var(--uiv2-success)';
+  if (v >= 65) return 'var(--uiv2-warning)';
+  return 'var(--uiv2-danger)';
+}
 
 function toDateInputValue(iso, timezone) {
   if (!iso) return '';
@@ -69,29 +101,29 @@ export default function PostDetailDrawer({
   const [activePlatform, setActivePlatform] = useState(posts[0]?.platform || null);
   const [editedByPost, setEditedByPost] = useState({});
   const [connectedAccounts, setConnectedAccounts] = useState([]);
-  const [audit, setAudit] = useState(null);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditError, setAuditError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [bestTimes, setBestTimes] = useState(null);
   const [bestTimesLoading, setBestTimesLoading] = useState(false);
   const [bestTimesError, setBestTimesError] = useState(null);
-  const [aiTab, setAiTab] = useState('audit');
-  const [usedVariantLabel, setUsedVariantLabel] = useState(null);
-  const [addedTags, setAddedTags] = useState({});
+
+  // Discovery score + regenerate — the Studio-shared model (see header note).
+  const [discoveryScore, setDiscoveryScore] = useState(DEFAULT_DISCOVERY_SCORE);
+  const [discoveryStatus, setDiscoveryStatus] = useState('idle'); // idle|scoring|optimizing|scored|failed
+  const [discoveryError, setDiscoveryError] = useState(null);
+  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataError, setMetadataError] = useState(null);
 
   useEffect(() => {
     setActivePlatform(posts[0]?.platform || null);
     setEditedByPost({});
-    setAudit(null);
-    setAuditError(null);
     setIsDirty(false);
     setBestTimes(null);
     setBestTimesError(null);
-    setAiTab('audit');
-    setUsedVariantLabel(null);
-    setAddedTags({});
+    setDiscoveryScore(DEFAULT_DISCOVERY_SCORE);
+    setDiscoveryStatus('idle');
+    setDiscoveryError(null);
+    setMetadataError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group?.groupKey]);
 
@@ -121,6 +153,7 @@ export default function PostDetailDrawer({
 
   const activePost = posts.find((p) => p.platform === activePlatform) || posts[0];
   const edited = editedByPost[activePost.id] || {};
+  const editedTitle = edited.title ?? activePost.title ?? '';
   const editedCaption = edited.caption ?? activePost.caption ?? '';
   const editedHashtags = edited.hashtags ?? activePost.hashtags ?? [];
   const editedDate = edited.date ?? toDateInputValue(activePost.scheduled_at, timezone);
@@ -129,9 +162,15 @@ export default function PostDetailDrawer({
 
   const selectedAccount = connectedAccounts.find((a) => a.id === editedAccountId) || null;
   const editedPlatform = selectedAccount?.platform || activePost.platform;
-  const charLimit = PLATFORM_CHAR_LIMITS[editedPlatform] ?? 2200;
-  const captionOver = editedCaption.length > charLimit;
   const canReassign = activePost.status !== 'published' && connectedAccounts.length > 1;
+
+  // Media lives on the joined `generations` row — Supabase can return a
+  // to-one join as either an object or a single-element array depending on
+  // how the relationship was inferred, so unwrap both (same defensive
+  // pattern checkPublishReadiness already uses for this same join).
+  const generationRow = Array.isArray(activePost?.generations) ? activePost.generations[0] : activePost?.generations;
+  const mediaType = generationRow?.media_type || 'image';
+  const needsTitle = platformNeedsTitle(editedPlatform, mediaType);
 
   const currentPostForReadiness = {
     ...activePost,
@@ -151,13 +190,19 @@ export default function PostDetailDrawer({
   function patchEdited(patch) {
     setEditedByPost((prev) => ({ ...prev, [activePost.id]: { ...prev[activePost.id], ...patch } }));
     setIsDirty(true);
-    setAudit(null);
+    // Stale-score invalidation — identical rule to Studio's
+    // updatePostProduction: touching title/caption/hashtags means any
+    // previously-shown discovery score no longer describes what's on screen.
+    if ('title' in patch || 'caption' in patch || 'hashtags' in patch) {
+      setDiscoveryStatus('idle');
+    }
   }
 
   async function handleSave() {
     setIsSaving(true);
     try {
       const updates = {
+        title: editedTitle || null,
         caption: editedCaption,
         hashtags: editedHashtags,
         scheduled_at: combineDateAndTime(editedDate, editedTime, timezone) || activePost.scheduled_at,
@@ -170,33 +215,75 @@ export default function PostDetailDrawer({
     }
   }
 
-  async function handleRunAudit() {
-    if (!editedCaption.trim()) return;
-    setAuditLoading(true);
-    setAuditError(null);
+  // Full LLM regeneration of title/caption/hashtags — generate-post-metadata
+  // self-persists to the posts row (server-owned workflow_state lifecycle,
+  // same as Studio); the realtime subscription in useCalendarPosts picks up
+  // that write independently of whether "Save changes" is later clicked.
+  async function handleRegenerateMetadata() {
+    setMetadataLoading(true);
+    setMetadataError(null);
     try {
-      const result = await auditPostCaption({ ...activePost, caption: editedCaption, hashtags: editedHashtags }, brandKit);
-      setAudit({ ...result, originalCaption: editedCaption });
+      const result = await regeneratePostMetadata(activePost.id, ['title', 'caption', 'hashtags']);
+      patchEdited({
+        title: String(result.title || editedTitle || '').trim(),
+        caption: String(result.caption || editedCaption || '').trim(),
+        hashtags: Array.isArray(result.hashtags) ? result.hashtags : editedHashtags,
+      });
     } catch (err) {
-      setAuditError(err?.message || 'Audit failed. Check your connection.');
+      setMetadataError(err?.message || 'Could not regenerate right now.');
     } finally {
-      setAuditLoading(false);
+      setMetadataLoading(false);
     }
   }
 
-  function handleApplyFix(fix) {
-    patchEdited({ caption: fix.caption, hashtags: fix.hashtags });
+  async function handleRescore() {
+    if (!editedCaption.trim()) return;
+    setDiscoveryStatus('scoring');
+    setDiscoveryError(null);
+    try {
+      const score = await scorePostSeo({
+        postId: activePost.id,
+        title: editedTitle,
+        caption: editedCaption,
+        hashtags: editedHashtags,
+        platform: editedPlatform,
+        mediaType,
+        visualPrompt: generationRow?.prompt || '',
+      });
+      setDiscoveryScore(score);
+      setDiscoveryStatus('scored');
+    } catch (err) {
+      setDiscoveryStatus('failed');
+      setDiscoveryError(err?.message || 'Scoring unavailable.');
+    }
   }
 
-  function handleUseVariant(variant) {
-    patchEdited({ caption: variant.caption });
-    setUsedVariantLabel(variant.label);
-  }
-
-  function handleAddSuggestedTag(tag) {
-    if (editedHashtags.includes(tag)) return;
-    patchEdited({ hashtags: [...editedHashtags, tag] });
-    setAddedTags((prev) => ({ ...prev, [tag]: true }));
+  async function handleOptimize() {
+    if (!editedCaption.trim()) return;
+    setDiscoveryStatus('optimizing');
+    setDiscoveryError(null);
+    try {
+      const result = await optimizePostSeo({
+        postId: activePost.id,
+        title: editedTitle,
+        caption: editedCaption,
+        hashtags: editedHashtags,
+        platform: editedPlatform,
+        mediaType,
+        visualPrompt: generationRow?.prompt || '',
+        brandKit,
+      });
+      patchEdited({
+        title: result.optimizedTitle,
+        caption: result.optimizedCaption,
+        hashtags: result.optimizedHashtags,
+      });
+      setDiscoveryScore(result);
+      setDiscoveryStatus('scored');
+    } catch (err) {
+      setDiscoveryStatus('failed');
+      setDiscoveryError(err?.message || 'Optimization unavailable.');
+    }
   }
 
   // Real slot-scoring via the calendar-ai edge function's slot_suggestions
@@ -213,7 +300,7 @@ export default function PostDetailDrawer({
         platforms: [editedPlatform].filter(Boolean),
         existingPosts: [],
         brandKit,
-        contentType: activePost?.generations?.media_type || 'image',
+        contentType: mediaType,
         count: 3,
       });
       setBestTimes(suggestions.slice(0, 3).map((s) => {
@@ -235,6 +322,7 @@ export default function PostDetailDrawer({
   const isPublished = primary.status === 'published';
   const isFailed = primary.status === 'failed';
   const isLocked = isLockedForReschedule(primary.status);
+  const isDiscoveryBusy = discoveryStatus === 'scoring' || discoveryStatus === 'optimizing';
 
   return (
     <div className="drawer-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
@@ -280,6 +368,21 @@ export default function PostDetailDrawer({
               </div>
             )}
 
+            {/* Title only shows when the active platform actually uses one
+                (YouTube/Pinterest always; TikTok for photo posts) — mirrors
+                Studio's PostProductionPanel showTitleField gate exactly. */}
+            {needsTitle && (
+              <label className="ui-field">
+                <span className="ui-field-label">Title{posts.length > 1 ? ` — ${PLATFORM_LABELS[activePost.platform] || activePost.platform}` : ''}</span>
+                <input
+                  className="ui-input"
+                  value={editedTitle}
+                  onChange={(e) => patchEdited({ title: e.target.value })}
+                  disabled={isPublished}
+                />
+              </label>
+            )}
+
             <label className="ui-field">
               <span className="ui-field-label">Caption{posts.length > 1 ? ` — ${PLATFORM_LABELS[activePost.platform] || activePost.platform}` : ''}</span>
               <textarea
@@ -291,7 +394,6 @@ export default function PostDetailDrawer({
                 rows={4}
               />
             </label>
-            <div className={`caption-counter${captionOver ? ' is-over' : ''}`}>{editedCaption.length} / {charLimit}</div>
 
             {editedHashtags.length > 0 && (
               <div className="hashtag-wrap">
@@ -309,89 +411,71 @@ export default function PostDetailDrawer({
             )}
 
             {!isPublished && (
-              <div>
-                {auditLoading ? (
-                  <span className="ui-field-hint">Auditing caption…</span>
-                ) : audit ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {['audit', 'rewrite', 'hashtags'].map((tab) => (
-                        <button
-                          key={tab}
-                          type="button"
-                          className={`ui-button ui-button-sm ${aiTab === tab ? 'ui-button-secondary' : 'ui-button-ghost'}`}
-                          onClick={() => setAiTab(tab)}
-                        >
-                          {tab === 'audit' ? 'Audit' : tab === 'rewrite' ? 'Rewrite' : 'Hashtags'}
-                        </button>
-                      ))}
-                    </div>
+              <PlatformFitStrip
+                platforms={[{ id: activePost.id, platform: editedPlatform, label: PLATFORM_LABELS[editedPlatform] || editedPlatform }]}
+                caption={editedCaption}
+                hashtags={editedHashtags}
+                title={editedTitle}
+                mediaType={mediaType}
+                onAutoFit={(_platformKey, trimmed) => patchEdited({ caption: trimmed })}
+              />
+            )}
 
-                    {aiTab === 'audit' && (
-                      <div className="ui-field-hint" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <span>Score {audit.score} ({audit.grade})</span>
-                        {audit.issues.map((issue, i) => (
-                          <div key={i}>&middot; {issue.message}</div>
-                        ))}
-                        {audit.fixedCaption && audit.fixedCaption !== editedCaption && (
-                          <button type="button" className="ui-button ui-button-ghost ui-button-sm" style={{ width: 'fit-content' }} onClick={() => handleApplyFix(audit)}>
-                            <Sparkles size={12} aria-hidden="true" /> Apply AI fix
-                          </button>
-                        )}
-                      </div>
-                    )}
+            {!isPublished && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="ui-button ui-button-ghost ui-button-sm"
+                  style={{ width: 'fit-content' }}
+                  onClick={handleRegenerateMetadata}
+                  disabled={metadataLoading}
+                >
+                  <Sparkles size={12} aria-hidden="true" /> {metadataLoading ? 'Regenerating…' : 'Regenerate title & caption'}
+                </button>
+                {metadataError && <div className="ui-field-error">{metadataError}</div>}
 
-                    {aiTab === 'rewrite' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {audit.variants.length === 0 ? (
-                          <span className="ui-field-hint">No rewrite variants came back — try re-running the audit.</span>
-                        ) : audit.variants.map((v) => (
-                          <div key={v.label} className="ui-field-hint" style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: 10 }}>
-                            <div style={{ fontWeight: 600, marginBottom: 4 }}>{v.label}</div>
-                            <div style={{ marginBottom: 8 }}>{v.caption}</div>
-                            {usedVariantLabel === v.label ? (
-                              <span style={{ color: 'var(--color-success-text, #1F8F5D)', fontWeight: 600 }}>In use — original kept as a revision</span>
-                            ) : (
-                              <button type="button" className="ui-button ui-button-ghost ui-button-sm" onClick={() => handleUseVariant(v)}>Use this one</button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {aiTab === 'hashtags' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {audit.hashtagSuggestions.length === 0 ? (
-                          <span className="ui-field-hint">No hashtag suggestions came back — try re-running the audit.</span>
-                        ) : (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {audit.hashtagSuggestions.map((h) => {
-                              const already = editedHashtags.includes(h.tag) || addedTags[h.tag];
-                              return (
-                                <button
-                                  key={h.tag}
-                                  type="button"
-                                  className="hashtag-chip"
-                                  disabled={already}
-                                  onClick={() => handleAddSuggestedTag(h.tag)}
-                                  style={{ cursor: already ? 'default' : 'pointer', border: 'none' }}
-                                >
-                                  {h.tag} <span className="ui-field-hint" style={{ margin: 0 }}>{h.reach}</span>{already ? ' ✓' : ''}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                        <span className="ui-field-hint">Ranked by likely discovery reach. Tap to add.</span>
-                      </div>
+                <div className="scope-note" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                    <span className="ui-field-label" style={{ margin: 0 }}>Discovery readiness</span>
+                    {isDiscoveryBusy ? (
+                      <span>…</span>
+                    ) : discoveryStatus === 'failed' ? (
+                      <span style={{ color: 'var(--uiv2-text-secondary)' }}>—</span>
+                    ) : discoveryStatus === 'scored' ? (
+                      <span style={{ fontWeight: 700, color: scoreColor(discoveryScore.seoScore || 0) }}>{discoveryScore.seoScore ?? 0}</span>
+                    ) : (
+                      <span style={{ color: 'var(--uiv2-text-secondary)' }}>—</span>
                     )}
                   </div>
-                ) : (
-                  <button type="button" className="ui-button ui-button-ghost ui-button-sm" onClick={handleRunAudit} disabled={!editedCaption.trim()}>
-                    <Sparkles size={12} aria-hidden="true" /> Audit caption
-                  </button>
-                )}
-                {auditError && <div className="ui-field-error">{auditError}</div>}
+
+                  {discoveryStatus === 'scored' && discoveryScore.seoBreakdown && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {SCORE_DIMS.map(([key, label]) => {
+                        const val = discoveryScore.seoBreakdown?.[key] ?? 0;
+                        return (
+                          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+                            <span style={{ width: 100, color: 'var(--uiv2-text-secondary)' }}>{label}</span>
+                            <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'var(--uiv2-bg-inset)', overflow: 'hidden' }}>
+                              <div style={{ width: `${val}%`, height: '100%', background: scoreColor(val) }} />
+                            </div>
+                            <span style={{ width: 24, textAlign: 'right', fontFamily: 'var(--uiv2-font-mono)' }}>{val}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {discoveryError && <div className="ui-field-error">{discoveryError}</div>}
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="ui-button ui-button-ghost ui-button-sm" onClick={handleRescore} disabled={isDiscoveryBusy || !editedCaption.trim()}>
+                      {discoveryStatus === 'scoring' ? 'Scoring…' : 'Re-score'}
+                    </button>
+                    <button type="button" className="ui-button ui-button-ghost ui-button-sm" onClick={handleOptimize} disabled={isDiscoveryBusy || !editedCaption.trim()}>
+                      <Sparkles size={12} aria-hidden="true" /> {discoveryStatus === 'optimizing' ? 'Optimizing…' : 'Optimize for discovery'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
