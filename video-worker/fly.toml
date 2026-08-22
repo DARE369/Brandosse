@@ -29,7 +29,13 @@
 # this lockdown exists to prevent. min_machines_running = 1, deliberately.
 
 app = "brandosse-video-worker"
-primary_region = "cdg"
+# lhr, because Supabase for this project is in AWS eu-west-1 (Ireland) —
+# confirmed from supabase/.temp/pooler-url: aws-1-eu-west-1.pooler.supabase.com.
+# Fly has no Dublin region, and London is the nearest. This is the region that
+# matters: every rendered clip is uploaded to Supabase Storage and every stage
+# writes job progress to Postgres, so worker-to-database latency dominates,
+# not worker-to-user. A volume cannot be moved between regions afterwards.
+primary_region = "lhr"
 
 [build]
   dockerfile = "Dockerfile"
