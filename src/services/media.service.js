@@ -272,7 +272,17 @@ export async function editImage({
     width: dimensions.width,
     height: dimensions.height,
     storagePath: data.storagePath || null,
-    generationCost: data.credits_used ?? 3,
+    // LOCK L2.6 — report what the server actually charged, never a guess.
+    //
+    // This defaulted to 3. The server charges 1 (generateImage/index.ts:26,
+    // CREDITS_PER_IMAGE) and returns credits_used in the response, so whenever
+    // that field was absent the UI displayed THREE TIMES the true cost. A
+    // stale constant nobody revisited — the same class of defect as the
+    // hardcoded model default in _shared/llm.ts.
+    //
+    // null means "unknown", which the UI can render honestly. Inventing a
+    // number is how a money figure becomes wrong without anyone noticing.
+    generationCost: data.credits_used ?? null,
     generationId: data.generation_id || null,
     ...normalizeProviderPayload(data),
   };
