@@ -183,10 +183,10 @@ The audit is not complete until these are done — its own self-check says so.
 
 | Lock | What |
 |---|---|
-| **L6.1** | Persona walkthroughs: unaided first-run as Casual Operator, migration flow as Power Migrant |
-| **L6.2** | **Run** the test suite and all 8 guard scripts; record real pass/fail |
-| **L6.3** | Verify production environment: Vercel, Supabase edge secrets, Railway — reconcile against every `unverified_notes` in the findings |
-| **L6.4** | Confirm whether cross-tenant **writes** leak (read exposure is confirmed; writes were deliberately not tested) |
+| **L6.1** ✅ | Persona walkthroughs: unaided first-run as Casual Operator, migration flow as Power Migrant — `tests/e2e/persona-walkthroughs.spec.js`. The Power Migrant test may not call `page.goto()` after sign-in: every surface must be reached by CLICKING. Every other test in the suite navigates by URL, which is the automated equivalent of the address bar — so a route reachable only that way passes all of them while being invisible to a person (finding P9-002). All 7 surfaces reachable; verified by adding a surface with no nav control and confirming it was reported |
+| **L6.2** ✅ | **Run** the test suite and all guard scripts; record real pass/fail — **11/11 offline guards pass, 4/4 live probes pass, e2e 15 passed / 4 skipped / 0 failed** (2026-08-22). The finding: **CI ran the e2e suite never**, which is why four tests had been failing for months against markup deleted in the ui-v2 migration. An `e2e` job now runs it on the daily schedule |
+| **L6.3** ✅ | Verify production environment — all 4 required edge secrets present; 3 of 15 optional unset, each falling back to a pinned literal. 3 variables the code reads were in no `.env.example` (`check-env-contract.cjs` now fails on any undeclared read). `supabase/config.toml` did not exist, so `verify_jwt` was implicit (P10s-004): probed all 52 live — 51 correctly closed, and **`job-webhook` was rejecting every fal.ai callback it exists to receive**. Fixed and guarded by `edge-auth-probe.mjs`. **Open for the founder: 7 unused API keys are still deployed** |
+| **L6.4** ✅ | Confirm whether cross-tenant **writes** leak — **15 of 15 attempts refused.** UPDATE/INSERT/DELETE/REASSIGN across `sessions`, `posts`, `generations`, plus `user_credits.balance` and `profiles.status`. Every table carries a positive control (the victim edits its own row and it must land), and no verdict is read from a status code, because PostgREST returns 204 for an update that matched nothing — the ambiguity behind the retracted credit-minting finding. `cross-tenant-write-probe.mjs` |
 
 **Gate 6 — no unverified claims remain in the audit.**
 
