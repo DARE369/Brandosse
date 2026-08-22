@@ -2,11 +2,10 @@
 
 import React from "react";
 import { Loader2 } from "lucide-react";
-import UserNavbar from "../../components/User/UserNavbar";
-import UserSidebar from "../../components/User/UserSidebar";
 import SubmitForm from "../../components/video-engine/SubmitForm";
 import { useAuth } from "../../Context/AuthContext";
 import { fetchUserCredits } from "../../services/videoEngineData";
+import { AppShell } from "../../ui-v2";
 
 export default function VideoSubmitPage() {
   const { user } = useAuth();
@@ -33,10 +32,7 @@ export default function VideoSubmitPage() {
   }, [user?.id]);
 
   return (
-    <div className="dashboard-shell">
-      <UserNavbar />
-      <UserSidebar />
-      <main className="dashboard-content ve-app-content" id="main-content">
+    <AppShell activeKey="video" mainClassName="ve-app-content">
         {loading ? (
           <div className="ve-page-loading">
             <Loader2 size={28} className="ve-spin ve-loading-icon" aria-hidden="true" />
@@ -45,7 +41,6 @@ export default function VideoSubmitPage() {
         ) : (
           <SubmitForm initialCredits={credits} creditError={creditError} />
         )}
-      </main>
-    </div>
+    </AppShell>
   );
 }

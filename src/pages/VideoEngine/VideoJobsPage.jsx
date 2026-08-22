@@ -2,12 +2,11 @@
 
 import React from "react";
 import { Loader2, Plus, RefreshCw } from "lucide-react";
-import UserNavbar from "../../components/User/UserNavbar";
-import UserSidebar from "../../components/User/UserSidebar";
 import JobsList from "../../components/video-engine/JobsList";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useAuth } from "../../Context/AuthContext";
 import { fetchUserJobs } from "../../services/videoEngineData";
+import { AppShell } from "../../ui-v2";
 
 export default function VideoJobsPage() {
   const { navigate } = useAppNavigation();
@@ -32,10 +31,7 @@ export default function VideoJobsPage() {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="dashboard-shell">
-      <UserNavbar />
-      <UserSidebar />
-      <main className="dashboard-content ve-app-content" id="main-content">
+    <AppShell activeKey="video" mainClassName="ve-app-content">
         <section className="ve-page">
           <div className="ve-list-header">
             <div>
@@ -66,7 +62,6 @@ export default function VideoJobsPage() {
             <JobsList initialJobs={jobs} />
           )}
         </section>
-      </main>
-    </div>
+    </AppShell>
   );
 }

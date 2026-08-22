@@ -2,12 +2,11 @@
 
 import React from "react";
 import { Loader2 } from "lucide-react";
-import UserNavbar from "../../components/User/UserNavbar";
-import UserSidebar from "../../components/User/UserSidebar";
 import JobDetailView from "../../components/video-engine/JobDetailView";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useAuth } from "../../Context/AuthContext";
 import { fetchJobDetail } from "../../services/videoEngineData";
+import { AppShell } from "../../ui-v2";
 
 export default function VideoJobDetailPage({ jobId = null }) {
   const { navigate, pathname } = useAppNavigation();
@@ -31,10 +30,7 @@ export default function VideoJobDetailPage({ jobId = null }) {
   }, [id, user?.id]);
 
   return (
-    <div className="dashboard-shell">
-      <UserNavbar />
-      <UserSidebar />
-      <main className="dashboard-content ve-app-content" id="main-content">
+    <AppShell activeKey="video" mainClassName="ve-app-content">
         {loading ? (
           <div className="ve-page-loading">
             <Loader2 size={28} className="ve-spin ve-loading-icon" aria-hidden="true" />
@@ -56,7 +52,6 @@ export default function VideoJobDetailPage({ jobId = null }) {
             sourceUrl={detail.job?.source_url}
           />
         ) : null}
-      </main>
-    </div>
+    </AppShell>
   );
 }

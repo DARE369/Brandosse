@@ -1,11 +1,10 @@
 "use client";
 
 import React from "react";
-import UserNavbar from "../../components/User/UserNavbar";
-import UserSidebar from "../../components/User/UserSidebar";
 import CreditDashboard from "../../components/video-engine/CreditDashboard";
 import { useAuth } from "../../Context/AuthContext";
 import { fetchUserCredits, fetchUserTransactions } from "../../services/videoEngineData";
+import { AppShell } from "../../ui-v2";
 export default function CreditsPage() {
   const { user } = useAuth();
   const [balance, setBalance] = React.useState(0);
@@ -33,16 +32,12 @@ export default function CreditsPage() {
   }, [user?.id]);
 
   return (
-    <div className="dashboard-shell">
-      <UserNavbar />
-      <UserSidebar />
-      <main className="dashboard-content ve-app-content" id="main-content">
+    <AppShell activeKey="billing" mainClassName="ve-app-content">
         {loading ? (
           <div className="ve-page-loading">Loading credits...</div>
         ) : (
           <CreditDashboard initialBalance={balance} initialTransactions={transactions} />
         )}
-      </main>
-    </div>
+    </AppShell>
   );
 }
