@@ -92,27 +92,6 @@ fees before a single generation** — ~40% of revenue.
 
 ---
 
-## 🟡 OD-3 — Repository visibility
-**Opened:** 2026-08-22 · **Status:** OPEN
-
-`github.com/DARE369/Brandosse` is **public** (`private: false`, confirmed via the
-GitHub API).
-
-Two consequences:
-
-1. The `WORKER_WEBHOOK_SECRET` committed in `docs/VIDEO_LAB_COMPLETE_GUIDE.md`
-   was publicly readable for the repository's entire life. It is rotated, so the
-   current value is safe — but the old one should be assumed harvested, since
-   bots scrape public GitHub for credential patterns continuously.
-2. `audit/` is now public: 117 findings describing, with `file:line` precision,
-   every weakness in the product, plus live data volumes and user counts. The
-   specific defects are fixed, so it is not a live exploit map — but it is a
-   detailed profile of the system.
-
-**Decision needed:** make the repository private, or move `audit/` out of it.
-
----
-
 ## Decision log
 
 *(Move entries here when decided — keep the reasoning, it is the expensive part.)*
@@ -122,4 +101,5 @@ Two consequences:
 | 2026-08-21 | Video generation (P4) **cut from v1** | Never produced a video (1 real asset in 32 attempts); negative margin at the cheapest credit tier; repairing it makes unit economics worse, not better (P10o-002). D5 §3 |
 | 2026-08-21 | Worker migrates **Railway → Fly.io**, after lockdown | Infrastructure relocation, not new capability. Sequenced as Wave 7 so the first Fly deploy is also the first *working* deploy |
 | 2026-08-22 | Worker env vars **not** set on Railway | No point configuring a host being decommissioned. Deferred to Wave 7 |
+| 2026-08-22 | **OD-3 CLOSED — repository made private** | It had been public for its entire life, which is how the committed `WORKER_WEBHOOK_SECRET` was publicly readable until rotation. Assume that old value was harvested; bots scrape public GitHub for credential patterns continuously. Going private also removes `audit/` — 117 findings with `file:line` precision plus live data volumes — from public view |
 | 2026-08-22 | **OD-2 CLOSED — Sentry chosen** for error tracking | Free Developer plan: 5,000 errors/mo, 30-day retention, 1 user — ample at current scale (14 users) and likely until real launch traffic. Configured for Next.js *and* Supabase Edge Functions; verified by planting two deliberate failures, both ingested HTTP 200. Python worker deferred to Wave 7, since it cannot boot today anyway |

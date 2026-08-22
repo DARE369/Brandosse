@@ -31,9 +31,10 @@ All three were being violated when the audit ran.
 **blocking engineering work**. Read it before proposing a plan — some work is
 blocked on a decision, not on effort, and proposing it anyway wastes a cycle.
 
-Currently open: **Zernio per-account pricing** (blocks L5.1 → four pillars),
-**error-tracking provider** (blocks L0.4 and two guards), **repository
-visibility** (the repo is public and `audit/` is in it).
+Currently open: **OD-1 — Zernio per-account pricing.** It blocks L5.1, and four
+pillars sit behind that (analytics needs published posts; the loop needs
+analytics; reach needs the loop). It is also ~3× the entire rest of the cost
+model, as a *fixed* cost against usage-priced revenue.
 
 ## 🔒 Completion Lockdown is ACTIVE
 
