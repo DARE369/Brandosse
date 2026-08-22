@@ -45,6 +45,8 @@ const PLATFORM_PROVIDED = new Set([
   "VERCEL",
   "VERCEL_ENV",
   "VERCEL_URL",
+  "NEXT_PUBLIC_VERCEL_ENV",
+  "NEXT_RUNTIME",   // Next sets this per runtime inside instrumentation.ts
   "CI",
   // Supabase injects these into every edge function runtime.
   "SUPABASE_URL",
@@ -99,12 +101,27 @@ function collectReads() {
     /os\.environ\.get\(\s*["']([A-Z][A-Z0-9_]{2,})["']/g,
     /os\.getenv\(\s*["']([A-Z][A-Z0-9_]{2,})["']/g,
     /os\.environ\[\s*["']([A-Z][A-Z0-9_]{2,})["']\s*\]/g,
+    // The worker's config is pydantic, so its variables are named in an alias
+    // rather than an os.environ call. Missing this made every WORKER_* look
+    // dead when config.py reads all of them.
+    /alias\s*=\s*["']([A-Z][A-Z0-9_]{2,})["']/g,
   ];
 
   const jsFiles = [
     ...walk(path.join(ROOT, "src"), [".js", ".jsx", ".ts", ".tsx"]),
     ...walk(path.join(ROOT, "app"), [".js", ".jsx", ".ts", ".tsx"]),
     ...walk(path.join(ROOT, "supabase", "functions"), [".ts"]),
+    // Tests read the E2E_* credentials, and are as much a consumer as the app.
+    ...walk(path.join(ROOT, "tests"), [".js", ".ts"]),
+    // Build-time config lives at the repository root, not under src/ — this is
+    // where next.config.mjs reads SENTRY_ORG and the Sentry instrumentation
+    // files read NEXT_PUBLIC_SENTRY_DSN. Walking only src/ and app/ made all
+    // four look unused.
+    ...["next.config.mjs", "instrumentation.ts", "instrumentation-client.ts",
+        "sentry.server.config.ts", "sentry.edge.config.ts", "sentry.client.config.ts",
+        "playwright.config.cjs"]
+      .map((f) => path.join(ROOT, f))
+      .filter((f) => fs.existsSync(f)),
   ];
   for (const file of jsFiles) {
     const rel = path.relative(ROOT, file).replace(/\\/g, "/");
@@ -173,6 +190,47 @@ if (undeclared.length > 0) {
   process.exit(1);
 }
 
+// ── And the other direction: declared, but read by nothing ──────────────────
+// A key that nothing reads is not harmless. It is a live credential to a paid
+// service that no failure would ever surface: steal it, and nothing in this
+// product breaks, so nothing alerts. Seven of them were sitting in the Supabase
+// edge secrets on 2026-08-22 — Grok (twice), Freepik, Gemini, Magnific,
+// Pollinations and Replicate — for providers the code stopped calling long ago.
+// Every generation on record used fal-ai.
+//
+// Declaring a variable here is how somebody learns to go and set it, so a stale
+// declaration actively recruits new copies of a key nobody needs.
+const IMPLICIT = new Set([
+  // Read by tooling rather than by this repository's own source.
+  "SENTRY_AUTH_TOKEN", // @sentry/nextjs reads it from the env for source-map upload
+  "DATABASE_URL", // psql / migration tooling
+  "CRON_SECRET", // asserted by pg_cron job bodies, which live in the database
+]);
+
+const unread = [];
+for (const name of declared) {
+  if (reads.has(name) || IMPLICIT.has(name) || TEST_ONLY.has(name)) continue;
+  // WORKER_* names contain their unprefixed twin; treat a prefixed read as
+  // covering only the prefixed name.
+  if ([...reads.keys()].some((r) => r === name)) continue;
+  unread.push(name);
+}
+unread.sort();
+
+if (unread.length > 0) {
+  console.error(
+    `Env-contract guardrail failed — ${unread.length} variable(s) declared in .env.example that nothing reads:\n`,
+  );
+  for (const name of unread) console.error(`  ${name}`);
+  console.error(
+    "\nEither the code that used them is gone (delete the declaration, and the key\n"
+      + "from every environment that holds it), or they are read by tooling rather\n"
+      + "than source (add them to IMPLICIT above, with a note saying what reads them).\n"
+      + "A credential nothing reads is one whose theft nothing would reveal.",
+  );
+  process.exit(1);
+}
+
 console.log(
-  `Env-contract guardrail passed — ${reads.size} variable(s) read across web, edge and worker, all declared.`,
+  `Env-contract guardrail passed — ${reads.size} read, ${declared.size} declared, no drift in either direction.`,
 );
