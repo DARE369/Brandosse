@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "../../Context/AuthContext";
 import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
+import { SIGNUP_CREDIT_GRANT } from "../../constants/credits";
 import AuthLayout from "../../layouts/AuthLayout";
 import { APP_ROOT_PATH } from "../../utils/authRouting";
 import {
@@ -214,7 +215,7 @@ export default function Register() {
     >
       <div className="auth-credits-badge">
         <span className="auth-credits-icon">*</span>
-        <span>100 free AI credits included on signup</span>
+        <span>{SIGNUP_CREDIT_GRANT} free AI credits included on signup</span>
       </div>
 
       <div className="auth-field auth-field-plan">

@@ -6,6 +6,7 @@ import Link from "next/link";
 import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
 import AuthLoadingOverlay from "../../components/Shared/AuthLoadingOverlay";
 import { BarChart3, CalendarDays, LayoutDashboard, Minus, Plus, Settings, Sparkles } from "lucide-react";
+import { SIGNUP_CREDIT_GRANT } from "../../constants/credits";
 const FEATURES = [
   {
     icon: (
@@ -125,7 +126,7 @@ const FAQS = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes - new accounts start with 100 free AI credits, enough to generate and schedule your first week of content. Paid plans unlock higher limits and automation features.",
+    a: `Yes - new accounts start with ${SIGNUP_CREDIT_GRANT} free AI credits, no card required. Paid plans unlock higher limits and automation features.`,
   },
   {
     q: "How does smart scheduling work?",
@@ -258,7 +259,7 @@ export default function LandingPage() {
           </div>
 
           <p className="lp-hero-note">
-            No credit card required | 100 free AI credits on signup
+            No credit card required | {SIGNUP_CREDIT_GRANT} free AI credits on signup
           </p>
         </div>
 
