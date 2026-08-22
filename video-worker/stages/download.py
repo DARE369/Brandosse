@@ -32,6 +32,13 @@ YTDLP_BASE_OPTIONS = {
     'no_warnings': False,
     'extract_flat': False,
     'merge_output_format': 'mp4',
+    # Detecting a JS runtime is not the same as being allowed to use one.
+    # yt-dlp enables only Deno by default (it sandboxes); node must be named
+    # explicitly or the challenge solver stays dark and YouTube returns no
+    # format URLs. Measured on Fly 2026-08-22, same video, same cookies:
+    #   without this -> 0 usable formats
+    #   with this    -> 49 formats, 38 downloadable video
+    'js_runtimes': {'node': {}},
     # NOTE: this used to say the iOS client "bypasses YouTube's bot detection on
     # server IPs without requiring cookies". That stopped being true. Tested from
     # the Fly host on 2026-08-22: ios, web AND android all returned "Sign in to
