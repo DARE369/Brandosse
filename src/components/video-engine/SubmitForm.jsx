@@ -417,7 +417,10 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
         {workerStatus === "unhealthy" ? (
           <div className="ve-inline-status ve-inline-warning" role="status">
             <WifiOff size={16} aria-hidden="true" />
-            <span>Video worker is offline. Jobs can be queued but will start once the worker restarts.</span>
+            <span>
+              The processor is asleep — it powers down when idle to keep running costs near zero.
+              Submitting wakes it, which adds about half a minute before processing starts.
+            </span>
           </div>
         ) : null}
 
