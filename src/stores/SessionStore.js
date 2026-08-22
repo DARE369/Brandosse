@@ -3050,8 +3050,14 @@ const useSessionStore = create((set, get) => ({
     }
   },
 
-  generateCaption: async (platform = 'instagram') => {
-    const { selectedGeneration } = get();
+  /**
+   * LOCK L5.4 — `refineInstruction` turns this into an EDIT of the current
+   * caption instead of a fresh generation. Without it the only affordance was
+   * Regenerate: a blind re-roll that discarded the user's draft and could not
+   * be steered (audit finding P3-003).
+   */
+  generateCaption: async (platform = 'instagram', refineInstruction = null) => {
+    const { selectedGeneration, postProduction } = get();
     if (!selectedGeneration) return;
 
     try {
@@ -3076,6 +3082,10 @@ const useSessionStore = create((set, get) => ({
           previousCaptions: (previousCaptionRows || [])
             .map((row) => String(row.caption || '').trim())
             .filter(Boolean),
+          // Both are required server-side before refinement mode engages, so a
+          // refine with an empty draft correctly falls back to generation.
+          refineInstruction: refineInstruction || null,
+          currentCaption: refineInstruction ? (postProduction?.caption || '') : null,
           tone: null,
         },
       });

@@ -22,6 +22,20 @@ function scoreColor(v) {
 }
 
 /**
+ * LOCK L5.4 — the refinement vocabulary.
+ *
+ * Deliberately short. Every option here is one a user would actually ask for
+ * out loud, and each is phrased as an instruction the model can apply to an
+ * existing caption rather than a style it should invent from scratch.
+ */
+const REFINE_PRESETS = [
+  { label: "Shorter",  instruction: "Make it noticeably shorter without losing the main point." },
+  { label: "Punchier", instruction: "Make the opening line punchier and more attention-grabbing." },
+  { label: "Warmer",   instruction: "Make the tone warmer and more conversational." },
+  { label: "Add CTA",  instruction: "End with a clear, specific call to action." },
+];
+
+/**
  * Single unified post-production panel — title/caption/hashtags, real
  * discovery score (seo-score edge function via optimizeSeo/scoreSeo in
  * SessionStore), and a real target-account dropdown (backed by
@@ -41,6 +55,7 @@ export default function PostProductionPanel({
   onClose,
   onGenerateAnother,
   onRegenerateMetadata,
+  onRefineCaption,
   onRescore,
   metadataRetryAfter = 0,
   seoRetryAfter = 0,
@@ -198,6 +213,32 @@ export default function PostProductionPanel({
           <span className={styles.metadataFailedHint}>Last attempt failed — try again.</span>
         )}
       </div>
+
+      {/*
+        LOCK L5.4 — steer the caption instead of re-rolling it.
+        Regenerate was the only affordance: a blind overwrite that discarded the
+        draft and could not be directed. These apply an instruction to the
+        EXISTING caption, so everything the user already liked survives.
+        Shown only when there is a caption to refine — an instruction with
+        nothing to apply it to is a control that cannot work (LOCK L2.5).
+      */}
+      {onRefineCaption && (postProduction.caption || "").trim() ? (
+        <div className={styles.refineRow}>
+          <span className={styles.refineLabel}>Refine:</span>
+          {REFINE_PRESETS.map((preset) => (
+            <Button
+              key={preset.instruction}
+              variant="ghost"
+              size="sm"
+              onClick={() => onRefineCaption(preset.instruction)}
+              disabled={postProduction.metadataStatus === "in_progress" || metadataRetryAfter > 0}
+              title={`Rewrite the current caption: ${preset.instruction}`}
+            >
+              {preset.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       <div className={styles.tagRow}>
         {(postProduction.hashtags || []).map((tag, i) => (

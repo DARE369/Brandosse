@@ -564,6 +564,26 @@ function StudioBody({ brandKit }) {
     }
   }, [regeneratePostMetadata, generateCaption, postProduction, applyRateLimit]);
 
+  // LOCK L5.4 — apply an instruction to the EXISTING caption.
+  //
+  // Distinct from handleRegenerateMetadata: that rewrites title, caption and
+  // hashtags from scratch. This one keeps the draft and changes only what was
+  // asked, so a user who likes their caption but wants it shorter does not
+  // lose the version they liked.
+  const handleRefineCaption = useCallback(async (instruction) => {
+    if (!instruction) return;
+    const toastId = toast.loading("Refining caption…");
+    try {
+      await generateCaption(postProduction?.selectedPlatforms?.[0] || "instagram", instruction);
+      toast.success("Caption refined", { id: toastId });
+    } catch (err) {
+      toast.dismiss(toastId);
+      if (!applyRateLimit("regenerateMetadata", err)) {
+        toast.error(err?.message || "Could not refine the caption.");
+      }
+    }
+  }, [generateCaption, postProduction, applyRateLimit]);
+
   const handleRescore = useCallback(async () => {
     try {
       await scoreSeo();
@@ -1803,6 +1823,7 @@ function StudioBody({ brandKit }) {
                     onClose={() => setStudioStage("results")}
                     onGenerateAnother={() => setStudioStage("brief")}
                     onRegenerateMetadata={handleRegenerateMetadata}
+                    onRefineCaption={handleRefineCaption}
                     onRescore={handleRescore}
                     metadataRetryAfter={getRateLimitRemaining("regenerateMetadata")}
                     seoRetryAfter={getRateLimitRemaining("rescore")}
