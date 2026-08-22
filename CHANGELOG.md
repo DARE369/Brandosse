@@ -99,6 +99,17 @@ existed. See [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md).
 
 ### Infrastructure — Added
 
+- **CI itself was broken and nobody knew.** `npm ci` had been failing on Linux
+  for months on `main`: `sass` and `@emnapi/core` are dependencies of
+  unknown-platform FALLBACK packages (`sass-embedded-all-unknown`,
+  `@tailwindcss/oxide-wasm32-wasi`), and npm on Windows never resolves those
+  subtrees, so they were never written to the lock. `npm ci` on Ubuntu validates
+  the entire tree and refused. A workflow that only builds, whose build is
+  broken, produces exactly as much signal as no workflow — which is why it
+  survived. Found only because this PR added guards whose result someone
+  actually looked at. Third instance of the same pattern this release, after
+  the cron-monitoring allowlist and four guard scripts failing against deleted
+  files: **verification nobody watches decays to zero.**
 - **CI runs checks, not just a build.** Eight guard scripts existed and executed
   nowhere; four had been failing for months against files deleted during the
   ui-v2 migration. All eight now pass and run on every PR, alongside a secret

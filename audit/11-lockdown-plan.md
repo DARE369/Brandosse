@@ -68,13 +68,13 @@ The standards every later wave is judged against. Done first so the rules exist 
 
 | Lock | What | Proven by | Guarded by |
 |---|---|---|---|
-| **L0.1** | CI runs tests, not just a build | The existing Playwright spec executes in CI | `.github/workflows/ci.yml` test job, required to pass |
+| **L0.1** ✅ | CI runs checks, not just a build | **Green on Ubuntu 2026-08-22** — first time the guards have ever executed outside Windows. Doing so immediately exposed that `npm ci` had been failing on `main` for months | `.github/workflows/ci.yml`, required on every PR |
 | **L0.2** | Cross-tenant test harness | Log in as user A, attempt B's rows across all 89 tables | Blocking CI job |
 | **L0.3** | Un-blind job monitoring | Delete the 3-name allowlist at `20260710110000_...sql:55` | `healthCheck` enumerates *all* `cron.job` rows; alerts on unknown/failing |
 | **L0.4** ✅ | Error tracking + alerting | **Two planted failures ingested, HTTP 200** — one via the Next.js path, one simulating `llm_provider_fallback` from the edge runtime | Next.js (server/client/edge/render) + all 51 Supabase Edge Functions via `_shared/sentry.ts`. **Python worker deferred to Wave 7** — it cannot boot today regardless |
 | **L0.5** | Secret scanning | A test commit containing a fake key fails CI | Pre-commit hook + CI job |
 | **L0.6** | Startup env validation | Worker and edge functions refuse to start with a missing required key | Extend the pattern already at `video-worker/config.py:14-15` |
-| **L0.7** | Wire the 8 existing guard scripts | Each `scripts/check-*.cjs` runs and passes | CI job — *or delete the script if it no longer earns its place* |
+| **L0.7** ✅ | Wire the 8 existing guard scripts | All 8 pass; 4 had been failing for months against files deleted during the ui-v2 migration, and repointing `check-status-literals` immediately found two genuine violations | CI job on every PR |
 
 **Gate 0 — the lock is functional.** Deliberately break something (revoke a key, freeze a post, stage a fake secret) and confirm the machinery catches it **within one CI run or one alert cycle**. Until a planted failure is caught, Wave 0 is not done.
 
