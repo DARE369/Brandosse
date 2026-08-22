@@ -228,10 +228,52 @@ def _download_with_ytdlp(url: str, output_path_template: str, job_id: str, cooki
         raise DownloadError(f"Download failed: {str(e)[:300]}", job_id)
 
 
+def _resolve_worker_upload(job: dict) -> str:
+    """
+    Resolve a `worker://{user_id}/{upload_id}` source that the browser uploaded
+    straight onto this machine's volume (LOCK L7.4, see uploads.py).
+
+    Nothing is downloaded — the file is already here. That is the whole point:
+    Supabase Storage on this project caps uploads at 50MB, which is far below a
+    real long-form source, and the volume this worker already pays for does not.
+    """
+    from uploads import local_path_for, upload_dir  # local import: avoids a cycle
+
+    ref = job["source_url"][len("worker://"):]
+    if "/" not in ref:
+        raise DownloadError("Malformed upload reference on this job.", job["id"])
+    user_id, upload_id = ref.split("/", 1)
+
+    user_dir = os.path.join(upload_dir(), user_id)
+    if os.path.isdir(user_dir):
+        for name in sorted(os.listdir(user_dir)):
+            if name.startswith(upload_id):
+                candidate = os.path.join(user_dir, name)
+                if os.path.getsize(candidate) > 0:
+                    log.info(
+                        "worker_upload_resolved",
+                        job_id=job["id"],
+                        size_mb=round(os.path.getsize(candidate) / (1024 * 1024), 1),
+                    )
+                    return candidate
+
+    # The volume is scratch space, not durable storage. A machine replacement,
+    # or the orphan reaper after 24h, removes uploads — so say what happened
+    # rather than reporting a generic missing file.
+    raise DownloadError(
+        "The uploaded file is no longer on the worker. Uploads are held for 24 hours "
+        "and are cleared when the worker is redeployed — please upload it again.",
+        job["id"],
+    )
+
+
 def _download_uploaded_file(job: dict, temp_dir: str) -> str:
     """
     Download a user-uploaded file from Supabase Storage.
     Returns the local file path.
+
+    Retained for sources uploaded through Supabase (<=50MB). Files sent straight
+    to the worker use the worker:// scheme and _resolve_worker_upload instead.
     """
     storage_path = job["source_url"]
     local_path = os.path.join(temp_dir, "source.mp4")
@@ -280,8 +322,13 @@ async def run_download(job: dict, temp_dir: str) -> dict:
             video_path = None
 
         elif platform == 'upload':
-            log.info("upload_download_start", job_id=job_id)
-            video_path = await asyncio.to_thread(_download_uploaded_file, job, temp_dir)
+            if str(source_url).startswith('worker://'):
+                # Already on this machine's volume — no fetch, no egress, no
+                # 50MB ceiling.
+                video_path = await asyncio.to_thread(_resolve_worker_upload, job)
+            else:
+                log.info("upload_download_start", job_id=job_id)
+                video_path = await asyncio.to_thread(_download_uploaded_file, job, temp_dir)
 
             duration_secs_raw = await asyncio.to_thread(get_video_duration, video_path)
             if duration_secs_raw is None:

@@ -4,10 +4,9 @@ import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useAuth } from "../../Context/AuthContext";
 import { VIDEO_ENGINE_CONSTANTS } from "../../lib/video-engine/constants";
 import { useWorkerHealth } from "../../hooks/video-engine/useWorkerHealth";
-import { submitVideoJob } from "../../services/videoEngineApi";
+import { requestUploadTicket, submitVideoJob } from "../../services/videoEngineApi";
 import { fetchUserJobs } from "../../services/videoEngineData";
 import ClipSettingsPanel from "./ClipSettingsPanel";
-import { supabase } from "../../services/supabaseClient";
 
 // Mirrors MAX_CONCURRENT_JOBS / activeStatuses in src/lib/video-engine/rate-limiter.ts
 // (the actual server-enforced limit) — kept in sync here only so the UI can
@@ -24,12 +23,18 @@ const ACTIVE_JOB_STATUSES = ["queued", "downloading", "transcribing", "analyzing
 // It matters more than convenience: uploading is the ONLY ingestion path that
 // does not depend on YouTube tolerating a datacenter IP. Link ingestion is kept,
 // and kept honest about being the less reliable of the two.
-const SOURCE_BUCKET = "video-source-cache";
-
-// Enforced by the bucket itself (supabase/migrations/20260822210000). Stated up
-// front rather than discovered at the end of a failed upload — this is the
-// project's plan ceiling, not a preference.
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+// Uploads go STRAIGHT TO THE WORKER, not to Supabase Storage.
+//
+// Supabase on this project refuses any bucket limit above 50MB (the free-plan
+// ceiling, measured 2026-08-22 — 1024/500/200MB all rejected with HTTP 413). A
+// 60-minute 1080p podcast is 1-3GB, so that path only ever worked for the wrong
+// size of video, and raising it is a paid plan rather than a code change.
+//
+// The worker already has a paid-for 25GB volume. Uploading there costs nothing
+// extra, has no 50MB ceiling, and skips a download hop — the file lands on the
+// machine that needs it. Auth is a short-lived signed ticket from
+// /api/video/upload-ticket; the worker secret never reaches the browser.
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024 * 1024;
 
 const ACCEPTED_VIDEO_TYPES = [
   "video/mp4", "video/quicktime", "video/x-matroska",
@@ -197,27 +202,48 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
    * is what makes one user unable to read another's unpublished source video.
    */
   async function uploadSource(chosen) {
+    // 1. Ask our own server for a signed, short-lived permission slip. The
+    //    worker secret stays on the server; the browser only ever holds an HMAC
+    //    bound to this user and this one upload.
+    const ticket = await requestUploadTicket();
+
+    // 2. Send the bytes straight to the worker's volume.
     const ext = (chosen.name.split(".").pop() || "mp4").toLowerCase().slice(0, 5);
-    const objectPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+    const response = await fetch(ticket.upload_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": chosen.type || "video/mp4",
+        "X-Upload-User": ticket.user_id,
+        "X-Upload-Id": ticket.upload_id,
+        "X-Upload-Expires": String(ticket.expires_at),
+        "X-Upload-Signature": ticket.signature,
+        "X-Upload-Ext": ext,
+      },
+      body: chosen,
+    });
 
-    const { error: uploadError } = await supabase.storage
-      .from(SOURCE_BUCKET)
-      .upload(objectPath, chosen, {
-        contentType: chosen.type || "video/mp4",
-        upsert: false,
-      });
-
-    if (uploadError) {
-      // The bucket enforces the size limit too; say which failure this was.
-      if (/exceeded|too large|413/i.test(uploadError.message || "")) {
-        throw new Error(
-          `Upload rejected: the file is larger than the ${formatBytes(MAX_UPLOAD_BYTES)} limit.`,
-        );
+    if (!response.ok) {
+      let detail = "";
+      try {
+        detail = (await response.json())?.detail || "";
+      } catch {
+        detail = await response.text().catch(() => "");
       }
-      throw new Error(`Upload failed: ${uploadError.message || "unknown error"}`);
+      if (response.status === 507) {
+        throw new Error(detail || "The worker is out of disk space. Try again once current jobs finish.");
+      }
+      if (response.status === 413) {
+        throw new Error(detail || `That file is over the ${formatBytes(MAX_UPLOAD_BYTES)} limit.`);
+      }
+      if (response.status === 403) {
+        throw new Error("That upload window expired. Reload the page and try again.");
+      }
+      throw new Error(detail || `Upload failed (HTTP ${response.status}).`);
     }
 
-    return objectPath;
+    // 3. The job stores a worker:// reference. download.py recognises it and
+    //    skips fetching, because the file is already on the machine.
+    return ticket.source_url;
   }
 
   async function handleSubmit(event) {
@@ -331,7 +357,7 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
               </span>
             ) : (
               <span className="ve-field-hint">
-                MP4, MOV, MKV, WebM or AVI, up to {formatBytes(MAX_UPLOAD_BYTES)}.
+                MP4, MOV, MKV, WebM or AVI, up to {formatBytes(MAX_UPLOAD_BYTES)}. Uploaded straight to the processor.
               </span>
             )}
           </label>
