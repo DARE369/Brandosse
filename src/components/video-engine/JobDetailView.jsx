@@ -2,6 +2,7 @@ import React from "react";
 import { useJobRealtime } from "../../hooks/video-engine/useJobRealtime";
 import ClipsGallery from "./ClipsGallery";
 import JobStatusPipeline from "./JobStatusPipeline";
+import { EmptyState, Button } from "../../ui-v2";
 
 const processingStatuses = new Set(["queued", "downloading", "transcribing", "analyzing", "rendering"]);
 
@@ -33,10 +34,11 @@ export default function JobDetailView({ initialJob, initialClips = [], sourceUrl
 
   return (
     <section className="ve-page">
-      <div className="ve-empty-state">
-        <strong>Unknown job state</strong>
-        <span>Refresh the page to check the latest status.</span>
-      </div>
+      <EmptyState
+        title="Unknown job state"
+        description="This job is in a state we don't have a screen for. Reloading usually resolves it — if not, the job list has the latest status."
+        actions={<Button onClick={() => window.location.reload()}>Reload</Button>}
+      />
     </section>
   );
 }

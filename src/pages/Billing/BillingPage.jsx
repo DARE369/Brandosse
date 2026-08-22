@@ -191,7 +191,12 @@ function BillingBody() {
             {!segmentsReady ? (
               <Skeleton height="80px" radius="var(--uiv2-radius-md)" />
             ) : segments.length === 0 ? (
-              <EmptyState dashed title="No usage yet" description="Generate or process something and it'll show up here." />
+              <EmptyState
+                dashed
+                title="No usage yet"
+                description="You haven't spent any credits, so there is nothing to break down by category."
+                actions={<Button size="sm" onClick={() => navigate("/app/generate")}>Create something</Button>}
+              />
             ) : (
               <CategoryBars segments={segments} />
             )}
@@ -225,7 +230,11 @@ function BillingBody() {
             {txLoading ? (
               <Skeleton height="120px" radius="var(--uiv2-radius-md)" />
             ) : transactions.length === 0 ? (
-              <EmptyState dashed title="No activity yet" description="Purchases and usage will appear here." />
+              <EmptyState
+                title="No activity yet"
+                description="Every credit you buy or spend gets a line here. Buy credits using the packages above."
+                noAction="the purchase controls are the section directly above this one"
+              />
             ) : (
               <div className={styles.ledgerTable}>
                 <div className={[styles.ledgerRow, styles.ledgerHeadRow].join(" ")}>

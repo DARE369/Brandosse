@@ -504,7 +504,12 @@ function AnalyticsBody() {
                   <span className={styles.rangeLabel}>{range === 90 ? "Last 12 weeks" : "Last 4 weeks"}</span>
                 </div>
                 {model.weeklySeries.every((s) => s.count === 0) ? (
-                  <EmptyState dashed title="Nothing published yet" description="Publish a post to start filling this chart." />
+                  <EmptyState
+                    dashed
+                    title="Nothing published yet"
+                    description="This chart counts posts that actually went out. Schedule one and it will appear here after it publishes."
+                    actions={<Button size="sm" onClick={() => navigate("/app/calendar")}>Schedule a post</Button>}
+                  />
                 ) : (
                   <WeeklyChart series={model.weeklySeries} />
                 )}
@@ -516,7 +521,12 @@ function AnalyticsBody() {
                     <span className={styles.sectionLabel}>By platform</span>
                   </div>
                   {model.platformRows.length === 0 ? (
-                    <EmptyState dashed title="No platform activity yet" description="Create or schedule content for a platform to start filling this in." />
+                    <EmptyState
+                      dashed
+                      title="No platform activity yet"
+                      description="Nothing has been created or scheduled for a platform yet, so there is nothing to break down."
+                      actions={<Button size="sm" onClick={() => navigate("/app/generate")}><Sparkles size={14} aria-hidden="true" /> Create content</Button>}
+                    />
                   ) : (
                     <div className={styles.platformTable}>
                       <div className={[styles.platformRow, styles.platformHeadRow].join(" ")}>
@@ -536,7 +546,11 @@ function AnalyticsBody() {
                     <span className={styles.sectionLabel}>Failed posts in this period</span>
                   </div>
                   {model.failedPosts.length === 0 ? (
-                    <EmptyState dashed title="No failures" description="Nothing failed to publish in this period." />
+                    <EmptyState
+                      title="No failures"
+                      description="Nothing failed to publish in this period."
+                      noAction="this empty state is the good outcome — there is nothing for the user to fix"
+                    />
                   ) : (
                     <div className={styles.failedList}>
                       {model.failedPosts.slice(0, 8).map((post) => (

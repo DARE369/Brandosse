@@ -44,7 +44,10 @@ export function NotificationBell({ userId, onNavigate }) {
       </div>
       <div className={styles.list}>
         {notifications.length === 0 ? (
-          <div className={styles.empty}>No notifications yet.</div>
+          <div className={styles.empty}>
+              Nothing yet. This is where we&apos;ll tell you when a post publishes,
+              a video finishes rendering, or something fails.
+            </div>
         ) : (
           notifications.map((n) => (
             <button

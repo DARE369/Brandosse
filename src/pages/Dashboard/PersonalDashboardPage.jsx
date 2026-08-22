@@ -385,7 +385,9 @@ function DashboardBody() {
                     <EmptyState
                       title={hasSearch ? `No generations match "${searchQuery}"` : "No generations yet"}
                       description={hasSearch ? "Try a different keyword, or clear the search." : "Generate your first post to start building your library."}
-                      actions={!hasSearch && <Button size="sm" onClick={() => navigate("/app/generate")}>Generate now</Button>}
+                      actions={hasSearch
+                        ? <Button size="sm" variant="subtle" onClick={() => setSearchQuery("")}>Clear search</Button>
+                        : <Button size="sm" onClick={() => navigate("/app/generate")}>Generate now</Button>}
                     />
                   </div>
                 ) : (
@@ -462,7 +464,12 @@ function DashboardBody() {
                 {loading ? (
                   <Skeleton height="120px" />
                 ) : connectedAccounts.length === 0 ? (
-                  <EmptyState title="No accounts connected" description="Connect a social account to start publishing." dashed />
+                  <EmptyState
+                    dashed
+                    title="No accounts connected"
+                    description="You can generate and schedule without one, but nothing can actually publish until an account is connected."
+                    actions={<Button size="sm" onClick={() => navigate("/app/settings/connect")}>Connect an account</Button>}
+                  />
                 ) : (
                   <div>
                     {connectedAccounts.map((a) => (

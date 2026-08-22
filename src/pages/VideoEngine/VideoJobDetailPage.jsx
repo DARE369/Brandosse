@@ -6,7 +6,7 @@ import JobDetailView from "../../components/video-engine/JobDetailView";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useAuth } from "../../Context/AuthContext";
 import { fetchJobDetail } from "../../services/videoEngineData";
-import { AppShell } from "../../ui-v2";
+import { AppShell, EmptyState, Button } from "../../ui-v2";
 
 export default function VideoJobDetailPage({ jobId = null }) {
   const { navigate, pathname } = useAppNavigation();
@@ -38,12 +38,11 @@ export default function VideoJobDetailPage({ jobId = null }) {
           </div>
         ) : error ? (
           <section className="ve-page">
-            <div className="ve-empty-state ve-empty-large">
-              <strong>{error}</strong>
-              <button className="ve-primary-btn" type="button" onClick={() => navigate("/app/video/jobs")}>
-                Back to My videos
-              </button>
-            </div>
+            <EmptyState
+              title="Couldn't open this video"
+              description={`${error} It may have been deleted, or belong to another account.`}
+              actions={<Button onClick={() => navigate("/app/video/jobs")}>Back to My videos</Button>}
+            />
           </section>
         ) : detail ? (
           <JobDetailView

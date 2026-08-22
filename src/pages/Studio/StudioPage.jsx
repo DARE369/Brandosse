@@ -1800,7 +1800,22 @@ function StudioBody({ brandKit }) {
               )}
 
               {completedGenerations.length === 0 && studioStage !== "generating" && (
-                <EmptyState title="Nothing generated yet" description="Describe what you want on the left, then hit Generate." dashed />
+                // The prompt box sits beside this on desktop, but stacks above
+                // it (and often off-screen) on mobile — so this needs a real
+                // control, not just a sentence pointing at one.
+                <EmptyState
+                  dashed
+                  title="Nothing generated yet"
+                  description="Describe the post you want — the image and the caption are made together."
+                  actions={(
+                    <Button size="sm" onClick={() => {
+                      promptRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      promptRef.current?.focus();
+                    }}>
+                      Write a prompt
+                    </Button>
+                  )}
+                />
               )}
 
               {/* Post production — inline, directly under the results grid, the
@@ -1980,7 +1995,12 @@ function StudioBody({ brandKit }) {
             ))}
           </div>
         ) : (
-          <EmptyState title="No video jobs" description="Video runs will show up here while processing." />
+          <EmptyState
+            dashed
+            title="No video jobs"
+            description="Video renders take a few minutes, so they run in the background and report back here."
+            actions={<Button size="sm" onClick={() => navigate("/app/video/new")}>Start a video</Button>}
+          />
         )}
       </Drawer>
 
@@ -2249,7 +2269,16 @@ function StudioBody({ brandKit }) {
             {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} height="96px" radius="8px" />)}
           </div>
         ) : sourcePickerItems.length === 0 ? (
-          <EmptyState title="No images yet" description="Generate an image first, then you can edit or animate it." />
+          <EmptyState
+            dashed
+            title="No images yet"
+            description="Editing and animating both start from an image you already made, and you haven't generated one yet."
+            actions={(
+              <Button size="sm" onClick={() => { setSourcePickerOpen(false); promptRef.current?.focus(); }}>
+                Write a prompt instead
+              </Button>
+            )}
+          />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8, maxHeight: "56vh", overflowY: "auto" }}>
             {sourcePickerItems.map((item) => (
