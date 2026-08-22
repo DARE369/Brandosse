@@ -56,12 +56,15 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
     "@playwright/test": "^1.60.0",
     "@types/node": "^25.6.2",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",
+    "sass": "^1.93.3",
     "sass-embedded": "^1.93.3",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3"
