@@ -52,7 +52,7 @@ The standards every later wave is judged against. Done first so the rules exist 
 | **L-1.3** | [`engineering/03-documentation.md`](../engineering/03-documentation.md) — what to write, what to **delete** | ✅ |
 | **L-1.4** | [`engineering/04-production-readiness.md`](../engineering/04-production-readiness.md) — Definition of Done, Regression Register, release gate | ✅ |
 | **L-1.5** | `CLAUDE.md` updated so the standards load into **every session** | ✅ |
-| **L-1.6** | `docs/` triage — keep-and-verify / rewrite / delete | ⬜ **STILL OPEN.** Counted 2026-08-22: **264 markdown files under `docs/`** (94 top-level, 170 tracked) against the 107 the charter recorded. It grew. `check-docs-canonical.cjs` only asserts 9 canonical files exist — it does not test any doc against the code, so nothing here is verified |
+| **L-1.6** ✅ | `docs/` triage — keep-and-verify / rewrite / delete | **Done 2026-08-22.** 2 deleted, both canonical docs repaired, 309 citations repointed, 47 flagged with what is known wrong, and 2 docs that instructed turning mock flags ON (the L1.4 defect) defused. Guarded by `check-doc-citations.cjs` — 702 citations across 214 current-state docs all resolve, and CI fails if one stops resolving |
 
 **Three design choices worth noting**, because they invert the usual advice:
 
