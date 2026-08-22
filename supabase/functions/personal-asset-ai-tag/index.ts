@@ -46,7 +46,10 @@ function extractJsonBlock(text: string): Record<string, unknown> | null {
 }
 
 async function fetchAsBase64(url: string): Promise<{ base64: string; mediaType: string }> {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    // LOCK L5.9 — download asset for tagging; bounded so a hung transfer fails cleanly.
+    signal: AbortSignal.timeout(60_000),
+  });
   if (!response.ok) {
     throw new Error(`Could not fetch asset file for tagging (${response.status})`);
   }
@@ -95,6 +98,8 @@ async function callClaudeVision(imageUrl: string): Promise<{ ai_tags: string[]; 
         },
       ],
     }),
+    // LOCK L5.9 — asset tagging; bounded so a hung provider fails cleanly.
+    signal: AbortSignal.timeout(45_000),
   });
 
   if (!response.ok) {

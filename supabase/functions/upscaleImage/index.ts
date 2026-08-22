@@ -85,7 +85,10 @@ serve(async (req) => {
     if (!providerUrl) throw new Error("Upscaler returned no image URL");
 
     // Upload.
-    const imgRes = await fetch(providerUrl);
+    const imgRes = await fetch(providerUrl, {
+      // LOCK L5.9 — download upscaled image; bounded so a hung transfer fails cleanly.
+      signal: AbortSignal.timeout(120_000),
+    });
     if (!imgRes.ok) throw new Error("Failed to fetch upscaled image");
     const imgBytes = new Uint8Array(await imgRes.arrayBuffer());
     const fileName = `${user.id}/${Date.now()}_upscaled.jpeg`;

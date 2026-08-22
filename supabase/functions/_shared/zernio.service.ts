@@ -29,6 +29,29 @@ import {
 
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 
+/**
+ * LOCK L5.9 — timeouts on every Zernio call.
+ *
+ * These four calls previously had NONE. Zernio is the only real publishing
+ * provider, and publish-post sets posts.status = 'publishing' BEFORE calling
+ * it (publish-post/index.ts:126-129). With no timeout, a hung Zernio request
+ * strands the post in that state permanently — and until LOCK L2.3 there was
+ * no reaper either. That combination produced 20 posts frozen for up to 139
+ * days.
+ *
+ * SIZING RULE: every value here must stay well under the reaper's 15-minute
+ * threshold, so a hung provider call fails cleanly and becomes a retryable
+ * `failed` post rather than being reaped as a mystery timeout.
+ *
+ * PUBLISH is the longest because Zernio fetches the media from our storage URL
+ * before posting; the others are small JSON round trips.
+ */
+const ZERNIO_TIMEOUT_MS = {
+  publish: 90_000,   // media fetch + platform post
+  read:    20_000,   // list accounts, fetch profile
+  connect: 20_000,   // OAuth URL generation
+} as const;
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 // (formerly imported from publisher.service.ts, the direct-per-platform-OAuth
 // path — removed; Zernio is the only real-publish provider now)
@@ -103,6 +126,7 @@ export async function ensureZernioProfile(
     method: "POST",
     headers: zernioHeaders(apiKey),
     body: JSON.stringify({ name: `brandosse-user-${userId}` }),
+    signal: AbortSignal.timeout(ZERNIO_TIMEOUT_MS.read),
   });
   await checkZernioError(res, "create profile");
   const data = await res.json();
@@ -128,7 +152,10 @@ export async function getZernioConnectUrl(
   const apiKey = getZernioKey();
   const url = `${ZERNIO_BASE}/connect/${encodeURIComponent(platform)}` +
     `?profileId=${encodeURIComponent(profileId)}&redirect_url=${encodeURIComponent(redirectUrl)}`;
-  const res = await fetch(url, { headers: zernioHeaders(apiKey) });
+  const res = await fetch(url, {
+    headers: zernioHeaders(apiKey),
+    signal: AbortSignal.timeout(ZERNIO_TIMEOUT_MS.connect),
+  });
   await checkZernioError(res, "connect");
   const data = await res.json();
   if (!data?.authUrl) throw new Error("Zernio did not return an authUrl");
@@ -139,6 +166,7 @@ export async function listZernioAccounts(profileId: string): Promise<ZernioAccou
   const apiKey = getZernioKey();
   const res = await fetch(`${ZERNIO_BASE}/accounts?profileId=${encodeURIComponent(profileId)}`, {
     headers: zernioHeaders(apiKey),
+    signal: AbortSignal.timeout(ZERNIO_TIMEOUT_MS.read),
   });
   await checkZernioError(res, "list accounts");
   const data = await res.json();
@@ -280,6 +308,7 @@ export async function publishToZernio(input: PublishInput): Promise<PublishResul
       method: "POST",
       headers: zernioHeaders(apiKey),
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(ZERNIO_TIMEOUT_MS.publish),
     });
 
     if (!res.ok) {
@@ -307,11 +336,24 @@ export async function publishToZernio(input: PublishInput): Promise<PublishResul
       note: publishNote,
     };
   } catch (err) {
+    // A thrown error here is a transport failure (timeout, DNS, connection
+    // reset) rather than a platform rejection, so it is always retriable —
+    // publish-post applies MAX_RETRIES=3 with backoff.
+    //
+    // LOCK L5.9 + L2.7: AbortSignal.timeout throws a TimeoutError whose raw
+    // message ("The signal has been aborted") is meaningless to a user, and
+    // this string lands in posts.error_message where they will read it. Say
+    // what actually happened instead.
+    const isTimeout = err instanceof Error
+      && (err.name === "TimeoutError" || err.name === "AbortError");
+
     return {
       success: false,
       platformPostId: null,
       platformPostUrl: null,
-      failureReason: err instanceof Error ? err.message : "Unknown Zernio error",
+      failureReason: isTimeout
+        ? `Publishing timed out after ${ZERNIO_TIMEOUT_MS.publish / 1000}s — the platform did not respond. This will be retried automatically.`
+        : (err instanceof Error ? err.message : "Unknown Zernio error"),
       retriable: true,
     };
   }

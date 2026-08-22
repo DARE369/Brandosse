@@ -74,6 +74,8 @@ export async function sendTransactionalEmail({
         html,
         text,
       }),
+      // LOCK L5.9 — transactional email; bounded so a hung provider fails cleanly.
+      signal: AbortSignal.timeout(20_000),
     });
 
     if (!response.ok) {

@@ -35,7 +35,10 @@ type QualityResult = {
 };
 
 async function fetchAsBase64(url: string): Promise<{ base64: string; mediaType: string }> {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    // LOCK L5.9 — download image for quality gate; bounded so a hung transfer fails cleanly.
+    signal: AbortSignal.timeout(60_000),
+  });
   if (!response.ok) throw new Error(`Could not fetch generated image (${response.status})`);
   const mediaType = response.headers.get("content-type") || "image/jpeg";
   const bytes = new Uint8Array(await response.arrayBuffer());
