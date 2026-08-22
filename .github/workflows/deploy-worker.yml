@@ -1,0 +1,115 @@
+name: Deploy worker
+
+# LOCK L7.1 — the video worker deploys from CI, not from a laptop.
+#
+# The first deploy attempt failed three times from a developer machine: the
+# router's DNS could not resolve Fly's build service, flyctl fell back to a
+# local Docker daemon that was not running, and a 602MB build context was being
+# uploaded over residential Wi-Fi. None of that is a property of the worker —
+# it is a property of deploying from wherever somebody happens to be sitting.
+#
+# Deploying from here fixes all three at once, and buys the things that matter
+# more than convenience:
+#
+#   attributable  every deploy is a commit and an actor, not shell history
+#   revocable     the credential lives in repo secrets, never on a disk
+#   repeatable    the same steps run for whoever merges, from any machine
+#
+# ── Least privilege ─────────────────────────────────────────────────────────
+# FLY_API_TOKEN here must be an APP-SCOPED deploy token:
+#
+#     flyctl tokens create deploy --app brandosse-video-worker
+#
+# NOT an org token. An org token can create and destroy every app in the
+# account, read all their secrets, and spend money. If this repository were ever
+# compromised, the blast radius should be "someone redeployed the worker", not
+# "someone ran crypto miners on the founder's card".
+
+on:
+  push:
+    branches: [main]
+    # Only when the worker itself changes. A docs commit should not redeploy a
+    # running service.
+    paths:
+      - 'video-worker/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why are you deploying by hand?'
+        required: false
+        default: 'manual deploy'
+
+# Two deploys racing produces a machine running neither commit cleanly.
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Fly.io
+    runs-on: ubuntu-latest
+    # Pull requests never deploy — including from forks, which is how a CI
+    # secret usually escapes.
+    if: github.event_name != 'pull_request'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to deploy without a token
+        run: |
+          if [ -z "${{ secrets.FLY_API_TOKEN }}" ]; then
+            echo "::error::FLY_API_TOKEN is not set (Settings → Secrets and variables → Actions)."
+            echo "::error::Create an APP-SCOPED token: flyctl tokens create deploy --app brandosse-video-worker"
+            exit 1
+          fi
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # The config is the source of truth for sizing, region and the volume
+      # mount. A deploy that silently ignored it would be worse than a failure.
+      - name: Validate fly.toml
+        run: flyctl config validate --config video-worker/fly.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Deploy
+        working-directory: video-worker
+        run: flyctl deploy --remote-only --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # config.validate_runtime_credentials() (L1.4) makes the worker refuse to
+      # boot on a missing required key rather than accepting jobs and failing
+      # them later, so a machine that is up has already proven its configuration.
+      # This confirms it actually answers.
+      - name: Verify the worker answers
+        run: |
+          URL="${{ secrets.WORKER_HEALTH_URL }}"
+          if [ -z "$URL" ]; then
+            URL="https://brandosse-video-worker.fly.dev"
+            echo "WORKER_HEALTH_URL not set — falling back to $URL"
+          fi
+          echo "waiting for $URL/health"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /tmp/health.json -w "%{http_code}" --max-time 15 "$URL/health" || echo 000)
+            if [ "$STATUS" = "200" ]; then
+              echo "healthy after ${i} attempt(s)"
+              cat /tmp/health.json
+              exit 0
+            fi
+            echo "  attempt $i: $STATUS"
+            sleep 10
+          done
+          echo "::error::Worker did not return 200 from /health within 5 minutes."
+          echo "::error::Check: flyctl logs --app brandosse-video-worker"
+          exit 1
+
+      - name: Report
+        if: always()
+        run: |
+          echo "### Worker deploy" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- actor: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- result: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
