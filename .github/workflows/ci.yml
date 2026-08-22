@@ -1,37 +1,104 @@
 name: CI
 
+# LOCK L0.1 / L0.5 / L0.7 — this workflow previously ran a BUILD ONLY.
+#
+# The repo had eight purpose-written guard scripts and one Playwright spec, and
+# none of them executed anywhere. Four of the eight had been failing for months
+# (pointing at files deleted during the ui-v2 migration) and nobody knew,
+# because a check that never runs cannot fail loudly. The launch audit called
+# this verification theatre; this workflow is the fix.
+#
+# Job split is deliberate:
+#   - `guards` and `build` are hermetic (no live database) so every PR gets
+#     fast, safe feedback.
+#   - `live-invariants` touches the production database and therefore runs on a
+#     schedule and on demand, NOT on every PR. Its probes are read-only on PRs
+#     by construction (--read-only); the scheduled run does the full check
+#     including the write probes that self-revert.
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # 06:00 UTC daily — catches drift that no code change would reveal, which is
+    # how the RLS gap, the frozen posts, and the fabricated-data job all
+    # persisted unnoticed for months.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build check
+  # ── Hermetic checks — no secrets, no network, every PR ─────────────────────
+  guards:
+    name: Guard scripts
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          # secret-scan uses `git ls-files`; a shallow clone is fine, but the
+          # full working tree must be present.
+          fetch-depth: 1
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
+      # LOCK L0.5 — no live credential may enter a tracked file. The live
+      # webhook secret sat in a docs/ markdown file from the first commit.
+      - name: Secret scan
+        run: node scripts/security/secret-scan.mjs
+
+      # LOCK L1.6 — signed OAuth state. Asserts a forged state naming another
+      # user is rejected. Hermetic: no network.
+      - name: OAuth state guard
+        run: node scripts/security/oauth-state.test.mjs
+        env:
+          # Any 32+ char value works; this test only needs a signing key and
+          # deliberately never touches the real one. The value is worded to read
+          # as an obvious placeholder so the secret scanner above does not flag
+          # this very file — which it did, correctly, on the first attempt.
+          OAUTH_STATE_SECRET: ci-placeholder-oauth-signing-key-for-tests-only
+
+      # LOCK L0.7 — the eight guard scripts that existed and never ran.
+      - name: check-env-security
+        run: node scripts/check-env-security.cjs
+      - name: check-status-literals
+        run: node scripts/check-status-literals.cjs
+      - name: check-edge-functions
+        run: node scripts/check-edge-functions.cjs
+      - name: check-production-workflow
+        run: node scripts/check-production-workflow.cjs
+      - name: check-docs-canonical
+        run: node scripts/check-docs-canonical.cjs
+      - name: check-ui-consistency
+        run: node scripts/check-ui-consistency.cjs
+      - name: check-e2e-env
+        run: node scripts/check-e2e-env.cjs
+      - name: check-production-ready
+        run: node scripts/check-production-ready.cjs
+
+  # ── Build ─────────────────────────────────────────────────────────────────
+  build:
+    name: Build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
       - name: Build
         run: npm run build:webpack
         env:
-          # Public vars — safe to store as GitHub secrets (Settings → Secrets → Actions)
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
-          # Server-only — placeholders are fine here; real values live in Vercel
+          # Server-only — placeholders are fine here; real values live in Vercel.
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
           GROQ_API_KEY: ci-placeholder
           ANTHROPIC_API_KEY: ci-placeholder
@@ -40,3 +107,46 @@ jobs:
           CRON_SECRET: ci-placeholder
           VIDEO_WORKER_WEBHOOK_SECRET: ci-placeholder
           WORKER_WEBHOOK_URL: http://localhost:8001
+
+  # ── Live invariants — touches production, so NOT on every PR ───────────────
+  live-invariants:
+    name: Live invariants
+    # Scheduled and manual only. Running write probes against production on
+    # every PR would be reckless; running them never is how the cross-tenant
+    # leak survived. Daily is the compromise.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      # The probes read .env.local, so materialise one from CI secrets. It is
+      # gitignored and lives only for the life of the runner.
+      - name: Materialise probe environment
+        run: |
+          cat > .env.local <<'ENVEOF'
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_USER_EMAIL=${{ secrets.E2E_USER_EMAIL }}
+          E2E_USER_PASSWORD=${{ secrets.E2E_USER_PASSWORD }}
+          ENVEOF
+
+      # LOCK L1.1 / L1.5 — the highest-value check in the repository. Logs in as
+      # an ordinary non-admin user with the PUBLIC anon key and asserts it can
+      # read nothing it does not own, and cannot promote itself.
+      - name: Cross-tenant isolation
+        run: node scripts/security/cross-tenant-probe.mjs
+
+      # LOCK L2.3 — no record may sit in a non-terminal state past its timeout.
+      # 20 posts were frozen for up to 139 days before the reaper existed.
+      - name: Stuck records
+        run: node scripts/security/stuck-records-probe.mjs
+
+      - name: Remove probe environment
+        if: always()
+        run: rm -f .env.local
