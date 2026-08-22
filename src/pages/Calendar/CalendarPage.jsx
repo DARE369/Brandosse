@@ -557,6 +557,90 @@ function CalendarBody({ brandKit }) {
     }
   }, [cellPalette]);
 
+  // ── LOCK L5.5 — bulk operations ───────────────────────────────────────────
+  //
+  // Every calendar action worked on exactly one post. Bulk reschedule and bulk
+  // delete are what a Power Migrant coming from Publer or Buffer reaches for
+  // first (audit P2-005/006).
+  //
+  // Both operate on GROUPS, not posts: one piece of content fanned out to three
+  // platforms is three rows in `posts` but one thing the user thinks about.
+  // Acting per-post would half-move a cross-posted item.
+  const handleBulkReschedule = useCallback(async (selectedGroups, days) => {
+    const posts = selectedGroups.flatMap((g) => g.posts || []);
+    const movable = posts.filter((p) => p.scheduled_at && !isLockedForReschedule(p.status));
+    const skipped = posts.length - movable.length;
+
+    if (movable.length === 0) {
+      toast.error('None of the selected posts can be moved — published posts stay put.');
+      return;
+    }
+
+    const toastId = toast.loading(`Moving ${movable.length} post${movable.length === 1 ? '' : 's'}…`);
+    let moved = 0;
+    const failures = [];
+
+    for (const post of movable) {
+      try {
+        const next = new Date(new Date(post.scheduled_at).getTime() + days * 86_400_000);
+        await updatePost(scope, post.id, { scheduled_at: next.toISOString() }, post.status);
+        moved += 1;
+      } catch (err) {
+        failures.push(err?.message || 'unknown error');
+      }
+    }
+
+    refetch();
+    refetchDrafts();
+    toast.dismiss(toastId);
+
+    // Report the real outcome, including what was skipped and why. A blanket
+    // "done" that hides partial failure is the defect L2.4 removed.
+    if (moved === 0) {
+      toast.error(`Could not move any posts. ${failures[0] ?? ''}`.trim());
+    } else {
+      const parts = [`Moved ${moved} post${moved === 1 ? '' : 's'} by ${days} day${days === 1 ? '' : 's'}`];
+      if (failures.length) parts.push(`${failures.length} failed`);
+      if (skipped) parts.push(`${skipped} skipped (already published)`);
+      toast.success(parts.join(' · '));
+    }
+  }, [scope, refetch, refetchDrafts]);
+
+  const handleBulkDelete = useCallback(async (selectedGroups) => {
+    const posts = selectedGroups.flatMap((g) => g.posts || []);
+    if (posts.length === 0) return;
+
+    // Bulk delete is irreversible and easy to trigger by accident, so it is the
+    // one bulk action that confirms first.
+    const label = `${posts.length} post${posts.length === 1 ? '' : 's'}`;
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+
+    const toastId = toast.loading(`Deleting ${label}…`);
+    let deleted = 0;
+    const failures = [];
+
+    for (const post of posts) {
+      try {
+        await deletePost(scope, post.id);
+        deleted += 1;
+      } catch (err) {
+        failures.push(err?.message || 'unknown error');
+      }
+    }
+
+    refetch();
+    refetchDrafts();
+    toast.dismiss(toastId);
+
+    if (deleted === 0) {
+      toast.error(`Could not delete. ${failures[0] ?? ''}`.trim());
+    } else if (failures.length) {
+      toast.success(`Deleted ${deleted} of ${posts.length} — ${failures.length} failed.`);
+    } else {
+      toast.success(`Deleted ${deleted} post${deleted === 1 ? '' : 's'}.`);
+    }
+  }, [scope, refetch, refetchDrafts]);
+
   const handleCommandApply = useCallback(async (action, result) => {
     if (!action) { setCmdBarOpen(false); return; }
 
@@ -833,6 +917,8 @@ function CalendarBody({ brandKit }) {
                   <CalendarListView
                     groups={allGroups}
                     isLoading={isLoading}
+                    onBulkReschedule={handleBulkReschedule}
+                    onBulkDelete={handleBulkDelete}
                     timezone={timezone}
                     todayKey={todayKey}
                     tomorrowKey={tomorrowKey}
