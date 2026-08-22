@@ -1,0 +1,332 @@
+- finding_id: P10s-001
+  pillar: P10s
+  capability: "RLS isolation on public.posts (personal workspace)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "LIVE PROBE 2026-08-20: authenticated as E2E QA user (id 29944d39-4a29-4f6c-a1cf-9685b2b422bd, role='parent', organization_id=null) via POST {SUPABASE_URL}/auth/v1/token?grant_type=password with the anon key, then GET {SUPABASE_URL}/rest/v1/posts?select=id,user_id,caption,status,created_at&limit=20 using that user's own JWT (not service role) returned 20 rows, 7 of which have user_id != the caller's own id (8baf52b4-8445-4e59-a26f-02ea434f481a, 00868f5d-82d8-4df8-b05b-4f8c02be298f, c59668c3-0f96-4b83-8449-23c710bc24e6, 5a7f3dbd-5496-4bfa-97ed-40df115b1483, d6fda41b-5163-460c-93f4-95301a3ffaa0), including full caption text of other users' private drafts."
+    - "Content-Range header on GET {SUPABASE_URL}/rest/v1/posts?select=id&limit=1 with Prefer: count=exact returned 0-0/188 — the QA user's JWT can list/count all 188 posts across the whole table, not just their own."
+    - "Leaked rows include organization_id: null for most of the other users (e.g. 00868f5d.../c59668c3...), i.e. these are PERSONAL (non-org) drafts, not org-shared content — so this is not explained by the org_workspace_member_read_posts SELECT policy (supabase/migrations/20260324160000_org_rls_policies.sql:448-451), which requires public.org_current_user_has_brand_access(organization_id, brand_project_id) and that function's USING(om.organization_id = p_organization_id) can never be true for a null organization_id."
+    - "The base ownership policy reproduced at supabase/migrations/20260710090000_baseline_core_tables.sql:253-256 is: CREATE POLICY \"Users or scoped admins manage own posts\" ON public.posts FOR ALL USING (auth.uid() = user_id OR public.can_admin_access_user(auth.uid(), user_id)) — and can_admin_access_user (supabase/migrations/20260312153000_admin_foundation.sql:376-393) returns false for anyone who is not is_super_admin_user() or an org_admin whose org matches the target's profile.organization_id. The QA user's own profile row (GET /rest/v1/profiles?id=eq.29944d39...) shows role='parent', organization_id=null — not admin, not org-linked — so per the migration-file text this account should be denied on every leaked row."
+    - "Conclusion: the LIVE policy actually enforced on public.posts diverges from the migration file's reproduction (consistent with the brief's 'the migrations lie' warning — migrations are a reproduction of history, not a source of live truth), OR a broader permissive policy exists live that grants SELECT to any authenticated user regardless of ownership/org. Root cause not fully isolated (live pg_policies is not introspectable via the anon/PostgREST surface used here — would need service-role access to pg_catalog or the Supabase dashboard/SQL editor to enumerate the actual live policy list on public.posts)."
+  observed_behavior: "Any authenticated (non-admin, non-org, plain 'parent'-role) user can read every other user's personal posts table rows — including full AI-generated captions/prompts, status, and timestamps — via a direct PostgREST GET request with their own anon-issued JWT. No admin/org relationship exists between the probing account and the exposed accounts."
+  expected_behavior: "A user should only ever be able to SELECT rows where auth.uid() = user_id, or rows in an organization they are an active member of with brand access. Cross-tenant/cross-user reads must be impossible from the client using only a normal user JWT."
+  persona_impact:
+    power_migrant: "A power user managing multiple brands would immediately notice competitors' unpublished captions and content strategy are readable by any signed-up account — a trust-destroying, possibly legally actionable data breach they would report or leave over immediately."
+    casual_operator: "A casual solo creator has no way to detect this at all — their private draft captions (some containing business/personal identifying details, e.g. a school's back-to-school flyer copy) are silently readable by strangers; they'd never know to check."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P3", "P5", "P6", "P7", "P8"]
+  effort: M
+  effort_reasoning: "Requires enumerating the ACTUAL live policy set on public.posts (via Supabase SQL editor / pg_policies, not migrations), identifying and dropping/fixing whichever permissive policy is over-broad, then re-running this exact behavioral probe (not a service-role read) to confirm closure. Likely a single wrong/leftover policy, but must be verified against live pg_policies, not inferred from migration files, since this app has a documented history of live schema (and evidently live RLS policy state) diverging from migrations."
+  confidence: HIGH
+  unverified_notes: "Root cause (which specific live policy grants the extra access) is unconfirmed — could not query pg_policies with the tools available (no service-role SQL execution RPC found; PostgREST does not expose policy definitions). Recommend immediate manual check in Supabase Studio: SELECT * FROM pg_policies WHERE tablename='posts'."
+  trace_id: "T-P10s-01"
+  source_agent: "A12"
+- finding_id: P10s-002
+  pillar: P10s
+  capability: "RLS isolation on public.generations (personal workspace, AI prompt history)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "LIVE PROBE 2026-08-20: same QA JWT as P10s-001. GET {SUPABASE_URL}/rest/v1/generations?select=id,user_id,organization_id,prompt&limit=200 returned 159 total rows (Content-Range: 0-99/159 then follow-up), of which 44 belong to a user_id other than the caller. 39 of those 44 have organization_id = null, i.e. personal (non-org) generation records belonging to at least 6 unrelated accounts (c59668c3-0f96-4b83-8449-23c710bc24e6, 575af8cd-bac3-4c30-bab9-b649ee45dde3, d6fda41b-5163-460c-93f4-95301a3ffaa0, 00868f5d-82d8-4df8-b05b-4f8c02be298f, and others) — including the full raw `prompt` text used for their AI image/video generations."
+    - "The QA user's only legitimate org relationship (confirmed via GET /rest/v1/organization_members?user_id=eq.<self>) is organization_id a6750f27-7eb3-4efa-bad8-461d68ac8934 as an active 'contributor', invited by user 8baf52b4-8445-4e59-a26f-02ea434f481a — that org membership legitimately explains exposure of 8baf52b4's org-scoped rows, but does NOT explain the 39 null-organization_id rows from unrelated users who share no org with the QA account."
+    - "Same class of bug as P10s-001 (public.posts) — the live RLS enforcement on public.generations does not actually restrict SELECT to auth.uid() = user_id for personal (non-org) rows, contradicting the ownership policy pattern documented in migrations (e.g. supabase/migrations/20260312153000_admin_foundation.sql:777 'USING (user_id = auth.uid() OR public.can_admin_access_user(auth.uid(), user_id))' for the generations-family policy template)."
+  observed_behavior: "Any authenticated user can read the full raw AI prompt text, generation status, and metadata of other users' personal (non-org) generation records via a direct PostgREST query with their own JWT."
+  expected_behavior: "generations rows should only be visible to auth.uid() = user_id, or org members with brand access for org-scoped rows."
+  persona_impact:
+    power_migrant: "A user relying on prompt engineering as a competitive edge would have their exact working prompts scraped by any competitor with a free account — a direct product-differentiation leak, not just a privacy issue."
+    casual_operator: "A casual user's private generation history (which may reveal personal details embedded in prompts) is exposed to strangers with zero indication this is happening."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P5"]
+  effort: M
+  effort_reasoning: "Same root-cause fix as P10s-001 likely resolves this — both tables show the identical bypass pattern (personal/null-org rows leaking to unrelated authenticated users), suggesting one shared broken policy or role grant rather than two independent bugs. Confirming requires live pg_policies inspection."
+  confidence: HIGH
+  unverified_notes: "Same unresolved root cause as P10s-001. Not yet checked: whether this is caused by a single project-wide misconfiguration (e.g. a `USING (true)` policy accidentally added to multiple tables, or the `anon`/`authenticated` Postgres role having been granted broader table privileges than RLS alone should allow)."
+  trace_id: "T-P10s-01"
+  source_agent: "A12"
+- finding_id: P10s-003
+  pillar: P10s
+  capability: "Forked tutoring-database RLS contamination risk"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "supabase/migrations/20260712140000_fix_sessions_broken_tutor_policies.sql:1-38 documents that public.sessions is shared with an unrelated tutoring-platform product live in the same Postgres schema, and that two tutor-facing policies ('Tutors can read assigned sessions', 'Tutors can update assigned sessions') called is_tutor_for_session(id) which queried a non-existent public.tutors table, causing EVERY SELECT on sessions (including this app's own legitimate queries) to hard-error, because Postgres RLS evaluates all permissive policies on a table and any one erroring aborts the whole query."
+    - "grep across supabase/migrations/*.sql for is_tutor_for_session confirms it appears ONLY inside that one fix migration (as documentation/rollback comments) — it is not referenced by any other tracked policy, so it does not gate any other content-app table per the migration record."
+    - "LIVE PROBE 2026-08-20: GET {SUPABASE_URL}/rest/v1/sessions?select=id,user_id&limit=200 with the QA user's JWT succeeded (68 rows, 0 belonging to other users) with no relation-does-not-exist error, confirming the fix migration is applied live and the query-abort bug is resolved for this app's own session reads."
+    - "supabase/migrations/20260710090000_baseline_core_tables.sql:349-363 ('MAJOR FLAG') documents that the live public.sessions table also carries tutoring-domain columns (parent_id, child_id, tutor_name, tutor_id, tutor_notes, ai_summary, parent_rating, recording_url, reminder timestamps) alongside this app's own columns, and that the live database separately contains children/tutors/diagnostic_requests/billing_records/progress_summaries tables — confirming the fork is real and current, not historical."
+    - "The QA test account's own public.profiles row (LIVE PROBE) has role='parent' — a tutoring-domain role value — on an account that only uses this content app. This shows profiles.role is not scoped to a fixed enum the content app owns; a tutoring-domain value reached a content-app account, meaning the two products' user/profile space is not cleanly separated at the schema level even for a real content-app user."
+    - "The baseline migration's own comment (20260710090000_baseline_core_tables.sql:349-354) states the 'Parents' policy on sessions is live but not migration-tracked (i.e., it was created directly against the live DB, outside any file in supabase/migrations/), so its exact predicate cannot be verified from source — only that it did not leak cross-user session rows in this probe."
+  observed_behavior: "The specific query-aborting bug (is_tutor_for_session referencing a missing table) has been fixed and content-app session reads work correctly and are properly isolated per-user in the live probe. However, the underlying architecture — one Postgres schema hosting two unrelated products' tables, RLS policies, and role vocabularies — remains in place and is a standing risk: any future migration, extension, or manually-applied policy for the tutoring product can silently break or weaken this app's isolation again, exactly as it already did once."
+  expected_behavior: "A production content-app database should not share tables, RLS policy namespaces, or role vocabularies with an unrelated product. Cross-product contamination should be impossible by construction (separate schema/project), not by careful policy hygiene that has already failed once."
+  persona_impact:
+    power_migrant: "Not directly visible to end users today, but represents systemic fragility a technical evaluator (e.g. an acquirer or security-conscious enterprise customer doing diligence) would flag immediately as disqualifying for a serious SaaS."
+    casual_operator: "No direct impact today since the immediate bug is fixed, but the casual user's data sits in a database architecture where a stray future policy change for an unrelated product can re-break isolation without warning."
+  severity: HIGH
+  blast_radius: ["P1", "P2", "P5", "P6", "P7", "P8"]
+  effort: XL
+  effort_reasoning: "True fix requires migrating this app to its own Supabase project/schema, separating it from the tutoring product entirely — a significant, high-risk data-migration project, not a policy tweak."
+  confidence: MEDIUM
+  unverified_notes: "Could not verify the live, untracked 'Parents' policy's exact predicate (no pg_policies access via available tools). Could not confirm whether any OTHER untracked, live-only policy from the tutoring product touches posts/generations/content_plans — this is raised as the leading hypothesis for the P10s-001/P10s-002 root cause (a shared-schema project makes it plausible that a template/quickstart policy such as `USING (true)` was applied broadly during early scaffolding and never audited away) but is NOT confirmed; flagging for whoever gets live SQL-editor access to run `SELECT * FROM pg_policies WHERE tablename IN ('posts','generations');`."
+  trace_id: "T-P10s-02"
+  source_agent: "A12"
+- finding_id: P10s-004
+  pillar: P10s
+  capability: "Edge function auth matrix (51 functions in supabase/functions/)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "grep for requireUser/requireServiceRole/requireActiveOrgMember/CRON_SECRET/VIDEO_WORKER_WEBHOOK_SECRET across all 51 supabase/functions/*/index.ts files. 44 of 51 call requireUser, requireServiceRole, and/or requireActiveOrgMember. 7 call NONE of those three shared guards: credit-monthly-reset, daily-analysis, healthCheck, job-webhook, org-complete-invitation-signup, pipeline-client-action."
+    - "supabase/functions/credit-monthly-reset/index.ts:19-25 — guards via manual string comparison `authHeader !== \`Bearer ${serviceKey}\`` against SUPABASE_SERVICE_ROLE_KEY itself (not a dedicated cron secret). Functionally closed (fails 401 without the service key) but (a) uses the raw service-role key as a bearer credential outside its normal SDK usage, widening its blast radius if ever logged/leaked in a request trace, and (b) uses non-constant-time `!==` comparison."
+    - "supabase/functions/daily-analysis/index.ts:24-36 — NO authorization check of any kind found in the full file (grep for Authorization/authHeader/CRON_SECRET/requireUser returns nothing). It creates an admin (service-role) Supabase client and iterates ALL active profiles, running write operations (ghost slot generation, optimal-time analysis) — this is invocable by anyone who can reach the function URL with zero credentials beyond the project's anon/publishable key already required by Supabase's default edge-function gateway. No app-level authorization exists inside the function itself."
+    - "supabase/functions/healthCheck/index.ts — expected to be intentionally open (standard health endpoint); confirmed low risk."
+    - "supabase/functions/job-webhook/index.ts:44-57 — authorizes via a per-job crypto.randomUUID() token embedded in the URL and stored on the job row, checked with `storedToken !== token` (non-constant-time, but a 122-bit random UUID makes timing-based recovery impractical). Function always returns HTTP 200 even on auth failure (intentional, documented, to avoid fal.ai webhook retry storms) — acceptable given the token is genuinely unguessable, but means failed-auth attempts are invisible to any external monitoring that only checks status codes (only a console.error, not surfaced)."
+    - "supabase/functions/org-complete-invitation-signup/index.ts and supabase/functions/pipeline-client-action/index.ts are correctly unauthenticated-by-design (invitation/client-review capability-URL tokens gate access, e.g. pipeline-client-action's client_review_token is checked, expiry-checked, and single-use via client_review_token_used_at) — appropriate pattern, not a gap."
+  observed_behavior: "daily-analysis is a service-role-privileged, DB-writing function reachable with no function-level authorization check beyond whatever the Supabase project gateway itself enforces (anon key / verify_jwt setting, which is a deploy-time config this audit could not directly inspect for this specific function)."
+  expected_behavior: "Any function that runs with service-role privileges and performs writes across all users' data (a cron-only job) should verify a dedicated secret (like credit-monthly-reset does) or Supabase's cron-invocation identity, independent of the project-wide gateway setting, so a misconfigured or future gateway change cannot expose it."
+  persona_impact:
+    power_migrant: "Not directly visible to an end user, but an attacker who discovers the function URL could trigger repeated full-table admin writes (analysis/ghost-slot generation for every user), a resource-exhaustion / cost-abuse vector against the whole user base at once, not just their own account."
+    casual_operator: "No direct visible impact, but their account's ghost-slot/optimal-time data could be silently mutated by unauthenticated repeated triggering."
+  severity: MEDIUM
+  blast_radius: ["P8"]
+  effort: XS
+  effort_reasoning: "Add the same manual service-role-bearer check credit-monthly-reset already uses (or a dedicated CRON_SECRET) to daily-analysis/index.ts — a copy-paste-sized fix."
+  confidence: MEDIUM
+  unverified_notes: "Did not verify each function's `verify_jwt` deploy-time setting (supabase/config.toml or dashboard per-function config) — if daily-analysis is deployed with verify_jwt=true (Supabase default), an attacker would still need a valid anon-signed JWT (i.e. any registered account, or even the public anon key depending on config) to invoke it, which lowers but does not eliminate the risk versus a dedicated function-level check. Recommend checking supabase/config.toml for a `[functions.daily-analysis]` verify_jwt override."
+  trace_id: "T-P10s-03"
+  source_agent: "A12"
+- finding_id: P10s-005
+  pillar: P10s
+  capability: "Secret hygiene — video worker webhook secret in git history"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "docs/VIDEO_LAB_COMPLETE_GUIDE.md:538 contains `WORKER_WEBHOOK_SECRET=d1ae45...` (redacted) committed in the repo's very first commit (650b946, 'chore: initial Brandosse codebase', 2026-06-30) and still present verbatim at current HEAD (git show HEAD:docs/VIDEO_LAB_COMPLETE_GUIDE.md:538)."
+    - "This exact value is confirmed LIVE: .env.local:34 has `VIDEO_WORKER_WEBHOOK_SECRET=d1ae45...` (redacted) — the identical secret, meaning it has never been rotated since being committed and is the real, currently-active shared secret between the Next.js server (src/lib/video-engine/worker-client.ts:6) and the Python worker (video-worker/config.py:29, verified via video-worker/main.py:81-85's verify_webhook_secret)."
+    - "The repo's GitHub remote (`origin https://github.com/DARE369/Brandosse.git`, confirmed via `git remote -v`) is a PUBLIC repository (verified via `curl https://api.github.com/repos/DARE369/Brandosse` → `\"private\": false`), and local git history (48 commits, not shallow, matches GitHub's 2 branches exactly) is the complete, non-rewritten history — so this secret has been publicly readable on the internet since 2026-06-30."
+    - "Contrasts with the memory note that only Groq/FAL/Pollination keys reached git history and service-role/Anthropic/Paystack stayed disk-only — a targeted re-verification (git log --all -p for API_KEY/_SECRET/_TOKEN assignment patterns with non-empty, non-placeholder values across the full history) found NO real Groq/FAL/Pollination/Anthropic/service-role/Paystack key values in git history (only .env.example placeholders like `GROQ_API_KEY=\"gsk_...\"`) — that prior belief about those specific providers could not be reproduced against the current repo state and should be treated as unconfirmed/possibly stale, while this WORKER_WEBHOOK_SECRET leak is newly confirmed and real."
+    - "Current exploitability is partially mitigated: the worker's configured URL in .env.local/.env.example is `http://localhost:8001` (not a public deployment), so the leaked secret cannot currently be used against a publicly reachable worker from this repo's tracked env files alone. However, video-worker/railway.toml exists, confirming a Railway (public cloud) deployment path is set up for this worker — if/when deployed with this same unrotated secret, the leaked value would grant any internet user the ability to hit /webhook/job-submitted, /webhook/cancel-job (which can fake-cancel jobs and trigger `credits_to_refund`), and the authenticated /status endpoint (video-worker/main.py:107-121, exposing active_job_ids)."
+  observed_behavior: "A real, currently-active shared secret is committed in a markdown doc in a public GitHub repository and has never been rotated."
+  expected_behavior: "No real secret value should ever be committed, even in documentation; docs should use a placeholder. Any secret that was ever committed to a public repo must be treated as compromised and rotated immediately, regardless of current deployment status."
+  persona_impact:
+    power_migrant: "Not directly visible to a product user, but represents the kind of infra-security lapse that would fail any serious due-diligence review (e.g. an enterprise customer's security questionnaire or an investor's technical audit)."
+    casual_operator: "No direct visible impact today given the worker isn't publicly deployed with this secret, but the moment it is (Railway config already exists for this purpose), any user's video job could be remotely cancelled/manipulated by a stranger who scraped this public repo."
+  severity: CRITICAL
+  blast_radius: ["P4"]
+  effort: XS
+  effort_reasoning: "Rotate VIDEO_WORKER_WEBHOOK_SECRET/WORKER_WEBHOOK_SECRET immediately in both the Next.js and Python worker environments, and scrub/redact the value from docs/VIDEO_LAB_COMPLETE_GUIDE.md:538 (note: git history will still contain the old value forever unless history is rewritten with BFG/filter-repo and force-pushed — rotation, not history-scrubbing, is the effective fix)."
+  confidence: HIGH
+  unverified_notes: "Did not check whether video-worker has actually been deployed to Railway with a public URL at any point in its history (only the railway.toml config file's presence was confirmed) — if it has been/is publicly deployed, exploitability is immediate rather than latent. Recommend the user confirm current Railway deployment status directly."
+  trace_id: "T-P10s-04"
+  source_agent: "A12"
+- finding_id: P10s-006
+  pillar: P10s
+  capability: "Admin-role resolution in supabase/functions/admin-list-posts (moderation queue)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/admin-list-posts/index.ts:167-205 (resolveAdminScope) is a locally hand-rolled admin check, NOT the shared, canonical helper used everywhere else. It computes `const resolvedRole = adminRoleResult.data?.role || profileResult.data?.role || null;` (line 184) — i.e. if the caller has no row in public.admin_roles, it falls back to the caller's OWN public.profiles.role column."
+    - "isSuperAdminRole (index.ts:158-161) matches on loose values: `normalized === 'super_admin' || normalized === 'superadmin' || normalized === 'admin'` — so a bare profiles.role of 'admin' is sufficient to be granted full super_admin scope in this function, with no admin_roles table entry required at all."
+    - "Contrast with the canonical/shared implementation: _shared/org.ts:224-230 `isSuperAdminUser` (used by admin-account-action, admin-seed-connected-account, publish-post, mock-publish, etc.) calls getAdminRole() which ONLY queries public.admin_roles and does an exact `=== 'super_admin'` match — no profiles.role fallback, no loose string matching. The DB-level equivalent, public.is_super_admin_user() (supabase/migrations/20260313090000_admin_rls_recursion_hotfix.sql:50-58), likewise only consults get_admin_role() against admin_roles. admin-list-posts is the only place in the 51 functions that reimplements this logic instead of importing the shared helper, and its reimplementation is materially weaker."
+    - "public.profiles is writable by its own owner with no column restriction: supabase/migrations/20260312153000_admin_foundation.sql:592-596 `CREATE POLICY \"Users update own profile\" ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id)` — this policy has no column-level grant restriction and no CHECK constraint on allowed values for the `role` column, so any authenticated user's own JWT is, per this policy text, sufficient to PATCH their own profiles row's `role` field to any string value including 'admin' via a direct PostgREST request (`PATCH {SUPABASE_URL}/rest/v1/profiles?id=eq.<self>` body `{\"role\":\"admin\"}`)."
+    - "Chain: if that PATCH succeeds (not executed — see unverified_notes, this audit is strictly read-only), the same user's next call to admin-list-posts would pass resolveAdminScope as isSuperAdmin=true (since admin_roles has no row for them, the code falls through to profiles.role='admin', which isSuperAdminRole() accepts), granting them a full read of every user's posts, assigned moderator, quality-review scores, and profile PII (email/full_name per the ProfileRow type at index.ts:27-35) platform-wide — independent of, and in addition to, the P10s-001 RLS bypass already confirmed on public.posts directly."
+  observed_behavior: "admin-list-posts trusts a self-editable profiles column as a fallback source of admin privilege, via logic duplicated locally instead of reusing the shared, correctly-scoped admin-check helper the rest of the codebase uses."
+  expected_behavior: "Admin/super-admin status must be resolved exclusively from a table the requesting user cannot write to (admin_roles), via one shared, audited helper function — never via a fallback to a user-owned, user-writable column, and never duplicated ad hoc per function."
+  persona_impact:
+    power_migrant: "Not directly visible, but if exploited it means any user could read every other user's/every org's moderation data and PII — a severe breach of the multi-tenant boundary the product's SaaS promise depends on."
+    casual_operator: "No direct visible impact to a casual user's own workflow, but their posts/PII would be exposed to this class of attack same as everyone else's."
+  severity: CRITICAL
+  blast_radius: ["P1", "P2", "P8"]
+  effort: S
+  effort_reasoning: "Delete admin-list-posts' local resolveAdminScope function and replace its call site with the shared _shared/org.ts isSuperAdminUser/requireOrgAdminOrSuperAdmin helpers (mirrors what every other admin function already does) — small, contained change. Separately, either add a DB trigger/CHECK constraint that blocks non-admins from writing to profiles.role, or add role to a column-level REVOKE so the self-update policy can no longer touch it."
+  confidence: MEDIUM
+  unverified_notes: "Could NOT verify the self-escalation write end-to-end because this audit is strictly read-only (no INSERT/UPDATE/DELETE permitted per the task brief) — the PATCH to profiles.role was deliberately not attempted. The finding rests on: (a) confirmed live-readable RLS policy text matching supabase/migrations/20260312153000_admin_foundation.sql:592-596 with no column restriction (this is the migration-file version; per the P10s-001 finding, live policies have been shown to diverge from migration files, so the live 'Users update own profile' policy should be independently confirmed, though divergence discovered so far has only made access MORE permissive, not less, which would not help here), and (b) static code reading of admin-list-posts/index.ts's resolveAdminScope logic, which is unambiguous regardless of live policy state. Recommend the app owner (not this audit) test the PATCH directly, or grant a follow-up audit explicit write permission to confirm."
+  trace_id: "T-P10s-05"
+  source_agent: "A12"
+- finding_id: P10s-007
+  pillar: P10s
+  capability: "OAuth/social-account linking CSRF + state validation (Zernio connect flow)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "OAUTH_STATE_SECRET is referenced ONLY in docs/BRANDOSSE_LAUNCH_PLAN.md, docs/SESSION_SUMMARY_REPORT.md, praise-presentation/01-technical-deep-dive.md, and .github/workflows/ci.yml — a repo-wide search (Grep) found ZERO references in any actual application code (app/**, src/**, supabase/functions/**). The env var the prior audit memory called 'required' is not consumed anywhere at runtime — there is no code path where its absence could either fail open or fail closed, because it is never read at all."
+    - "app/api/auth/zernio/connect/route.js:9-10 states explicitly in its own header comment: 'there's no signed state to build — Zernio owns the OAuth exchange itself, we only need to know which of our users initiated the connect (carried via redirect_url)'. This confirms no CSRF state token is generated for this flow, by design, not by omission-bug."
+    - "app/api/auth/zernio/connect/route.js:2 also references 'app/api/auth/oauth/route.js's request/auth pattern' as the thing this flow mirrors minus the state — but no such file exists anywhere under app/ (confirmed via find app -path '*oauth*' -type f and find app -path '*api/auth*' -type f, which list only the three zernio/* routes). The comment points at a file that is not in the current tree, so its 'mirrors X' justification cannot be verified and may be stale/aspirational."
+    - "app/api/auth/zernio/callback/route.js:120-131 resolves which Brandosse user a callback belongs to PURELY from the `profileId` URL query parameter — `SELECT id FROM profiles WHERE zernio_profile_id = <profileId query param>` — with NO check of the requester's own session/cookies/Authorization header at all (unlike connect/route.js, which does call getRequestUser()). The callback route has no equivalent auth check."
+    - "app/api/auth/zernio/callback/route.js:141-148 then does `upsertZernioAccount({ userId, platform, account: { _id: accountId, username } })` where `userId` came from that unauthenticated profileId lookup and `accountId`/`platform`/`username` come directly, unsigned and unvalidated, from the request's query string — the resulting row is inserted/updated in public.connected_accounts scoped to that resolved userId."
+    - "profileId is not a session-bound secret: it is generated server-side (connect/route.js:104-114, a Zernio-issued Mongo-style _id) but is then embedded in cleartext in a URL that (a) appears in the user's own browser address bar/history during a legitimate connect, (b) is sent to zernio.com as a query parameter (and from there, per standard browser Referer behavior, potentially to any third-party resource zernio.com's OAuth pages load), and (c) is echoed back by Zernio's own redirect. Nothing about it is single-use, time-limited, or bound to the browser session that initiated the flow."
+  observed_behavior: "The callback endpoint that creates/updates a user's connected_accounts row is reachable by anyone who can supply a valid platform+profileId(+accountId) query string, with no CSRF token, no session check, and no proof the caller is the browser that started the flow. Knowledge of a victim's zernio_profile_id value (leaked via Referer/history/logs, or simply observed once during any legitimate flow involving that user) is sufficient to directly link an attacker-controlled social account into the victim's Brandosse account via a single unauthenticated GET request — no victim browser interaction required at request time, since the endpoint doesn't rely on the victim's session at all."
+  expected_behavior: "OAuth-adjacent callback/linking endpoints must bind the callback to the specific session/user that initiated the flow via a signed, single-use, time-limited state token (checked against a server-side or signed-cookie value, not just round-tripped through the third party), independent of any downstream `profileId`-based lookup. A capability-URL fallback (if used at all) must be a genuinely unguessable, single-use token — not a reusable identifier that also travels through third-party redirect chains and Referer headers."
+  persona_impact:
+    power_migrant: "A power user managing multiple client accounts would be a high-value target — hijacking which social accounts their generated content publishes to is a direct path to reputational/financial harm for their business."
+    casual_operator: "A casual user has no way to know their 'connected' Instagram/TikTok account is actually attacker-controlled; content they believe is going to their own audience could silently be misrouted."
+  severity: HIGH
+  blast_radius: ["P4", "P6"]
+  effort: M
+  effort_reasoning: "Requires adding a real signed/session-bound state parameter to the Zernio connect→callback round trip (generate a signed state at connect time, store server-side or in an httpOnly cookie, verify it at callback time before trusting profileId) — a contained but non-trivial change to both routes, plus removing or updating the stale OAUTH_STATE_SECRET references so docs/CI match what's actually implemented."
+  confidence: HIGH
+  unverified_notes: "Did not test the live callback endpoint with a crafted request (would require writing a real connected_accounts row for a real account, which this read-only audit is not permitted to do). Did not confirm whether Zernio's own OAuth authorization page independently protects against CSRF on ITS side (i.e., whether Zernio requires the visiting browser to have an active Zernio-side session tied to the connect attempt) — if Zernio enforces that, it would reduce but not eliminate this app's own callback-side gap, since the vulnerability described here (unauthenticated callback trusting query-param profileId) does not depend on Zernio's behavior at all."
+  trace_id: "T-P10s-06"
+  source_agent: "A12"
+- finding_id: P10s-008
+  pillar: P10s
+  capability: "Stripe webhook idempotency (credit purchase double-crediting race)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "app/api/webhooks/stripe/route.ts:22-42 correctly verifies the Stripe signature via stripe.webhooks.constructEvent before trusting the payload, and fails closed (500) if STRIPE_WEBHOOK_SECRET is unset — this part of the flow is solid."
+    - "app/api/webhooks/stripe/route.ts:72-84: idempotency is implemented as a check-then-act pattern — SELECT credit_transactions WHERE stripe_payment_id = X (line 72-75), and only if no row is found does it proceed to update user_credits.balance (line 88-107) and then INSERT the credit_transactions row (line ~109+). This is NOT atomic: two webhook deliveries for the same event (Stripe explicitly documents webhooks can be delivered more than once, and retries on any non-2xx or timeout) arriving close enough together can both pass the SELECT-finds-nothing check before either has inserted its row, both then proceed to add credits."
+    - "supabase/migrations/20260710090000_baseline_core_tables.sql:519 defines `stripe_payment_id text` on credit_transactions with no UNIQUE constraint or unique index found anywhere in supabase/migrations/*.sql (grep for stripe_payment_id returns only this one column-definition line) — so there is no database-level backstop against the race even if the application-level check is beaten."
+  observed_behavior: "A duplicate/retried Stripe webhook delivery arriving within the window between the duplicate-check SELECT and the credit_transactions INSERT can cause a user's credit balance to be incremented twice for a single payment."
+  expected_behavior: "Payment-crediting idempotency should be enforced with a database-level UNIQUE constraint on stripe_payment_id (or the Stripe event id), so even a genuine race between concurrent webhook deliveries cannot double-credit — the application-level check-then-act pattern alone is insufficient."
+  persona_impact:
+    power_migrant: "Not something they'd notice directly, but a systemic double-crediting bug (even if rare) is a real, quantifiable revenue-leak the business absorbs silently."
+    casual_operator: "No visible negative impact to them (they'd just get bonus credits) — this is purely a business-cost/abuse-surface issue, not a user-facing harm."
+  severity: MEDIUM
+  blast_radius: ["P8"]
+  effort: XS
+  effort_reasoning: "Add a UNIQUE constraint/index on credit_transactions(stripe_payment_id) via a new migration, and catch the resulting unique-violation error in the webhook handler as the 'already processed' signal instead of relying solely on the pre-check SELECT."
+  confidence: MEDIUM
+  unverified_notes: "This is a race-condition finding based on static code + schema reading, not reproduced live (would require sending duplicate concurrent webhook payloads, which risks real credit mutation and was not attempted under this read-only audit's constraints). Likelihood of actual exploitation depends on Stripe's real-world redelivery timing, which was not measured."
+  trace_id: "T-P10s-07"
+  source_agent: "A12"
+
+# ── Added 2026-08-21 during Wave 1 remediation. Both WRITE-CONFIRMED live. ──
+
+- finding_id: P10s-009
+  pillar: P10
+  capability: "profiles self-update — privilege escalation (write-confirmed)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "live probe 2026-08-21: PATCH /rest/v1/profiles?id=eq.<self> {\"role\":\"admin\"} -> HTTP 204, role changed parent -> admin (reverted)"
+    - "supabase/migrations/20260312153000_admin_foundation.sql:310-317 (get_admin_role COALESCEs to profiles.role)"
+    - "supabase/migrations/20260312153000_admin_foundation.sql:350-357 (is_admin_user -> get_admin_role)"
+    - "supabase/migrations/20260710090000_baseline_core_tables.sql:253-257 (posts policy calls can_admin_access_user)"
+    - "scripts/security/cross-tenant-probe.mjs (now asserts this)"
+  observed_behavior: >
+    An ordinary authenticated user, with only the public anon key and their own
+    JWT, can set their own profiles.role to 'admin'. Because get_admin_role()
+    falls back to profiles.role, this resolves to 'super_admin', which makes
+    is_admin_user() and can_admin_access_user(anyone) return true — and both the
+    posts and generations RLS policies consult those. The result is full
+    cross-tenant read access.
+    This means the cross-tenant fix applied in 20260821090000 is reopenable by
+    any user in a single request. The two findings are not independent: this one
+    subsumes it.
+    The audit originally rated the related admin-list-posts issue (P10s-006) as
+    "plausible, not write-confirmed". It is now confirmed, and the root cause is
+    broader than that one edge function.
+  expected_behavior: >
+    A user-facing attribute must never be an authorization source, and a
+    privileged column must never be self-writable. profile_self_update_guard()
+    already exists and is correct; it simply is not enforced by the live policy.
+  persona_impact:
+    power_migrant: "Their unpublished content and prompts are readable by anyone who signs up and sends one request."
+    casual_operator: "Same exposure, with no ability to detect or prevent it."
+  severity: BLOCKER
+  blast_radius: ["P10", "P3", "P6", "P8"]
+  effort: S
+  effort_reasoning: "One migration. The guard function already exists; the work is enforcing it and removing the get_admin_role fallback. Attempted twice — see unverified_notes."
+  confidence: HIGH
+  unverified_notes: >
+    Migration 20260821120000 dropped only two named policies and did not take
+    effect, which strongly suggests an additional live-only permissive UPDATE
+    policy on profiles that the migration history does not describe — the same
+    defect class as the original posts leak. 20260821140000 supersedes it with
+    an allowlist sweep. NOT YET CONFIRMED FIXED.
+  trace_id: "T-P10s-09"
+  source_agent: "orchestrator"
+
+- finding_id: P10s-010
+  pillar: P10
+  capability: "profiles.credits self-writable — display integrity (CORRECTED)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "live probe 2026-08-21: PATCH /rest/v1/profiles {\"credits\":999999} -> 204, profiles.credits changed 100 -> 999999 (reverted)"
+    - "live probe 2026-08-21: PATCH /rest/v1/user_credits {\"balance\":999999} -> 204 but balance UNCHANGED at 531 — RLS correctly filtered the row"
+    - "supabase/functions/generateImage/index.ts:186 (spend reads user_credits.balance)"
+    - "supabase/migrations/20260622000001_deduct_credits_rpc.sql:15-21 (deduct_credits updates user_credits)"
+    - "src/components/User/ProfileMenu.jsx:26 and src/admin/pages/AdminUserDetailPage.jsx:365 (profiles.credits is rendered)"
+  observed_behavior: >
+    CORRECTED — an earlier version of this finding rated it BLOCKER on the
+    assumption that a self-writable credit balance granted free access to paid
+    AI providers. That was WRONG and is retracted here.
+    Two different columns exist. profiles.credits IS self-writable. But every
+    metered operation checks user_credits.balance, and deduct_credits updates
+    user_credits — and user_credits.balance was verified NOT self-writable
+    (the PATCH returned 204, the standard PostgREST response when RLS filters
+    the row out of the UPDATE, and the balance was unchanged).
+    So the real impact is display integrity, not spend: a user can inflate the
+    credit figure shown in their own profile menu and on the admin user-detail
+    page, while their actual spending power is untouched. profiles.credits
+    appears to be a vestigial duplicate of the real balance.
+    Note the 204-with-no-effect response is exactly why status codes alone are
+    not evidence — the write must be re-read to know whether it landed.
+  expected_behavior: >
+    A vestigial duplicate of a security-relevant value should not exist. Either
+    profiles.credits is removed and all display reads point at
+    user_credits.balance, or it is made non-self-writable by the same guard.
+    Two sources of truth for a money figure is the underlying defect.
+  persona_impact:
+    power_migrant: "Could display a false balance to themselves; no real gain. Minor."
+    casual_operator: "Unaffected."
+  severity: MAJOR
+  blast_radius: ["P9", "P10"]
+  effort: XS
+  effort_reasoning: "Covered by the same guard as P10s-009 (profile_self_update_guard already asserts credits unchanged). The better fix is deleting the duplicate column and pointing display reads at user_credits."
+  confidence: HIGH
+  unverified_notes: >
+    Live data shows every profile at exactly 100 credits (the signup grant), so
+    there is no evidence of prior abuse. Whether any authorization or billing
+    path reads profiles.credits was checked across src/ and found to be display
+    only — but supabase/functions/** was not exhaustively swept for it.
+  trace_id: "T-P10s-10"
+  source_agent: "orchestrator"
+
+- finding_id: P10s-011
+  pillar: P10
+  capability: "daily-analysis edge function — unauthenticated, discloses all user IDs"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "live 2026-08-21: POST /functions/v1/daily-analysis with ONLY NEXT_PUBLIC_SUPABASE_ANON_KEY -> HTTP 200"
+    - "response body disclosed all 12 active user IDs"
+    - "cron.job command for daily-calendar-analysis embedded a literal JWT decoding to {\"role\":\"anon\"}, byte-identical to the public anon key"
+    - "supabase/functions/daily-analysis/index.ts:24-30 (no auth guard before the fix)"
+    - "supabase/functions/credit-monthly-reset/index.ts:19-26 (the correct pattern, present in a sibling function)"
+  observed_behavior: >
+    The function had no authorization check. Supabase edge functions accept any
+    valid project JWT by default, and the anon key qualifies — it ships in the
+    client bundle and is public by design. So any visitor could invoke a
+    service-level batch job and receive the complete list of active user IDs.
+    Two distinct harms: enumeration (those UUIDs are the lookup key used by
+    other endpoints, making this useful reconnaissance rather than trivia), and
+    unauthenticated resource abuse (each call iterates every active profile with
+    several queries, with no rate limit).
+    Found only because LOCK L0.3 un-blinded cron monitoring, which exposed the
+    job, whose hand-written command revealed the anon-key auth.
+    A sweep of all 52 edge functions found this was the ONLY genuinely
+    unguarded one: 46 use a shared guard, and 5 more use a legitimate token
+    scheme (job-webhook per-job token, pipeline-client-action and
+    org-complete-invitation-signup token flows, credit-monthly-reset
+    service-role check, and healthCheck which is deliberately public and returns
+    no sensitive data).
+  expected_behavior: >
+    A scheduled batch job has no legitimate caller except cron and must be
+    service-role only.
+  persona_impact:
+    power_migrant: "Their user id is obtainable by any visitor, which weakens every other id-keyed surface."
+    casual_operator: "Same exposure, undetectable to them."
+  severity: MAJOR
+  blast_radius: ["P10", "P8"]
+  effort: XS
+  effort_reasoning: "Copy the existing service-role guard from credit-monthly-reset, plus one migration re-registering the cron job with Vault auth. Both written."
+  confidence: HIGH
+  unverified_notes: >
+    Fix written but NOT yet applied: migration 20260821200000 must be applied
+    BEFORE the function is redeployed, or the nightly run 401s in the gap.
+    Whether the endpoint was ever actually abused was not checked — edge
+    function invocation logs would show it.
+  trace_id: "T-P10s-11"
+  source_agent: "orchestrator"

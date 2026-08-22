@@ -1,0 +1,469 @@
+# P9 — Personal dashboard shell audit (A11)
+# Written incrementally; append-only during the run.
+
+- finding_id: P9-001
+  pillar: P9
+  capability: "primary navigation (app shell)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "app/app/layout.jsx:1-5 (no shared shell/nav — just Providers)"
+    - "src/next/NextAppProviders.jsx:83-116 (AppRuntime renders {children} directly, no AppHeader/sidebar)"
+    - "src/ui-v2/shell/AppHeader.jsx:1-20 (comment: 'each screen composes its own right-side controls... since the exact set differs per mockup')"
+    - "src/pages/Dashboard/PersonalDashboardPage.jsx:31-37 (NAV_ITEMS, 5 items, no Analytics)"
+    - "src/pages/Calendar/CalendarPage.jsx:83-88 (NAV_ITEMS, 5 items, no Analytics)"
+    - "src/pages/Settings/BrandKitPage.jsx:31-36 (NAV_ITEMS, 5 items, no Analytics)"
+    - "src/pages/Studio/StudioPage.jsx:42-47 (NAV_ITEMS, 5 items, no Analytics)"
+    - "src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:37-43 (NAV_ITEMS, 6 items, includes Analytics)"
+    - "src/pages/Billing/BillingPage.jsx:28-34 (NAV_ITEMS, 6 items, includes Analytics)"
+    - "src/pages/HelpPage/HelpPage.jsx:32-38 (NAV_ITEMS, 6 items, includes Analytics)"
+    - "src/pages/Settings.jsx:25-31 (NAV_ITEMS, 6 items, includes Analytics)"
+    - "src/pages/Library/LibraryPage.jsx:45-50 (NAV_ITEMS, 5 items, no Analytics)"
+  observed_behavior: >
+    There is no shared/centralized nav component or route config. app/app/layout.jsx
+    mounts only auth/theme/query providers (NextAppProviders.jsx) — no shell. Each of
+    the 9 ui-v2 pages that render AppHeader hand it its own hand-copied `NAV_ITEMS`
+    array. These arrays have drifted: Dashboard, Calendar, Library, Brand Kit, and
+    Studio/Generate (5 of the 9) OMIT the Analytics link entirely; only Analytics,
+    Billing, Help, and Settings (4 of 9) include it. Practical effect: a user on
+    Dashboard, Calendar, Library, Studio, or Brand Kit — i.e. every page in the core
+    idea→generate→publish loop — has NO primary-nav path to Analytics. They can only
+    reach it by first navigating to Help, Billing, or Settings (themselves only
+    reachable via the AvatarMenu dropdown, src/ui-v2/shell/AvatarMenu.jsx:10-15), or
+    by already knowing the URL. This directly damages the thesis's "insights feed
+    back into the next idea" loop: Analytics is structurally hard to reach from the
+    pages where a user would act on an insight.
+  expected_behavior: >
+    A single source of truth for primary navigation (shared config or shell
+    component) rendered identically on every authenticated page, so nav entries
+    can't silently diverge. Category leaders (Buffer, Later, Notion) render one
+    persistent sidebar/header across the whole app; the entry set never changes
+    page-to-page.
+  persona_impact:
+    power_migrant: "Notices immediately that Analytics disappears depending which page they're on — reads as a bug, erodes trust that the app is finished, and makes them assume other links are similarly unreliable."
+    casual_operator: "Doesn't consciously notice the drift, but silently never discovers Analytics exists unless they land on Billing/Help/Settings first — for a solo operator relying on obvious next-steps, a page-dependent nav is just as bad as a hidden feature."
+  severity: MAJOR
+  blast_radius: ["P8"]
+  effort: S
+  effort_reasoning: "Mechanical fix: extract one shared NAV_ITEMS/config + one shared header-mounting pattern; no new design needed since the 9 call sites already prove the desired shape works, they just need to be de-duplicated."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P9-01"
+  source_agent: "A11"
+
+- finding_id: P9-002
+  pillar: P9
+  capability: "video generation surfaces (jobs, submit, credits) reachability from primary nav"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "src/components/User/UserSidebar.jsx:27-70 (separate legacy NAV_ITEMS with sections Command/Publish/System, includes 'Video Lab' -> /app/video/jobs)"
+    - "src/pages/VideoEngine/VideoJobsPage.jsx:3-10 (imports UserNavbar/UserSidebar, not ui-v2 AppHeader)"
+    - "src/pages/VideoEngine/VideoSubmitPage.jsx:3-9 (same legacy shell)"
+    - "src/pages/VideoEngine/VideoJobDetailPage.jsx:3-9 (same legacy shell)"
+    - "src/pages/VideoEngine/CreditsPage.jsx:3-8 (same legacy shell)"
+    - "grep for '/app/video' across src/pages, src/ui-v2, src/components/Shared: only self-referential links inside VideoEngine pages themselves (VideoJobDetailPage.jsx:47 -> /app/video/jobs, VideoJobsPage.jsx:46 -> /app/video/new)"
+    - "None of the 9 ui-v2 NAV_ITEMS arrays (dashboard/calendar/library/studio/brand-kit/analytics/billing/help/settings) contain an entry for /app/video/new or /app/video/jobs"
+    - "src/ui-v2/shell/AvatarMenu.jsx:10-15 (LINKS: Analytics, Settings, Billing & credits, Help & support — no Video)"
+  observed_behavior: >
+    The 4 video-engine routes (video/new, video/jobs, video/jobs/[id], billing/credits)
+    render on an entirely separate legacy shell (UserNavbar/UserSidebar,
+    src/components/User/) with its own nav taxonomy, not src/ui-v2. No ui-v2 page —
+    including Dashboard, the natural launch point — links to /app/video/new or
+    /app/video/jobs anywhere. The only way into video generation is typing the URL
+    directly or an out-of-band link. billing/credits (also on the legacy shell) is at
+    least reachable via AvatarMenu's "Billing & credits" -> /app/billing, but that
+    page is BillingPage.jsx (ui-v2), a different component from CreditsPage.jsx
+    (legacy) — unclear if/how a user gets from one to the other.
+  expected_behavior: >
+    Video generation, if shipped, needs a discoverable entry point from Dashboard or
+    Studio (the idea→generation surfaces) — a competitor would not ship a generation
+    modality reachable only by URL guessing.
+  persona_impact:
+    power_migrant: "A power user who knows the product does video won't find it from the nav and will conclude the feature was removed or is broken; erodes confidence in the roadmap."
+    casual_operator: "Never discovers video generation exists at all — total feature loss for this persona, not just friction."
+  severity: MAJOR
+  blast_radius: ["P4", "P9"]
+  effort: S
+  effort_reasoning: "Adding a nav entry is small; the bigger cost (not sized here, out of scope for A11) is deciding whether video pages get migrated onto ui-v2 shell at all — see ui-v2 migration fraction finding."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P9-02"
+  source_agent: "A11"
+
+- finding_id: P9-003
+  pillar: P9
+  capability: "ui-v2 migration completeness (headline fraction)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "app/app/dashboard/page.jsx -> src/pages/Dashboard/PersonalDashboardPage.jsx:28 (imports from '../../ui-v2')"
+    - "app/app/generate/page.jsx + app/app/generate/[sessionId]/page.jsx -> src/pages/GeneratePage/GeneratePageV2.jsx:8 -> src/pages/Studio/StudioPage.jsx:36 (imports from '../../ui-v2')"
+    - "app/app/calendar/page.jsx -> src/pages/Calendar/CalendarPage.jsx:77 (imports from '../../ui-v2')"
+    - "app/app/library/page.jsx -> src/pages/Library/LibraryPage.jsx:21 (imports from '../../ui-v2')"
+    - "app/app/analytics/page.jsx -> src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:34 (imports from '../../ui-v2')"
+    - "app/app/onboarding/page.jsx -> src/pages/Onboarding/OnboardingWizard.jsx:36 (imports UiV2ThemeProvider, Button, Skeleton from '../../ui-v2')"
+    - "app/app/help/page.jsx -> src/pages/HelpPage/HelpPage.jsx:29 (imports from '../../ui-v2')"
+    - "app/app/settings/page.jsx -> src/pages/Settings.jsx:12-14 (imports UiV2ThemeProvider, AppHeader, etc from '../ui-v2')"
+    - "app/app/settings/brand-kit/page.jsx -> src/pages/Settings/BrandKitPage.jsx:21 (imports from '../../ui-v2')"
+    - "app/app/settings/connect/page.jsx -> src/pages/ConnectAccount/ConnectAccountFlow.jsx:28 (imports from '../../ui-v2')"
+    - "app/app/billing/page.jsx -> src/pages/Billing/BillingPage.jsx:25 (imports from '../../ui-v2')"
+    - "app/app/billing/credits/page.jsx -> src/pages/VideoEngine/CreditsPage.jsx:4-6 (imports UserNavbar/UserSidebar from '../../components/User/' — legacy)"
+    - "app/app/design/page.jsx -> src/pages/DesignLab/GoldenReference.jsx:9-15 (imports UiButton/UiCard/etc from '../../components/Shared/ui' — a DIFFERENT, pre-ui-v2 primitives system, plus GoldenReference.css; NOT src/ui-v2)"
+    - "app/app/video/new/page.jsx -> src/pages/VideoEngine/VideoSubmitPage.jsx:5-6 (UserNavbar/UserSidebar — legacy)"
+    - "app/app/video/jobs/page.jsx -> src/pages/VideoEngine/VideoJobsPage.jsx:5-6 (UserNavbar/UserSidebar — legacy)"
+    - "app/app/video/jobs/[id]/page.jsx -> src/pages/VideoEngine/VideoJobDetailPage.jsx:5-6 (UserNavbar/UserSidebar — legacy)"
+    - "app/app/page.jsx -> src/next/AppHomeRedirect.jsx:1-58 (pure redirect, renders only AuthLoadingOverlay/AppRedirect — no page UI, excluded from the fraction)"
+    - "app/app/profile/page.jsx:1-4 (pure redirect() to /app/settings — no page UI, excluded from the fraction)"
+  observed_behavior: >
+    Of the 19 in-scope routes, 2 (app/app/page.jsx, app/app/profile) render no UI of
+    their own — they are pure redirects and are excluded from the denominator. Of the
+    remaining 17 substantive routes, 12 render src/ui-v2 primitives (dashboard,
+    generate, generate/[sessionId], calendar, library, analytics, onboarding, help,
+    settings, settings/brand-kit, settings/connect, billing) and 5 render the OLD
+    legacy shell (billing/credits, design, video/new, video/jobs, video/jobs/[id]),
+    which uses components/User/UserNavbar + UserSidebar — a nav/shell system with its
+    own distinct visual language, confirmed different from ui-v2's AppHeader (see
+    P9-001/P9-002 evidence: different labels, different grouping, different link set).
+    **Headline: 12/17 = ~71% of substantive personal-dashboard routes are on ui-v2;
+    12/19 = ~63% if the two redirect-only routes are counted in the denominator.**
+    Additionally, app/app/design (the page literally named "Design Reference" /
+    "GoldenReference", whose own header comment calls it "the canonical world-class
+    page... every migrated page copies") is ITSELF not on ui-v2 — it uses
+    components/Shared/ui, an older primitives set, and has not been touched since the
+    initial commit (git log shows only "chore: initial Brandosse codebase" for that
+    file, vs. active ui-v2 commits like "feat: rebuild Studio and Dashboard on ui-v2
+    design system"). The one page meant to be the up-to-date reference is stale.
+  expected_behavior: >
+    A migration this far along (71%) is achievable to finish; a competitor-grade
+    product does not ship a live app where 5 of 17 core routes plus the internal
+    design-reference page itself are on three different, visually inconsistent shell
+    systems (ui-v2 AppHeader, legacy UserNavbar/UserSidebar, and components/Shared/ui
+    primitives).
+  persona_impact:
+    power_migrant: "Clicking from Billing into Billing & Credits (legacy CreditsPage) or into Video Lab produces a visibly different, older-feeling app — reads as an unfinished product mid-migration, which damages trust in the whole platform even though most of it is fine."
+    casual_operator: "Less likely to visit the legacy pages at all (video is orphaned per P9-002), so the inconsistency mostly hits them indirectly via billing/credits — but the visual discontinuity there right where money changes hands is a bad place for the app to look unfinished."
+  severity: MAJOR
+  blast_radius: ["P4", "P9"]
+  effort: L
+  effort_reasoning: "5 routes need full ui-v2 rebuilds (video/* has real functional surface — job lists, submit forms — not a trivial re-skin) plus the GoldenReference page needs regenerating from the current ui-v2 primitives to be trustworthy as a reference again."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P9-03"
+  source_agent: "A11"
+
+- finding_id: P9-004
+  pillar: P9
+  capability: "connected-account health truthfulness on the dashboard"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/hooks/useDashboardData.js:226-230 (query selects health_score, consecutive_failure_count, last_failure_reason from connected_accounts_health_summary)"
+    - "src/hooks/useDashboardData.js:117-140 (ACCOUNT_STATUS_MAP + toAccountCard: statusLabel/statusTone derive ONLY from connection_status via getConnectedAccountSemanticStatus; health_score, consecutive_failure_count, last_failure_reason are fetched but never read anywhere in this file)"
+    - "src/services/platforms/platformUtils.js:16-21 (getConnectedAccountSemanticStatus maps raw connection_status string only — 'active'/'connected' both -> 'connected', which maps to label 'Healthy'/tone 'success'; no capability/score check)"
+    - "src/pages/Dashboard/PersonalDashboardPage.jsx:489-492 (renders only statusDot + statusLabel, i.e. the connection_status-derived badge; health_score/last_failure_reason never rendered)"
+    - "Live query (read-only, service role) against connected_accounts_health_summary filtered to this QA user's own personal-scope rows (user_id=29944d39-4a29-4f6c-a1cf-9685b2b422bd, scope=personal) returned 4 rows: titan_drex/tiktok connection_status=active health_score=20 is_mock=false last_failure_reason='TikTok photo posts use the caption as the post title, capped at 90 characters (yours is 131). Shorten the caption, or publish this as a TikTok video instead.'; Dare/tiktok connection_status=error health_score=85 is_mock=true; QA Test Brand/pinterest connection_status=active health_score=100 is_mock=true; QA Threads Brand/threads connection_status=active health_score=100 is_mock=true"
+    - "qa-shots screenshot (this run) desktop_app_dashboard.png: Connected Accounts panel shows 'titan_drex ... Healthy' with a plain green status dot identical in style to a fully healthy account — no health-score, warning, or failure-reason indicator anywhere on the card"
+  observed_behavior: >
+    Driving the real app as this QA user and cross-checking against the live DB:
+    titan_drex is a REAL (non-mock) connected TikTok account with health_score=20/100
+    and a specific, human-readable last_failure_reason on file (a caption-length
+    publish failure). The dashboard renders it with the exact same green dot +
+    "Healthy" label used for a 100%-healthy account, because the status badge is
+    derived solely from the raw connection_status string ("active"), and the
+    health_score/failure-reason fields — despite being fetched in the same query —
+    are discarded before render. Separately, two of the four accounts (QA Test Brand,
+    QA Threads Brand) are mock/test accounts (is_mock=true) that can never really
+    publish; the code does have a "Demo" per-account badge for this case
+    (PersonalDashboardPage.jsx:483-485) which fires here since not all 4 accounts are
+    mock, but that badge only communicates "this isn't real," not "this is broken" —
+    it doesn't help a user distinguish titan_drex's genuine, real, currently-broken
+    account from a fully working one.
+  expected_behavior: >
+    A dashboard that claims to summarize account health should surface degraded
+    health_score / recent failure reasons, not just echo a coarse connection_status
+    enum. A user relying on this panel to decide "can I schedule to this account"
+    is actively misled into believing titan_drex is fine when the system already
+    knows, in structured data, exactly why it isn't.
+  persona_impact:
+    power_migrant: "Schedules a post to titan_drex trusting the green 'Healthy' badge, then discovers at publish time (or never, if it silently fails) that the account has a known, already-diagnosed problem the dashboard chose not to show them — this is the kind of surprise that ends a trial."
+    casual_operator: "Has no idea any of their accounts need attention beyond the one obviously red-flagged 'Dare' account — assumes titan_drex 'just works' since it's green, with no vocabulary or context to know health_score even exists."
+  severity: MAJOR
+  blast_radius: ["P6", "P8"]
+  effort: S
+  effort_reasoning: "Data is already fetched (health_score, last_failure_reason); this is a rendering/threshold fix in toAccountCard() and the account row markup, not a new data pipeline."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P9-04"
+  source_agent: "A11"
+
+- finding_id: P9-005
+  pillar: P9
+  capability: "dashboard post-status accounting (Content Flow panel)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/hooks/useDashboardData.js:196-222 (Promise.all only counts POST_STATUS.SCHEDULED, PUBLISHED, DRAFT, FAILED via postCount(); no query for POST_STATUS.PUBLISHING at all)"
+    - "src/constants/statuses.js:17 (POST_STATUS.PUBLISHING = 'publishing' exists as a real, distinct status in the app's own status enum)"
+    - "Live query (read-only) of this QA user's own posts (user_id=29944d39-4a29-4f6c-a1cf-9685b2b422bd, organization_id is null) status breakdown: 72 draft, 29 failed, 6 published, 3 publishing (110 total)"
+    - "3 publishing-status rows for this user have scheduled_at of 2026-05-31, 2026-07-08, 2026-04-20 and updated_at no later than 2026-07-10 — i.e. stuck for weeks to months as of the audit date (2026-08-21)"
+    - "qa-shots screenshot (this run) desktop_app_dashboard.png: Content Flow panel shows exactly 72 Drafted / 0 Scheduled / 6 Published / 29 Failed = 107, matching the 4 queried buckets and excluding the 3 publishing-status posts entirely"
+  observed_behavior: >
+    The dashboard's 'Content Flow' panel — the one place meant to give a truthful
+    summary of where a user's content stands — has no bucket, count, or mention of
+    the 'publishing' status at all, even though it is a first-class status in the
+    app's own status enum. For this QA account specifically, 3 real posts have been
+    stuck mid-publish for weeks to months; none of them appear anywhere in the
+    dashboard's totals (72+0+6+29=107, not 110). A user auditing "what happened to
+    my content" from the dashboard has no way to learn these 3 posts exist or are
+    stuck.
+  expected_behavior: >
+    Every real status value the system can put a post into should be accounted for
+    somewhere on the primary status summary — at minimum counted, ideally flagged
+    as needing attention given how long these have sat unresolved.
+  persona_impact:
+    power_migrant: "Reconciles their own count of posts scheduled vs. the dashboard's total, notices the gap, and now doesn't trust any number on the page — a data-integrity red flag from a tool meant to run their operation."
+    casual_operator: "Never notices the gap (doesn't know to look), so simply never learns 3 of their posts never actually went out — the content silently vanishes from their mental model, and they may believe something was posted when it wasn't."
+  severity: MAJOR
+  blast_radius: ["P5", "P8"]
+  effort: S
+  effort_reasoning: "One more count query plus a bucket in the same panel; the hook already has the pattern established for the other 4 statuses."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P9-05"
+  source_agent: "A11"
+
+- finding_id: P9-006
+  pillar: P9
+  capability: "calendar rendering of stuck 'publishing' posts"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/calendar/components/PostCard.jsx:41-42 (formatCardTime: if post.status === POST_STATUS.PUBLISHING return 'now' — unconditional, no staleness check against updated_at/scheduled_at)"
+    - "src/calendar/components/StatusPill.jsx:1-6 (comment acknowledges the 'honesty affordance' principle for the Published pill, but PUBLISHING has no equivalent staleness handling)"
+    - "Live data: this user's 3 publishing-status posts have updated_at of 2026-05-23, 2026-07-10, 2026-07-10 — 6 weeks to 3 months before the audit date (2026-08-21), yet PostCard.jsx would render each as 'now' wherever they appear on the calendar grid"
+  observed_behavior: >
+    Any post stuck in 'publishing' status is labeled 'now' on its calendar card
+    regardless of how long it has actually been stuck — a post that has been
+    mid-publish for 3 months reads identically to one that started publishing 2
+    seconds ago. Combined with P9-005 (dashboard drops these posts from its totals
+    entirely), a stuck post is both invisible in the aggregate view and, when found
+    on the calendar, mislabeled as actively in-progress rather than stalled.
+  expected_behavior: >
+    A competitor's scheduler treats "publishing for an abnormal amount of time" as
+    a distinct, flagged state (e.g. "stuck — retry" or "taking longer than usual"),
+    not a permanent, undated "now."
+  persona_impact:
+    power_migrant: "Sees 'now' on a months-old post, assumes the system is actively working on it, and doesn't intervene (retry/delete/reschedule) — the mislabeling actively prevents the exact corrective action a power user would otherwise take."
+    casual_operator: "Has no idea 'now' can mean 'stuck since April' — reasonably concludes the app is currently busy, not broken, and waits indefinitely."
+  severity: MAJOR
+  blast_radius: ["P5"]
+  effort: S
+  effort_reasoning: "formatCardTime already receives the post object; a staleness threshold (e.g. >10 min since updated_at) swapping the label to something like 'stalled' is a small, local change."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P9-06"
+  source_agent: "A11"
+
+- finding_id: P9-007
+  pillar: P9
+  capability: "calendar Drafts-rail thumbnail rendering for video generations"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/calendar/components/UnscheduledRail.jsx:48 (thumbnailUrl = draft.generations?.storage_path || null — used as-is, no host/scheme guard)"
+    - "src/calendar/components/UnscheduledRail.jsx:79 (<video className=\"draft-card__thumb\" src={thumbnailUrl} .../> — renders the raw storage_path directly as the <video> src)"
+    - "src/components/Generate/BatchGenerationGrid.jsx:11 (a DIFFERENT component already has: url.includes('video.pollinations.ai') ? FALLBACK_VIDEO_URL : url — proving the team knows storage_path can legitimately be a live video.pollinations.ai URL and that it needs a fallback)"
+    - "src/components/Generate/PostProductionPanel.jsx:23 (same fallback guard, independently duplicated)"
+    - "Live Playwright run against /app/calendar as the QA user (this session) produced console/network failures: 'GET https://video.pollinations.ai/prompt/<full URL-encoded prompt text>?width=720&height=1280&seed=602149 net::ERR_NAME_NOT_RESOLVED' (and 3 more, one per queued/drafted video generation) plus matching 'CONSOLE ERR: Failed to load resource: net::ERR_NAME_NOT_RESOLVED'"
+  observed_behavior: >
+    For at least some of this user's generations, the `generations.storage_path`
+    column is not a stored asset at all — it is a direct, un-cached
+    video.pollinations.ai/prompt/<full prompt text> URL, i.e. a live third-party
+    generation endpoint being used as if it were a static thumbnail. Two Studio
+    components (BatchGenerationGrid, PostProductionPanel) already detect this and
+    substitute a fallback video, proving this is a known, previously-hit problem —
+    but UnscheduledRail.jsx (the Calendar page's Drafts rail, in this auditor's P9
+    scope) has no such guard, so it renders the raw URL straight into a <video src>.
+    In this environment the domain fails DNS resolution entirely
+    (ERR_NAME_NOT_RESOLVED), so the thumbnail is simply broken/blank for every video
+    draft with this storage_path shape. Even where the domain does resolve, using a
+    live generation endpoint as a thumbnail means every calendar render re-issues an
+    AI image/video generation call and re-transmits the full original prompt text to
+    a third party — not a caching or performance concern this auditor is sizing, but
+    directly relevant to "does the UI show real, stable content."
+  expected_behavior: >
+    Thumbnails should point at a stored, stable asset URL. Where a fallback is
+    necessary for legacy/malformed storage_path values, it needs to be applied
+    consistently everywhere that value is rendered as media — not patched in two
+    Studio components while the Calendar surface (which pulls from the same
+    `generations` table) is left exposed.
+  persona_impact:
+    power_migrant: "A content calendar with visibly broken/blank thumbnails on drafts reads as unfinished software and undermines confidence in the whole scheduling surface, especially since Studio (a few clicks away) clearly handles the same data correctly."
+    casual_operator: "Sees blank boxes where preview images should be and has no idea why — assumes the upload/generation failed even when the underlying content is fine, likely re-generating or abandoning the draft unnecessarily."
+  severity: MAJOR
+  blast_radius: ["P4", "P5"]
+  effort: S
+  effort_reasoning: "The exact fallback pattern already exists twice in the codebase (BatchGenerationGrid.jsx:11, PostProductionPanel.jsx:23); extracting it to a shared helper and applying it in UnscheduledRail.jsx (and auditing any other raw storage_path consumers) is small, mechanical work."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P9-07"
+  source_agent: "A11"
+
+- finding_id: P9-008
+  pillar: P9
+  capability: "legacy shell rendering (UserNavbar/UserSidebar) on video/* and billing/credits"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "Observed live: Playwright screenshots of /app/video/jobs, /app/video/new, /app/billing/credits (this session, post-login, post-networkidle+3s) all show the entire nav — brand mark, search box, credits pill, notification bell, avatar, and the full sidebar (Command Center/AI Studio/Content Library/Video Lab/Content Calendar/Insights/Credits/Settings/Brand Kit/Help/Sign out) — rendered as unstyled, full-width, stacked plain text ABOVE the real page content, on every single one of these routes"
+    - "Re-verified not a load-timing/FOUC artifact: page.evaluate() after waitUntil:'networkidle' + 3000ms extra wait returned getComputedStyle('.app-sidebar') = { display: 'block', position: 'static', width: '1440px' } — i.e. permanently unstyled, not mid-transition"
+    - "src/components/User/UserSidebar.jsx:157 (<aside className={`app-sidebar ${collapsed ? 'collapsed' : ''}`}...>)"
+    - "src/components/User/UserNavbar.jsx:494 (<header className=\"app-navbar\">)"
+    - "src/styles/Sidebar.css:6,30,42,64,79,133 (the stylesheet @imported for this shell defines .user-sidebar, .sidebar-header, .sidebar-toggle-btn, .sidebar-menu, .menu-item, .sidebar-footer — NONE of these match the .app-sidebar/.sidebar-top-controls/.sidebar-user classes UserSidebar.jsx actually renders)"
+    - "src/styles/Navbar.css:2,16,24,31 (defines .navbar, .logo, .nav-links, .navbar-link — none match .app-navbar)"
+    - "grep across src/ for '.app-sidebar'/'.app-navbar' definitions: the ONLY matches are scoped selectors 'src/styles/responsive-contract.css:233 .calendar-v2-layout > .app-sidebar' and 'src/org/styles/Pipeline.css:460-461 .org-calendar-wrapper .calendar-v2-shell > .app-navbar' — both belong to the newer Calendar-v2 shell and only apply when nested under those specific parent wrappers, which UserSidebar/UserNavbar are never rendered inside"
+    - "src/styles/app-entry.css:23 (@import './Sidebar.css') confirms the stylesheet IS loaded app-wide via app/layout.jsx:1 — this rules out a missing-import explanation; the file loads, it simply styles different class names than the component renders"
+    - "Confirmed identically broken at 375px mobile viewport (qa-shots mobile_app_video_jobs.png, this run) — same unstyled full-width text dump, not a desktop-only artifact"
+  observed_behavior: >
+    A class-name collision from refactor drift: `.app-sidebar`/`.app-navbar` are
+    class names that originated with the newer Calendar-v2 shell and are only
+    defined in CSS when scoped under that shell's parent wrapper. The older
+    UserSidebar/UserNavbar components (used by video/new, video/jobs,
+    video/jobs/[id], billing/credits) independently adopted the same bare class
+    names at some point, but their own stylesheet (Sidebar.css/Navbar.css) still
+    defines the OLD names (.user-sidebar, .navbar). The result: on all 4 of these
+    routes, the entire navigation chrome renders with zero applied styling —
+    a top-to-bottom dump of every nav label as plain stacked text, full page width,
+    ahead of the real (correctly styled) page content below it. This was directly
+    observed live in the running app, not inferred from code.
+  expected_behavior: >
+    A live route a real user can reach must never render its primary navigation as
+    an unstyled text dump. This is a baseline visual-integrity bar, not a
+    nice-to-have — any user landing here (billing/credits included, where they're
+    about to enter a payment flow) would reasonably conclude the app is broken or
+    compromised.
+  persona_impact:
+    power_migrant: "Immediately loses trust in the product's engineering quality — an unstyled nav dump at the top of a billing page is the kind of thing that makes a professional user assume the whole app is fragile, not just this corner of it."
+    casual_operator: "Confused and likely to bounce on sight — the page looks broken before they even parse what it's for; on billing/credits specifically, this is exactly the wrong place to look untrustworthy."
+  severity: BLOCKER
+  blast_radius: ["P4"]
+  effort: S
+  effort_reasoning: "Root cause is precisely identified (class name mismatch between component markup and stylesheet); fix is renaming either the component's classNames or the CSS selectors to match, verified against the 4 affected routes — no architecture change needed."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P9-08"
+  source_agent: "A11"
+
+- finding_id: P9-009
+  pillar: P9
+  capability: "notifications — content-lifecycle events feeding the bell"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/ui-v2/shell/NotificationBell.jsx:1-16 (real component, wired to useUserNotifications(userId), renders unread dot / mark-all-read / list — not a stub)"
+    - "src/hooks/useUserNotifications.js (referenced by NotificationBell; genuine query hook against user_notifications)"
+    - "grep across supabase/functions/ for any INSERT into user_notifications: only supabase/functions/admin-notify-user/index.ts and supabase/functions/_shared/org.ts write to it — both are admin/org-initiated, not personal content-lifecycle events"
+    - "No migration or edge function found that inserts a user_notifications row on post publish success, post publish failure, a post entering/stuck in 'publishing', video job completion, or a connected account degrading (grep across supabase/migrations/ and supabase/functions/ for user_notifications writers found only the two files above)"
+    - "Live query (read-only) of this QA user's own user_notifications rows: 4 total, all type='system', all org-invite or task-due content ('Task due soon' 2026-04-29; three 'You've been invited to join Peculiar Media' from 2026-03-27/28) — none reference a post, generation, or account event, and the newest is ~4 months stale as of the audit date (2026-08-21)"
+    - "This user has, in the same window, 29 failed posts, 3 posts stuck in 'publishing' for weeks/months (see P9-005), and one real connected account with health_score=20 (see P9-004) — none of which produced a notification"
+  observed_behavior: >
+    The notification pipe itself is real and correctly wired to the UI (bell,
+    unread state, dropdown) — this is not a stub. But nothing in the personal
+    content pipeline (post publish/fail, stuck-publishing detection, video job
+    completion, account health degradation) writes into it. The only writer is an
+    admin-initiated action. So a real user with dozens of failed posts and a broken
+    connected account gets a visually-functioning, permanently-empty-of-relevant-
+    content notification bell.
+  expected_behavior: >
+    For the product thesis's "loop must close" requirement, a failed publish or a
+    stuck job is exactly the kind of event that should proactively surface to the
+    user (bell + ideally email/push) rather than requiring them to notice it
+    themselves on the dashboard (which, per P9-005, doesn't even count the stuck
+    ones).
+  persona_impact:
+    power_migrant: "Expects a notification system that actually tells them when something needs their attention (this is table stakes on Buffer/Later); discovering it only ever fires for org admin messages is a trust hit once found."
+    casual_operator: "Never gets proactively told a post failed — has to happen to notice on the dashboard/calendar themselves, which for a casual user who checks in occasionally means silent content loss."
+  severity: MAJOR
+  blast_radius: ["P5", "P8"]
+  effort: M
+  effort_reasoning: "Requires wiring notification-insert calls into the existing post-status-transition and video-job-completion code paths (multiple call sites across edge functions/worker), not just a UI change."
+  confidence: HIGH
+  unverified_notes: "Did not check src/org/** notification paths (out of scope per brief) or whether a currently-disabled cron/worker was intended to backfill these — grepped supabase/functions and supabase/migrations only."
+  trace_id: "T-P9-09"
+  source_agent: "A11"
+
+- finding_id: P9-010
+  pillar: P9
+  capability: "global search box on legacy (video/*, billing/credits) pages"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/components/User/UserNavbar.jsx:130-136 (default props: searchQuery = '', onSearchQueryChange = () => {}, searchResults = [], searchLoading = false, onSearchSelect = () => {})"
+    - "src/pages/VideoEngine/VideoJobsPage.jsx:36 (<UserNavbar /> — rendered with zero props)"
+    - "src/pages/VideoEngine/CreditsPage.jsx:37 (<UserNavbar /> — rendered with zero props)"
+    - "By extension src/pages/VideoEngine/VideoSubmitPage.jsx and VideoJobDetailPage.jsx also import UserNavbar with the same no-prop pattern (VideoSubmitPage.jsx:6, VideoJobDetailPage.jsx:6)"
+    - "src/components/User/UserNavbar.jsx:524-528 (search <input> is a controlled field bound to the searchQuery prop with onChange calling onSearchQueryChange — since both are the inert defaults on these 4 pages, the input's value is permanently pinned to '' and every keystroke's onChange is a no-op, so the field cannot hold typed text)"
+    - "qa-shots screenshot desktop_app_video_jobs.png / desktop_app_billing_credits.png (this run): the 'Search posts, prompts, and generations' input renders fully styled-looking and present in the header markup (visible as raw unstyled text in this run due to P9-008, but present in the DOM either way)"
+  observed_behavior: >
+    On the 4 legacy-shell routes (video/new, video/jobs, video/jobs/[id],
+    billing/credits), the header search box is rendered but wired to zero props,
+    which default to no-ops — the input cannot accept or retain typed text, never
+    calls a search, and never shows a results dropdown. It looks like a working
+    global search affordance and is functionally inert. (The Dashboard's own search
+    — src/hooks/useDashboardData.js searchQuery/setSearchQuery — is separately real
+    but only filters the 120 most-recently-fetched generations client-side; it is
+    not a cross-content-type global search either, and does not reach posts,
+    library assets, or video jobs.)
+  expected_behavior: >
+    A search box that's visibly present should work, at minimum accepting input; a
+    competitor's global search reaches across posts/drafts/assets/jobs, not just
+    whichever list happens to already be in memory on the current page.
+  persona_impact:
+    power_migrant: "Tries to search for a specific past video job or transaction from the header search (a natural first move for a power user managing volume), gets a field that won't even accept keystrokes — reads as broken, not just limited."
+    casual_operator: "Less likely to rely on search at all, but if they do try it here, get silent failure with no error or explanation — confusing rather than merely inconvenient."
+  severity: MAJOR
+  blast_radius: ["P4"]
+  effort: S
+  effort_reasoning: "The component already supports real search via props (used correctly elsewhere, presumably by whatever legacy dashboard originally passed them) — these 4 call sites just need the same wiring, or a genuine global search service standing behind it if one doesn't already exist."
+  confidence: HIGH
+  unverified_notes: "Did not locate any current caller that passes real searchResults/onSearchQueryChange into UserNavbar — if one exists elsewhere in the app (outside this agent's 19-route scope) the search backend may already exist and only need wiring here."
+  trace_id: "T-P9-10"
+  source_agent: "A11"
+
+- finding_id: P9-011
+  pillar: P9
+  capability: "shared Modal primitive — keyboard focus management and accessible naming"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/ui-v2/primitives/Modal.jsx:17 (const panelRef = useRef(null) — declared, then never attached to any focus() call, tabIndex, or focus-trap logic; only used as a DOM ref target with no behavior)"
+    - "src/ui-v2/primitives/Modal.jsx:24-35 (role='dialog' aria-modal='true' present on the panel div, but no aria-labelledby/aria-label wired to the title div at line 39 — the title has no id and the dialog element never references one)"
+    - "src/ui-v2/primitives/Modal.jsx:28-30 (Escape-to-close is an onKeyDown handler on the OVERLAY div, which only fires for keydown events that bubble up through a focused descendant of that overlay; since nothing ever moves focus into the portal on open, a keyboard user's focus remains wherever it was — typically the trigger button outside the portal — so this handler will not receive the Escape keypress in the common case)"
+    - "No useEffect in Modal.jsx moves focus on open or restores it to the trigger element on close (grepped the whole file — no such effect exists)"
+    - "This is the shared primitive used across ui-v2 for every confirm/schedule/delete dialog (per the component's own doc comment, line 12-14: 'matches the schedule/publish/delete-confirm pattern repeated across every mockup') — a fix here fixes every consumer, but the current state means every one of those dialogs has the same gap"
+  observed_behavior: >
+    Every ui-v2 modal (schedule confirm, delete confirm, etc.) opens without moving
+    keyboard focus into the dialog, has no focus trap (Tab can move focus to
+    elements behind the overlay), does not restore focus to the trigger on close,
+    and has no accessible name wired via aria-labelledby despite rendering a visible
+    title. Escape-to-close is implemented but attached at a DOM location that a
+    keyboard-only user's focus will typically never reach.
+  expected_behavior: >
+    WCAG 2.1 baseline for a modal dialog: focus moves into the dialog on open
+    (ideally to the first interactive element or a sensible default), Tab is
+    trapped within the dialog while open, focus returns to the invoking control on
+    close, and the dialog has an accessible name via aria-labelledby pointing at
+    its visible title. This is table-stakes, not an enhancement — any competitor's
+    modal (and most component libraries used off-the-shelf) gets this for free.
+  persona_impact:
+    power_migrant: "A keyboard-driven power user (the exact persona most likely to notice and rely on this) cannot reliably close a modal with Escape or safely Tab through it without leaking focus to hidden background controls — a real, not cosmetic, usability break for anyone not using a mouse."
+    casual_operator: "Screen-reader or keyboard-assisted users get no announcement of what the dialog is for and no reliable way to interact with or dismiss it — for this persona it can mean being functionally locked out of scheduling/deleting flows entirely."
+  severity: MAJOR
+  blast_radius: ["P5", "P6", "P8"]
+  effort: S
+  effort_reasoning: "Contained to one shared primitive file; adding a focus-on-open effect, a basic Tab-trap, focus restoration, and an aria-labelledby wired to the title id fixes every consumer at once."
+  confidence: HIGH
+  unverified_notes: "Did not audit src/ui-v2/primitives/Dropdown.jsx (used by AvatarMenu/NotificationBell) for the same gap — flagging as likely-similar but unverified; would need the same read to confirm."
+  trace_id: "T-P9-11"
+  source_agent: "A11"

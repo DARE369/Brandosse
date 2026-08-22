@@ -1,0 +1,263 @@
+# A4 — Pillar auditor for P3 (Content generation — TEXT)
+# Scope: caption/hashtag/title/SEO text generation for the personal dashboard
+# (Studio). Image rendering = A7. Video = A5/A6. Publishing = A8.
+# All findings evidenced via static code read + live read-only DB queries
+# against content_plans / brand_kit (see trace notes).
+
+- finding_id: P3-001
+  pillar: P3
+  capability: "LLM provider routing (Groq-primary / Claude-fallback) for content-plan generation"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "supabase/functions/_shared/llm.ts:38-67"          # resolveProviders — orders [groq, anthropic] when preferred=groq
+    - "supabase/functions/generate-content-plan/index.ts:194-217" # generatePlan() calls callLlm with preferredProvider:'groq'
+    - "supabase/functions/generate-content-plan/index.ts:219-246" # revisePlan() same
+    - "LIVE DB: content_plans.plan_provider, ordered by created_at desc, limit 20 (queried 2026-08-20 via read-only REST) — the 16 most recent rows (2026-08-18T10:28 through 2026-08-20T14:34) are ALL plan_provider='anthropic'; the last plan_provider='groq' row is 2026-08-06T12:41. Across all 54 rows: {anthropic:16, groq:13, null:25(pre-tracking)}."
+  observed_behavior: "The code explicitly prefers Groq (cheap, fast Llama-3.3-70B) for the primary content-plan LLM call and only falls back to Anthropic Claude on Groq failure (llm.ts:172-189, catch-and-continue). Live data shows Groq has served ZERO of the last 16 consecutive content-plan generations over more than 2 days (2026-08-18 to 2026-08-20) — every single one silently fell back to Claude Sonnet 4.6. Groq worked as recently as 2026-08-06. Because the fallback succeeds, no error is ever surfaced to the user or logged anywhere the developer would see it (no alerting on fallback rate) — the failure is only visible by querying the DB directly, which is how this was found."
+  expected_behavior: "A competitor-grade provider-routing layer would alert/log when the intended-primary provider fails 100% of the time for 2+ days, and/or have a health check. The architected cost model (cheap Groq primary, expensive Claude only as an emergency fallback) is currently fully inverted in production with nobody aware."
+  persona_impact:
+    power_migrant: "Doesn't notice directly — output quality is fine (Claude is the stronger model) — but this is exactly the kind of silent infra rot that erodes trust once discovered, and it directly echoes the prior 'placeholder GROQ key broke session naming' incident class the codebase has already been burned by once."
+    casual_operator: "No visible impact today since generation still works and reads as high quality — the risk is entirely on the business side (cost), not the user-facing experience."
+  severity: MAJOR
+  blast_radius: ["P3"]
+  effort: S
+  effort_reasoning: "Root cause unconfirmed from code alone (needs checking the live GROQ_API_KEY secret / whether 'llama-3.3-70b-versatile' was deprecated on Groq's side around 2026-08-18) — but once diagnosed the fix is a secret rotation or model-id swap, plus adding a fallback-rate log/alert (S-M for the alerting piece)."
+  confidence: HIGH
+  unverified_notes: "Root cause of the Groq failure (invalid/expired key vs. model deprecation vs. Groq outage) is NOT verified — no access to Supabase edge function secrets or Groq-side logs from this audit. The FACT of 100% fallback since 2026-08-18 is HIGH confidence (direct DB query, 16/16 consecutive rows)."
+  trace_id: "T-P3-01"
+  source_agent: "A4"
+
+- finding_id: P3-002
+  pillar: P3
+  capability: "Timeout handling on primary text-generation LLM calls"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/_shared/llm.ts:69-113"   # callAnthropic — fetch() has no signal/timeout
+    - "supabase/functions/_shared/llm.ts:115-147"  # callOpenAiCompatible — fetch() has no signal/timeout
+    - "supabase/functions/_shared/llm.ts:215-239"  # callVisionJudge DOES set signal: AbortSignal.timeout(20_000) — contrast
+    - "supabase/functions/_shared/llm.ts:280-313"  # callAnthropicWithDocument DOES set signal: AbortSignal.timeout(100_000) — contrast
+  observed_behavior: "callLlm() — used by generate-content-plan, generate-post-metadata, generate-caption, and ai-brand-consistency-check, i.e. every TEXT generation path — has no client-side timeout on either provider's fetch() call. If Groq or Anthropic hangs (rather than erroring fast), the request blocks until the Supabase edge function's own platform-level wall-clock limit kills it, rather than failing fast into the same-request Anthropic fallback within a controlled window. The two specialist functions in the same file (callVisionJudge, callAnthropicWithDocument) both got explicit AbortSignal.timeout() after a prior documented incident (extractBrandKit truncation) — that lesson was not applied to the primary callLlm() path all TEXT generation depends on."
+  expected_behavior: "Every outbound LLM call should have an explicit timeout well under the platform's hard limit, so a hung provider triggers the SAME-request fallback to the second provider instead of guaranteeing the whole request fails."
+  persona_impact:
+    power_migrant: "A hung Groq/Anthropic call mid-generation reads as the app being frozen/broken rather than a fast, clean 'switched providers' recovery — the exact class of reliability rough edge that makes a power user distrust a tool under real load."
+    casual_operator: "Sees a stuck spinner with no feedback for however long the platform-level timeout takes to fire, worse than a quick error + retry prompt."
+  severity: MAJOR
+  blast_radius: ["P3"]
+  effort: XS
+  effort_reasoning: "Add `signal: AbortSignal.timeout(N)` to the two fetch() calls in callAnthropic/callOpenAiCompatible — same pattern already used elsewhere in the same file."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P3-01"
+  source_agent: "A4"
+
+- finding_id: P3-003
+  pillar: P3
+  capability: "Text iteration / revision history (regenerate-with-instruction, compare, revert)"
+  status: MISSING
+  maturity: L2
+  evidence:
+    - "grep -rn \"content_versions\" src/ supabase/ → zero matches anywhere in application code"
+    - "supabase/migrations/20260312153000_admin_foundation.sql:150-167" # content_versions schema: created_by_admin_id, quality_review_id → this is ADMIN content-moderation versioning, not a user-facing draft history feature
+    - "supabase/functions/generate-post-metadata/index.ts:81-90"  # normalizeFields — 'fields' controls WHICH of title/caption/hashtags to touch, no instruction/tone/length override param exists anywhere in the request type
+    - "src/components/Generate/PostProductionPanel.jsx:786-806"  # 'Regenerate' button calls handleRegenerateMetadata(['caption']) with no user-supplied instruction; textarea's prior content is overwritten in place with no diff/undo affordance
+    - "src/pages/Studio/SessionHistoryDrawer.jsx:1-318"    # the only 'history' UI in Studio — browses past SESSIONS (separate prompts), not caption revisions within one generation
+  observed_behavior: "The only table that could plausibly serve as per-generation content revision history (content_versions) is part of the admin moderation schema, is never read or written by any application code, and has fields (created_by_admin_id, quality_review_id) that make clear it was built for admin review workflows, not user-facing iteration. The 'Regenerate' button in Post Production is a blind reroll: no instruction field ('make it shorter/punchier/more formal'), no A/B compare of old vs. new, no revert-to-previous, and the previous caption is not even passed to the LLM as context to avoid producing a near-duplicate. A user can only iterate by typing manually into the caption textarea themselves."
+  expected_behavior: "Any tool competing with Jasper/Copy.ai/ChatGPT for content iteration needs, at minimum: instructable regeneration ('shorter', 'punchier', tone change), a way to see/restore a prior version, and ideally side-by-side variant comparison. This is explicitly called out as a Power-Migrant-persona dealbreaker in the audit brief itself."
+  expected_behavior_note: "n/a"
+  persona_impact:
+    power_migrant: "Will try 'make this punchier' or expect an undo/version history within the first few minutes and find neither — this is a stated churn trigger ('no revision history') for this exact persona."
+    casual_operator: "Less impacted day-to-day (they may just accept the first caption or hand-edit it), but still has no safety net if a manual edit goes wrong beyond browser undo."
+  severity: BLOCKER
+  blast_radius: ["P3"]
+  effort: M
+  effort_reasoning: "Needs a real schema (or genuine repurposing of content_versions with a non-admin-coupled shape), a write on every regenerate/manual-save, an instruction parameter threaded through generate-post-metadata's prompt, and revision-history UI — non-trivial but well-scoped, not a rearchitecture."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P3-01"
+  source_agent: "A4"
+
+- finding_id: P3-004
+  pillar: P3
+  capability: "AI image-caption suggestions (mediaCaptionSuggestions.js)"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/services/groqClient.js:7-9"    # BROWSER_GROQ_TOKEN = '' (hardcoded empty); GROQ_TOKEN = BROWSER_GROQ_TOKEN
+    - "src/services/groqClient.js:154-164" # hasGroq()/providerOrder() → always returns [] since GROQ_TOKEN is always falsy
+    - "src/services/groqClient.js:214-223" # callWithFailover throws 'No browser LLM provider is configured...' immediately, every call, unconditionally
+    - "src/services/mediaCaptionSuggestions.js:122-157" # generateImageCaptionSuggestions: catches the guaranteed vision-call failure, catches the guaranteed text-call failure, then returns buildStaticFallback() — two hardcoded generic strings
+    - "src/services/mediaCaptionSuggestions.js:84-96"   # buildStaticFallback: 'Fresh visual from our ${context} content stack...' / 'Behind this post is a simple goal...' — literal hardcoded copy
+    - "src/org/components/calendar/CalendarBatchScheduleModal.jsx:156" # the only live caller (org-scoped, out of personal-dashboard scope)
+  observed_behavior: "generateImageCaptionSuggestions() is architected to look like a real two-tier AI fallback (vision model → text model → static default), but the browser-side Groq token is permanently hardcoded to an empty string by design ('Browser-exposed provider keys are intentionally disabled', groqClient.js:3-4), so both AI tiers throw on every single call, 100% of the time, and every user unconditionally receives the two hardcoded static captions. Nothing in the UI distinguishes 'AI suggestion' from 'hardcoded placeholder' — the caller presents these as generated suggestions."
+  expected_behavior: "Either wire this through a Supabase edge function (the pattern used correctly elsewhere in this same pillar, e.g. generate-caption) so it's real, or remove/relabel the feature so it doesn't present static copy as AI output."
+  persona_impact:
+    power_migrant: "Would notice within two uses that 'AI suggestions' are the exact same two captions every time, regardless of image content — an immediate trust breach once identified as fake, even though its only current caller is org-scoped."
+    casual_operator: "Might not notice on a single use, but the deception is real: the UI implies image-aware AI analysis that never runs."
+  severity: MAJOR
+  blast_radius: ["P3"]
+  effort: S
+  effort_reasoning: "Route generateImageCaptionSuggestions through a Supabase edge function (mirroring generate-caption's pattern) instead of a browser-side Groq call; the prompt/schema work is already written, only the transport is broken."
+  confidence: HIGH
+  unverified_notes: "This file's only reachable caller found in this audit is in src/org/** (CalendarBatchScheduleModal.jsx), which is formally out of the personal-dashboard scope this audit targets — flagged because mediaCaptionSuggestions.js was explicitly named in this agent's assigned file slice and the underlying defect (fake-AI-presented-as-real) is a Rule-6/dimension-6 finding regardless of which surface currently calls it."
+  trace_id: "T-P3-02"
+  source_agent: "A4"
+
+- finding_id: P3-005
+  pillar: P3
+  capability: "generate-caption edge function + SessionStore.generateCaption action"
+  status: STUBBED
+  maturity: L2
+  evidence:
+    - "src/stores/SessionStore.js:3000-3031" # generateCaption action: loads brand kit, last 5 real prior captions (anti-repetition), calls the edge fn correctly
+    - "supabase/functions/generate-caption/index.ts:95-108" # full engineered system prompt: brand voice, platform char limits, content pillars, dont_list, 5 hashtags
+    - "grep -rn \"generateCaption\\b\" src/pages src/components --include=*.jsx → zero matches"
+  observed_behavior: "This is the best-designed TEXT prompt in the pillar — it's the only one that feeds the LLM the user's actual previous captions specifically to avoid repetition (SessionStore.js:3008-3015), and has a tight, well-scoped system prompt (generate-caption/index.ts:95-108). It is never invoked by any component in src/pages or src/components — the action exists in the store but no button or effect calls it. The live 'Regenerate' caption flow instead goes through generate-post-metadata (P3-003's REGENERATE, a more generic title+caption+hashtags-in-one prompt with no anti-repetition context)."
+  expected_behavior: "A fully-built, well-engineered feature should be wired to the UI it was clearly built for, or removed to avoid confusion/drift between two parallel unmaintained caption-generation code paths."
+  persona_impact:
+    power_migrant: "Gets the weaker of two available caption-regeneration prompts by default, and would have no way to discover the better one exists — it's invisible."
+    casual_operator: "Not directly affected — the path they do get (generate-post-metadata) still works — but the product is quietly wasting a better implementation."
+  severity: MAJOR
+  blast_radius: ["P3"]
+  effort: S
+  effort_reasoning: "Wire the existing SessionStore.generateCaption action to a button in PostProductionPanel.jsx, or fold its anti-repetition context into generate-post-metadata's prompt and delete the orphan."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P3-01"
+  source_agent: "A4"
+
+- finding_id: P3-006
+  pillar: P3
+  capability: "Dead browser-side LLM call paths (callGroqJSON / callGroqVisionJSON consumers)"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/components/BrandKit/BrandKitConversation.jsx:4,57" # imports + calls callGroqJSON — always throws (see P3-004 evidence chain)
+    - "src/hooks/useGroqSuggestions.js:2,115"                  # same
+    - "src/services/suggestedPrompts.js:2,121"                 # same, reached only via src/components/Generate/GenerationCanvas.jsx:22, itself only imported by src/org/components/OrgGenerateComposer.jsx (org-scoped)
+    - "src/services/llmClient.js:1-30"                         # exports chat/generateBrief/checkBrandConsistency — grep for importers of this file across src/ returns zero hits outside the file itself"
+  observed_behavior: "Four more code paths depend on the same permanently-empty BROWSER_GROQ_TOKEN as P3-004 and will always throw if reached; BrandKitConversation.jsx and useGroqSuggestions.js additionally have zero importers anywhere in the codebase, and llmClient.js is entirely unimported. This is dead weight that will silently start 'working' incorrectly (throwing) the moment someone wires a button to it, since nothing here would surface as broken until then."
+  expected_behavior: "Dead/unreachable code that depends on an intentionally-disabled client secret should either be deleted or clearly marked, not left as live-looking exports."
+  persona_impact:
+    power_migrant: "No direct impact today (unreachable), but a future engineer wiring 'one more' AI feature into BrandKitConversation or useGroqSuggestions will ship a broken feature without realizing the transport was dead from day one."
+    casual_operator: "No impact — never reaches this code."
+  severity: MINOR
+  blast_radius: ["P3"]
+  effort: S
+  effort_reasoning: "Delete the four files/exports, or migrate them to the edge-function pattern before anything is wired to them."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P3-02"
+  source_agent: "A4"
+
+- finding_id: P3-007
+  pillar: P3
+  capability: "Empty/failed caption text is silently accepted as a successful generation"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/services/contentPlanValidator.js:120-125" # plan.caption.primary defaults to '' with only a console repairLog entry, never a thrown error
+    - "src/components/Generate/PostProductionPanel.jsx:221-235" # nextCaption falsy → the whole hydration effect no-ops; postProduction.caption stays '' with no distinct 'AI produced nothing' state
+    - "src/components/Generate/PostProductionPanel.jsx:800-806" # textarea placeholder 'Write your caption, or regenerate with AI...' — visually identical whether the AI failed to write anything or the user simply hasn't started
+  observed_behavior: "If the content-plan LLM call returns JSON without a usable caption.primary (malformed output, over-terse response, schema drift), validateAndRepairPlan silently patches it to an empty string and the pipeline proceeds to quality_gate_pass:true / stores the plan / renders the image — the generation is recorded as fully successful even though the core text deliverable is blank. The user sees an empty caption box indistinguishable from 'I haven't written one yet.'"
+  expected_behavior: "A missing caption from a paid AI generation should be treated as a partial failure (surfaced with a distinct message/retry affordance), not silently normalized into the same empty state as a blank starting point."
+  persona_impact:
+    power_migrant: "Would notice the image finished but the caption is empty and have no idea whether that's a bug, a quota issue, or just how the tool works — no error to act on."
+    casual_operator: "Most likely to just assume they need to type their own caption, never learning the AI silently failed and quietly doing the AI's job themselves for free."
+  severity: MAJOR
+  blast_radius: ["P3"]
+  effort: S
+  effort_reasoning: "Distinguish 'plan.caption.primary was missing/empty from the LLM' from 'user hasn't typed' with a flag threaded through to the UI, and log/alert on the rate of empty-caption plans."
+  confidence: HIGH
+  unverified_notes: "Have not observed this actually occurring in the live content_plans sample queried (the rows inspected all had real captions) — this is a code-path finding about an unguarded edge case, not a confirmed live occurrence. Frequency in production is UNVERIFIED without broader sampling of content_plans.content_plan->caption->primary for empty strings."
+  trace_id: "T-P3-01"
+  source_agent: "A4"
+
+- finding_id: P3-008
+  pillar: P3
+  capability: "Cost control / metering on text-generation LLM calls"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/generate-content-plan/index.ts:248-286" # serve handler: enforceRateLimit only, no ensureCreditsAvailable/recordCreditUsage anywhere in the file
+    - "supabase/functions/generate-post-metadata/index.ts:285-480" # same — no credit calls; also never stores llmResult.totalTokens anywhere (contrast with content_plans.groq_tokens_used)
+    - "supabase/functions/ai-brand-consistency-check/index.ts:48,101-109" # contrast: this org-only function DOES call ensureCreditsAvailable + recordCreditUsage(1 credit)
+    - "supabase/functions/_shared/rateLimit.ts:18-28" # generate-content-plan and generate-post-metadata are both capped only at 10 requests/min/user, nothing tighter"
+  observed_behavior: "Every personal-dashboard TEXT generation call (initial content-plan, every 'Regenerate caption & title' click) is free from the user's perspective and untracked from the business's perspective beyond a per-minute rate limit — there is no credit deduction and no per-call cost/token logging on the regenerate path. A user can call generate-post-metadata up to 10x/minute indefinitely (14,400 calls/day theoretically), each one a real Anthropic-preferred LLM call, with zero spend visibility to the operator."
+  expected_behavior: "Text generation cost should either be bundled into the flow's existing credit price (as quality-gate explicitly does for images, per its own doc comment) or independently tracked/capped, with token/cost data logged consistently across all text-generation edge functions, not just content_plans."
+  persona_impact:
+    power_migrant: "Not felt directly by the user — this is an operator-facing gap, but if unlimited free regeneration ever gets throttled/paywalled reactively, it will feel like a rug-pull rather than a pre-communicated limit."
+    casual_operator: "Benefits today (free unlimited caption regen) but this is unsustainable/inconsistent product economics, not a designed 'generous free tier.'"
+  severity: MAJOR
+  blast_radius: ["P3"]
+  effort: M
+  effort_reasoning: "Requires deciding the metering model (bundle into image credit vs. standalone text-credit cost), then threading credit checks + token logging through both edge functions consistently."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P3-01"
+  source_agent: "A4"
+
+- finding_id: P3-009
+  pillar: P3
+  capability: "Model-tier consistency within one generation's text lifecycle"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "supabase/functions/generate-content-plan/index.ts:194-198" # initial plan generation: preferredProvider:'groq' (Llama-3.3-70B)
+    - "supabase/functions/generate-post-metadata/index.ts:367-368" # 'Regenerate caption & title' button: preferredProvider:'anthropic' (Claude)
+    - "src/services/groqClient.js:281-284" # code comment acknowledging provider/model can silently differ from what was requested and callers 'must record these, not assume Groq'
+  observed_behavior: "The first-draft caption/hashtags/SEO for a generation are produced (when Groq is healthy) by Llama-3.3-70B-versatile, while clicking 'Regenerate caption & title' afterward routes to Claude by preference. A user iterating within one session can get qualitatively different writing styles/quality between their first draft and a regenerate, with no indication in the UI that the model changed underneath them (the response does include provider/model but the UI does not surface it to the end user)."
+  expected_behavior: "A coherent product should either keep model choice consistent within one generation's iteration lifecycle, or make the model/quality tradeoff an explicit, visible user choice — not an invisible side effect of which endpoint happened to be called."
+  persona_impact:
+    power_migrant: "Would eventually notice regenerated copy 'feels different' in voice/quality from the original and have no explanation available in-product."
+    casual_operator: "Unlikely to notice or care which model wrote which draft, as long as each individual result reads well."
+  severity: MINOR
+  blast_radius: ["P3"]
+  effort: S
+  effort_reasoning: "Align preferredProvider across generate-content-plan and generate-post-metadata, or surface model/provider in the UI so the inconsistency is at least legible."
+  confidence: MEDIUM
+  unverified_notes: "Whether this is felt as a real quality problem in practice depends on Llama-3.3-70B vs Claude Sonnet 4.6 output quality on this specific prompt style — not independently benchmarked in this audit, judged from prompt/model class only."
+  trace_id: "T-P3-01"
+  source_agent: "A4"
+
+# ── Appended by the orchestrator during Phase 2 model/cost research, 2026-08-21 ──
+
+- finding_id: P3-010
+  pillar: P3
+  capability: "default LLM model selection — two generations stale"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/_shared/llm.ts:51 — model: readEnv(ANTHROPIC_MODEL, false) || 'claude-3-5-sonnet-latest'"
+    - "supabase/functions/_shared/llm.ts:278 — same default in the document-extraction path"
+    - ".env.local — ANTHROPIC_MODEL is NOT SET (verified), so the code default applies"
+    - ".env.example:48,107 — ANTHROPIC_MODEL documented as an optional override, left empty"
+    - "audit/findings/A4-P3.yaml P3-001 — Groq fails 100%, so Claude serves ALL content-plan traffic"
+  observed_behavior: >
+    The Anthropic fallback defaults to claude-3-5-sonnet-latest, a 2024-generation
+    model, and the override env var is unset in every environment inspected. Because
+    Groq has been failing 100% since ~2026-08-18, this stale default is not a rarely
+    exercised fallback — it is currently generating ALL of the product content. Current
+    models (Claude Opus 5 at $5/$25 per MTok, Sonnet 5 at $3/$15, Haiku 4.5 at $1/$5)
+    are materially stronger at exactly the tasks this product performs: brand-voice
+    copywriting, structured JSON planning, and content scoring.
+    The output quality ceiling of the entire product is therefore set by a two-
+    generation-old model that nobody chose deliberately — it is a default nobody
+    revisited.
+  expected_behavior: >
+    Model selection should be explicit, current, and per-task: a cheap fast model for
+    high-volume low-stakes calls, a strong model for brand-voice generation and
+    scoring. Given the founder requirement that all pillars reach L5, output quality
+    cannot be capped by an unexamined default.
+  persona_impact:
+    power_migrant: "Directly compares output against ChatGPT or Claude used natively on current models, and finds this weaker. Since generation quality is the product, this alone can lose the switch."
+    casual_operator: "Cannot name the cause, but experiences generic-sounding copy and concludes the AI is not very good."
+  severity: MAJOR
+  blast_radius: ["P1", "P2", "P4", "P7"]
+  effort: S
+  effort_reasoning: "Changing the default and setting ANTHROPIC_MODEL is trivial. The real work is choosing a per-task model policy and re-testing prompt quality against the new model, since prompts tuned for 3.5 Sonnet may behave differently."
+  confidence: HIGH
+  unverified_notes: "Production Supabase edge secrets may set ANTHROPIC_MODEL to something current — UNVERIFIED, needs the Supabase dashboard. If unset there too, this is live. Many other claude-* model strings appear across the repo (opus-4-6, opus-4-8, haiku-4-5, etc.); those appear in registries/docs, whereas llm.ts is the path that actually executes."
+  trace_id: "T-P3-10"
+  source_agent: "orchestrator"

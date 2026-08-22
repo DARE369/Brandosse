@@ -1,0 +1,139 @@
+# P10o — Scale, jobs & cost
+# source_agent: A13 (agent runs killed by session limits; completed directly by the orchestrator)
+# Full arithmetic in audit/findings/A13-cost-model.md. Verified 2026-08-21.
+
+- finding_id: P10o-001
+  pillar: P10
+  capability: "unit economics — one credit unit priced across two incompatible cost bases"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/lib/video-engine/credit-packages.ts:3 — 1 credit = 1 minute of source video processing"
+    - "src/lib/video-engine/credit-packages.ts:16-45 — $15/100, $35/300, $99/1000 credits ($0.099-0.150 per credit)"
+    - "supabase/functions/generateVideo/index.ts:32-33 — CREDITS_STD_VIDEO=5, CREDITS_PRO_VIDEO=15"
+    - "supabase/functions/_shared/fal.service.ts:585-594 — videoHailouPerClip $0.500, videoKlingPerSec $0.070"
+    - "audit/findings/A13-cost-model.md sections 2-4"
+  observed_behavior: >
+    The credit is defined as a minute of source video processing — a clipping concept —
+    and then reused to price video generation, whose cost structure is unrelated.
+    Cost to the business per credit: clipping $0.0033-0.0050; video generation standard
+    $0.100. That is a 20-30x spread on an identically priced unit.
+    At the cheapest credit tier ($0.099), a standard video generation earns $0.495
+    against a $0.500 internal cost estimate — a loss. Premium (15 credits) earns 53-76%.
+    The cheaper-sounding tier costs the business more than twice as much per credit as
+    the premium one.
+    A rational user maximises value by spending every credit on video generation, which
+    is the loss-making activity. The only thing currently preventing that arbitrage is
+    that video generation does not work (1 real asset in 32 attempts, P4-002).
+  expected_behavior: >
+    Pricing units must track cost structure. Video generation should be priced per
+    second against actual provider cost, or on a separate unit from clipping minutes.
+  persona_impact:
+    power_migrant: "Will find the cheapest cost-per-output path quickly and optimise into it — precisely the path that loses money."
+    casual_operator: "Cannot reason about credits spanning 30x cost differences, and will feel misled when a video costs 5-15 credits while an hour of clipping costs 60."
+  severity: BLOCKER
+  blast_radius: ["P4", "P5"]
+  effort: M
+  effort_reasoning: "Repricing plus migration of existing balances and packages. The arithmetic is straightforward; the product and comms work around changing a live pricing model is the real cost."
+  confidence: HIGH
+  unverified_notes: "Internal cost table estimates Hailuo at $0.500/clip; market rate is $0.28 (D2 section 1.4) — a 79% overestimate that distorts every downstream decision. Reconcile before repricing."
+  trace_id: "T-P10o-01"
+  source_agent: "A13"
+
+- finding_id: P10o-002
+  pillar: P10
+  capability: "fixing video generation makes unit economics worse"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "audit/findings/A13-cost-model.md section 5 (heavy-user profile: 82% of cost is video generation)"
+    - "audit/findings/A5-P4.yaml P4-002 (0 successful fal.ai generations in product history)"
+    - "Gate 0: founder designated P4 a launch surface requiring L3+"
+  observed_behavior: >
+    Blended margins currently look healthy (94% for a typical user) primarily because
+    video generation never succeeds, so its cost is never incurred. For a heavy user,
+    modelled video generation is 82% of total cost — everything else in the product
+    combined is about $3/month. A user spending a full Pro pack (1,000 credits, $99)
+    entirely on standard video generation would cost roughly $100 to serve.
+    Therefore repairing P4 — a launch requirement — converts a theoretical cost into a
+    real one and degrades unit economics rather than improving them.
+  expected_behavior: >
+    The pricing model must be corrected BEFORE P4 is repaired, not after. Shipping a
+    working P4 on the current credit model would sell a loss-making product at scale.
+  persona_impact:
+    power_migrant: "Unaffected directly — this is a business-survival issue, not a UX one."
+    casual_operator: "Unaffected directly; would be affected by the price rise that eventually becomes necessary."
+  severity: BLOCKER
+  blast_radius: ["P4"]
+  effort: S
+  effort_reasoning: "The decision and repricing are small work. Flagged BLOCKER because of sequencing: it must precede the P4 repair, and that ordering constraint is easy to miss."
+  confidence: HIGH
+  unverified_notes: "Depends on the Hailuo cost reconciliation in P10o-001. At the $0.28 market rate the standard tier is profitable (43% at Pro pricing) and this finding softens considerably — but does not disappear, since video remains the dominant cost driver."
+  trace_id: "T-P10o-02"
+  source_agent: "A13"
+
+- finding_id: P10o-003
+  pillar: P10
+  capability: "silent 3x overcharge on standard text-to-video"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/generateVideo/index.ts:102-104 — tierUpgraded = requestedQuality === standard && !isI2V; creditsNeeded = premium ? 15 : 5"
+    - "supabase/functions/generateVideo/index.ts:99-100 — comment states Hailuo 2.3 is image-to-video only"
+    - "audit/findings/A5-P4.yaml P4-006"
+  observed_behavior: >
+    A user requesting the standard tier without a source image is silently upgraded to
+    premium and charged 15 credits instead of 5 — three times the price they selected.
+    The transaction description records it as a tier upgrade, but the user chose the
+    cheap option and was billed the expensive one.
+    Note this incidentally protects margin, since the standard path is the loss-making
+    one. The business is currently shielded by a billing surprise.
+  expected_behavior: >
+    Either the standard tier supports text-to-video at its stated price, or the UI
+    prevents selecting it without an image and states the real price before charging.
+    Silent 3x price changes are refund and chargeback events.
+  persona_impact:
+    power_migrant: "Notices the credit discrepancy immediately, reads it as deceptive billing, and disputes it publicly."
+    casual_operator: "Does not notice until credits run out three times faster than expected, then cannot explain why."
+  severity: MAJOR
+  blast_radius: ["P4"]
+  effort: S
+  effort_reasoning: "Surface the upgrade in the UI with explicit consent before deduction, or block the invalid combination. The detection logic already exists at line 102."
+  confidence: HIGH
+  unverified_notes: "Whether the UI warns before submission was not fully traced — the P9 agent did not reach the video-generation surface in depth."
+  trace_id: "T-P10o-03"
+  source_agent: "A13"
+
+- finding_id: P10o-004
+  pillar: P10
+  capability: "live provider-routing cost inversion"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/generate-content-plan/index.ts:198 — Groq preferred"
+    - "live DB content_plans.plan_provider — anthropic for 16 consecutive rows 2026-08-18 to 2026-08-20; last groq row 2026-08-06"
+    - "supabase/functions/_shared/llm.ts:51 — Anthropic default model claude-3-5-sonnet-latest"
+    - "audit/findings/A4-P3.yaml P3-001, P3-010"
+  observed_behavior: >
+    Groq has failed 100% of content-plan calls for days; the Claude fallback absorbs all
+    of it correctly, so nothing is user-visible and nothing alerted. Groq
+    llama-3.3-70b-versatile runs roughly $0.59/$0.79 per MTok against Claude 3.5 Sonnet
+    at $3/$15 — approximately 5x input and 19x output cost versus the intended path.
+    At present volumes the absolute cost is trivial. At launch volume it is the
+    difference between a 94% and a roughly 70% margin on the typical user.
+    The fallback working correctly is what allowed the failure to persist unnoticed —
+    a direct consequence of the monitoring blind spot in P7-005.
+  expected_behavior: >
+    Provider fallback must emit an alert. A cost-relevant routing change that persists
+    for days without detection is an observability failure, not a provider failure.
+  persona_impact:
+    power_migrant: "Invisible; arguably benefits from higher-quality inference than intended."
+    casual_operator: "Invisible."
+  severity: MAJOR
+  blast_radius: ["P3", "P10"]
+  effort: S
+  effort_reasoning: "Root-cause the Groq key or model deprecation, then add an alert on fallback activation. The alerting gap is the durable fix and is small."
+  confidence: HIGH
+  unverified_notes: "Root cause of the Groq failure is UNVERIFIED — expired key vs llama-3.3-70b-versatile deprecation vs provider outage. Requires Supabase edge secrets and Groq dashboard access."
+  trace_id: "T-P10o-04"
+  source_agent: "A13"

@@ -1,0 +1,174 @@
+# P7 — SEO & reach engineering
+# source_agent: A9 (agent runs killed by API/session limits; completed directly by the orchestrator)
+# All findings first-hand verified against code + live DB (read-only), 2026-08-20.
+
+- finding_id: P7-001
+  pillar: P7
+  capability: "discovery score — the scoring engine"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/_shared/seo.ts:15-22 (SeoScoreInput type — the complete input surface)"
+    - "supabase/functions/_shared/seo.ts:35-45 (BREAKDOWN_WEIGHTS, hand-assigned)"
+    - "supabase/functions/_shared/seo.ts:212-231 (callScoringLlm, preferredProvider anthropic, temperature 0.2)"
+    - "supabase/functions/_shared/seo.ts:233-297 (scoreContent: LLM JSON -> 9 sub-scores -> weighted sum)"
+  observed_behavior: >
+    The discovery score is an LLM (Claude-preferred, temp 0.2) asked to rate a post
+    across 9 dimensions — readability, keywordRelevance, hashtagQuality, hookStrength,
+    ctaStrength, platformFit, brandConsistency, visualCaptionAlignment,
+    recommendationPotential — whose outputs are combined by a hand-assigned weight
+    vector into a 0-100 number. The engineering around it is genuinely careful:
+    invalid JSON triggers one corrective retry (seo.ts:258-272), a second failure
+    throws rather than fabricating a 0, and the UI renders "unscored, retry" instead
+    of a fake score. Scale normalization handles models that answer on a 10-point scale.
+    CRITICAL: SeoScoreInput is {title, caption, hashtags, platform, mediaType,
+    visualPrompt}. Every input originates from the post being scored. NO external
+    signal of any kind enters this function — no keyword volume, no competitor data,
+    no platform trend data, and no performance history from the user's own past posts.
+  expected_behavior: >
+    A user who has used VidIQ, TubeBuddy, or even a basic SEO tool expects scores
+    anchored to observable reality — search volume, competition, or measured
+    performance of comparable content. A score with no ground truth is an opinion
+    rendered as a number.
+  persona_impact:
+    power_migrant: "Recognizes an LLM opinion dressed as a metric within minutes. Because the score cannot be validated against outcomes, they will not let it influence their content decisions — and the feature loses all credibility."
+    casual_operator: "Trusts the number precisely because it looks authoritative, and optimizes toward a target that has never been shown to correlate with reach. Actively misleading for the persona least able to detect it."
+  severity: MAJOR
+  blast_radius: ["P1", "P2", "P8"]
+  effort: XL
+  effort_reasoning: "Grounding the score requires a real signal source: either ingesting platform/keyword data (new third-party integration) or closing the loop so the user's own published performance trains the weights. The second depends on P6 real publishing and P8 real analytics, neither of which currently supplies data. This is architecture, not tuning."
+  confidence: HIGH
+  unverified_notes: "The 9 sub-dimensions and their weights may well be reasonable heuristics; no claim is made that they are wrong — only that nothing validates them. Testing correlation against real outcomes is impossible today because there is almost no real performance data (9 published posts, 6 on one account)."
+  trace_id: "T-P7-01"
+  source_agent: "A9"
+
+- finding_id: P7-002
+  pillar: P7
+  capability: "the discovery score cannot learn (no feedback path)"
+  status: MISSING
+  maturity: L0
+  evidence:
+    - "supabase/functions/_shared/seo.ts:15-22 (no performance fields in the input type)"
+    - "supabase/functions/_shared/seo.ts:35-45 (weights are compile-time constants, not learned)"
+    - "grep of seo.ts for engagement|historical|performance|analytics|impressions: only match is prompt text at seo.ts:147 warning against engagement bait"
+  observed_behavior: >
+    The scoring weights are hardcoded constants. No mechanism reads what actually
+    performed and adjusts scoring. A post that scored 92 and reached nobody, and a post
+    that scored 41 and went viral, change nothing about how the next post is scored.
+    The system cannot improve at its central promise.
+  expected_behavior: >
+    The product thesis states insights must mechanically re-enter the loop and that
+    reach is part of the product. A discovery score that never learns from outcomes
+    violates both constraints directly.
+  persona_impact:
+    power_migrant: "The product cannot get better at the one thing they hired it for. There is no compounding advantage to staying, which removes the retention argument entirely."
+    casual_operator: "Never perceives the absence, but receives permanently un-improving advice."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P3", "P8"]
+  effort: XL
+  effort_reasoning: "Requires the full chain: real publishing at volume (P6) -> real metrics ingestion (P8) -> attribution from generation to published performance -> a training or weighting mechanism. This is the product's core differentiating loop and is currently absent end to end."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P7-02"
+  source_agent: "A9"
+
+- finding_id: P7-003
+  pillar: P7
+  capability: "trend signal ingestion for reach"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "live DB trending_topics: written daily at 02:00 UTC, newest 2026-08-20T02:00:07Z; only two distinct topic strings ever — 'AI Tools' and 'Content Creation Tips'"
+    - "supabase/functions/daily-analysis/index.ts:337-372 (hardcoded topic constants)"
+    - "audit/findings/A10-P8.yaml P8-001, P8-002"
+    - "audit/findings/A2-P1.yaml P1-001 (trend/real-world signal ingestion STUBBED)"
+  observed_behavior: >
+    CORRECTED 2026-08-20 — an earlier version of this finding stated daily-analysis was
+    never scheduled. That was WRONG. It runs daily at 02:00 UTC and has done so for
+    roughly five months. The error came from trusting get_cron_job_status(), which is
+    blind by construction (see P7-005).
+    The trend signal is fabricated: two hardcoded topic strings written across four
+    platforms, every day, for ~1200 rows. Verified independently against live data —
+    only 'AI Tools' and 'Content Creation Tips' have ever existed in the table.
+    So trend ingestion is worse than absent: a job runs, writes rows, and produces the
+    appearance of a live trend feed containing no real-world signal whatsoever.
+  expected_behavior: >
+    Trend signals must derive from real platform or search data to be worth anything.
+    A daily job writing two constant strings is a simulation of a feature.
+  persona_impact:
+    power_migrant: "Two static topics repeated daily is detectable in one glance and reads as deceptive rather than merely incomplete."
+    casual_operator: "Would be shown fabricated topics as though they were live market trends, with no way to tell the difference."
+  severity: MAJOR
+  blast_radius: ["P1", "P2", "P8"]
+  effort: L
+  effort_reasoning: "Not a scheduling fix — the job already runs. Requires a real trend data source (new third-party integration or platform API), which under the Completion Lock means the current fabricated writer should be disabled rather than extended. Sizing reflects sourcing real data, not wiring cron."
+  confidence: HIGH
+  unverified_notes: "The exact scheduler invoking daily-analysis is UNIDENTIFIED — it is not visible via get_cron_job_status() and cron.job is not reachable over PostgREST. Needs Supabase dashboard access to name it. That it runs is certain from the row timestamps."
+  trace_id: "T-P7-03"
+  source_agent: "A9"
+
+- finding_id: P7-005
+  pillar: P7
+  capability: "cron/job observability (cross-cutting — surfaced during P7 verification)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/migrations/20260710110000_cron_reliability_and_credit_reset.sql:27-56"
+    - "specifically line 55: WHERE j.jobname IN ('process-scheduled-posts', 'process-risk-alerts', 'credit-monthly-reset')"
+    - "live DB trending_topics rows prove a 4th scheduled process runs daily and is invisible to this RPC"
+  observed_behavior: >
+    get_cron_job_status() filters cron.job through a HARDCODED allowlist of exactly
+    three job names. Any other scheduled job is invisible to it by construction. The
+    healthCheck edge function calls this RPC, so production health monitoring reports
+    all-clear while an unknown number of jobs run unobserved. This directly caused a
+    false conclusion during this audit — the fabricated-trends job (P7-003) ran daily
+    for ~5 months without appearing in the system's own monitoring.
+  expected_behavior: >
+    Job monitoring must enumerate all jobs in cron.job, not a hardcoded subset, and
+    alert on unknown or failing jobs rather than silently omitting them.
+  persona_impact:
+    power_migrant: "Invisible to users directly, but it is the reason failures reach them before they reach the operator."
+    casual_operator: "Same — experienced as unexplained breakage that nobody noticed first."
+  severity: MAJOR
+  blast_radius: ["P2", "P6", "P8", "P10"]
+  effort: XS
+  effort_reasoning: "Delete the WHERE clause and add an alert on unknown/failing jobs. One migration."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P7-05"
+  source_agent: "A9"
+
+- finding_id: P7-004
+  pillar: P7
+  capability: "cold-start path for a zero-audience account"
+  status: MISSING
+  maturity: L0
+  evidence:
+    - "supabase/functions/_shared/seo.ts:15-22 (scoring is per-post text only)"
+    - "audit/findings/A8-P6.yaml P6-001 (real publishing exists on one platform, one account)"
+    - "audit/findings/A3-P2.yaml P2-003 (optimal_posting_times: 0 live rows; OptimalTimesService.js imported nowhere)"
+    - "live RPC get_cron_job_status() (no trend/analysis job scheduled)"
+  observed_behavior: >
+    Walking the thesis constraint concretely — a user signs up today with 0 followers.
+    What in this product materially improves their odds of being discovered? Verified
+    mechanisms: an LLM rates their caption text and suggests edits. That is the
+    complete list. Posting-time optimization does not run (0 rows, service unimported).
+    Trend signals do not refresh (job unscheduled). Performance never feeds back
+    (P7-002). Hashtags are LLM-guessed with no volume or competition data. There is no
+    thumbnail optimization, no platform-algorithm modeling, and no cross-account or
+    collaborative signal.
+  expected_behavior: >
+    The thesis states reach is part of the product and that small/new accounts must have
+    a credible path to an audience. Meeting that requires at least one mechanism
+    grounded in real distribution data. Currently zero such mechanisms exist.
+  persona_impact:
+    power_migrant: "This is the entire reason they would switch. Its absence means there is no wedge — the product is a nicer editor, not a growth system."
+    casual_operator: "Follows the score to 90+, posts, reaches nobody, and concludes the product does not work. The score's authority makes the disappointment worse."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P3", "P8"]
+  effort: XL
+  effort_reasoning: "This is the product's central promise and is currently unimplemented in every mechanism. It cannot be closed by polish; it needs a real signal source and a working loop. Sizing it honestly: this is the single largest gap in the audit."
+  confidence: HIGH
+  unverified_notes: "P9 (dashboard) and P8 (analytics) audits were killed before completion; if either surfaces a reach mechanism not visible from the scoring path, this finding must be revised. On current evidence, none exists."
+  trace_id: "T-P7-04"
+  source_agent: "A9"

@@ -1,0 +1,234 @@
+# A3 — Pillar P2 (Content planning & strategy), personal dashboard only
+# Live calendar route: app/app/calendar/page.jsx:1 -> src/pages/Calendar/CalendarPage.jsx
+# (src/pages/CalendarPage/ is empty/dead; confirmed via find + grep, no imports reference it)
+
+- finding_id: P2-001
+  pillar: P2
+  capability: "content pillars / content strategy themes"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "supabase/functions/daily-analysis/index.ts:243-252 (only reader of content_pillars table)"
+    - "live query: GET /rest/v1/content_pillars?select=*&limit=3 -> 15 rows total, ALL identical: name=Educational, description='Educational and informative content', color=#10b981, keywords=[tutorial,howto,tips,guide,learn], created_at=2026-01-08T11:36:58.549922+00:00 for every row (one per user)"
+    - "grep -rn content_pillars src app supabase: zero INSERT/UPDATE call sites anywhere in src/**; only src/org/** (BrandKitPage.jsx:44,74,621-662; out of scope) touches a *different* thing — a content_pillars JSON column on brand_settings, not this table"
+  observed_behavior: "The live content_pillars table is real and has one row per user, but every row is byte-identical seed data stamped at the same timestamp — clear evidence of a one-time backfill script, not a user-authored feature. No personal-dashboard component reads, lists, creates, or edits a content pillar. The only code that ever queries this table is the daily-analysis edge function's ghost-slot generator."
+  expected_behavior: "A content-planning feature should let a user define/name/color 2-5 recurring content themes, see them surfaced when scheduling, and rotate through them — table stakes for any 'content calendar' competitor (Later, Buffer, Planable all have this)."
+  persona_impact:
+    power_migrant: "Has used tools with real content-pillar rotation and reporting by theme; finds a single hardcoded 'Educational' pillar with no edit UI and concludes strategy planning isn't real here."
+    casual_operator: "Never sees content pillars mentioned anywhere in the personal calendar UI, so has no idea the concept exists or that it silently gates the ghost-slots feature (P2-002)."
+  severity: MAJOR
+  blast_radius: ["P2-002"]
+  effort: M
+  effort_reasoning: "Needs a settings UI (CRUD) plus wiring it into the schedule/quick-post flow to be meaningful — table and read path already exist."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P2-01"
+  source_agent: "A3"
+
+- finding_id: P2-002
+  pillar: P2
+  capability: "ghost slots (AI-suggested content calendar gaps)"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "supabase/functions/daily-analysis/index.ts:230-324 (generateGhostSlotsForUser — full generation logic exists)"
+    - "supabase/functions/daily-analysis/index.ts:374-400 (pg_cron scheduling SQL is left as a comment block, 'Run this in Supabase SQL Editor' — not in any migration or supabase/config.toml)"
+    - "grep -rn 'cron.schedule|pg_cron' supabase/migrations: no results; grep -rn daily-analysis src app: no client invocation anywhere"
+    - "live query: GET /rest/v1/calendar_settings?select=*&limit=3 -> ghost_slots_enabled=false for all 7 rows (every live user); no src/** write path to calendar_settings exists (grep confirms only daily-analysis reads it, no personal settings page found)"
+    - "live query: GET /rest/v1/ghost_slots?select=* -> 0 rows (Content-Range: */0)"
+  observed_behavior: "The ghost-slot generator is fully coded (reads content_pillars, trending_topics, optimal_posting_times, writes suggestions to ghost_slots) but is gated behind (a) calendar_settings.ghost_slots_enabled, which is false for every live user with no UI anywhere to flip it, and (b) content_pillars existing (P2-001, which is dead seed data), and is only ever triggered by a manually-run pg_cron job whose setup SQL sits commented out in the function file with no evidence it was ever executed. The live table has zero rows, confirming the pipeline has never produced output for a real user."
+  expected_behavior: "Ghost slots (proactive 'you have a gap on Thursday, here's what to post' suggestions) should appear on the calendar grid automatically once enabled, driven by a scheduled job a user doesn't have to manually configure via SQL."
+  persona_impact:
+    power_migrant: "Would expect this kind of proactive scheduling nudge from any modern tool; it doesn't exist reachable from the UI at all despite the backend code implying it's a shipped feature."
+    casual_operator: "Never encounters ghost slots since there's no setting to turn them on and no cron job populating them even if there were."
+  severity: MAJOR
+  blast_radius: ["P2-001", "P2-003"]
+  effort: L
+  effort_reasoning: "Needs: personal settings UI for calendar_settings, a real pg_cron (or alternative trigger) wired up and verified live, a populated content_pillars UI, and calendar UI to render ghost_slots rows."
+  confidence: HIGH
+  unverified_notes: "Cannot directly query pg_cron.job via PostgREST (not exposed); absence is inferred from zero rows in ghost_slots + zero grep hits for any invocation path, not a direct cron-table read."
+  trace_id: "T-P2-02"
+  source_agent: "A3"
+
+- finding_id: P2-003
+  pillar: P2
+  capability: "best time to post / optimal posting time recommendation"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/services/OptimalTimesService.js:1-466 (complete Groq-backed analysis pipeline: analyzeOptimalTimes, getRecommendedTime, analyzeAllPlatforms, analyzeTrendingTopics)"
+    - "grep -rn OptimalTimesService src app: zero import sites anywhere in the codebase — the entire file is dead code"
+    - "grep -rn get_best_posting_time src app supabase: zero hits — the RPC named in ground truth is never called by any client or edge function"
+    - "live query: GET /rest/v1/optimal_posting_times?select=* -> 0 rows (Content-Range: */0), confirming the pipeline has never executed for any user"
+    - "supabase/functions/daily-analysis/index.ts:109-182 (a second, edge-function copy of the same optimal-times logic) is also never invoked client-side (no client call site, no verified cron — see P2-002)"
+  observed_behavior: "A full best-time-to-post feature (with an LLM call, a fallback to per-platform industry-average defaults in getDefaultBestTime, and a getRecommendedTime(userId, platform, targetDate) API) is written twice (once client-side, once in the edge function) and neither copy is ever called. ScheduleModal.jsx and QuickPostComposer.jsx do not surface any best-time suggestion to the user when picking a schedule slot."
+  expected_behavior: "When scheduling a post, the picker should suggest (or default to) a data-backed best time, a baseline feature in Later/Buffer/Hootsuite."
+  persona_impact:
+    power_migrant: "Actively looks for 'best time to post' when scheduling and finds no such affordance anywhere in the schedule modal or quick post composer."
+    casual_operator: "Doesn't know to ask for it, but ends up picking arbitrary times with zero guidance, hurting their reach."
+  severity: MAJOR
+  blast_radius: []
+  effort: M
+  effort_reasoning: "The analysis code already exists (dead but reusable); real work is wiring getRecommendedTime into ScheduleModal/QuickPostComposer and verifying the Groq call path and fallback under real data."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P2-03"
+  source_agent: "A3"
+
+- finding_id: P2-004
+  pillar: P2
+  capability: "AI week-plan generation and apply (Ask AI / ⌘K command bar)"
+  status: STUBBED
+  maturity: L2
+  evidence:
+    - "src/calendar/components/CalendarCommandBar.jsx:9 ('Generate a week plan for 3 posts' is the FIRST suggested command shown to every user who opens ⌘K)"
+    - "supabase/functions/calendar-ai/index.ts:97-112 (weekPlanData: real Groq call, real structured plan JSON) and :143-159 (command intent 'week_plan' auto-generates the plan inline and always attaches a week_plan action)"
+    - "src/calendar/components/CalendarCommandBar.jsx:178-189 (client-side guarantees a 'week_plan' and 'suggest_slots' action button is always shown when those intents fire) and :198-206 (handleApplyAction forwards the action + full AI result to the parent via onApplyAction)"
+    - "src/pages/Calendar/CalendarPage.jsx:568-606 (handleCommandApply): only 3 of the 7 documented action types are handled — 'reschedule' (571-578), 'update_caption' (580-597), 'audit' (599-603). 'week_plan', 'suggest_slots', 'add_draft_post', and 'delete_post' all fall through to the final `setCmdBarOpen(false); return;` at line 605 with no DB write, no toast, no error."
+    - "supabase/functions/calendar-ai/index.ts:120-129 documents all 7 action payload shapes including add_draft_post and delete_post, none of which CalendarPage implements"
+  observed_behavior: "User asks the AI to plan their week (the app's own top suggested command). The edge function does real work and returns a full multi-day plan. The UI renders an 'Apply week plan' button per CalendarCommandBar.jsx:78/180-184. Clicking it silently closes the dialog — CalendarPage.handleCommandApply has no case for 'week_plan', so nothing is created, no toast fires, no error is shown. The identical silent no-op happens for 'Show optimal slots', 'Schedule draft' (add_draft_post), and 'Delete post' action buttons."
+  expected_behavior: "Clicking 'Apply week plan' should create draft/scheduled posts rows for each plan entry (reusing createPost/createQuickPost, which this same file already imports); 'Delete post' and 'Schedule draft' should perform their named action; a competitor's AI planning assistant that silently drops the user's approved output on click would be a shipped bug, not a beta feature."
+  persona_impact:
+    power_migrant: "Uses the flagship AI planning feature exactly as advertised (the first suggested command), gets a plan, clicks Apply, and nothing happens with zero feedback — reads as broken software and erodes trust in every other AI feature on the page."
+    casual_operator: "Doesn't know enough to notice anything is missing (no error appears) but never gets the batch scheduling they asked for and has no idea why; likely repeats the fruitless action or gives up on the assistant entirely."
+  severity: BLOCKER
+  blast_radius: ["P2-002", "P2-003"]
+  effort: S
+  effort_reasoning: "The create machinery already exists in this same file (createPost/createQuickPost, commitReschedule); this is adding 3-4 missing switch cases in handleCommandApply that call already-existing functions, not new plumbing."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P2-04"
+  source_agent: "A3"
+
+- finding_id: P2-005
+  pillar: P2
+  capability: "campaigns / content series / repurposing"
+  status: MISSING
+  maturity: L0
+  evidence:
+    - "grep -rniE 'campaign|content series|repurpos' across src/calendar/**, src/pages/Calendar/**, supabase/functions/calendar-ai/**, supabase/functions/generate-content-plan/**: zero matches"
+    - "src/calendar/services/calendarService.js:1-429 (the entire personal data layer) has no campaign_id/series_id column usage, no grouping concept beyond generation_id (multi-platform fan-out of one asset, not a campaign)"
+  observed_behavior: "There is no concept anywhere in the personal calendar of grouping posts into a campaign or series, nor any 'repurpose this post for another platform/format' action."
+  expected_behavior: "Planning 'a body of work' (per the pillar's core question) implies grouping related posts under a campaign/series and reusing content across platforms — standard in Planable, Sprout Social, CoSchedule."
+  persona_impact:
+    power_migrant: "Came from a tool with campaign grouping and reporting; cannot represent a multi-week launch or series here at all, a 10-minute churn trigger."
+    casual_operator: "Doesn't need campaign tooling for occasional single posts, so this gap is invisible to them — the one persona this doesn't hurt."
+  severity: MAJOR
+  blast_radius: []
+  effort: XL
+  effort_reasoning: "Needs new schema (campaign/series table + FK on posts), new UI surfaces across grid/list/drawer, and bulk-apply semantics — a genuinely new feature, not a fix."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P2-05"
+  source_agent: "A3"
+
+- finding_id: P2-006
+  pillar: P2
+  capability: "bulk operations (multi-select, bulk reschedule, bulk delete)"
+  status: MISSING
+  maturity: L0
+  evidence:
+    - "grep -rniE 'bulk|multiSelect|multi-select|selectAll' src/calendar/**, src/pages/Calendar/**: only hit is a comment in calendarService.js:201 naming bulk-delete as a hypothetical future caller of the single-id deletePost()"
+    - "src/calendar/services/calendarService.js:204-214 (deletePost) takes exactly one postId, .eq('id', postId) — no array/IN-clause variant exists"
+    - "src/pages/Calendar/CalendarPage.jsx: confirmDeletePost (420-433) and handleDeletePost (416-418) operate on a single deleteConfirmTarget only; no checkbox/selection state exists anywhere in CalendarGrid.jsx, CalendarListView.jsx, or UnscheduledRail.jsx"
+  observed_behavior: "Every post action (delete, reschedule, duplicate, unschedule) operates on exactly one post at a time via the detail drawer or individual card controls. There is no way to select multiple posts/drafts and act on them together."
+  expected_behavior: "A Power Migrant expects to select 20 stale drafts and bulk-delete or bulk-reschedule them in one action — table stakes once post volume grows past a handful."
+  persona_impact:
+    power_migrant: "Churns in minutes once they have more than a few drafts/posts to clean up or reschedule around a launch date change — this is explicitly the persona's stated 10-minute churn trigger for missing bulk actions."
+    casual_operator: "Rarely has enough volume to need bulk actions, so this gap doesn't register for them."
+  severity: MAJOR
+  blast_radius: []
+  effort: M
+  effort_reasoning: "Selection state + toolbar UI across 3 view components, plus IN-clause service functions (deletePosts, reschedulePosts) built on the existing single-post primitives."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P2-06"
+  source_agent: "A3"
+
+- finding_id: P2-007
+  pillar: P2
+  capability: "drafts rail pagination"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/calendar/services/calendarService.js:101-114 (fetchDrafts): .order('created_at', { ascending: false }).limit(50) — hardcoded, no offset/cursor param"
+    - "src/calendar/hooks/useCalendarPosts.js:181-203 (useCalendarDrafts) calls fetchDraftsService(scope) with no range/pagination args and exposes no 'load more' affordance"
+  observed_behavior: "A user with more than 50 draft posts silently loses visibility into their 51st-oldest and beyond — no pagination, no count indicator, no 'X more not shown' messaging."
+  expected_behavior: "Either paginate/infinite-scroll the drafts rail or clearly indicate more exist beyond the visible 50."
+  persona_impact:
+    power_migrant: "A prolific creator who batches drafts will silently lose track of older unscheduled content with zero warning that anything is being hidden."
+    casual_operator: "Unlikely to ever hit 50 drafts, so this is invisible to them."
+  severity: MINOR
+  blast_radius: []
+  effort: S
+  effort_reasoning: "Add a count query + 'Load more' button reusing the existing fetch with an offset."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P2-07"
+  source_agent: "A3"
+
+- finding_id: P2-008
+  pillar: P2
+  capability: "trending topics feed (feeds ghost slots' topic matching)"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "supabase/functions/daily-analysis/index.ts:337-372 (updateTrendingTopics): comment at line 340 reads '// In production, you'd call actual trend APIs here / // For now, using mock data or Groq analysis', followed by two hardcoded literal trend objects ('AI Tools', 'Content Creation Tips') upserted verbatim regardless of platform (lines 346-365)"
+    - "src/services/OptimalTimesService.js:397-455 (analyzeTrendingTopics) is a second, real Groq-backed implementation of the same concept, but per P2-003 it is never imported/called anywhere"
+  observed_behavior: "The only code path that actually runs (if daily-analysis's cron were ever active — unverified per P2-002) writes two identical hardcoded trend rows for every platform, not real trend data, directly contradicting its own comment about being a placeholder ('for now'). The real Groq-based trend analyzer exists but is dead code."
+  expected_behavior: "Trending-topics data feeding into ghost-slot suggestions should reflect actual current trends, not a static 'AI Tools' / 'Content Creation Tips' pair hardcoded at build time."
+  persona_impact:
+    power_migrant: "Would immediately recognize repeated generic trend suggestions across all platforms as fake/templated content, undermining trust in any AI insight surfaced by the app."
+    casual_operator: "Never reaches this since it's not surfaced in the personal calendar UI at all (only feeds the already-broken ghost_slots pipeline, P2-002)."
+  severity: MINOR
+  blast_radius: ["P2-002"]
+  effort: S
+  effort_reasoning: "The real implementation (analyzeTrendingTopics in OptimalTimesService.js) already exists; swapping the mock call for it in daily-analysis is a small change once P2-002's cron/trigger question is resolved."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P2-08"
+  source_agent: "A3"
+
+- finding_id: P2-009
+  pillar: P2
+  capability: "schedule/reschedule concurrency guard"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "src/calendar/hooks/useScheduleAction.js:122-175 (writePost): fetchPostUpdatedAt (line 138) and the actual updatePostService write (line 166) are two separate sequential network round-trips, not one atomic DB operation/transaction"
+    - "src/calendar/hooks/useScheduleAction.js:17-18 self-documents this: 'the staleness check is read-then-conditionally-write, not a DB-level constraint — see DECISIONS_LOG.md for why and the residual risk'"
+  observed_behavior: "Between the read of updated_at and the write, another concurrent request (e.g. the same user in two tabs, or a future org-mode multi-editor case) can slip in and be silently overwritten, since Postgres/PostgREST is never told to make the check-and-write atomic (no WHERE updated_at = X on the UPDATE itself)."
+  expected_behavior: "True optimistic concurrency should apply the updated_at check as a WHERE clause on the UPDATE statement itself (single round trip, atomic), not as a separate preceding SELECT."
+  persona_impact:
+    power_migrant: "Working across two devices/tabs (a stated habit of power users) hits a real, if narrow, race window where a concurrent edit can be lost without the 'stale' toast ever firing."
+    casual_operator: "Single-tab, single-device usage makes this essentially unreachable for them."
+  severity: MINOR
+  blast_radius: []
+  effort: S
+  effort_reasoning: "Convert the check into a conditional UPDATE ... WHERE updated_at = $1 and branch on rows-affected — the guard logic already exists, just needs to move into one query."
+  confidence: HIGH
+  unverified_notes: "DECISIONS_LOG.md referenced in the code comment was not read (out of evidence scope per brief — docs don't count) — the race is inferred directly from the two sequential Supabase calls in the code, not from the doc."
+  trace_id: "T-P2-09"
+  source_agent: "A3"
+
+- finding_id: P2-010
+  pillar: P2
+  capability: "'Post now' publish action on personal calendar"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/pages/Calendar/CalendarPage.jsx:435-468 (handlePostNow/confirmPostNow) calls executeMockPublishAttempts from src/services/platforms/mockPublishWorkflow.js — the known mock-publish surface"
+    - "src/pages/Calendar/CalendarPage.jsx:819 (ConfirmDialog copy): 'This posts immediately (simulated) instead of waiting for its scheduled time.' — the simulation is disclosed in-product, unlike some other mock surfaces in this codebase"
+  observed_behavior: "Publishing from the calendar is fully simulated (no real platform API call), and the confirm dialog explicitly labels it '(simulated)' to the user before they confirm."
+  expected_behavior: "Documented here for completeness per the brief's mock-surface tracking requirement; not scored as a defect on its own since it is honestly disclosed at the point of action, unlike an undisclosed mock."
+  persona_impact:
+    power_migrant: "Will discover no real posts ever go out and correctly conclude the product cannot yet be used for its stated purpose — this is a pre-launch blocker at the product level even though the disclosure itself is honest."
+    casual_operator: "May not read the parenthetical carefully and could believe a post actually went out, especially since a success toast fires identically to a real publish."
+  severity: MAJOR
+  blast_radius: ["P1"]
+  effort: XL
+  effort_reasoning: "Real publishing requires per-platform OAuth + API integration work tracked elsewhere (mockPublishService/mockOAuthProvider are known repo-wide mock surfaces, not specific to Calendar) — sizing here reflects only the Calendar-side dependency, not a duplicate of the full publishing-pillar estimate."
+  confidence: HIGH
+  unverified_notes: "The publish pipeline itself belongs to another pillar (P1/publishing); flagged here only because the Calendar's 'Post now' is the trigger point and its success-toast behavior is indistinguishable from a real publish."
+  trace_id: "T-P2-10"
+  source_agent: "A3"
