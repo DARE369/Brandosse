@@ -8,7 +8,7 @@
 ## Implemented
 
 ### Dashboard health card
-- Wired `src/components/Dashboard/AccountHealthCard.jsx` into `src/pages/Dashboard/UserDashboard.jsx`
+- Wired `src/components/Dashboard/AccountHealthCard.jsx` into `src/pages/Dashboard/PersonalDashboardPage.jsx`
 - The dashboard now reads from `public.connected_accounts_health_summary`
 - The previous lightweight account status list is replaced with:
   - healthy vs attention summary

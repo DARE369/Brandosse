@@ -93,6 +93,12 @@ jobs:
       - name: check-credit-grant
         run: node scripts/check-credit-grant.cjs
 
+      # LOCK L-1.6 — "documentation is a claim" was the only law in CLAUDE.md
+      # with no detector behind it. This checks the one claim docs make
+      # mechanically: that the file they point at exists.
+      - name: check-doc-citations
+        run: node scripts/check-doc-citations.cjs
+
       # LOCK L6.3 — every variable the code reads, across web/edge/worker, must
       # be written down in .env.example. Three were not, and all three were
       # already set in production — so nothing was broken, and nobody setting up

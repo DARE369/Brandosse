@@ -1,5 +1,4 @@
 # SocialAI Technical Constraints
-
 Generated on: 2026-05-08  
 Repository root: `c:\Users\Dare\Desktop\social-media-agent - Copy`  
 Primary audience: engineers, technical leads, implementation agents, reviewers, and deployment owners.
@@ -155,15 +154,12 @@ These are read server-side through `Deno.env` or compatible process env access:
 | `SUPABASE_SERVICE_ROLE_KEY` | Admin/privileged functions | Must never be exposed to frontend code. |
 | `APP_URL` / `PUBLIC_APP_URL` / `NEXT_PUBLIC_APP_URL` | Invitation and client-review links | Prefer server-side `APP_URL` or `PUBLIC_APP_URL`; public app URL is a fallback in current functions. |
 | `GROQ_API_KEY` | Server-side Groq LLM calls | Server secret is preferred over any client-exposed key. |
-| `GROK_API_KEY` / `XAI_API_KEY` | Server-side xAI/Grok calls | Used by shared LLM helpers and prompt/carousel functions. |
 | `GROQ_MODEL` | Optional model override | Defaults exist in code. |
-| `GROK_MODEL` | Optional model override | Defaults exist in code. |
 | `ANTHROPIC_API_KEY` | Optional Anthropic provider | Supported by `supabase/functions/_shared/llm.ts`. |
 | `ANTHROPIC_MODEL` | Optional model override | Defaults exist in code. |
 | `DEFAULT_AI_MODEL` | Optional provider preference | Used by shared LLM provider resolution. |
-| `FREEPIK_API_KEY` | Freepik image/edit/video functions | Required by Freepik shared service. |
-| `MYGROK_KEY` | Optional future prompt enhancement | Reserved in Freepik shared service. |
-| `REPLICATE_API_TOKEN` | Legacy/start-generation video path | Required by `start-generation` when using Replicate. |
+| `FAL_API_KEY` | Image and video generation | The only media provider. `generateImage`, `editImage`. |
+| `ZERNIO_API_KEY` | Social publishing | Required by `publish-post`. |
 | `RESEND_API_KEY` | Transactional email | Required to send email through Resend. |
 | `RESEND_FROM_EMAIL` / `FROM_EMAIL` | Transactional email | Sender address. |
 | `FROM_NAME` | Transactional email | Defaults to `SocialAI`. |
@@ -238,7 +234,7 @@ If a workflow requires immediate freshness, it must explicitly invalidate/refetc
 Use existing feature stores/services before adding new global state:
 
 - personal generation/session state: `src/stores/SessionStore.js`
-- calendar state: `src/stores/CalendarStore.js`
+- calendar state: `src/calendar/services/calendarService.js`
 - library state: `src/stores/LibraryStore.js`
 - help state: `src/stores/HelpStore.js`
 - brand kit state: `src/stores/BrandKitStore.js`
@@ -498,22 +494,29 @@ A common failure mode is a local app pointed at a Supabase project where functio
 
 The server-side LLM helper supports:
 
-- Groq
-- xAI/Grok
-- Anthropic
+- Anthropic (primary — `claude-sonnet-5`, pinned)
+- Groq (fallback)
 
-Provider fallback order depends on configured keys and optional provider preference. Production features should prefer server-side Edge Function usage over exposing provider keys in frontend env variables.
+xAI/Grok was removed entirely; its keys were deleted from every environment on
+2026-08-22. Model IDs are pinned explicitly and `-latest` is banned (L4.7) — an
+unpinned default silently generated all product content on a 2024-era model for
+months. A fallback firing logs `llm_provider_fallback` at error level and pages
+Sentry; it is an alerting event, not a normal path. Production features should prefer server-side Edge Function usage over exposing provider keys in frontend env variables.
 
 ### 11.2 Media Generation Providers
 
-Freepik is the active shared provider service for:
+**fal.ai is the only media generation provider.** `generateImage/index.ts` and
+`editImage/index.ts` call it directly and store the result in the
+`generated_assets` bucket.
 
-- text-to-image
-- image editing
-- text-to-video
-- task polling and status normalization
+Freepik, Magnific, Pollinations, Replicate and Gemini were all removed. Verified
+2026-08-22: no code reads their keys, the vault and all seven cron jobs reference
+none of them, and of 159 generations on record every one used `fal-ai` or predates
+the `provider` column. the former Freepik service files,
+`_shared/freepik.service.ts` and the `start-generation` function no longer exist.
 
-Replicate remains present in a legacy/start-generation path. Do not expand Replicate usage without clarifying whether it is still part of the intended provider strategy.
+Generated media must be stored in our own bucket, never hotlinked — 48% of
+historical generations pointed at hosts we do not control (L5.10).
 
 ### 11.3 Social Platform Connections
 

@@ -1,3 +1,11 @@
+> **Superseded on routing — the Vite/React-Router scaffolding it cites is gone.**
+> `src/main.jsx`, `src/App.jsx`, `src/router/router.jsx`,
+> `src/next/RouterCompat.jsx`, `src/next/NextRouteClients.jsx`,
+> `src/next/NextAppBridge.jsx`, `src/next/ReactRouterRuntime.jsx` and
+> `src/Context/ReactRouterNavigationProvider.jsx` were all removed when the
+> Next.js App Router migration finished. Routing now lives in [`app/`](/app).
+> Anything else here is unverified — flagged, not fixed.
+
 ﻿# User Pages Audit and Improvement Plan
 
 Updated: 2026-02-17
@@ -18,13 +26,13 @@ The user-side product has solid structure and useful building blocks, but has se
 - Impact: generated media cards do not reliably render as completed in main grid.
 
 2. Dashboard published KPI uses non-canonical status
-- `src/pages/Dashboard/UserDashboard.jsx:89`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx:89`
 - Impact: published count is wrong when DB uses `published`.
 
 3. Calendar single-item scheduling does not persist
 - Parent passes `post` and ignores modal datetime callback:
-  - `src/pages/CalendarPage/CalendarPageV2.jsx:221`
-  - `src/pages/CalendarPage/CalendarPageV2.jsx:223`
+  - `src/pages/Calendar/CalendarPage.jsx:221`
+  - `src/pages/Calendar/CalendarPage.jsx:223`
 - Modal signature and behavior mismatch:
   - `src/pages/CalendarPage/components/ScheduleModal.jsx:5`
   - `src/pages/CalendarPage/components/ScheduleModal.jsx:39`
@@ -41,14 +49,14 @@ The user-side product has solid structure and useful building blocks, but has se
 - `src/stores/SessionStore.js:455`
 
 6. Calendar realtime subscription function is broken and not used
-- Broken call pattern: `src/stores/CalendarStore.js:448`
+- Broken call pattern: `src/calendar/services/calendarService.js:448`
 - Not wired from page
 - Impact: stale UI and hidden runtime error if enabled.
 
 7. Draft relation mismatch
-- Query omits `connected_accounts` relation: `src/stores/CalendarStore.js:71`
+- Query omits `connected_accounts` relation: `src/calendar/services/calendarService.js:71`
 - UI expects relation:
-  - `src/pages/CalendarPage/components/DraftsSidebar.jsx:46`
+  - `src/calendar/components/UnscheduledRail.jsx:46`
   - `src/pages/CalendarPage/components/BulkScheduleModal.jsx:47`
 
 8. Ghost slot dismissal forces full browser reload
@@ -79,7 +87,7 @@ The user-side product has solid structure and useful building blocks, but has se
 13. Unused/legacy files increase cognitive load
 - `src/pages/GeneratePage/state/useGenerationService.js`
 - `src/pages/GeneratePage/state/generationMachine.js`
-- `src/pages/CalendarPage/components/CalendarGrid.jsx`
+- `src/calendar/components/CalendarGrid.jsx`
 - `src/components/Shared/ScheduleModal.jsx`
 - Several user components appear unused by user pages (`KpiCard`, `StatusBadge`, `TrendsPanel`, `PromptTemplateBuilder`, `AIResultPreviewer`).
 

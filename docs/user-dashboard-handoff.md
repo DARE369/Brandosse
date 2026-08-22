@@ -1,4 +1,12 @@
 # User Dashboard System: Product + Technical Handoff
+> **Superseded on routing — the Vite/React-Router scaffolding it cites is gone.**
+> `src/main.jsx`, `src/App.jsx`, `src/router/router.jsx`,
+> `src/next/RouterCompat.jsx`, `src/next/NextRouteClients.jsx`,
+> `src/next/NextAppBridge.jsx`, `src/next/ReactRouterRuntime.jsx` and
+> `src/Context/ReactRouterNavigationProvider.jsx` were all removed when the
+> Next.js App Router migration finished. Routing now lives in [`app/`](/app).
+> Anything else here is unverified — flagged, not fixed.
+
 
 Updated: 2026-03-26  
 Audience: product, design, QA, support, and engineering  
@@ -88,7 +96,7 @@ The MVP goal is to unify content creation and content operations in one workspac
 
 Visible in:
 
-- `src/pages/Dashboard/UserDashboard.jsx`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx`
 - `src/components/User/UserNavbar.jsx`
 - `src/components/User/UserSidebar.jsx`
 - `src/styles/UserDashboard.css`
@@ -222,7 +230,7 @@ The dashboard’s core data flow is:
 
 Core dashboard components:
 
-- `src/pages/Dashboard/UserDashboard.jsx`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx`
 - `src/components/Dashboard/RealtimeKPICards.jsx`
 - `src/hooks/useRealtimeKPIs.js`
 
@@ -319,7 +327,7 @@ The dashboard is composed of five major modules:
 
 Dashboard page:
 
-- `src/pages/Dashboard/UserDashboard.jsx`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx`
 
 KPI subsystem:
 
@@ -343,8 +351,8 @@ Auth and routing:
 Related pages that share the dashboard shell:
 
 - `src/pages/GeneratePage/GeneratePageV2.jsx`
-- `src/pages/CalendarPage/CalendarPageV2.jsx`
-- `src/pages/LibraryPage/LibraryPageV2.jsx`
+- `src/pages/Calendar/CalendarPage.jsx`
+- `src/pages/Library/LibraryPage.jsx`
 - `src/pages/Settings.jsx`
 - `src/pages/Settings/BrandKitPage.jsx`
 - `src/pages/HelpPage/HelpPage.jsx`

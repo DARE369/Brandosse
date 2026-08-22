@@ -2,7 +2,11 @@
 
 Generated on: 2026-05-08  
 Repository root: `c:\Users\Dare\Desktop\social-media-agent - Copy`  
-Primary stack: Next.js App Router, React 18, Zustand, React Query, Supabase, Edge Functions, Recharts, lucide-react, dnd-kit, Framer Motion, Groq, Freepik, Replicate-oriented media flows.
+Primary stack: Next.js App Router, React 18, Zustand, React Query, Supabase,
+Edge Functions, Recharts, lucide-react, dnd-kit, Framer Motion. Text generation
+is Anthropic-first with a Groq fallback; media generation is **fal.ai only**.
+Freepik and Replicate were removed 2026-08-22 — see
+[`TECHNICAL_CONSTRAINTS.md` §11.2](TECHNICAL_CONSTRAINTS.md).
 
 ## Scope And Completeness Contract
 
@@ -55,11 +59,11 @@ The product combines AI generation, media generation/editing, SEO/caption optimi
 | Route | Surface | Main Files | Feature Summary |
 | --- | --- | --- | --- |
 | `/app` | Post-auth router | `src/utils/PostAuthRedirect.jsx` | Resolves destination based on auth, admin/org access, last context, and default landing preferences. |
-| `/app/dashboard` | Personal dashboard | `src/pages/Dashboard/UserDashboard.jsx` | Onboarding checklist, KPIs, recent generations, search, quick actions, connected-account health, realtime refresh. |
+| `/app/dashboard` | Personal dashboard | `src/pages/Dashboard/PersonalDashboardPage.jsx` | Onboarding checklist, KPIs, recent generations, search, quick actions, connected-account health, realtime refresh. |
 | `/app/generate` | AI generation workspace | `src/pages/GeneratePage/GeneratePageV2.jsx`, `src/stores/SessionStore.js` | Session-based prompt/media generation, carousel/edit/video flows, post production, captions, SEO, draft/publish handoff, history rail, deep links. |
 | `/app/generate/:sessionId` | Generation session | Same as above | Loads a specific generation session and selection. |
-| `/app/calendar` | Personal calendar | `src/pages/CalendarPage/CalendarPageV2.jsx`, `src/stores/CalendarStore.js` | Month/week/day/list views, scheduling, drag/drop rescheduling, ghost slots, optimal times, library selection, filters, bulk scheduling. |
-| `/app/library` | Personal content library | `src/pages/LibraryPage/LibraryPageV2.jsx`, `src/stores/LibraryStore.js` | Posts, drafts, scheduled/published/failed content, media assets, templates, pillars, upload, duplicate, retry, schedule, repurpose. |
+| `/app/calendar` | Personal calendar | `src/pages/Calendar/CalendarPage.jsx`, `src/calendar/services/calendarService.js` | Month/week/day/list views, scheduling, drag/drop rescheduling, ghost slots, optimal times, library selection, filters, bulk scheduling. |
+| `/app/library` | Personal content library | `src/pages/Library/LibraryPage.jsx`, `src/stores/LibraryStore.js` | Posts, drafts, scheduled/published/failed content, media assets, templates, pillars, upload, duplicate, retry, schedule, repurpose. |
 | `/app/analytics` | Personal analytics | `src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx` | App-side generated/posts/drafts/scheduled/published/failed/connected-account metrics, funnel, platform panels, recent content. |
 | `/app/help` | Help and complaints | `src/pages/HelpPage/HelpPage.jsx`, `src/stores/HelpStore.js` | FAQ search, support ticket/complaint submission, screenshots, comments, status history, viewed/resolved tracking. |
 | `/app/settings` | Personal settings | `src/pages/Settings.jsx` | Profile, preferences, notifications, connected accounts, read-only org account access. |
@@ -125,13 +129,13 @@ The product combines AI generation, media generation/editing, SEO/caption optimi
 | Feature Area | Included Capabilities | Primary Source |
 | --- | --- | --- |
 | Authentication and session state | Supabase session handling, profile fallback, admin role resolution, org membership resolution, password reset/update, Google OAuth, pending signup/invite routing, default workspace routing, audit logs. | `src/Context/AuthContext.jsx`, `src/services/authService.js`, `src/utils/authRouting.js`, `src/utils/protectedRoute.jsx` |
-| App shell and context | User navbar/sidebar, theme, logout provider, workspace sync, global mock publish modal, protected app routing. | `src/App.jsx`, `src/components/User/UserNavbar.jsx`, `src/components/User/UserSidebar.jsx`, `src/Context/LogoutContext.jsx`, `src/Context/ThemeContext.jsx` |
-| Dashboard | Onboarding checklist, KPI cards, recent generations/search, quick actions, health card, realtime updates. | `src/pages/Dashboard/UserDashboard.jsx`, `src/components/Dashboard/*`, `src/hooks/useRealtimeKPIs.js` |
+| App shell and context | User navbar/sidebar, theme, logout provider, workspace sync, global mock publish modal, protected app routing. | `src/components/User/UserNavbar.jsx`, `src/components/User/UserSidebar.jsx`, `src/Context/LogoutContext.jsx`, `src/Context/ThemeContext.jsx` |
+| Dashboard | Onboarding checklist, KPI cards, recent generations/search, quick actions, health card, realtime updates. | `src/pages/Dashboard/PersonalDashboardPage.jsx`, `src/components/Dashboard/*`, `src/hooks/useRealtimeKPIs.js` |
 | Generation sessions | Session history, active session loading/switching/deleting, prompt enhancement, prompt suggestions, image generation, carousel generation, image editing, video generation/status polling, generation selection, lineage. | `src/pages/GeneratePage/GeneratePageV2.jsx`, `src/stores/SessionStore.js`, `src/components/Generate/*` |
-| Post production | Caption generation/optimization, metadata regeneration, SEO score/optimization, hashtags, save draft, publish handoff, selected generation hydration. | `src/components/Generate/PostProductionPanel.jsx`, `src/components/Generate/SEOPanel.jsx`, `src/stores/SessionStore.js` |
+| Post production | Caption generation/optimization, metadata regeneration, SEO score/optimization, hashtags, save draft, publish handoff, selected generation hydration. | `src/components/Generate/PostProductionPanel.jsx`, `src/stores/SessionStore.js` |
 | Personal brand kit | Setup choice, document upload, extraction loader, conversation path, manual review form, dashboard, assets, diff modal, version hash support. | `src/pages/Settings/BrandKitPage.jsx`, `src/components/BrandKit/*`, `src/stores/BrandKitStore.js` |
-| Personal calendar | Calendar data fetch, draft scheduling, post updates/deletes, ghost slots, best posting time, optimal times, filters, local preferences, realtime subscription. | `src/pages/CalendarPage/CalendarPageV2.jsx`, `src/pages/CalendarPage/components/*`, `src/stores/CalendarStore.js` |
-| Personal library | Unified library sections for drafts/scheduled/published/failed/media/templates/pillars, upload media, create draft from media, schedule/reschedule, retry, duplicate, delete, template usage. | `src/pages/LibraryPage/LibraryPageV2.jsx`, `src/stores/LibraryStore.js` |
+| Personal calendar | Calendar data fetch, draft scheduling, post updates/deletes, ghost slots, best posting time, optimal times, filters, local preferences, realtime subscription. | `src/pages/Calendar/CalendarPage.jsx`, `src/pages/CalendarPage/components/*`, `src/calendar/services/calendarService.js` |
+| Personal library | Unified library sections for drafts/scheduled/published/failed/media/templates/pillars, upload media, create draft from media, schedule/reschedule, retry, duplicate, delete, template usage. | `src/pages/Library/LibraryPage.jsx`, `src/stores/LibraryStore.js` |
 | Personal analytics | Generation/post counts, scheduling/publishing funnel, connected account health, platform distribution, next best actions, recent content table, native metrics placeholders. | `src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx` |
 | Settings | Profile display name/avatar, timezone, locale, theme, default landing route, notification toggles, personal connected accounts, org account access read-only. | `src/pages/Settings.jsx`, `src/pages/Settings/*` |
 | Help and complaints | FAQ content search, tickets, complaint submission with optional screenshot, comments, status history, mark viewed, admin event notification fallback. | `src/pages/HelpPage/HelpPage.jsx`, `src/pages/HelpPage/helpContent.js`, `src/stores/HelpStore.js` |
@@ -188,10 +192,10 @@ The product combines AI generation, media generation/editing, SEO/caption optimi
 
 | Capability | Description | Primary Source |
 | --- | --- | --- |
-| Image generation | Generates images through Edge Function/API service and Freepik integration. | `src/services/ApiService.js`, `src/services/freepik.service.js`, `supabase/functions/generateImage/index.ts` |
-| Image editing | Edit image modal/panel and `editImage` Edge Function. | `src/components/Generate/EditImageModal.jsx`, `src/components/Generate/ImageEditPanel.jsx`, `supabase/functions/editImage/index.ts` |
-| Carousel generation | Carousel plan and pipeline generation. | `src/stores/SessionStore.js`, `src/services/generationPipeline.js`, `supabase/functions/generateCarouselPlan/index.ts` |
-| Video generation | Video job creation, status polling, processing modal/status bar. | `src/stores/SessionStore.js`, `src/components/Generate/VideoProcessingModal.jsx`, `supabase/functions/generateVideo/index.ts`, `supabase/functions/videoStatus/index.ts` |
+| Image generation | Generates images via fal.ai and stores them in the `generated_assets` bucket. | `src/services/ApiService.js`, `supabase/functions/generateImage/index.ts` |
+| Image editing | Edit image modal/panel and `editImage` Edge Function. | `src/components/Generate/EditImageModal.jsx`, `supabase/functions/editImage/index.ts` |
+| Carousel generation | Carousel plan and pipeline generation. | `src/stores/SessionStore.js`, `src/services/generationPipeline.js`,  |
+| Video generation | Video job creation, status polling, processing modal/status bar. | `src/stores/SessionStore.js`, `src/components/Generate/VideoProcessingModal.jsx`, `supabase/functions/generateVideo/index.ts`,  |
 | Prompt enhancement | Prompt rewriting/enhancement and suggestions. | `src/services/ApiService.js`, `src/services/suggestedPrompts.js`, `src/hooks/useGroqSuggestions.js`, `supabase/functions/enhance-prompt/index.ts`, `supabase/functions/prompt-suggestions/index.ts` |
 | Caption generation | Caption generation and optimization from selected content. | `src/stores/SessionStore.js`, `src/services/mediaCaptionSuggestions.js`, `supabase/functions/generate-caption/index.ts` |
 | Metadata generation | Post metadata generation and status tracking for personal/org drafts. | `src/stores/SessionStore.js`, `src/org/services/orgDraftWorkflowService.js`, `supabase/functions/generate-post-metadata/index.ts` |
@@ -200,14 +204,14 @@ The product combines AI generation, media generation/editing, SEO/caption optimi
 | Content plans and validation | Content plan extraction/validation, quality gate support. | `src/services/contentPlanValidator.js`, `src/services/intentExtractor.js`, `src/services/qualityGate.js` |
 | Session titles | Auto-generation of generation session titles. | `src/services/sessionTitleService.js`, `app/api/session-title/route.js` |
 | Mock publishing | Mock OAuth, publish workflow, platform registry, post preview, mock-publish Edge Function. | `src/services/platforms/*`, `src/components/Publishing/*`, `supabase/functions/mock-publish/index.ts` |
-| Account health | Connection events, failure detection, health views, admin/org/personal health cards. | `src/services/platforms/connectionService.js`, `src/components/Dashboard/AccountHealthCard.jsx`, `src/org/components/OrgAccountHealthCard.jsx`, `supabase/functions/detect-account-failures/index.ts` |
+| Account health | Connection events, failure detection, health views, admin/org/personal health cards. | `src/services/platforms/connectionService.js`, `src/org/components/OrgAccountHealthCard.jsx`, `supabase/functions/detect-account-failures/index.ts` |
 
 ## State Stores, Hooks, And Contexts
 
 | Module | Role |
 | --- | --- |
 | `src/stores/SessionStore.js` | Generation sessions, generation actions, post production, video jobs, captions, SEO, draft/publish flows, subscriptions. |
-| `src/stores/CalendarStore.js` | Personal calendar posts/drafts/ghost slots/pillars/optimal times/settings/realtime. |
+| `src/calendar/services/calendarService.js` | Personal calendar posts/drafts/ghost slots/pillars/optimal times/settings/realtime. |
 | `src/stores/LibraryStore.js` | Personal library rows, media assets, templates, pillars, upload/schedule/duplicate/retry/delete. |
 | `src/stores/BrandKitStore.js` | Personal brand kit loading/upsert, extraction/diff, asset upload/update/delete, onboarding state. |
 | `src/stores/HelpStore.js` | Complaints, comments, status history, screenshot upload, admin notifications, form state. |
@@ -234,12 +238,11 @@ The product combines AI generation, media generation/editing, SEO/caption optimi
 
 | Service | Purpose |
 | --- | --- |
-| `src/services/supabaseClient.js`, `src/services/supabaseConfig.js`, `src/services/api.js` | Supabase configuration and base API helpers. |
+| `src/services/supabaseClient.js`, `src/services/supabaseConfig.js`,  | Supabase configuration and base API helpers. |
 | `src/services/queryClient.js` | React Query client setup. |
 | `src/services/authService.js` | Auth helper operations. |
 | `src/services/ApiService.js` | Generation, text, video, caption, SEO, provider config, API status, cost estimation. |
 | `src/services/edgeFunctionClient.js` | Edge Function invocation wrapper. |
-| `src/services/freepik.service.js` | Freepik image/edit/video operations through Edge Functions. |
 | `src/services/generationPipeline.js` | Generation pipeline registration and single/carousel execution. |
 | `src/services/groqClient.js` | Groq content plan, revision, brand-aware prompts, JSON/vision helpers. |
 | `src/services/llmClient.js` | LLM chat, brief generation, brand consistency check. |
@@ -366,7 +369,7 @@ Purpose is inferred from function name and client usage.
 
 Shared function modules:
 
-- `_shared/auth-users.ts`, `_shared/connectionHelpers.ts`, `_shared/env.ts`, `_shared/freepik.service.ts`, `_shared/http.ts`, `_shared/llm.ts`, `_shared/mail.ts`, `_shared/mockPublish.ts`, `_shared/org.ts`, `_shared/org-bootstrap.ts`, `_shared/pipeline.ts`, `_shared/storage.ts`, `_shared/supabase.ts`.
+- `_shared/auth-users.ts`, `_shared/connectionHelpers.ts`, `_shared/env.ts`, `_shared/http.ts`, `_shared/llm.ts`, `_shared/mail.ts`, `_shared/mockPublish.ts`, `_shared/org.ts`, `_shared/org-bootstrap.ts`, `_shared/pipeline.ts`, `_shared/storage.ts`, `_shared/supabase.ts`.
 - Function-side SQL references: `supabase/functions/schema.sql`, `supabase/functions/policies.sql`, `supabase/functions/README.md`.
 
 ## Supabase Migration Inventory
@@ -437,14 +440,14 @@ Shared function modules:
 | Org styles | `src/org/styles/*` for workspace, office, calendar, pipeline, common room, asset library, brand kit, org admin, draft workflow, generate composer. |
 | Admin styles | `src/admin/styles/*`, `src/admin/pages/AdminModeration/AdminModerationPage.css`, `AdminModeration.scss`, component CSS. |
 | Constants/utilities | `src/constants/statusEnums.js`, `src/constants/statuses.js`, `src/utils/*`, `src/org/utils/*`, `src/admin/utils/*`. |
-| Legacy code | `src/legacy/generation/generationMachine.js`, `src/legacy/generation/useGenerationService.js`, `src/legacy/supabase.js`, `src/admin/AdminDashboard.jsx`, `src/admin/adminRoutes.jsx`, `src/pages/InvitationAcceptPage.jsx`, legacy admin content components/mocks. |
+| Legacy code | **Deleted in Wave 3 (L3.1-L3.3).** Formerly `src/legacy/**`, `src/app/**`, `src/api/**`, `src/admin/AdminDashboard.jsx`, `src/admin/adminRoutes.jsx`, `src/pages/InvitationAcceptPage.jsx`, legacy admin content components/mocks. |
 | Tests | `src/admin/components/AdminNavbar/AdminNavbar.test.jsx` is the only test file found by the source scan. |
 
 ## Existing Documentation Inventory
 
 Documentation already exists in several layers:
 
-- Current/root docs for dashboard, calendar, generate, user dashboard, MVP/current work, weekly audits, schema/database consistency, connected-account rollout, Freepik setup, Groq prompting, post/generation lifecycle, theming, mobile/tablet layout, and implementation reports.
+- Current/root docs for dashboard, calendar, generate, user dashboard, MVP/current work, weekly audits, schema/database consistency, connected-account rollout, Groq prompting, post/generation lifecycle, theming, mobile/tablet layout, and implementation reports.
 - Handoff docs under `docs/handoff/` for `personal`, `org-member`, `org-admin`, `platform-admin`, and `shared`, including page docs, workflow docs, dependency/data model docs, coverage checklists, wiring gaps, and audit maps.
 - Implementation docs under `docs/implementation/socialai-full-fix/` and `docs/implementation/ui-unification/`.
 - Org rollout docs for stages 1 through 8, org UI refresh phases, org calendar, org admin handoff, and workspace/office/common-room/asset-library references.

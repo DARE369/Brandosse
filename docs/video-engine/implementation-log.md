@@ -1,4 +1,11 @@
 # Video Engine Implementation Log
+> **Historical record — 2026-05-10. Not a description of the system as it is now.**
+> Kept because what was decided and why still matters; do not follow anything
+> here as instructions. It predates the 2026-08 launch audit and the
+> completion lockdown — several providers named here (Pollinations, Magnific,
+> Freepik, Replicate, Grok) are gone, and files it cites have been deleted.
+> Current state: verify against code. What changed: [`CHANGELOG.md`](/CHANGELOG.md).
+
 
 ## 2026-05-10 13:32 +01:00 - Stage 8 Frontend UI
 

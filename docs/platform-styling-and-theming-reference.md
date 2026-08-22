@@ -1,5 +1,4 @@
 # Platform Styling, Visual Structure, and Theming Reference
-
 Updated: 2026-05-11  
 Audience: Claude or any engineer standardizing the SocialAI UI  
 Scope: Whole-platform styling architecture, layout hierarchy, token usage, consistency rules, and a true system-default theme model.
@@ -249,10 +248,10 @@ Important styling detail:
 
 Files:
 
-- `src/pages/Dashboard/UserDashboard.jsx`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx`
 - `src/components/User/UserNavbar.jsx`
 - `src/components/User/UserSidebar.jsx`
-- `src/styles/UserDashboard.css`
+- `src/pages/Dashboard/PersonalDashboardPage.module.css`
 
 Visual structure:
 
@@ -281,8 +280,8 @@ This is the strongest active product shell and should be treated as the visual r
 
 Files:
 
-- `src/pages/Dashboard/UserDashboard.jsx`
-- `src/styles/UserDashboard.css`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx`
+- `src/pages/Dashboard/PersonalDashboardPage.module.css`
 
 Structure:
 
@@ -345,7 +344,7 @@ Important styling note:
 
 Files:
 
-- `src/pages/CalendarPage/CalendarPageV2.jsx`
+- `src/pages/Calendar/CalendarPage.jsx`
 - `src/styles/CalendarV2.css`
 - `src/styles/responsive-contract.css`
 
@@ -379,8 +378,8 @@ Important styling note:
 
 Files:
 
-- `src/pages/LibraryPage/LibraryPageV2.jsx`
-- `src/styles/LibraryV2.css`
+- `src/pages/Library/LibraryPage.jsx`
+- `src/pages/Library/LibraryPage.module.css`
 
 Structure:
 
@@ -1004,7 +1003,7 @@ Optional longer-term persistence:
 
 Important note:
 
-- there is already a `user_settings.theme` default insert path in `src/services/supabase.js`
+- there is already a `user_settings.theme` default insert path in `src/services/supabaseClient.js`
 - it is not currently wired to the active theme system
 - if backend persistence is added, prefer `theme_preference` over storing only a resolved theme
 

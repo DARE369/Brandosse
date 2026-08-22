@@ -1,4 +1,15 @@
 # Video Lab - Complete Technical Documentation
+> **Superseded — verify against code before trusting anything here.**
+> Written before the 2026-08 launch audit. Known wrong as of 2026-08-22:
+> media generation is **fal.ai only** (Freepik, Magnific, Pollinations, Replicate
+> and Grok are gone, keys deleted from every environment); text generation is
+> Anthropic-first with a Groq fallback, model IDs pinned; and several files cited
+> here no longer exist — `src/services/freepik.service.js`,
+> `_shared/freepik.service.ts`, `src/config/magnificModels.js`,
+> `supabase/functions/start-generation`, `src/app/`, `src/api/`.
+> Current provider truth: [`TECHNICAL_CONSTRAINTS.md` §11](TECHNICAL_CONSTRAINTS.md).
+> This file has NOT been line-by-line verified — it is flagged, not fixed.
+
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -538,8 +549,8 @@ WORKER_REPLICATE_API_KEY=...
 WORKER_WEBHOOK_SECRET=<set-in-railway-and-vercel-never-commit>  # rotated 2026-08-21; the previous literal value was exposed here
 
 # Mock Mode (for development)
-WORKER_USE_MOCK_ANTHROPIC=true
-WORKER_USE_MOCK_REPLICATE=true
+WORKER_USE_MOCK_ANTHROPIC=false   # L1.4: mocks are opt-in, never default
+WORKER_USE_MOCK_REPLICATE=false   # L1.4: mocks are opt-in, never default
 
 # FFmpeg & System
 WORKER_FFMPEG_PATH=ffmpeg

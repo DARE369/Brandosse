@@ -1,4 +1,15 @@
 # Brandosse — Page-by-Page Overhaul & Launch Plan
+> **Superseded — verify against code before trusting anything here.**
+> Written before the 2026-08 launch audit. Known wrong as of 2026-08-22:
+> media generation is **fal.ai only** (Freepik, Magnific, Pollinations, Replicate
+> and Grok are gone, keys deleted from every environment); text generation is
+> Anthropic-first with a Groq fallback, model IDs pinned; and several files cited
+> here no longer exist — `src/services/freepik.service.js`,
+> `_shared/freepik.service.ts`, `src/config/magnificModels.js`,
+> `supabase/functions/start-generation`, `src/app/`, `src/api/`.
+> Current provider truth: [`TECHNICAL_CONSTRAINTS.md` §11](TECHNICAL_CONSTRAINTS.md).
+> This file has NOT been line-by-line verified — it is flagged, not fixed.
+
 
 _Synthesized from a 5-agent deep audit (Generate, Calendar, Library, Settings/BrandKit/Billing, Analytics/Video Lab), the dashboard rebuild, and the live QA screenshot verification. Last updated 2026-06-18._
 

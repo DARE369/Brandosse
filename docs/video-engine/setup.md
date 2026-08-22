@@ -1,4 +1,19 @@
 # Video Engine Setup
+> **Historical — the video-engine build journal, 2026-02 to 2026-05. Not current.**
+> Written while the app was still Vite-based and the pipeline was mock-first.
+> The implementation went a different way. What the worker ACTUALLY does today:
+>
+> | stage | reality |
+> |---|---|
+> | download | `yt_dlp` (`stages/download.py`) |
+> | transcribe | **Groq Whisper `whisper-large-v3-turbo`** over HTTP — not Replicate, not WhisperX (`stages/transcribe.py:14-15`) |
+> | analyze | **Anthropic `claude-sonnet-4-6`**, live, not mocked (`stages/analyze.py:265-272`) |
+> | render / stitch | OpenCV + ffmpeg (`stages/render.py`) |
+>
+> Replicate is referenced nowhere in worker source. Mock flags now default to
+> **False** (L1.4) — anything here telling you to enable them is wrong and unsafe.
+> Environment contract: [`.env.example`](/.env.example). Changes: [`CHANGELOG.md`](/CHANGELOG.md).
+
 
 Last updated: 2026-05-10 00:28 +01:00
 
@@ -14,10 +29,11 @@ The worker uses Python and free local media tools.
 - private Supabase Storage buckets:
   - `video-clips`
   - `video-source-cache`
-- mock flags enabled for paid services while building:
-  - `WORKER_USE_MOCK_REPLICATE=true`
-  - `WORKER_USE_MOCK_ANTHROPIC=true`
-  - `VIDEO_ENGINE_USE_MOCK_PAYMENTS=true`
+- ~~mock flags enabled for paid services while building~~ **DO NOT DO THIS.**
+  Mock flags default to `False` and are opt-in only (L1.4). Defaulting them on is
+  how the worker spent months returning fabricated analysis that looked real.
+  `WORKER_USE_MOCK_REPLICATE` and `VIDEO_ENGINE_USE_MOCK_ANTHROPIC` no longer
+  exist. See [`.env.example`](/.env.example) for the real contract.
 
 ## Install FFmpeg On Windows
 
@@ -85,8 +101,8 @@ Then fill `video-worker/.env`:
 WORKER_SUPABASE_URL=
 WORKER_SUPABASE_SERVICE_KEY=
 WORKER_WEBHOOK_SECRET=
-WORKER_USE_MOCK_ANTHROPIC=true
-WORKER_USE_MOCK_REPLICATE=true
+WORKER_USE_MOCK_ANTHROPIC=false   # L1.4: never default this on
+WORKER_USE_MOCK_REPLICATE=false   # L1.4: never default this on
 ```
 
 Use the Supabase service role key, not the anon key. Keep `video-worker/.env` out of git.
@@ -96,7 +112,7 @@ Use the Supabase service role key, not the anon key. Keep `video-worker/.env` ou
 Stage 4 can run without a Replicate token while mock mode is enabled:
 
 ```env
-WORKER_USE_MOCK_REPLICATE=true
+WORKER_USE_MOCK_REPLICATE=false   # L1.4: never default this on
 WORKER_REPLICATE_API_TOKEN=
 ```
 
@@ -107,7 +123,7 @@ Do not disable mock mode until you intentionally want to run paid Replicate tran
 Stage 5 can run without an Anthropic key while mock mode is enabled:
 
 ```env
-WORKER_USE_MOCK_ANTHROPIC=true
+WORKER_USE_MOCK_ANTHROPIC=false   # L1.4: never default this on
 WORKER_ANTHROPIC_API_KEY=
 ```
 

@@ -1,4 +1,13 @@
 # Weekly Objective Audit and Execution Plan
+> **Historical record. Not a description of the system as it is now.**
+> Kept because what was decided and why still matters; do not follow anything
+> here as instructions. It predates the 2026-08 launch audit and the completion
+> lockdown — providers named here (Pollinations, Magnific, Freepik, Replicate,
+> Grok) are gone, and files it cites were deleted in the ui-v2 migration.
+> **Its citations are deliberately left as written** — a record that names files
+> which did not exist when it was written is not a record.
+> Current state: verify against code. What changed: [`CHANGELOG.md`](/CHANGELOG.md).
+
 
 As of: Saturday, February 28, 2026  
 Repo: `social-media-agent` (current working tree, including uncommitted changes)

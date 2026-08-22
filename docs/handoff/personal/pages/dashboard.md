@@ -8,7 +8,7 @@ This is the personal home screen. It shows KPI metrics, recent generations, quic
 - Access: authenticated user under `/app` protected shell.
 
 ## Component Composition
-- `src/pages/Dashboard/UserDashboard.jsx`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx`
 - Shared shell: `UserNavbar`, `UserSidebar`
 - Feature components:
   - `RealtimeKPICards`

@@ -1,4 +1,19 @@
 # Stage 7 - Next.js API Layer
+> **Historical — the video-engine build journal, 2026-02 to 2026-05. Not current.**
+> Written while the app was still Vite-based and the pipeline was mock-first.
+> The implementation went a different way. What the worker ACTUALLY does today:
+>
+> | stage | reality |
+> |---|---|
+> | download | `yt_dlp` (`stages/download.py`) |
+> | transcribe | **Groq Whisper `whisper-large-v3-turbo`** over HTTP — not Replicate, not WhisperX (`stages/transcribe.py:14-15`) |
+> | analyze | **Anthropic `claude-sonnet-4-6`**, live, not mocked (`stages/analyze.py:265-272`) |
+> | render / stitch | OpenCV + ffmpeg (`stages/render.py`) |
+>
+> Replicate is referenced nowhere in worker source. Mock flags now default to
+> **False** (L1.4) — anything here telling you to enable them is wrong and unsafe.
+> Environment contract: [`.env.example`](/.env.example). Changes: [`CHANGELOG.md`](/CHANGELOG.md).
+
 
 Last updated: 2026-05-10 00:28 +01:00
 

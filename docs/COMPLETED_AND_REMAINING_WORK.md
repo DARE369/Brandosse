@@ -10,11 +10,11 @@ Purpose: Show what is complete now and what must be delivered next, in priority 
 | --- | --- | --- | --- |
 | Auth and access | User login/register and protected route behavior are active under native Next routes. | `app/**`, `src/Context/AuthContext.jsx`, `src/utils/protectedRoute.jsx`, `src/next/NextAppProviders.jsx` | Users and admins can access role-appropriate product areas. |
 | User generation workspace | Session-based generation flow, prompt enhancement, and post-production panel are in place. | `src/pages/GeneratePage/GeneratePageV2.jsx`, `src/stores/SessionStore.js`, `src/components/Generate/*` | Users can create and prepare content in one workspace. |
-| Calendar foundation | Calendar views, draft rail, and scheduling interfaces are implemented. | `src/pages/CalendarPage/CalendarPageV2.jsx`, `src/stores/CalendarStore.js`, `src/pages/CalendarPage/components/*` | Teams can plan content timing and manage upcoming posts. |
+| Calendar foundation | Calendar views, draft rail, and scheduling interfaces are implemented. | `src/pages/Calendar/CalendarPage.jsx`, `src/calendar/services/calendarService.js`, `src/pages/CalendarPage/components/*` | Teams can plan content timing and manage upcoming posts. |
 | Mock social connection | Mock connect/disconnect flow for core platforms is working. | `src/pages/Settings.jsx`, `src/services/MockOAuthService.js` | Product demos can include multi-platform workflow simulation. |
 | Admin oversight | Admin overview, user management, and moderation workflow are active. | `src/admin/pages/AdminOverview.jsx`, `src/admin/pages/AdminUsersPage.jsx`, `src/admin/pages/AdminModeration/AdminModerationPage.jsx` | Central team can monitor and manage content operations. |
 | Runtime stability fixes | Key DB/runtime issues were resolved (brand_kit race, navbar post query mismatch, status write normalization in core admin paths). | `docs/database-consistency-audit.md`, `src/stores/BrandKitStore.js`, `src/components/User/UserNavbar.jsx`, admin moderation files listed in audit | Reduced demo risk and fewer hard runtime breaks during normal use. |
-| Realtime foundations | Realtime subscriptions exist across dashboard/admin/generate/calendar areas. | `src/pages/Dashboard/UserDashboard.jsx`, `src/stores/SessionStore.js`, `src/admin/pages/AdminOverview.jsx` | Stakeholders can observe dynamic product behavior in demos. |
+| Realtime foundations | Realtime subscriptions exist across dashboard/admin/generate/calendar areas. | `src/pages/Dashboard/PersonalDashboardPage.jsx`, `src/stores/SessionStore.js`, `src/admin/pages/AdminOverview.jsx` | Stakeholders can observe dynamic product behavior in demos. |
 
 ## 2. Remaining Work (Prioritized, Dependency-Aware)
 
