@@ -157,17 +157,17 @@ The largest wave. Everything here works but fails its D4 bar.
 
 | Lock | What | Effort | D4 |
 |---|---|---|---|
-| **L5.1** | Publishing to ≥4 real platforms via Zernio | **L** | DoC-1 |
-| **L5.2** | Publish-failure notifications → `user_notifications` | M | DoC-1 |
+| **L5.1** ⏸ | Publishing to ≥4 real platforms via Zernio | **L** | **BLOCKED — see [`OPEN-DECISIONS.md`](../OPEN-DECISIONS.md) OD-1.** API access is fine (key works, 16 platforms supported); the blocker is per-account pricing: ~$12/mo for the 4-platform floor, ~$6/user/mo at scale as a FIXED cost against usage-priced revenue |
+| **L5.2** ✅ | Publish-failure notifications | S | **Mostly already built** — `useUserNotifications` already surfaced failed posts in the bell (verified: 6 for the QA user). The real gap was that `posts.error_message` was stored and never selected, so the alert said *that* something failed but not *why*. Reason + deep-link now wired. Push/email is genuinely new → D8 |
 | **L5.3** | Clipping: fix analysis truncation; platform export presets | M | DoC-2 |
 | **L5.4** | Text: instruction-based refinement replacing blind overwrite | M | DoC-3 |
 | **L5.5** | Bulk calendar operations | M | DoC-4 |
 | **L5.6** | Finish ui-v2 migration (5 routes) + delete legacy shell — fixes the unstyled billing page | **L** | DoC-9 |
-| **L5.7** | Shared nav component; add the missing video-generation entry | S | DoC-9 |
-| **L5.8** | **Reprice video generation**; remove the silent 3× tier upgrade; reconcile the cost table | M | DoC-8 |
+| **L5.7** ✅ | Shared nav component | S | 9 pages each declared their own `NAV_ITEMS` and had drifted — 5 showed Analytics, 4 did not. Single definition in `ui-v2/shell/navItems.js`, plus the Videos entry that no page listed |
+| **L5.8** ⏸ | **Reprice video generation**; remove the silent 3× tier upgrade | M | **BLOCKED on OD-1** — repricing cannot be settled without the per-connected-account cost, which is ~3× the entire rest of the cost model |
 | **L5.9** ✅ | Timeouts on all provider calls | S | **28/28 bounded.** `zernio.service.ts` had 4 calls and 0 timeouts — the direct mechanism behind the frozen posts. Every value sits under the reaper threshold so a hung provider retries cleanly |
 | **L5.10** | Store hotlinked image assets; reclassify placeholder rows | M | DoC-8 |
-| **L5.11** | Relabel the discovery score as a stylistic checklist until grounded | S | DoC-7 |
+| **L5.11** ✅ | Relabel the discovery score | S | "Discovery readiness" → "Copy review", with *"An AI review of your writing — not a prediction of reach."* Applied to Studio panel and calendar drawer |
 | **L5.12** | Complete the brand-kit conversation | M | DoC-5 |
 | **L5.13** | Analytics export + date-range comparison | M | DoC-6 |
 | **L5.14** | Cost-per-user tracking + per-user video ceiling | M | DoC-10 |

@@ -21,18 +21,8 @@ import { fetchUserTransactions } from "../../services/videoEngineData";
 import {
   UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton,
   Card, Badge, Skeleton, EmptyState, Button, MobileNavDrawer,
-  NotificationBell, AvatarMenu,
-} from "../../ui-v2";
+  NotificationBell, AvatarMenu, NAV_ITEMS,} from "../../ui-v2";
 import styles from "./BillingPage.module.css";
-
-const NAV_ITEMS = [
-  { key: "dashboard", label: "Dashboard", href: "/app/dashboard" },
-  { key: "studio", label: "Studio", href: "/app/generate" },
-  { key: "library", label: "Library", href: "/app/library" },
-  { key: "calendar", label: "Calendar", href: "/app/calendar" },
-  { key: "analytics", label: "Analytics", href: "/app/analytics" },
-  { key: "brand-kit", label: "Brand Kit", href: "/app/settings/brand-kit" },
-];
 
 const LOW_BALANCE_THRESHOLD = 10;
 

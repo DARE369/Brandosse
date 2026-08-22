@@ -74,20 +74,11 @@ import ToastStack, { TOAST_ICONS, useToastStack } from '../../calendar/component
 
 import {
   UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton, MobileNavDrawer,
-  NotificationBell, AvatarMenu,
-} from '../../ui-v2';
+  NotificationBell, AvatarMenu, NAV_ITEMS,} from '../../ui-v2';
 import '../../calendar/calendar-engine-v2.css';
 import styles from './CalendarPage.module.css';
 
 const MOBILE_VIEW_BREAKPOINT = 600;
-
-const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', href: '/app/dashboard' },
-  { key: 'studio', label: 'Studio', href: '/app/generate' },
-  { key: 'library', label: 'Library', href: '/app/library' },
-  { key: 'calendar', label: 'Calendar', href: '/app/calendar' },
-  { key: 'brand-kit', label: 'Brand Kit', href: '/app/settings/brand-kit' },
-];
 
 function ThemeToggleButton() {
   const { isDark, toggleTheme } = useUiV2Theme();

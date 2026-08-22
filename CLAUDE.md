@@ -25,6 +25,16 @@ All three were being violated when the audit ran.
 - **Pin model IDs explicitly.** Never `-latest` for production output. A provider fallback firing is an alerting event.
 - **No secrets in git**, including in documentation.
 
+## ⚠️ Open decisions — check before planning work
+
+[`OPEN-DECISIONS.md`](OPEN-DECISIONS.md) holds founder decisions that are
+**blocking engineering work**. Read it before proposing a plan — some work is
+blocked on a decision, not on effort, and proposing it anyway wastes a cycle.
+
+Currently open: **Zernio per-account pricing** (blocks L5.1 → four pillars),
+**error-tracking provider** (blocks L0.4 and two guards), **repository
+visibility** (the repo is public and `audit/` is in it).
+
 ## 🔒 Completion Lockdown is ACTIVE
 
 Per [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md): **no new capability until everything pending is locked.** Finish, connect, or delete what exists. New ideas go to [`audit/08-horizon-register.md`](audit/08-horizon-register.md) — do not smuggle them in as "completion work." If it needs a new table, a new third-party integration, or a new nav item, it is new.
