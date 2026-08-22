@@ -902,6 +902,14 @@ const DEFAULT_GENERATION_SETTINGS = {
   referenceImageUrl: '',
 };
 
+// handleGenerate writes settings.brandKit right before every run: the loaded
+// kit when "Match my brand kit" is on, explicit null when the user switched
+// it off. undefined means no toggle has run yet this session (e.g. the very
+// first load), which is the only case that should fall back to a fresh load.
+const resolveBrandKit = (settings, userId) => (
+  settings.brandKit !== undefined ? settings.brandKit : loadBrandKit(userId)
+);
+
 // Generation settings that should survive a reload, as an explicit ALLOWLIST.
 // A denylist would be wrong here: handleGenerate writes transient values into
 // settings before each run (brandKit — a large object that would bloat
@@ -1716,7 +1724,7 @@ const useSessionStore = create((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const brandKit = await loadBrandKit(user.id);
+      const brandKit = await resolveBrandKit(settings, user.id);
       const { registerImageGenerator, runGenerationPipeline } = await import('../services/generationPipeline');
 
       registerImageGenerator(async (promptText, aspectRatio, opts = {}) => {
@@ -1952,7 +1960,7 @@ const useSessionStore = create((set, get) => ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-      const brandKit = await loadBrandKit(user.id);
+      const brandKit = await resolveBrandKit(settingsSnapshot, user.id);
       const { registerImageGenerator, renderSingleFromPlan } = await import('../services/generationPipeline');
 
       registerImageGenerator(async (promptText, aspectRatio, opts = {}) => {
@@ -2063,7 +2071,7 @@ const useSessionStore = create((set, get) => ({
     const session = get().activeSession;
     if (!session) return;
 
-    const brandKit = await loadBrandKit(user.id);
+    const brandKit = await resolveBrandKit(settings, user.id);
     const abortController = new AbortController();
     set({ isGenerating: true, generationAbortController: abortController });
 
@@ -2148,7 +2156,7 @@ const useSessionStore = create((set, get) => ({
       const prompt = generation.slide_prompt || generation.prompt || '';
       if (!prompt.trim()) throw new Error('No prompt available to regenerate this variant.');
 
-      const brandKit = await loadBrandKit(user.id);
+      const brandKit = await resolveBrandKit(settings, user.id);
       const aspectRatio = generation.metadata?.aspect_ratio || settings.aspectRatio || '1:1';
       const category = generation.carousel_slide_index ? 'carousel' : 'image';
 
@@ -2236,7 +2244,7 @@ const useSessionStore = create((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const brandKit = await loadBrandKit(user.id);
+      const brandKit = await resolveBrandKit(settings, user.id);
       const { registerImageGenerator, runGenerationPipeline } = await import('../services/generationPipeline');
       const pipelineSettings = {
         ...settings,
@@ -2478,7 +2486,7 @@ const useSessionStore = create((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const brandKit = await loadBrandKit(user.id);
+      const brandKit = await resolveBrandKit(settings, user.id);
 
       const { data: created, error: insertError } = await supabase
         .from('generations')
@@ -2613,7 +2621,7 @@ const useSessionStore = create((set, get) => ({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
     const session = await ensureSession(get, prompt);
-    const brandKit = settings.brandKit || (await loadBrandKit(user.id));
+    const brandKit = await resolveBrandKit(settings, user.id);
 
     const images = await generateImages({
       prompt,
@@ -2664,7 +2672,7 @@ const useSessionStore = create((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const brandKit = await loadBrandKit(user.id);
+      const brandKit = await resolveBrandKit(settings, user.id);
       const videoMode = settings.mediaType === 'image-to-video' ? 'image-to-video' : 'text-to-video';
       if (videoMode === 'image-to-video' && !String(settings.referenceImageUrl || '').trim()) {
         throw new Error('Source image is required for image-to-video generation');
@@ -2989,6 +2997,59 @@ const useSessionStore = create((set, get) => ({
     set({ postProduction: { ...DEFAULT_POST_PRODUCTION } });
   },
 
+  /**
+   * LOCK L4.4 — snapshot the current caption BEFORE it is overwritten.
+   *
+   * "Regenerate" was a blind overwrite: the previous caption was destroyed with
+   * no diff, no history and no way back (audit finding P3-003). content_versions
+   * already existed with the right shape and a read policy for owners — only the
+   * owner INSERT policy was missing (migration 20260822090000).
+   *
+   * Deliberately best-effort: a failure to record history must never block the
+   * regeneration the user actually asked for. It warns rather than throwing.
+   * Append-only — nothing here ever updates or deletes a prior version.
+   */
+  snapshotCurrentVersion: async (reason = 'regenerate') => {
+    const { selectedGeneration, postProduction } = get();
+    if (!selectedGeneration?.id) return null;
+
+    const caption = String(postProduction?.caption || '').trim();
+    // Nothing worth preserving — do not write an empty row.
+    if (!caption) return null;
+
+    try {
+      const { count } = await supabase
+        .from('content_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('generation_id', selectedGeneration.id);
+
+      const versionNumber = Number(count || 0) + 1;
+
+      const { data, error } = await supabase
+        .from('content_versions')
+        .insert({
+          generation_id: selectedGeneration.id,
+          post_id: postProduction?.postId || null,
+          version_number: versionNumber,
+          is_original: versionNumber === 1,
+          is_active: false,
+          prompt: selectedGeneration.prompt || null,
+          caption,
+          hashtags: normalizeHashtags(postProduction?.hashtags || []),
+          platform_target: postProduction?.selectedPlatforms?.[0] || null,
+        })
+        .select('id, version_number')
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      // Never block the user's action on bookkeeping.
+      console.warn('[SessionStore] could not record content version:', err?.message || err, { reason });
+      return null;
+    }
+  },
+
   generateCaption: async (platform = 'instagram') => {
     const { selectedGeneration } = get();
     if (!selectedGeneration) return;
@@ -3021,6 +3082,10 @@ const useSessionStore = create((set, get) => ({
       if (error) throw error;
 
       const result = data || {};
+
+      // LOCK L4.4 — preserve what is about to be replaced.
+      await get().snapshotCurrentVersion('regenerate-caption');
+
       set((state) => ({
         postProduction: {
           ...state.postProduction,

@@ -116,6 +116,7 @@ export default function PostProductionPanel({
     postProduction,
     updatePostProduction,
     regeneratePostMetadata,
+    generateCaption,
     scoreSeo,
     optimizeSeo,
     checkBrandConsistency,
@@ -354,7 +355,26 @@ export default function PostProductionPanel({
     const toastId = toast.loading(`Regenerating ${label.toLowerCase()}...`);
 
     try {
-      await regeneratePostMetadata(requestedFields);
+      // LOCK L4.3 — caption-only regeneration uses generate-caption.
+      //
+      // SessionStore.generateCaption() was fully implemented and called by
+      // NOTHING: it loads the brand kit and passes the user's 5 most recent
+      // captions as anti-repetition context, and its edge function carries the
+      // best caption prompt in the codebase. Meanwhile this button used
+      // generate-post-metadata, which has no history and no anti-repetition —
+      // so pressing "Regenerate" repeatedly could return near-identical copy.
+      //
+      // Scoped to the caption field only. Title and hashtags stay on the
+      // metadata path, which self-persists to the post row and owns
+      // workflow_state — behaviour this change deliberately does not touch.
+      if (requestedFields.length === 1 && requestedFields[0] === 'caption') {
+        // postProduction has `selectedPlatforms` (array), not `platform` —
+        // using the wrong key here would silently always caption for Instagram
+        // regardless of what the user picked.
+        await generateCaption(postProduction?.selectedPlatforms?.[0] || 'instagram');
+      } else {
+        await regeneratePostMetadata(requestedFields);
+      }
       toast.success(`${label} ready`, { id: toastId });
     } catch (err) {
       toast.error(err?.message || `${label} regeneration failed`, { id: toastId });
