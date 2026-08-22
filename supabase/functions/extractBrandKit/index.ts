@@ -11,6 +11,24 @@ type ExtractRequest = {
   fileName?: string;
   mimeType?: string;
   websiteUrl?: string;
+  /**
+   * LOCK L5.12 — conversational onboarding source.
+   *
+   * The 6-question brand-kit conversation used to finish by calling Groq
+   * DIRECTLY FROM THE BROWSER, where the token is hardcoded to "" — so it
+   * failed 100% of the time, in every environment, for every user who
+   * completed all six answers (audit P1-004). The questions worked; only the
+   * final extraction step was unreachable.
+   *
+   * Routed here rather than to a new endpoint because this is the same
+   * operation the function already performs — extract a brand kit from source
+   * text — just with conversation answers as the source instead of a document
+   * or a website. Same extraction prompt, same normalisation, same output
+   * shape, so the conversation cannot drift from the document path.
+   */
+  conversationAnswers?: Array<{ question?: string; answer?: string }> | null;
+  /** Anything already extracted from a document/site, to be built upon. */
+  prefilled?: Record<string, unknown> | null;
 };
 
 // Schema matches the real public.brand_kit columns exactly (see
@@ -408,8 +426,72 @@ serve(async (req: Request) => {
     const mimeType = String(body.mimeType || "").trim();
     const websiteUrl = String(body.websiteUrl || "").trim();
 
-    if (!storagePath && !websiteUrl) {
-      throw new Error("Missing storagePath or websiteUrl");
+    const conversationAnswers = Array.isArray(body.conversationAnswers) ? body.conversationAnswers : [];
+
+    if (!storagePath && !websiteUrl && conversationAnswers.length === 0) {
+      throw new Error("Missing storagePath, websiteUrl, or conversationAnswers");
+    }
+
+    // ── LOCK L5.12 — conversational onboarding ────────────────────────────
+    //
+    // Flatten the Q&A into the same "brand source text" the document and
+    // website paths produce, then hand it to the SAME extractor. Reusing
+    // runExtraction is the point: the conversation cannot drift away from the
+    // document path, because there is only one extractor and one schema.
+    if (conversationAnswers.length > 0) {
+      const transcript = conversationAnswers
+        .map((entry, index) => {
+          const q = String(entry?.question || `Question ${index + 1}`).trim();
+          const a = String(entry?.answer || "").trim();
+          return a ? `Q: ${q}\nA: ${a}` : "";
+        })
+        .filter(Boolean)
+        .join("\n\n");
+
+      if (!transcript) {
+        throw new Error("conversationAnswers contained no answers");
+      }
+
+      const prefilled = body.prefilled && typeof body.prefilled === "object" ? body.prefilled : null;
+      // The extraction prompt was written for document and website prose, where
+      // brand facts appear as statements. An interview transcript is a
+      // different shape: the signal is in short, direct answers, and the first
+      // live test showed it silently dropping content_pillars and dont_list
+      // even when the answers plainly contained them ("never call it
+      // artisanal", "brewing process, Lagos food culture, customer stories").
+      //
+      // These instructions tell the extractor how to read Q&A. Without them the
+      // conversation completes and quietly loses fields the user explicitly
+      // provided — worse than failing, because the user believes they were heard.
+      const sourceText = [
+        "The following is a brand-discovery INTERVIEW with the brand owner.",
+        "Their answers are first-hand and authoritative: prefer them over inference, and do not soften or generalise them.",
+        "",
+        // These map the six interview questions onto the ACTUAL brand_kit
+        // columns. Naming real fields matters: an earlier draft of this block
+        // referenced dont_list and content_pillars, which this schema does not
+        // have, so the model had nowhere to put those answers and silently
+        // dropped them.
+        "How to read it:",
+        "- Phrases the owner says they use often -> signature_phrases.",
+        "- Phrases they say to avoid -> forbidden_phrases.",
+        "- Topics, claims, or subjects they say never to post about -> content_restrictions.",
+        "- Named competitors they mention -> competitor_names.",
+        "- Words describing how the brand should sound -> tone_descriptors, with the fuller description in brand_voice.",
+        "- Who buys from them -> target_audience, plus audience_age_range and audience_locations when stated.",
+        "- Colours, photography style, and things to avoid visually -> visual_style_keywords, color_palette, photo_style_notes, avoid_visual_elements.",
+        "- Extract these even when the answer is one informal sentence: an interview answer is a statement of fact about the brand, not a passing mention.",
+        "",
+        transcript,
+        prefilled ? `Previously extracted context (build on this, do not discard it):\n${JSON.stringify(prefilled)}` : "",
+      ].filter(Boolean).join("\n");
+
+      const brandNameHint = String(
+        (prefilled as Record<string, unknown> | null)?.brand_name || "",
+      ).trim();
+
+      const result = await runExtraction(sourceText, brandNameHint);
+      return jsonResponse({ ...result, source: "conversation" });
     }
 
     // -- Website-URL source (mockup's "yourbrand.com" import / "Re-import

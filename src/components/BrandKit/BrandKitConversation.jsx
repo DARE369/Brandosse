@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, PenLine, Send, Sparkles } from 'lucide-react';
 import useBrandKitStore from '../../stores/BrandKitStore';
-import { callGroqJSON } from '../../services/groqClient';
+import { supabase } from '../../services/supabaseClient';
 import {
   CONVERSATION_QUESTIONS,
-  buildFinalConversationInferencePrompt,
+  // buildFinalConversationInferencePrompt is no longer imported: the extraction
+  // prompt now lives server-side in extractBrandKit, so there is exactly one
+  // brand-kit prompt rather than a browser copy that can drift from it.
   normalizeConversationResult,
 } from '../../services/brandKitConversation';
 import BrandKitLivePreview from './BrandKitLivePreview';
@@ -49,18 +51,31 @@ export default function BrandKitConversation({
   }, [messages, isThinking]);
 
   const finalizeConversation = async (nextAnswers) => {
-    const prompt = buildFinalConversationInferencePrompt({
-      answers: nextAnswers,
-      prefilled: collectedData,
+    // LOCK L5.12 — extraction runs SERVER-SIDE.
+    //
+    // This used to call callGroqJSON() directly from the browser, where the
+    // Groq token is hardcoded to "" (groqClient.js:7-9). So every user who
+    // answered all six questions hit a guaranteed failure at the final step —
+    // 100% of the time, in every environment, since the token is hardcoded
+    // rather than env-gated (audit P1-004). The six questions worked; only the
+    // step that turns them into a brand kit was unreachable.
+    //
+    // Routed to extractBrandKit rather than a new endpoint: it is the same
+    // operation (source text -> brand kit) the document and website paths
+    // already use, so the conversation shares one extractor and one schema and
+    // cannot drift away from them.
+    const { data, error } = await supabase.functions.invoke('extractBrandKit', {
+      body: {
+        conversationAnswers: CONVERSATION_QUESTIONS.map((question, index) => ({
+          question,
+          answer: nextAnswers[index] || '',
+        })),
+        prefilled: collectedData || null,
+      },
     });
+    if (error) throw error;
 
-    const result = await callGroqJSON(prompt, {
-      system: 'Return only valid JSON for the requested schema.',
-      temperature: 0.2,
-      max_tokens: 1400,
-    });
-
-    const normalized = normalizeConversationResult(result, collectedData);
+    const normalized = normalizeConversationResult(data, collectedData);
     setCollectedData(normalized.brandKit);
     setConfidenceMap(normalized.confidenceMap);
     setExtractedDraft(normalized.brandKit, normalized.confidenceMap, normalized.missingTier1Fields);
