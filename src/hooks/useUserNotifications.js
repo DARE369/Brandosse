@@ -101,7 +101,7 @@ export function useUserNotifications(userId) {
         .limit(15),
       supabase
         .from("posts")
-        .select("id, status, account_id, created_at, scheduled_at, published_at")
+        .select("id, status, account_id, created_at, scheduled_at, published_at, error_message")
         .eq("user_id", activeUserId)
         .is("organization_id", null)
         .order("created_at", { ascending: false })
@@ -136,12 +136,31 @@ export function useUserNotifications(userId) {
         const status = (post.status ?? POST_STATUS.SCHEDULED).toLowerCase();
         const timestamp = post.published_at ?? post.scheduled_at ?? post.created_at;
         const account = normalizePostAccountData(accountById.get(post.account_id));
+        const isFailed = status === POST_STATUS.FAILED;
+
+        // LOCK L5.2 — a failure notification must say WHY, and go to the post.
+        //
+        // This previously showed "Post publishing failed" with only the account
+        // name, and routed to the calendar generally. posts.error_message was
+        // already being written (publish-post records the provider reason, and
+        // the L2.3 reaper records timeouts) and was never selected, let alone
+        // shown — so the user learned that something failed but nothing about
+        // what to do next, and then had to hunt for which post it was.
+        //
+        // 22% of live posts are in a failed state, so this is the difference
+        // between an actionable alert and an anxiety generator.
+        const reason = String(post.error_message || "").trim();
+
         return {
           id: `post-${post.id}`,
           timestamp,
           headline: POST_NOTIFICATION_HEADLINES[status] ?? "Post update",
-          detail: `${account.platform} - ${account.accountName}`,
-          route: "/app/calendar",
+          detail: isFailed && reason
+            ? reason.slice(0, 140)
+            : `${account.platform} - ${account.accountName}`,
+          // Deep-link straight to the offending post; CalendarPage already
+          // reads ?postId= and opens the detail drawer (CalendarPage.jsx:253).
+          route: isFailed ? `/app/calendar?postId=${post.id}` : "/app/calendar",
         };
       });
 

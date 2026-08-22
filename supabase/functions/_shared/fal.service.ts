@@ -74,6 +74,23 @@ export interface FalVideoResult {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const FAL_QUEUE_BASE = "https://queue.fal.run";
+/**
+ * LOCK L5.9 — timeouts on fal.ai calls.
+ *
+ * Only 1 of 7 call sites had one. The others are submit/status/result polling
+ * against a queue; a hung poll leaves a video_jobs row non-terminal, which the
+ * L2.3 reaper then has to clean up as a mystery timeout instead of the call
+ * failing cleanly with a reason.
+ *
+ * Polls are short (they return immediately by design); submit is longer
+ * because fal accepts and enqueues the job.
+ */
+const FAL_TIMEOUT_MS = {
+  submit: 60_000,
+  poll:   20_000,
+  cancel: 15_000,
+} as const;
+
 const FAL_RUN_BASE   = "https://fal.run";
 
 export const FAL_MODELS = {
@@ -146,6 +163,7 @@ async function queueSubmit(modelId: string, input: unknown, apiKey: string, webh
     method: "POST",
     headers: falHeaders(apiKey),
     body: JSON.stringify({ input }),
+    signal: AbortSignal.timeout(FAL_TIMEOUT_MS.submit),
   });
   await checkFalError(res, "queue submit");
   const data: QueueSubmitResult = await res.json();
@@ -190,14 +208,20 @@ export async function submitVideoJob(
  * reconstructing it from a model id. */
 export async function getQueueStatus(statusUrl: string): Promise<{ status: QueueStatus; error?: string }> {
   const apiKey = getFalKey();
-  const res = await fetch(statusUrl, { headers: falHeaders(apiKey) });
+  const res = await fetch(statusUrl, {
+    headers: falHeaders(apiKey),
+    signal: AbortSignal.timeout(FAL_TIMEOUT_MS.poll),
+  });
   await checkFalError(res, "queue status");
   return res.json();
 }
 
 export async function getQueueResult<T = FalVideoResult>(responseUrl: string): Promise<T> {
   const apiKey = getFalKey();
-  const res = await fetch(responseUrl, { headers: falHeaders(apiKey) });
+  const res = await fetch(responseUrl, {
+    headers: falHeaders(apiKey),
+    signal: AbortSignal.timeout(FAL_TIMEOUT_MS.poll),
+  });
   await checkFalError(res, "queue response");
   return res.json() as Promise<T>;
 }
@@ -209,7 +233,11 @@ export async function getQueueResult<T = FalVideoResult>(responseUrl: string): P
 export async function cancelQueueJob(cancelUrl: string): Promise<boolean> {
   try {
     const apiKey = getFalKey();
-    const res = await fetch(cancelUrl, { method: "PUT", headers: falHeaders(apiKey) });
+    const res = await fetch(cancelUrl, {
+      method: "PUT",
+      headers: falHeaders(apiKey),
+      signal: AbortSignal.timeout(FAL_TIMEOUT_MS.cancel),
+    });
     return res.ok;
   } catch {
     return false;
@@ -229,7 +257,10 @@ async function queuePoll<T>(
   while (Date.now() - start < maxWait) {
     const statusRes = await fetch(
       `${FAL_QUEUE_BASE}/${modelId}/requests/${requestId}/status`,
-      { headers: falHeaders(apiKey) },
+      {
+        headers: falHeaders(apiKey),
+        signal: AbortSignal.timeout(FAL_TIMEOUT_MS.poll),
+      },
     );
     await checkFalError(statusRes, "queue status");
     const status = await statusRes.json();
@@ -237,7 +268,10 @@ async function queuePoll<T>(
     if (status.status === "COMPLETED") {
       const resultRes = await fetch(
         `${FAL_QUEUE_BASE}/${modelId}/requests/${requestId}/response`,
-        { headers: falHeaders(apiKey) },
+        {
+          headers: falHeaders(apiKey),
+          signal: AbortSignal.timeout(FAL_TIMEOUT_MS.poll),
+        },
       );
       await checkFalError(resultRes, "queue response");
       return resultRes.json() as T;

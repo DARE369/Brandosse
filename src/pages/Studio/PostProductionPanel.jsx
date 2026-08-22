@@ -220,7 +220,25 @@ export default function PostProductionPanel({
 
       <div>
         <div className={styles.scoreRow}>
-          <span className={styles.fieldLabel}>Discovery readiness</span>
+          {/*
+            LOCK L5.11 — this was labelled "Discovery readiness", which claims
+            the score predicts whether content gets discovered. It does not.
+            _shared/seo.ts scores ONLY the post's own text: its input type is
+            {title, caption, hashtags, platform, mediaType, visualPrompt}. No
+            keyword volume, no competitor data, no platform signal, and no
+            history of what the user's own posts actually did. The weights are
+            compile-time constants, so it cannot learn either.
+
+            A Power Migrant identifies an unvalidated LLM opinion quickly. The
+            real harm is to the Casual Operator, who trusts it BECAUSE it looks
+            authoritative and optimises toward a number with no demonstrated
+            relationship to reach.
+
+            Relabelled to what it honestly is — a review of the writing. The
+            name goes back to "Discovery readiness" the day it is grounded in
+            real outcome data (see audit D8 / H2).
+          */}
+          <span className={styles.fieldLabel}>Copy review</span>
           {/* WEEK 2 FIX 3/4: "not scored yet" / "failed" must never look
               like a real score of 0 — scoreColor(0) would otherwise render
               a red "0" indistinguishable from a genuinely poor score. */}
@@ -250,6 +268,11 @@ export default function PostProductionPanel({
               <RefreshCw size={12} aria-hidden="true" /> {seoRetryAfter > 0 ? `Retry in ${seoRetryAfter}s` : "Re-score"}
             </Button>
           </div>
+        )}
+        {postProduction.seoStatus === "scored" && (
+          <p className={styles.metadataFailedHint} style={{ marginTop: 4 }}>
+            An AI review of your writing — not a prediction of reach.
+          </p>
         )}
         {postProduction.seoStatus === "scored" && postProduction.seoBreakdown && (
           <div className={styles.scoreBars}>

@@ -123,19 +123,95 @@ const ACCOUNT_STATUS_MAP = {
   disconnected: { label: "Disconnected", tone: "danger" },
 };
 
+/**
+ * LOCK L2.1 / L2.2 — an account's badge must reflect what it can actually do.
+ *
+ * This previously derived status from `connection_status` alone, with a
+ * fallback of `{ label: "Healthy", tone: "success" }` for anything
+ * unrecognised — a fail-open default expressed in UI. Two live consequences:
+ *
+ *   1. Four accounts (provider='direct') are structurally unable to publish —
+ *      that code path was removed, and publish-post now rejects them outright.
+ *      All four rendered as green "Healthy".
+ *   2. The one real working account sat at health_score = 20 with a recorded
+ *      failure reason and ALSO rendered green, because health_score and
+ *      last_failure_reason were fetched and then never read.
+ *
+ * A user told "Healthy" has no reason to investigate. Precedence below runs
+ * hard-blocked -> degraded -> connection state -> unknown, and there is
+ * deliberately NO "assume healthy" branch: an unrecognised state reports as
+ * unknown, because inventing reassurance is the defect being fixed.
+ *
+ * `can_publish` and `publish_block_reason` are computed in
+ * connected_accounts_health_summary (migration 20260821220000) so every
+ * consumer inherits them rather than re-deriving and re-breaking this.
+ */
+const PUBLISH_BLOCK_LABELS = {
+  provider_removed: "Reconnect required",
+  provider_missing: "Reconnect required",
+  provider_unsupported: "Unsupported provider",
+};
+
+// Below this, the account is failing often enough that "Healthy" is a lie.
+const DEGRADED_HEALTH_THRESHOLD = 70;
+
 function toAccountCard(row) {
   const normalized = normalizeConnectedAccountRow(row) ?? row;
-  const semantic = getConnectedAccountSemanticStatus(normalized?.connection_status);
-  const statusInfo = ACCOUNT_STATUS_MAP[semantic] ?? { label: "Healthy", tone: "success" };
   const platformKey = normalizePlatformKey(normalized?.platform);
-  return {
+
+  const base = {
     id: normalized?.id,
     mark: platformKey.slice(0, 2).toUpperCase(),
     name: getConnectedAccountDisplayName(normalized) ?? formatPlatformName(platformKey),
     handle: normalized?.username ? `@${normalized.username}` : normalized?.account_name ?? "",
-    statusLabel: statusInfo.label,
-    statusTone: statusInfo.tone,
     isMock: !!normalized?.is_mock,
+  };
+
+  // 1. Hard block — cannot publish at all. Outranks everything, including an
+  //    "active" connection_status, which is exactly the case that was lying.
+  if (normalized?.can_publish === false) {
+    const reason = normalized?.publish_block_reason;
+    return {
+      ...base,
+      statusLabel: PUBLISH_BLOCK_LABELS[reason] ?? "Cannot publish",
+      statusTone: "danger",
+      blockReason: reason ?? "unknown",
+      detail: "This account cannot publish. Reconnect it to restore posting.",
+    };
+  }
+
+  // 2. Degraded — it can publish, but it has been failing.
+  const health = Number(normalized?.health_score);
+  if (Number.isFinite(health) && health < DEGRADED_HEALTH_THRESHOLD) {
+    return {
+      ...base,
+      statusLabel: "Degraded",
+      statusTone: "warning",
+      healthScore: health,
+      detail: normalized?.last_failure_reason || "Recent publishing attempts have failed.",
+    };
+  }
+
+  // 3. Connection state, for accounts that are otherwise fine.
+  const semantic = getConnectedAccountSemanticStatus(normalized?.connection_status);
+  const statusInfo = ACCOUNT_STATUS_MAP[semantic];
+
+  if (statusInfo) {
+    return {
+      ...base,
+      statusLabel: statusInfo.label,
+      statusTone: statusInfo.tone,
+      healthScore: Number.isFinite(health) ? health : undefined,
+      detail: normalized?.last_failure_reason || undefined,
+    };
+  }
+
+  // 4. Unrecognised — say so. Never assume healthy.
+  return {
+    ...base,
+    statusLabel: "Unknown",
+    statusTone: "warning",
+    detail: `Unrecognised connection state: ${normalized?.connection_status ?? "none"}`,
   };
 }
 
@@ -226,7 +302,8 @@ export function useDashboardData(userId, profile) {
         supabase.from("connected_accounts_health_summary").select(`
             id, platform, platform_display_name, display_name, account_name, username,
             connection_status, health_score, consecutive_failure_count, last_failure_reason,
-            last_successful_publish_at, scope, user_id
+            last_successful_publish_at, scope, user_id,
+            is_mock, provider, can_publish, publish_block_reason
           `).eq("scope", "personal").eq("user_id", userId).order("display_name", { ascending: true }),
         postCountInWindow(POST_STATUS.PUBLISHED, "published_at", windowStart),
         postCountInWindow(POST_STATUS.PUBLISHED, "published_at", prevWindowStart, windowStart),

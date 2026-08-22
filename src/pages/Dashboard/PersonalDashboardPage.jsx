@@ -24,17 +24,8 @@ import {
   Badge,
   MobileNavDrawer,
   NotificationBell,
-  AvatarMenu,
-} from "../../ui-v2";
+  AvatarMenu, NAV_ITEMS,} from "../../ui-v2";
 import styles from "./PersonalDashboardPage.module.css";
-
-const NAV_ITEMS = [
-  { key: "dashboard", label: "Dashboard", href: "/app/dashboard" },
-  { key: "studio", label: "Studio", href: "/app/generate" },
-  { key: "library", label: "Library", href: "/app/library" },
-  { key: "calendar", label: "Calendar", href: "/app/calendar" },
-  { key: "brand-kit", label: "Brand Kit", href: "/app/settings/brand-kit" },
-];
 
 function ThemeToggleButton() {
   const { isDark, toggleTheme } = useUiV2Theme();

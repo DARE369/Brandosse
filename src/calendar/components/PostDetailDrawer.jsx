@@ -436,7 +436,11 @@ export default function PostDetailDrawer({
 
                 <div className="scope-note" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                    <span className="ui-field-label" style={{ margin: 0 }}>Discovery readiness</span>
+                    {/* LOCK L5.11 — see pages/Studio/PostProductionPanel.jsx for the full
+                        reasoning. The score reads only the post's own text, has no
+                        external signal, and cannot learn, so it must not be labelled
+                        as a discovery prediction. */}
+                    <span className="ui-field-label" style={{ margin: 0 }}>Copy review</span>
                     {isDiscoveryBusy ? (
                       <span>…</span>
                     ) : discoveryStatus === 'failed' ? (

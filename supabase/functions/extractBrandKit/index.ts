@@ -428,6 +428,8 @@ serve(async (req: Request) => {
       const pageResponse = await fetch(parsedUrl.toString(), {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; BrandKitBot/1.0)" },
         redirect: "follow",
+        // LOCK L5.9 — brand kit extraction; bounded so a hung provider fails cleanly.
+        signal: AbortSignal.timeout(60_000),
       });
       if (!pageResponse.ok) {
         throw new Error(`Could not fetch ${parsedUrl.hostname} (${pageResponse.status})`);
@@ -458,7 +460,10 @@ serve(async (req: Request) => {
     if (signedErr) throw new Error(`Could not access uploaded document: ${signedErr.message}`);
     if (!signedData?.signedUrl) throw new Error("Signed URL was not returned");
 
-    const fileResponse = await fetch(signedData.signedUrl);
+    const fileResponse = await fetch(signedData.signedUrl, {
+      // LOCK L5.9 — download document bytes; bounded so a hung transfer fails cleanly.
+      signal: AbortSignal.timeout(60_000),
+    });
     if (!fileResponse.ok) {
       throw new Error(`Could not fetch document bytes (${fileResponse.status})`);
     }

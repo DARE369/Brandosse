@@ -1,0 +1,203 @@
+# P6 — Publishing & distribution
+# source_agent: A8 (agent runs killed by API/session limits; completed directly by the orchestrator)
+# All findings below are first-hand verified against code + live DB (read-only), 2026-08-20.
+
+- finding_id: P6-001
+  pillar: P6
+  capability: "real platform publishing (end-to-end)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "supabase/functions/publish-post/index.ts:142-174"
+    - "supabase/functions/_shared/zernio.service.ts:1-31"
+    - "live DB connected_accounts: 1 row is_mock=false provider=zernio platform=tiktok, total_posts_published=6"
+    - "live DB posts: 188 rows, 9 status=published"
+  observed_behavior: >
+    Real publishing EXISTS and has demonstrably worked. publish-post routes on
+    account.is_mock: mock accounts go to runMockPublish(), real accounts go to
+    publishToZernio(). Zernio is a unified third-party API over ~15 platforms that
+    holds the platform app registrations itself, so Brandosse never applied for
+    per-platform developer apps. Live evidence: exactly ONE real account exists
+    (TikTok, provider=zernio) and it has published 6 posts. The direct
+    per-platform OAuth path (publisher.service.ts) was deliberately REMOVED —
+    the code comment at publish-post/index.ts:161-163 states no platform ever had
+    app credentials configured, so it could never publish anything.
+  expected_behavior: >
+    A Power Migrant from Buffer expects real publishing across the platforms they
+    actually use — typically 4+ connected simultaneously — not one platform on one
+    account. One working platform is a proof of concept, not a publishing product.
+  persona_impact:
+    power_migrant: "Connects Instagram and LinkedIn, discovers only TikTok can actually publish. Churns immediately — multi-platform is the entire reason to use a scheduler."
+    casual_operator: "Likely only wants one platform, so may be served IF that platform is TikTok and IF they connect via Zernio. Any other choice silently fails (see P6-002)."
+  severity: BLOCKER
+  blast_radius: ["P2", "P8"]
+  effort: L
+  effort_reasoning: "Zernio integration itself is built and proven. Expanding coverage is per-platform config + testing + handling each platform's media constraints, not new architecture. The blocker is breadth and the broken-account class in P6-002, not the core mechanism."
+  confidence: HIGH
+  unverified_notes: "Zernio's own per-platform reliability, rate limits, and pricing are UNVERIFIED — needs Zernio account/docs access. Whether the 6 TikTok posts actually appeared publicly was not verified (would need the TikTok account)."
+  trace_id: "T-P6-01"
+  source_agent: "A8"
+
+- finding_id: P6-002
+  pillar: P6
+  capability: "connected-account provider integrity"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "supabase/functions/publish-post/index.ts:164-171"
+    - "live DB connected_accounts: 4 rows with is_mock=false AND provider='direct' (instagram x2, linkedin, youtube), connection_status='active'"
+  observed_behavior: >
+    Four live accounts are flagged is_mock=false (i.e. REAL) with provider='direct',
+    and connection_status='active'. But the 'direct' provider path was removed from
+    the codebase. publish-post:164-171 catches this and returns
+    "Unsupported publishing provider \"direct\". Reconnect this account through Zernio."
+    All four have total_posts_published=0 and access_token=NULL. The UI presents them
+    as active, connected accounts. They are structurally incapable of ever publishing.
+  expected_behavior: >
+    An account that cannot publish must never display as active. It should be marked
+    needs-reconnection with a one-click path to reconnect via Zernio, or be migrated
+    automatically.
+  persona_impact:
+    power_migrant: "Schedules a week of Instagram content against an 'active' account, and every post fails at dispatch. This is the exact trust-destroying failure that causes public complaints, not just churn."
+    casual_operator: "Sees a green 'active' Instagram connection, assumes publishing works, and never learns why nothing appeared. No mechanism tells them."
+  severity: BLOCKER
+  blast_radius: ["P2", "P8", "P9"]
+  effort: S
+  effort_reasoning: "A migration to flag provider='direct' accounts as needs_reconnect, plus a UI state and reconnect CTA. The detection logic already exists at publish-post:164."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P6-02"
+  source_agent: "A8"
+
+- finding_id: P6-003
+  pillar: P6
+  capability: "publish state machine — stuck-state recovery"
+  status: MISSING
+  maturity: L0
+  evidence:
+    - "supabase/functions/publish-post/index.ts:126-129"
+    - "live DB posts: 20 rows status='publishing', oldest updated_at=2026-04-04, newest=2026-07-10"
+    - "grep across supabase/migrations/** and supabase/functions/**: no code transitions a post OUT of 'publishing' except publish-post completing"
+  observed_behavior: >
+    publish-post sets status='publishing' before calling the provider. If the function
+    dies, times out, or the terminal update fails, the post remains 'publishing'
+    forever. NO reaper, timeout, or recovery job exists — verified by grepping every
+    occurrence of 'publishing' across migrations and functions. Live proof: 20 posts
+    are frozen in this state, the oldest for over four months. They will never be
+    retried (the scheduled worker only picks up status='scheduled'), never fail, and
+    never publish. They are invisible to every retry path.
+  expected_behavior: >
+    A publishing state must be time-bounded. After a timeout, the post is either
+    retried or moved to 'failed' with a surfaced reason. Stuck rows must be
+    observable and alertable.
+  persona_impact:
+    power_migrant: "Content silently vanishes into a dead state. No error, no retry, no notification — the worst possible failure mode for a scheduling tool, and undetectable without querying the DB."
+    casual_operator: "Post never appears and never errors. They conclude the product is broken and leave, with no support signal generated."
+  severity: BLOCKER
+  blast_radius: ["P2", "P8", "P10"]
+  effort: S
+  effort_reasoning: "A pg_cron reaper that fails or requeues posts in 'publishing' beyond N minutes. The cron infrastructure is already live and healthy (see P6-005), so this is one migration plus a backfill of the existing 20 rows."
+  confidence: HIGH
+  unverified_notes: "Root cause of each individual stuck row is UNVERIFIED — needs edge function logs. The absence of recovery is certain regardless of cause."
+  trace_id: "T-P6-03"
+  source_agent: "A8"
+
+- finding_id: P6-004
+  pillar: P6
+  capability: "OAuth token storage & refresh"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "live DB connected_accounts columns: access_token, refresh_token, token_expires_at, last_token_refresh, last_token_refresh_at"
+    - "live DB: the one real (zernio) account has access_token=NULL, token_expires_at=NULL"
+    - "live DB: mock accounts store plaintext tokens of the form 'mock_instagram_...', 'mock_tiktok_...'"
+    - "supabase/functions/_shared/zernio.service.ts:1-20 (Zernio holds the platform OAuth registrations)"
+  observed_behavior: >
+    Because Zernio holds the platform OAuth grants, Brandosse stores no real platform
+    token for the working account — access_token and token_expires_at are NULL. This
+    sidesteps the token-refresh problem entirely for the Zernio path: refresh is
+    Zernio's responsibility, not ours. The token columns are populated only with
+    plaintext mock values. Tokens are stored unencrypted at column level (relying on
+    at-rest encryption plus RLS).
+  expected_behavior: >
+    Delegating token custody to Zernio is a legitimate and arguably superior design —
+    but it must be a deliberate, documented decision, and the now-vestigial token
+    columns and refresh fields should not imply a refresh mechanism that does not exist.
+  persona_impact:
+    power_migrant: "Positive if it holds: no 60-day silent token death, which plagues self-managed OAuth integrations. But they now inherit Zernio as a single point of failure and a data-custody question they did not choose."
+    casual_operator: "Invisible and beneficial — fewer reconnection prompts."
+  severity: MINOR
+  blast_radius: ["P10"]
+  effort: XS
+  effort_reasoning: "Documentation plus removing or clearly marking the unused token/refresh columns. No functional change required."
+  confidence: HIGH
+  unverified_notes: "Whether Zernio refreshes tokens reliably, and what happens to a Brandosse account when a Zernio grant expires, is UNVERIFIED — needs Zernio docs/account. This is the key dependency risk of the design."
+  trace_id: "T-P6-04"
+  source_agent: "A8"
+
+- finding_id: P6-005
+  pillar: P6
+  capability: "scheduled publish worker (cron)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "live RPC get_cron_job_status(): job_name='process-scheduled-posts', schedule='* * * * *', is_active=true, last_run_at=2026-08-20T22:18:00Z, last_status='succeeded'"
+    - "supabase/migrations/20260710140000_create_process_scheduled_posts.sql:61"
+    - "supabase/migrations/20260716140000_fail_undispatchable_scheduled_posts.sql:68"
+    - "supabase/functions/publish-post/index.ts:34,192-206 (MAX_RETRIES=3, retry_count in workflow_state)"
+    - "supabase/functions/publish-post/index.ts:119-122 (double-publish guard)"
+  observed_behavior: >
+    The scheduling infrastructure is genuinely live and healthy — contrary to the
+    audit's initial working assumption. pg_cron runs process-scheduled-posts every
+    minute and it last succeeded minutes before this audit. Retry logic exists with
+    MAX_RETRIES=3 and backoff bookkeeping in workflow_state.publish.retry_count; a
+    double-publish guard returns early when status='published'; idempotency is
+    supported via publish_request_id. Ownership/tenancy checks at index.ts:98-117 are
+    thorough. Only THREE cron jobs exist in total: process-scheduled-posts,
+    process-risk-alerts, credit-monthly-reset.
+  expected_behavior: >
+    This is close to correct. The gap is that the state machine it drives has no
+    stuck-state recovery (P6-003), and dispatch failures are not surfaced to users
+    (P6-006).
+  persona_impact:
+    power_migrant: "The underlying queue is sound and would pass scrutiny; its failure modes are the problem, not its design."
+    casual_operator: "Invisible, which is correct for infrastructure."
+  severity: MINOR
+  blast_radius: ["P2"]
+  effort: XS
+  effort_reasoning: "The mechanism works; effort belongs to the findings it exposes rather than to this item."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P6-05"
+  source_agent: "A8"
+
+- finding_id: P6-006
+  pillar: P6
+  capability: "publish-failure surfacing to the user"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/publish-post/index.ts:196-222 (error_message written to posts)"
+    - "live DB posts: 42 rows status='failed' out of 188 total (22%)"
+    - "supabase/functions/publish-post/index.ts:236-246 (health_score decrement, last_failure_reason)"
+  observed_behavior: >
+    Failures ARE recorded — error_message on the post, last_failure_reason and a
+    health_score decrement on the account. 42 of 188 live posts (22%) are in 'failed'
+    state. What could not be verified is whether any notification, email, or in-app
+    alert ever tells the user a scheduled post failed; no notification write was found
+    on the publish-failure path.
+  expected_behavior: >
+    A failed scheduled post must actively notify the user. Buffer, Later, and
+    Metricool all push a failure notification — silent failure is unacceptable when
+    the user has left the app trusting the schedule.
+  persona_impact:
+    power_migrant: "Discovers failures only by manually auditing the calendar. With a 22% live failure rate, that is a daily chore they will refuse to perform."
+    casual_operator: "Never discovers the failure at all. Assumes it published."
+  severity: MAJOR
+  blast_radius: ["P8", "P9"]
+  effort: M
+  effort_reasoning: "A notification write on the failure path plus a UI surface. user_notifications table already exists; the delivery mechanism needs verification."
+  confidence: MEDIUM
+  unverified_notes: "Whether user_notifications is written on publish failure was NOT fully traced — the agent run covering notifications was killed. Needs: grep the publish path for notification inserts and confirm the UI reads them. The 22% failure rate mixes mock and real accounts and is not by itself proof of a real-publishing defect."
+  trace_id: "T-P6-06"
+  source_agent: "A8"

@@ -267,14 +267,20 @@ serve(async (req) => {
     if (!sourceUrl) throw new Error(`fal.ai (${modelId}) returned no image URL`);
 
     // ── Fetch + (optional) brand-logo composite ───────────────────────────────
-    const imgRes = await fetch(sourceUrl);
+    const imgRes = await fetch(sourceUrl, {
+      // LOCK L5.9 — download generated image / logo; bounded so a hung transfer fails cleanly.
+      signal: AbortSignal.timeout(120_000),
+    });
     if (!imgRes.ok) throw new Error("Failed to fetch generated image from fal.ai");
     let imgBytes = new Uint8Array(await imgRes.arrayBuffer());
     let ext = body.output_format ?? "jpeg";
 
     if (body.logo_url) {
       try {
-        const logoRes = await fetch(body.logo_url);
+        const logoRes = await fetch(body.logo_url, {
+          // LOCK L5.9 — download generated image / logo; bounded so a hung transfer fails cleanly.
+          signal: AbortSignal.timeout(120_000),
+        });
         if (logoRes.ok) {
           const logoBytes = new Uint8Array(await logoRes.arrayBuffer());
           imgBytes = await compositeLogo(imgBytes, logoBytes, {

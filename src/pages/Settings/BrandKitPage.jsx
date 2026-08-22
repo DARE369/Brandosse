@@ -17,8 +17,7 @@ import { useAppNavigation } from '../../Context/AppNavigationContext';
 import useBrandKitStore from '../../stores/BrandKitStore';
 import {
   UiV2ThemeProvider, useUiV2Theme, AppHeader, MobileNavDrawer, CreditPill, Avatar,
-  IconButton, Button, Skeleton,
-} from '../../ui-v2';
+  IconButton, Button, Skeleton, NAV_ITEMS,} from '../../ui-v2';
 import { useCreditBalance } from '../../hooks/useCreditBalance';
 import BrandKitSetupChoice from '../../components/BrandKit/BrandKitSetupChoice';
 import BrandKitExtractLoader from '../../components/BrandKit/BrandKitExtractLoader';
@@ -27,14 +26,6 @@ import BrandKitReviewForm from '../../components/BrandKit/BrandKitReviewForm';
 import BrandKitDashboard from '../../components/BrandKit/BrandKitDashboard';
 import BrandKitDiffModal from '../../components/BrandKit/BrandKitDiffModal';
 import styles from '../../components/BrandKit/BrandKit.module.css';
-
-const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', href: '/app/dashboard' },
-  { key: 'studio', label: 'Studio', href: '/app/generate' },
-  { key: 'library', label: 'Library', href: '/app/library' },
-  { key: 'calendar', label: 'Calendar', href: '/app/calendar' },
-  { key: 'brand-kit', label: 'Brand Kit', href: '/app/settings/brand-kit' },
-];
 
 // No established "Contact support" mechanism exists elsewhere in this app
 // (grepped — no mailto:/support constant anywhere). Logged as a judgment

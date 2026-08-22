@@ -5,14 +5,17 @@
  * authorization URL for the requested platform and redirects the browser
  * there. Zernio then redirects back to /api/auth/zernio/callback.
  *
- * Mirrors app/api/auth/oauth/route.js's request/auth pattern, but there's no
- * signed state to build — Zernio owns the OAuth exchange itself, we only need
- * to know which of our users initiated the connect (carried via redirect_url).
+ * Mirrors app/api/auth/oauth/route.js's request/auth pattern. Zernio owns the
+ * OAuth exchange itself, so we never see platform tokens — but we DO sign a
+ * short-lived state (LOCK L1.6) carrying the authenticated user id, so the
+ * callback can establish identity from something only this server could have
+ * produced rather than from a caller-supplied query parameter.
  */
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { createOAuthState } from '../../../_lib/oauthState';
 
 const ZERNIO_BASE = 'https://zernio.com/api/v1';
 
@@ -104,6 +107,7 @@ async function ensureZernioProfile(supabase, userId) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const platform = searchParams.get('platform')?.toLowerCase();
+  const scope = searchParams.get('scope') || 'personal';
 
   if (!platform) {
     return NextResponse.json({ error: 'platform is required' }, { status: 400 });
@@ -119,11 +123,21 @@ export async function GET(request) {
     const supabase = createServiceClient();
     const profileId = await ensureZernioProfile(supabase, user.id);
 
-    // profileId is carried in our own redirect_url (rather than relying on
-    // Zernio echoing it back on every platform's callback) so the callback
-    // always knows which Brandosse user/profile this connection belongs to.
+    // LOCK L1.6 — carry a SIGNED state, not just profileId.
+    //
+    // profileId alone is not an authorization token: it is a lookup key that
+    // anyone could supply, and the callback previously trusted it to decide
+    // which Brandosse user an incoming account belonged to. The signed state
+    // binds this flow to the user we just authenticated above, so the callback
+    // can derive identity from a value only this server could have produced.
+    // profileId is still passed for the Zernio-side lookup, but is no longer
+    // the source of identity.
+    const state = createOAuthState({ userId: user.id, platform, scope });
+
     const redirectUrl = `${getAppUrl(request)}/api/auth/zernio/callback` +
-      `?platform=${encodeURIComponent(platform)}&profileId=${encodeURIComponent(profileId)}`;
+      `?platform=${encodeURIComponent(platform)}` +
+      `&profileId=${encodeURIComponent(profileId)}` +
+      `&state=${encodeURIComponent(state)}`;
     const connectUrl = `${ZERNIO_BASE}/connect/${encodeURIComponent(platform)}` +
       `?profileId=${encodeURIComponent(profileId)}&redirect_url=${encodeURIComponent(redirectUrl)}`;
 

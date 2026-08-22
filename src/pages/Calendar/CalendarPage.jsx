@@ -51,6 +51,7 @@ import {
   monthStartKeyFor,
 } from '../../utils/timezone';
 import { isLockedForReschedule } from '../../utils/postStatusMachine';
+import { POST_STATUS } from '../../constants/statuses';
 
 import useCalendarUiStore from '../../calendar/stores/calendarUiStore';
 import { useCalendarDrafts, useCalendarPosts } from '../../calendar/hooks/useCalendarPosts';
@@ -73,20 +74,11 @@ import ToastStack, { TOAST_ICONS, useToastStack } from '../../calendar/component
 
 import {
   UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton, MobileNavDrawer,
-  NotificationBell, AvatarMenu,
-} from '../../ui-v2';
+  NotificationBell, AvatarMenu, NAV_ITEMS,} from '../../ui-v2';
 import '../../calendar/calendar-engine-v2.css';
 import styles from './CalendarPage.module.css';
 
 const MOBILE_VIEW_BREAKPOINT = 600;
-
-const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', href: '/app/dashboard' },
-  { key: 'studio', label: 'Studio', href: '/app/generate' },
-  { key: 'library', label: 'Library', href: '/app/library' },
-  { key: 'calendar', label: 'Calendar', href: '/app/calendar' },
-  { key: 'brand-kit', label: 'Brand Kit', href: '/app/settings/brand-kit' },
-];
 
 function ThemeToggleButton() {
   const { isDark, toggleTheme } = useUiV2Theme();
@@ -484,7 +476,7 @@ function CalendarBody({ brandKit }) {
         title: post.title, caption: post.caption, hashtags: post.hashtags,
         platform: post.platform, account_id: post.account_id,
         generation_id: post.generation_id || null,
-        status: 'draft', scheduled_at: null,
+        status: POST_STATUS.DRAFT, scheduled_at: null,
       });
       refetchDrafts();
       toast.success('Duplicated to a new draft');
@@ -507,7 +499,7 @@ function CalendarBody({ brandKit }) {
   const handleCreateDraftForDay = useCallback(async (dayKey) => {
     try {
       const scheduledAt = new Date(`${dayKey}T12:00:00.000Z`).toISOString();
-      await createPost(scope, { scheduled_at: scheduledAt, status: 'draft', caption: '' });
+      await createPost(scope, { scheduled_at: scheduledAt, status: POST_STATUS.DRAFT, caption: '' });
       refetchDrafts();
       toast.success('Draft created — edit it in the drawer');
     } catch (err) {
@@ -565,7 +557,7 @@ function CalendarBody({ brandKit }) {
     }
   }, [cellPalette]);
 
-  const handleCommandApply = useCallback(async (action) => {
+  const handleCommandApply = useCallback(async (action, result) => {
     if (!action) { setCmdBarOpen(false); return; }
 
     if (action.type === 'reschedule' && action.payload?.postId) {
@@ -602,6 +594,142 @@ function CalendarBody({ brandKit }) {
       return;
     }
 
+    // ── LOCK L2.4 — the four actions that used to silently do nothing ────────
+    //
+    // Everything below this point previously fell through to a bare
+    // `setCmdBarOpen(false)`: the dialog closed, nothing was written, and no
+    // toast or error was shown. "Ask AI" is the FIRST suggested command in the
+    // bar, it really does generate a Groq-backed weekly plan, and clicking
+    // "Apply week plan" discarded it. The user was left believing their week
+    // had been planned.
+    //
+    // The plumbing was already complete on the other side —
+    // CalendarCommandBar:200 passes `(action, result)` with a comment saying
+    // the parent can read `result.plan`. This handler simply never accepted
+    // the second argument.
+
+    // Apply a generated week plan — create a draft post per planned item.
+    // Drafts rather than scheduled posts: the plan is a proposal, and silently
+    // committing a week of live scheduled posts from one click would be a
+    // worse failure than the one being fixed.
+    if (action.type === 'week_plan') {
+      const plan = Array.isArray(result?.plan) ? result.plan : [];
+      if (plan.length === 0) {
+        toast.error('That plan came back empty — nothing to apply.');
+        setCmdBarOpen(false);
+        return;
+      }
+
+      const toastId = toast.loading(`Creating ${plan.length} draft posts…`);
+      let created = 0;
+      const failures = [];
+
+      for (const item of plan) {
+        try {
+          // `day` is YYYY-MM-DD and `time` is HH:MM, per the calendar-ai
+          // contract (calendar-ai/index.ts:103).
+          const when = item?.day && item?.time
+            ? new Date(`${item.day}T${item.time}:00`)
+            : null;
+          const scheduledAt = when && !Number.isNaN(when.getTime())
+            ? when.toISOString()
+            : null;
+
+          await createPost(scope, {
+            title: item?.hook || null,
+            caption: item?.caption || '',
+            hashtags: Array.isArray(item?.hashtags) ? item.hashtags : [],
+            platform: item?.platform || null,
+            scheduled_at: scheduledAt,
+            status: POST_STATUS.DRAFT,
+            generation_id: item?.draftId || null,
+          });
+          created += 1;
+        } catch (err) {
+          failures.push(err?.message || 'unknown error');
+        }
+      }
+
+      refetch();
+      refetchDrafts();
+      toast.dismiss(toastId);
+
+      // Report the real outcome, including partial success — never a blanket
+      // "done" that hides failures.
+      if (created === 0) {
+        toast.error(`Could not create any posts. ${failures[0] ?? ''}`.trim());
+      } else if (failures.length > 0) {
+        toast.success(`Created ${created} of ${plan.length} drafts — ${failures.length} failed.`);
+      } else {
+        toast.success(`Created ${created} draft post${created === 1 ? '' : 's'}.`);
+      }
+      setCmdBarOpen(false);
+      return;
+    }
+
+    // Schedule an existing draft at the AI-proposed time.
+    if (action.type === 'add_draft_post' && action.payload?.draftId) {
+      const { draftId, scheduledAt, platform } = action.payload;
+      const target = drafts.find((d) => d.id === draftId) || posts.find((p) => p.id === draftId);
+      if (!target) {
+        toast.error('That draft no longer exists.');
+        setCmdBarOpen(false);
+        return;
+      }
+      try {
+        await updatePost(scope, target.id, {
+          scheduled_at: scheduledAt || target.scheduled_at,
+          ...(platform ? { platform } : {}),
+          status: POST_STATUS.SCHEDULED,
+        }, target.status);
+        refetch();
+        refetchDrafts();
+        toast.success('Draft scheduled.');
+      } catch (err) {
+        toast.error(err?.message || 'Could not schedule that draft.');
+      }
+      setCmdBarOpen(false);
+      return;
+    }
+
+    if (action.type === 'delete_post' && action.payload?.postId) {
+      const target = posts.find((p) => p.id === action.payload.postId)
+        || drafts.find((d) => d.id === action.payload.postId);
+      if (!target) {
+        toast.error('That post no longer exists.');
+        setCmdBarOpen(false);
+        return;
+      }
+      try {
+        await deletePost(scope, target.id);
+        refetch();
+        refetchDrafts();
+        toast.success('Post deleted.');
+      } catch (err) {
+        toast.error(err?.message || 'Could not delete that post.');
+      }
+      setCmdBarOpen(false);
+      return;
+    }
+
+    // "Show optimal slots" is a read-only action — the suggestions are already
+    // rendered in the result panel. Confirm that rather than closing silently,
+    // and deliberately do NOT create posts: the label promises to show, not to
+    // schedule, and inventing writes the user did not ask for is its own bug.
+    if (action.type === 'suggest_slots') {
+      const count = Array.isArray(result?.suggestions) ? result.suggestions.length : 0;
+      toast.success(
+        count > 0
+          ? `${count} suggested slot${count === 1 ? '' : 's'} listed above.`
+          : 'No slot suggestions came back for that week.',
+      );
+      return; // keep the bar open so the suggestions stay visible
+    }
+
+    // Any action type we do not handle must say so out loud. Silence here is
+    // what this lock exists to eliminate.
+    console.warn('[calendar] unhandled AI action type:', action.type, action);
+    toast.error(`"${action.type}" is not supported yet.`);
     setCmdBarOpen(false);
   }, [posts, drafts, allGroups, scope, findGroupByKey, commitReschedule, refetch, refetchDrafts, setSelectedPostId]);
 

@@ -17,8 +17,7 @@ import {
 } from "lucide-react";
 import {
   UiV2ThemeProvider, useUiV2Theme, AppHeader, MobileNavDrawer, CreditPill,
-  IconButton, Button, EmptyState, Skeleton, NotificationBell, AvatarMenu, Modal,
-} from "../../ui-v2";
+  IconButton, Button, EmptyState, Skeleton, NotificationBell, AvatarMenu, Modal, NAV_ITEMS,} from "../../ui-v2";
 import { useAuth } from "../../Context/AuthContext";
 import usePersistentState from "../../hooks/usePersistentState";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
@@ -41,14 +40,6 @@ import AssetDetailDrawer from "./components/AssetDetailDrawer";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import TrashView from "./components/TrashView";
 import styles from "./LibraryPage.module.css";
-
-const NAV_ITEMS = [
-  { key: "dashboard", label: "Dashboard", href: "/app/dashboard" },
-  { key: "studio", label: "Studio", href: "/app/generate" },
-  { key: "library", label: "Library", href: "/app/library" },
-  { key: "calendar", label: "Calendar", href: "/app/calendar" },
-  { key: "brand-kit", label: "Brand Kit", href: "/app/settings/brand-kit" },
-];
 
 const LIBRARY_FILTER_PREFS_KEY = "socialai:library-filter-prefs-v2";
 

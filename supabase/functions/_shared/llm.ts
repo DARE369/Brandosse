@@ -1,5 +1,6 @@
 import { readEnv } from "./env.ts";
 import { createHttpError } from "./org.ts";
+import { reportToSentry } from "./sentry.ts";
 
 export type LlmMessage = {
   role: "system" | "user" | "assistant";
@@ -35,6 +36,34 @@ export function stripJsonFence(content: string) {
   return match ? match[1].trim() : content;
 }
 
+/**
+ * LOCK L4.7 — the default Anthropic model.
+ *
+ * This was `claude-3-5-sonnet-latest`, a 2024-generation model, and
+ * ANTHROPIC_MODEL was unset in every environment inspected. Because Groq has
+ * been failing 100% of content-plan calls since ~2026-08-18 with Claude
+ * silently absorbing all of it, that stale default was generating EVERY piece
+ * of content the product produced. The output-quality ceiling of the whole
+ * product was set by a default nobody had revisited.
+ *
+ * Claude Sonnet 5 is the right default here: same list price as Claude 3.5
+ * Sonnet ($3/$15 per MTok) for a materially stronger model, so this is a
+ * quality upgrade at no additional cost per token.
+ *
+ * Two rules, per engineering/01-versioning.md:
+ *   - Never rely on a code default for production output quality. Set
+ *     ANTHROPIC_MODEL explicitly per environment; this constant is the
+ *     backstop, not the plan.
+ *   - Never use a `-latest` alias in production. An alias silently changes the
+ *     model under you, which makes output regressions untraceable — pin it.
+ *
+ * Per-task selection: callers that want a cheaper model for high-volume,
+ * low-stakes work (scoring, classification) should pass `model` explicitly
+ * rather than changing this default. Raising quality for everything by
+ * changing one constant is exactly how the previous default went unexamined.
+ */
+const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5";
+
 function resolveProviders(preferredProvider?: string | null) {
   const groqKey      = readEnv("GROQ_API_KEY",      false);
   const anthropicKey = readEnv("ANTHROPIC_API_KEY", false);
@@ -48,7 +77,7 @@ function resolveProviders(preferredProvider?: string | null) {
 
   const anthropicEntry: ProviderConfig = {
     provider: "anthropic",
-    model: readEnv("ANTHROPIC_MODEL", false) || "claude-3-5-sonnet-latest",
+    model: readEnv("ANTHROPIC_MODEL", false) || DEFAULT_ANTHROPIC_MODEL,
     url: "https://api.anthropic.com/v1/messages",
     key: anthropicKey || "",
   };
@@ -94,6 +123,8 @@ async function callAnthropic(
       temperature,
       messages: conversation,
     }),
+    // LOCK L5.9 — LLM call; bounded so a hung provider fails cleanly.
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!response.ok) {
@@ -132,6 +163,8 @@ async function callOpenAiCompatible(
       ...(jsonMode && provider.provider === "groq" ? { response_format: { type: "json_object" } } : {}),
       messages,
     }),
+    // LOCK L5.9 — LLM call; bounded so a hung provider fails cleanly.
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!response.ok) {
@@ -185,6 +218,36 @@ export async function callLlm(options: {
       } as LlmResult;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      // LOCK L4.7 — a fallback is an ALERTING event, not a silent success.
+      //
+      // Groq failed 100% of content-plan calls for days while Claude quietly
+      // absorbed every one. Nothing broke from the user's side, so nothing
+      // surfaced — and the cost architecture inverted (roughly 5x input and
+      // 19x output vs the intended provider) with no signal at all.
+      //
+      // This log is deliberately at error level and deliberately structured:
+      // it is the tripwire that should have caught that outage on day one.
+      // Wire an alert to `llm_provider_fallback` when error tracking lands
+      // (LOCK E1).
+      const fallbackDetail = {
+        event: "llm_provider_fallback",
+        failed_provider: provider.provider,
+        failed_model: provider.model,
+        reason: lastError.message.slice(0, 200),
+        remaining_providers: providers.length - providers.indexOf(provider) - 1,
+      };
+      console.error("[llm] llm_provider_fallback", JSON.stringify(fallbackDetail));
+
+      // LOCK L0.4 — the console alone is what let the Groq outage run for days.
+      // Nobody reads edge-function logs unprompted; an alert has to arrive.
+      // Fire-and-forget: reporting must not add latency to the user's request,
+      // and the fallback below is about to serve them anyway.
+      void reportToSentry(lastError, {
+        event: "llm_provider_fallback",
+        level: "error",
+        extra: fallbackDetail,
+      });
     }
   }
 
@@ -275,7 +338,7 @@ export async function callAnthropicWithDocument(opts: {
     throw createHttpError("Document extraction requires ANTHROPIC_API_KEY.", 501);
   }
 
-  const model = readEnv("ANTHROPIC_MODEL", false) || "claude-3-5-sonnet-latest";
+  const model = readEnv("ANTHROPIC_MODEL", false) || DEFAULT_ANTHROPIC_MODEL;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

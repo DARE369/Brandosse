@@ -1,3 +1,50 @@
+# ⚠️ Engineering Standards — read before writing any code
+
+Full standards in [`engineering/`](engineering/). They are enforced, not aspirational: every rule exists because the 2026-08 launch audit (117 findings, [`audit/`](audit/)) found a specific defect it would have prevented.
+
+## The three laws
+
+**1. A change is not done until it is `fixed + proven + guarded`.**
+Fixed = defect corrected. Proven = an automated check shows it is correct now. Guarded = that check runs continuously.
+*Every serious finding in this codebase was working code that silently degraded — Groq failed 100% for days, trend data was fabricated for five months, 20 posts froze for four months. **None was detected.** A fix without a detector has a demonstrated half-life here.*
+
+**2. Code is the source of truth. Documentation is a claim.**
+Where a doc and the code disagree, **the doc is a bug** — fix or delete it. This repo has 107 docs in `docs/`, many contradicted by the code they describe. Do not trust them; verify against code. Do not add to them (see `engineering/03-documentation.md`).
+
+**3. Nothing may silently no-op, show fabricated data, or lose user content.**
+All three were being violated when the audit ran.
+
+## Non-negotiables
+
+- **Evidence or silence.** Every claim about what exists carries `file:line`. Cannot cite it → write `UNVERIFIED`. Never infer behaviour from a filename, route name, README, comment, type, or UI label. **A component that renders is not a feature that works** — trace to the handler, worker, DB write, or third-party call.
+- **Check the caller, not just the code.** This repo's dominant defect is *disconnection, not absence*: `OptimalTimesService.js` (466 lines, imported nowhere), `generate-caption` (correct, called by nothing), `week_plan` (generated, handler missing), `clip_selector.py` (292 lines, dead). Before writing something new, check whether it already exists unwired.
+- **Migrations are the only way schema changes.** No SQL Editor edits. **Never `supabase db push` without a diff** — live schema is drifted (89 tables live vs 65 in migrations). Migrations must be idempotent, transactional, and assert their post-condition.
+- **RLS changes require the behavioural probe**, not policy reading: `node scripts/security/cross-tenant-probe.mjs`. Service-role reads bypass RLS and prove nothing.
+- **Fail closed.** Mock modes are opt-in and never default. Missing credentials refuse startup rather than failing at runtime.
+- **Every outbound call needs a timeout.** Every non-terminal state needs a reaper.
+- **Pin model IDs explicitly.** Never `-latest` for production output. A provider fallback firing is an alerting event.
+- **No secrets in git**, including in documentation.
+
+## ⚠️ Open decisions — check before planning work
+
+[`OPEN-DECISIONS.md`](OPEN-DECISIONS.md) holds founder decisions that are
+**blocking engineering work**. Read it before proposing a plan — some work is
+blocked on a decision, not on effort, and proposing it anyway wastes a cycle.
+
+Currently open: **Zernio per-account pricing** (blocks L5.1 → four pillars),
+**error-tracking provider** (blocks L0.4 and two guards), **repository
+visibility** (the repo is public and `audit/` is in it).
+
+## 🔒 Completion Lockdown is ACTIVE
+
+Per [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md): **no new capability until everything pending is locked.** Finish, connect, or delete what exists. New ideas go to [`audit/08-horizon-register.md`](audit/08-horizon-register.md) — do not smuggle them in as "completion work." If it needs a new table, a new third-party integration, or a new nav item, it is new.
+
+## Review before merge
+
+Run the agentic passes in [`engineering/02-code-review.md`](engineering/02-code-review.md): correctness → security → **wiring** → **guard** (blocking) → red team. **A change with no guard is not approved.**
+
+---
+
 # Solo Founder Agent Team
 
 Six advisory subagents live in `.claude/agents/` to cover the non-engineering

@@ -1,0 +1,220 @@
+# A14 — P10 QUALITY, ERROR HANDLING & OBSERVABILITY
+# Findings written incrementally. Prefix P10q-NNN, source_agent: A14.
+
+- finding_id: P10q-001
+  pillar: P10
+  capability: "production error tracking / crash reporting"
+  status: MISSING
+  maturity: L0
+  evidence:
+    - "package.json:27-93 (full dependencies+devDependencies list, 37 packages, no Sentry/Bugsnag/Rollbar/Datadog/LogRocket/Highlight)"
+  observed_behavior: "No error-tracking SDK is installed anywhere in the repo (frontend, edge functions, or video-worker). grep for sentry/bugsnag/rollbar/datadog/logrocket across the tree returns zero real hits (a few CSS/docs false-positive substring matches, verified false by direct content grep). Errors that throw client-side or in an edge function are visible only in: (a) the browser devtools console of the one user who hit it, or (b) Supabase's own function-invocation logs if the developer happens to open that dashboard tab. There is no aggregation, no dedup, no alert, no stack-trace capture with source maps, no user-impact count."
+  expected_behavior: "Any production SaaS at this stage has Sentry (or equivalent) wired into the frontend AND edge functions AND worker, with release tagging and at least a Slack/email alert on new error types."
+  persona_impact:
+    power_migrant: "Comes from tools where their own failed exports/generations get proactively flagged to support before they even notice; here a silent failure is invisible to the vendor too."
+    casual_operator: "Never files a bug report — they just leave. The team never sees the failure that caused churn."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
+  effort: S
+  effort_reasoning: "Sentry SDK install + DSN wiring for Next.js is a few hours; edge-function wiring (Deno) and worker (Python) each another few hours. Small effort, but it is the single highest-leverage fix in this audit given the cross-agent through-line."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P10q-01"
+  source_agent: "A14"
+
+- finding_id: P10q-002
+  pillar: P10
+  capability: "Stripe payment webhook -> credit grant (money path)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/app/api/webhooks/stripe/route.ts:45-49 (handleWebhookEvent(event).catch(...) is fired without await; HTTP 200 {received:true} is returned to Stripe on line 49 regardless of whether the async handler has finished, or even started)"
+    - "src/app/api/webhooks/stripe/route.ts:63-129 (every failure branch inside handleWebhookEvent — missing metadata, invalid credits, dup-check query error, credit fetch error, balance update error, transaction insert error — does console.error(...) and `return;`, with no retry, no dead-letter write, no alert)"
+    - "src/app/api/webhooks/stripe/route.ts:90-116 (balance is read on line 90-94 and written back with a plain UPDATE on line 104-111 — read-modify-write on user_credits.balance with no row lock / atomic increment / RPC, so a concurrent request — e.g. a simultaneous generation debit — can race and lose an update)"
+  observed_behavior: "Because handleWebhookEvent is invoked without await and the 200 response is sent unconditionally right after, Stripe's own webhook retry mechanism (which only fires on non-2xx or timeout) can never be triggered by a failure in this code — a paid customer whose credit grant silently fails inside handleWebhookEvent gets no retry from Stripe, no error reported by the app, and no credits. The only trace is a console.error line in Vercel/Next server logs, which per finding P10q-001 has no aggregation or alerting. Separately, the balance update is a non-atomic read-then-write, creating a lost-update race against concurrent credit debits."
+  expected_behavior: "A payment webhook must be awaited before responding (or the 200 only sent after durable persistence, e.g. writing to a queue/outbox table), all failure branches must be reported to an on-call channel (this is literally lost revenue / support tickets), and balance mutations must use an atomic increment (SQL `balance = balance + X` or a dedicated RPC) rather than read-then-write."
+  persona_impact:
+    power_migrant: "Expects purchased credits to appear instantly and reliably, as with any competitor billing flow; a silent failure here means paying and not getting product, the single fastest way to lose trust and trigger a chargeback."
+    casual_operator: "Doesn't know to check a balance discrepancy — just assumes the product is broken or that they were scammed, contacts support (if they even bother) rather than retrying."
+  severity: BLOCKER
+  blast_radius: ["P10s"]
+  effort: S
+  effort_reasoning: "Awaiting the handler and wrapping the balance update in a single atomic RPC (already a common pattern elsewhere in the codebase, e.g. increment-style RPCs) is a small, contained change; the harder part is wiring in the alerting from P10q-001 first."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P10q-02"
+  source_agent: "A14"
+
+- finding_id: P10q-003
+  pillar: P10
+  capability: "AI provider fallback (Groq -> Anthropic) — root cause of the cross-agent-verified silent cost inversion"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/_shared/llm.ts:172-191 (callLlm loops providers in preference order; the per-provider try/catch at 173-188 has NO console.error/console.warn/log call of any kind on failure — line 186-188 is `catch (error) { lastError = error instanceof Error ? error : new Error(String(error)); }` and the loop silently continues to the next provider)"
+    - "supabase/functions/generate-content-plan/index.ts:194-217,219-246 (both generatePlan() and revisePlan() call callLlm with preferredProvider: 'groq'; the actual provider used is returned as `provider: llmResult.provider` but only inside the HTTP response body returned to the caller on line 282 — grep of the file confirms zero DB insert, zero console.log referencing provider/groq/fallback)"
+    - "supabase/functions/generate-content-plan/index.ts:282 (return jsonResponse(await generatePlan(body.brief)) — the only place `provider` is used; nothing reads or compares it against the requested preferredProvider)"
+  observed_behavior: "When Groq fails (as it has 100% of the time since ~2026-08-18 per cross-agent verification), callLlm's catch block does not log anything — not even which provider failed or why — before falling through to Anthropic. Anthropic succeeds, the function returns 200 OK with a valid content plan, and the only artifact that ever reveals the substitution is a `provider: \"anthropic\"` field buried in a JSON response body that no code path stores, diffs against the request, or alerts on. This is the exact mechanism by which a multi-day, 100%-failure-rate, cost-inverting Groq outage produced zero errors, zero logs, and zero alerts."
+  expected_behavior: "A provider fallback must, at minimum, console.error/log the failed provider and reason before falling back (so it's visible in Supabase function logs), and should increment a metric or write a row so a dashboard/alert can catch a fallback rate that spikes to 100% — the entire point of having a fallback is defeated if using it is invisible."
+  persona_impact:
+    power_migrant: "N/A directly for this user — this is an ops/founder-facing blind spot, not something an end user perceives directly, but the founder is the 'user' who is harmed: they lose the ability to control AI spend and quality tier without knowing it."
+    casual_operator: "Indirectly harmed if Anthropic-quality output differs from Groq-quality output in ways the founder assumed were consistent — the operator gets whatever the silent fallback produced with no way to know a substitution happened."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P4", "P10s"]
+  effort: XS
+  effort_reasoning: "Adding one console.error/warn line inside the existing catch block, plus optionally writing one row to a metrics/log table, is a trivial change — this is the cheapest, highest-leverage fix identified anywhere in the P10q pillar."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P10q-03"
+  source_agent: "A14"
+
+# ── P10q-004 onward: completed by the orchestrator after A14 was killed ──
+# Verified first-hand 2026-08-21.
+
+- finding_id: P10q-004
+  pillar: P10
+  capability: "error swallowing — measured, and NOT the problem it was assumed to be"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "grep across src/** and supabase/functions/**: exactly 1 empty catch block (src/services/calendarAIService.js)"
+    - "21 instances of .catch(() => {}) across 17 files, all in src/components and src/pages"
+    - "grep of those 21 filtered for credit|publish|payment|stripe|paystack|refund|deduct: ZERO matches"
+    - "representative samples: src/components/video-engine/ClipPreviewModal.jsx:47 (videoRef.play() autoplay rejection), src/components/User/UserSidebar.jsx:135 (background complaint fetch), src/components/User/UserNavbar.jsx:466 (mark-notification-viewed)"
+  observed_behavior: >
+    This finding CORRECTS an assumption the audit was carrying. Error swallowing was
+    expected to be widespread on critical paths given the number of silent failures
+    found elsewhere. It is not. There is exactly ONE empty catch block in the entire
+    codebase, and all 21 .catch(() => {}) swallows are in UI components handling
+    genuinely ignorable rejections — browser autoplay policy rejections, background
+    notification fetches, and non-blocking refreshes.
+    ZERO swallows sit on money, publish, credit, or data-write paths.
+    The silent failures documented elsewhere in this audit (Groq 100% failure, frozen
+    posts, fabricated trends, mock defaults) are therefore NOT caused by swallowed
+    exceptions. They are caused by the absence of monitoring and by fail-open defaults.
+    That is a different root cause requiring a different fix, and getting it right
+    matters: adding error handling would not have prevented a single one of them.
+  expected_behavior: >
+    Swallowed rejections on ignorable UI operations are acceptable practice. The single
+    empty catch block should be reviewed. No systemic remediation is warranted here.
+  persona_impact:
+    power_migrant: "No impact — these swallows are invisible and correct."
+    casual_operator: "No impact."
+  severity: MINOR
+  blast_radius: []
+  effort: XS
+  effort_reasoning: "Review one empty catch block. The broader class needs no work."
+  confidence: HIGH
+  unverified_notes: "Catch blocks that log-and-continue (rather than being empty) were not exhaustively classified; some may swallow meaningfully while appearing handled. A full pass would need to read each catch body."
+  trace_id: "T-P10q-04"
+  source_agent: "A14/orchestrator"
+
+- finding_id: P10q-005
+  pillar: P10
+  capability: "missing timeouts on outbound provider calls — including the sole publishing provider"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/_shared/zernio.service.ts: 4 fetch call sites, 0 using AbortSignal or signal:"
+    - "supabase/functions/_shared/fal.service.ts: 7 fetch call sites, 1 using AbortSignal"
+    - "supabase/functions/_shared/llm.ts: 5 fetch call sites, 3 using AbortSignal"
+    - "across supabase/functions/**: 29 fetch call sites, only 2 files reference AbortSignal/AbortController at all"
+  observed_behavior: >
+    Timeout coverage is inconsistent and worst where it matters most.
+    zernio.service.ts — the ONLY real publishing provider in the product (publish-post
+    routes every non-mock account through it) — has FOUR outbound calls and NOT ONE
+    timeout. A hung or slow Zernio response has nothing to bound it. Because
+    publish-post sets posts.status='publishing' BEFORE calling the provider
+    (publish-post/index.ts:126-129) and no reaper exists (P6-003), a hung Zernio call
+    is a direct mechanism for producing exactly the frozen-post state observed live in
+    20 rows.
+    llm.ts is mostly covered (3 of 5). fal.service.ts is largely uncovered (1 of 7).
+  expected_behavior: >
+    Every outbound network call must carry a timeout. For the publishing path
+    specifically, the timeout must be shorter than the reaper threshold so a hung
+    provider fails cleanly rather than stranding the record.
+  persona_impact:
+    power_migrant: "Experiences posts that neither publish nor fail — the worst outcome for a scheduling tool, and one they cannot diagnose or retry."
+    casual_operator: "Post silently never appears; no error is ever shown."
+  severity: MAJOR
+  blast_radius: ["P6", "P4"]
+  effort: S
+  effort_reasoning: "Add AbortSignal.timeout() to each call site. The pattern already exists in llm.ts and can be copied. Roughly 25 call sites."
+  confidence: HIGH
+  unverified_notes: "Whether Supabase edge functions impose a platform-level wall-clock limit that partially mitigates this was not verified; even if so, it would produce an abrupt kill rather than a handled timeout, still leaving the post stranded."
+  trace_id: "T-P10q-05"
+  source_agent: "A14/orchestrator"
+
+- finding_id: P10q-006
+  pillar: P10
+  capability: "test coverage and CI enforcement"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "tests/e2e/real-user-flows.spec.js — 300 lines, the entire automated test surface"
+    - "src/** 93,829 lines + supabase/functions/** 15,565 lines = ~109,000 lines under test by 300 lines of spec"
+    - ".github/workflows/ci.yml:9-40 — build job only; no test step, no lint step"
+    - "scripts/check-*.cjs — 8 guard scripts exist and are referenced by no workflow"
+  observed_behavior: >
+    One Playwright spec covers roughly 109,000 lines of application code, and CI does
+    not run it. CI runs a build and nothing else. Eight purpose-written guard scripts
+    (check-production-ready, check-env-security, check-edge-functions,
+    check-status-literals, check-ui-consistency and others) exist in scripts/ and are
+    wired into no workflow — they are verification theater in the precise sense that
+    they were written to catch problems and are never executed.
+    Critically, no test exists for cross-tenant data access — the audit's most severe
+    finding (P10s-001) would have been caught immediately by a test that logs in as
+    user A and attempts to read user B rows.
+  expected_behavior: >
+    CI must run tests. The guard scripts must either run or be deleted. A cross-tenant
+    authorization test must exist and must be blocking.
+  persona_impact:
+    power_migrant: "Experiences regressions that automated tests would have caught before release."
+    casual_operator: "Same."
+  severity: MAJOR
+  blast_radius: ["P10"]
+  effort: S
+  effort_reasoning: "Wiring existing scripts and the existing spec into CI is small. Writing the cross-tenant test is M and is the highest-value test in the codebase."
+  confidence: HIGH
+  unverified_notes: "Whether the existing Playwright spec currently PASSES was not verified — the agent assigned to run it was killed before doing so. It should be run before being made blocking."
+  trace_id: "T-P10q-06"
+  source_agent: "A14/orchestrator"
+
+- finding_id: P10q-007
+  pillar: P10
+  capability: "cron monitoring reports dispatch, not outcome"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "cron jobs use net.http_post (20260710120000_vault_based_cron_secrets.sql:118-127 and siblings)"
+    - "pg_net http_post is ASYNC — it returns a request_id immediately; the cron command succeeds if the SQL runs"
+    - "get_cron_job_status().last_status reads cron.job_run_details, which records SQL success, not the HTTP response"
+    - "actual HTTP statuses live in net._http_response, which nothing reads"
+    - "observed 2026-08-21: credit-monthly-reset last_status=succeeded for 2026-08-01 — proves a request was SENT, nothing about the response"
+  observed_behavior: >
+    Every cron job that calls an edge function does so through net.http_post,
+    which is asynchronous. The scheduled command returns a request_id the moment
+    the request is queued, so cron records success regardless of what the target
+    returns. A function that has been answering 401 or 500 for months still
+    shows last_status = succeeded.
+    This is the same class of defect as the get_cron_job_status allowlist fixed
+    in L0.3: monitoring that reports health it cannot observe. L0.3 made the
+    jobs visible; their outcomes are still not.
+    Discovered while verifying L1.7 — the only way to see real status codes was
+    to query net._http_response by hand.
+  expected_behavior: >
+    Job health must reflect the HTTP outcome. get_cron_job_status() should join
+    net._http_response and surface the last status code, and alert on non-2xx.
+  persona_impact:
+    power_migrant: "Invisible directly, but it is why a broken scheduled job reaches them before it reaches the operator."
+    casual_operator: "Same."
+  severity: MAJOR
+  blast_radius: ["P2", "P6", "P8", "P10"]
+  effort: S
+  effort_reasoning: "Extend get_cron_job_status() with a lateral join onto net._http_response keyed by request_id, and alert on non-2xx. The response data is already being captured — nothing reads it."
+  confidence: HIGH
+  unverified_notes: >
+    Whether request_id is retained anywhere that allows joining a cron run to
+    its response was not established. If not, the jobs may need to record it.
+  trace_id: "T-P10q-07"
+  source_agent: "orchestrator"

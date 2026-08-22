@@ -1,0 +1,1070 @@
+# A5 — P4 VIDEO GENERATION. Agent: A5 (video-pipeline-specialist).
+# Scope: GENERATION. `video-worker/stages/*` clipping logic is A6's.
+# Written incrementally — order is discovery order, not severity order.
+
+- finding_id: P4-001
+  pillar: P4
+  capability: "Which video system is the product? (two disjoint systems, one product surface)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/generateVideo/index.ts:1-284"
+    - "supabase/functions/_shared/fal.service.ts:86-88"
+    - "app/api/video/submit/route.ts:18-35"
+    - "app/api/video/submit/route.ts:141-160"
+    - "video-worker/stages/download.py"
+    - "app/(video-engine)/video/new/page.tsx"
+    - "app/app/video/new/page.jsx"
+  observed_behavior: >
+    P4 is not one feature; it is TWO unrelated systems that share the word "video"
+    and never touch each other.
+    (A) GENERATIVE VIDEO: `supabase/functions/generateVideo/index.ts` — prompt (+
+    optional image) -> fal.ai Hailuo 2.3 / Kling 2.5 Pro -> `generations` row
+    (media_type='video'). This is the Runway/Kling/Veo-class surface.
+    (B) THE "VIDEO ENGINE": `app/api/video/submit/route.ts` accepts ONLY
+    `platform: 'youtube' | 'twitter' | 'upload'` (:21) plus a source URL (:20). It writes
+    a `video_jobs` row (:141-150) consumed by the Python `video-worker`. This generates
+    nothing — it downloads an existing long-form video and cuts clips from it
+    (Opus Clip / Vizard category, not Runway).
+    They write to different tables (`generations` vs `video_jobs`), use different
+    providers (fal.ai vs yt-dlp+Whisper+Claude), check credits differently
+    (reserveCredits vs a raw balance read at app/api/video/submit/route.ts:113-134),
+    have different queues, different UIs, and different storage. No code path in
+    either references the other.
+  expected_behavior: >
+    A user clicking "video" in a content OS expects one coherent video capability.
+    Competitors do not ship two disjoint video products under one noun with no bridge
+    between them (e.g. generate a clip, then caption/reframe it in the same pipeline).
+  persona_impact:
+    power_migrant: "Discovers the 'video' nav leads to a YouTube-URL box, not a prompt box — a different product from the Kling/Runway workflow they came for. The generative surface is reachable only from Studio, and nothing connects the two, so they cannot generate a clip then reframe/caption it."
+    casual_operator: "Cannot form a mental model of what 'video' does here. Two screens both called video ask for two different inputs (a prompt vs a YouTube link) with no explanation of which one they want."
+  severity: MAJOR
+  blast_radius: ["P1", "P5", "P6"]
+  effort: L
+  effort_reasoning: "Not a bug — a product-architecture decision. Either unify the two pipelines behind one entry point or cut one. Both are multi-week."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P4-01"
+  source_agent: "A5"
+
+- finding_id: P4-002
+  pillar: P4
+  capability: "Generative video has never once succeeded in production (live DB evidence)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "LIVE DB: generations WHERE media_type='video' — 32 rows, entire lifetime"
+    - "LIVE DB: background_jobs WHERE job_type='video_generation' — 2 rows, both status='failed'"
+    - "supabase/functions/generateVideo/index.ts:210-265"
+  observed_behavior: >
+    A live read-only query of `generations` (media_type='video') returns the product's
+    ENTIRE video history — 32 rows. By what is actually in `storage_path`:
+    (a) 17 rows 2025-11-22..2025-11-26, status 'completed', storage_path =
+    https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4
+    — Google's public sample video. Canned. Not generated.
+    (b) 1 row 2025-12-30, status 'completed', storage_path =
+    https://placehold.co/1024x576/png?text=Video+Generating... — a PNG placeholder
+    IMAGE persisted as a completed VIDEO.
+    (c) 5 rows 2026-01-05..2026-02-19, status 'completed', storage_path =
+    https://video.pollinations.ai/prompt/... — free unauthenticated Pollinations
+    endpoint, hotlinked rather than copied into own storage.
+    (d) 1 row 2026-02-22, status 'completed' — a genuine Supabase storage object
+    (metadata.provider='freepik'; provider column NULL).
+    (e) 1 row 2026-06-25, status 'processing', storage_path = the Google sample again
+    (prompt "QA verify video thumbnail re-test").
+    (f) 2 rows 2026-08-19, provider='fal-ai', status='failed', storage_path NULL.
+    The fal.ai path — the current and only intended production generative path — has
+    produced exactly 2 rows ever and BOTH failed. Their `background_jobs` errors are
+    "fal.ai reported ERROR via webhook" and "Gave up after 20 reconciliation attempts
+    with no terminal fal.ai status". Lifetime success rate of the shipping generative
+    path: 0/2 (0%). Every `completed` video in the database is canned, a placeholder,
+    hotlinked, or from a provider (freepik/pollinations) that no longer appears in code.
+  expected_behavior: >
+    A launch surface must have demonstrated at least one end-to-end success on the
+    provider it ships with. Runway/Kling/Veo users measure success in the high 90s.
+  persona_impact:
+    power_migrant: "Their attempts will be the 3rd and 4th fal.ai attempts in the product's history. There is no evidence the path works at all; they hit the same two failure modes and leave."
+    casual_operator: "Clicks generate, waits, gets an error, cannot tell whether they did something wrong or the product is broken, and has no reason to try twice."
+  severity: BLOCKER
+  blast_radius: ["P1", "P5", "P6", "P8"]
+  effort: M
+  effort_reasoning: "Must first make ONE fal.ai video succeed end-to-end (key/model/params/webhook), then harden. The code is written; it has never been proven."
+  confidence: HIGH
+  unverified_notes: >
+    Counts as of 2026-08-21 via service-role PostgREST. `storage_path` is the real
+    output column; `output_url` is NULL on all 32 rows despite existing in the schema —
+    itself a dead-column signal.
+  trace_id: "T-P4-02"
+  source_agent: "A5"
+
+- finding_id: P4-003
+  pillar: P4
+  capability: "Clip-repurposing engine (video_jobs) — live success rate and 7-week silence"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "LIVE DB: video_jobs — 15 rows total (Content-Range 0-14/15), entire lifetime"
+    - "app/api/video/submit/route.ts:141-171"
+    - "video-worker/config.py:24-26"
+  observed_behavior: >
+    `video_jobs` holds 15 rows for the product's entire life: 6 'complete', 9 'failed' —
+    a 40% lifetime success rate. Most recent row 2026-07-02; most recent SUCCESS
+    2026-06-23. As of 2026-08-21 that is ~7 weeks with zero traffic and ~2 months since
+    anything worked. The 9 live failure messages are the real failure taxonomy:
+    x4 "Sign in to confirm you're not a bot" (yt-dlp blocked from a server IP);
+    "Requested format is not available";
+    "Stitched video upload failed: " (empty reason — swallowed error);
+    "Job timed out after 90 minutes";
+    "No valid clips could be created from Claude response" (LLM output unusable);
+    "Transcription failed: mkl_malloc: failed to allocate memory" (OOM);
+    "Download failed: [SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC] ... Giving up after 3 retries".
+    YouTube bot-blocking is not transient — it is the structural condition of
+    server-side yt-dlp, and it is 4 of the 9 failures. `WORKER_YOUTUBE_COOKIES`
+    (video-worker/config.py:24-26) exists specifically to work around it and is empty
+    in video-worker/.env.
+  expected_behavior: >
+    Opus Clip / Vizard succeed on a public YouTube URL essentially always, and when
+    they cannot they explain why in user language. 40% with raw yt-dlp stack traces
+    surfaced as the error message is not shippable.
+  persona_impact:
+    power_migrant: "Has used Opus Clip. A 40% success rate plus a raw yt-dlp traceback in the UI reads as an unfinished side project; they will not paste a second URL."
+    casual_operator: "Sees 'Sign in to confirm you're not a bot' and believes THEY are accused of being a bot or must log into YouTube. No recovery action is available to them."
+  severity: BLOCKER
+  blast_radius: ["P5"]
+  effort: M
+  effort_reasoning: "Cookie/proxy strategy for yt-dlp, an error-message translation layer, and memory sizing for transcription. Each bounded, but the bot-block needs an ongoing operational answer."
+  confidence: HIGH
+  unverified_notes: >
+    Whether the Railway-deployed worker is currently running is UNVERIFIED — 7 weeks of
+    zero rows is consistent with both "no users tried" and "worker is down".
+  trace_id: "T-P4-03"
+  source_agent: "A5"
+
+- finding_id: P4-004
+  pillar: P4
+  capability: "THE MOCK QUESTION — three flags, two of which no code reads, and a fail-open-to-fake default"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - ".env.local:36-38"
+    - ".env.example:71-74"
+    - "app/api/credits/purchase/route.ts:20"
+    - "src/app/api/credits/purchase/route.ts:20"
+    - "video-worker/config.py:21-22"
+    - "video-worker/utils/llm_client.py:115-131"
+    - "video-worker/.env:13-14"
+    - "EXHAUSTIVE REPO-WIDE GREP for VIDEO_ENGINE_USE_MOCK (--include=* , no path exclusions, including node_modules/ and .next/): 30 hits total; the ONLY non-doc, non-env, non-build-artifact files are app/api/credits/purchase/route.ts and src/app/api/credits/purchase/route.ts — both _PAYMENTS. Zero files reference _ANTHROPIC or _REPLICATE from code."
+  observed_behavior: >
+    Traced every read of all three flags across the entire repo.
+    (1) VIDEO_ENGINE_USE_MOCK_ANTHROPIC — ZERO code reads. It appears only in
+    .env.example:72, .env.local:36, and docs. No `process.env.VIDEO_ENGINE_USE_MOCK_ANTHROPIC`
+    exists anywhere in src/, app/, supabase/, or video-worker/.
+    (2) VIDEO_ENGINE_USE_MOCK_REPLICATE — ZERO code reads. Same: .env.example:73,
+    .env.local:37, docs only.
+    (3) VIDEO_ENGINE_USE_MOCK_PAYMENTS — read exactly once, at
+    app/api/credits/purchase/route.ts:20 (`process.env.VIDEO_ENGINE_USE_MOCK_PAYMENTS === 'true'`),
+    duplicated at src/app/api/credits/purchase/route.ts:20. DEFAULT WHEN UNSET — the strict
+    `=== 'true'` comparison yields false, so an unset flag means REAL Stripe. .env.local:38
+    sets it to `true`, so credit purchase is currently MOCKED locally.
+    The flags that ACTUALLY gate mocking have DIFFERENT NAMES — WORKER_USE_MOCK_ANTHROPIC /
+    WORKER_USE_MOCK_REPLICATE (video-worker/config.py:21-22). Both are `Field(default=True)`.
+    ANSWER TO "what is the default when a flag is unset":
+    VIDEO_ENGINE_USE_MOCK_ANTHROPIC / _REPLICATE — irrelevant either way, nothing reads them;
+    VIDEO_ENGINE_USE_MOCK_PAYMENTS unset -> REAL payments (fails open to real money);
+    WORKER_USE_MOCK_ANTHROPIC unset -> MOCK (fails open to FAKE OUTPUT);
+    WORKER_USE_MOCK_REPLICATE unset -> mock, but nothing reads it either (see P4-005).
+    The worker case is the dangerous one. video-worker/utils/llm_client.py:123-131 — if
+    use_mock_anthropic, call_claude() logs `claude_mock_response` at INFO and returns
+    `_mock_claude_response()`: hardcoded clip JSON with fabricated scores (hook_score 0.78,
+    overall_score 0.76) and hardcoded timestamps (start_time_secs 180.0, end_time_secs 240.0).
+    Downstream stages then really cut, render and upload clips at those fabricated timestamps
+    and charge real credits. Nothing marks the output as mocked in the DB or the UI.
+    A production deploy that simply omits WORKER_USE_MOCK_ANTHROPIC — exactly what happens if
+    someone copies .env.local's differently-named VIDEO_ENGINE_* flags instead — silently
+    ships canned analysis as real product output.
+  expected_behavior: >
+    Mock switches must default to OFF (real), be read by the code they claim to control,
+    share one name across every layer, and be impossible to leave on silently — a mocked
+    response should be stamped on the row and visible in the UI.
+  persona_impact:
+    power_migrant: "Would receive clips cut at a fixed 180s-240s window regardless of content, with invented 0.78 hook scores presented as analysis. They will recognise the scores as fake and never trust another number in the product."
+    casual_operator: "Has no way to know the clips were chosen by a hardcoded constant rather than by AI. They pay credits for, and publish, content selected at random."
+  severity: BLOCKER
+  blast_radius: ["P5", "P9"]
+  effort: S
+  effort_reasoning: "Flip the two pydantic defaults to False, delete the two dead VIDEO_ENGINE_* flags, unify on one name. Small change; the risk is that it is currently invisible."
+  confidence: HIGH
+  unverified_notes: >
+    Whether the live Railway worker sets WORKER_USE_MOCK_ANTHROPIC=false is UNVERIFIED —
+    Railway env vars are not in the repo. video-worker/.env:13-14 (local only) sets both to
+    false. The 6 completed video_jobs are therefore of UNKNOWN mock status.
+  trace_id: "T-P4-04"
+  source_agent: "A5"
+
+- finding_id: P4-005
+  pillar: P4
+  capability: "Provider reality — Replicate is configured everywhere and called nowhere"
+  status: STUBBED
+  maturity: L0
+  evidence:
+    - "package.json:51"
+    - ".env.local:20"
+    - "video-worker/config.py:20"
+    - "video-worker/config.py:22"
+    - ".env.example:109"
+    - ".env.example:140"
+    - "docs/TECHNICAL_CONSTRAINTS.md:166"
+    - "docs/video-engine/api-keys-and-mocks.md:60"
+    - "supabase/functions/_shared/fal.service.ts:95-99"
+  observed_behavior: >
+    Replicate is present as an npm dependency ("replicate": "^1.4.0", package.json:51), an
+    env var (.env.local:20, REPLICATE_API_TOKEN=, EMPTY), a documented edge-function secret
+    (.env.example:109), a worker config field (video-worker/config.py:20) and a worker mock
+    flag (config.py:22), and docs describe it as the "Legacy/start-generation video path ...
+    Required by start-generation when using Replicate" (docs/TECHNICAL_CONSTRAINTS.md:166).
+    None of it is wired to anything. Greps across src/, app/ and supabase/ for
+    `from 'replicate'`, `require('replicate')` and `api.replicate.com` return ZERO hits. In
+    the Python worker, `config.replicate_api_token` and `config.use_mock_replicate` are
+    DEFINED at config.py:20,22 and READ NOWHERE — the only occurrences in the entire worker
+    tree are their own declarations. docs/video-engine/api-keys-and-mocks.md:60 explains why:
+    real Replicate mode still requires someone to "replace the WhisperX model version
+    placeholder in video-worker/stages/transcribe.py". It was never finished.
+    ANSWER — the provider the code actually calls for generative video is fal.ai ONLY
+    (fal.service.ts:95-99, key FAL_API_KEY read from Supabase secrets). Replicate is called by
+    nothing, and the REPLICATE_API_TOKEN in .env.local is both unused AND empty.
+    Is there a live path requiring an absent key? FAL_API_KEY is absent from .env.local, but
+    generateVideo is a Supabase EDGE function reading Supabase secrets, so that absence is
+    expected rather than a defect. The real absent-key exposure is WORKER_YOUTUBE_COOKIES
+    (empty) — see P4-003.
+  expected_behavior: >
+    The config surface should describe the system that exists. A dependency, an env var, a
+    docs page and two config fields for a provider that is never called is misdirection
+    during incident response and an unnecessary supply-chain dependency.
+  persona_impact:
+    power_migrant: "Not directly visible, but it is why transcription quality can never be upgraded without code work — the 'just add a Replicate token' escape hatch the docs promise does not exist."
+    casual_operator: "Invisible. Indirect harm only: it made the team believe a fallback provider existed when none did."
+  severity: MINOR
+  blast_radius: []
+  effort: XS
+  effort_reasoning: "Delete the dependency, the two config fields, the env entries, and correct the two doc lines."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P4-05"
+  source_agent: "A5"
+
+- finding_id: P4-006
+  pillar: P4
+  capability: "fal.ai model routing is inverted — standard tier posts image-to-video params to a text-to-video model id"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "supabase/functions/_shared/fal.service.ts:86-88"
+    - "supabase/functions/_shared/fal.service.ts:12-13"
+    - "supabase/functions/_shared/fal.service.ts:518-526"
+    - "supabase/functions/generateVideo/index.ts:99-104"
+    - "supabase/functions/generateVideo/index.ts:216-223"
+    - "LIVE DB: the only 2 fal-ai video rows, both metadata.quality='standard' + is_image_to_video=true, both failed"
+  observed_behavior: >
+    fal.service.ts:86 declares `videoHailuo23: "fal-ai/minimax/video-01"` with the inline
+    comment "Hailuo 2.3 standard — image-to-video", repeated in the file header at :12. The
+    model ID and the comment describe different things: `minimax/video-01` is MiniMax's
+    first-generation endpoint, not Hailuo 2.3, and on fal.ai the image-to-video variant is a
+    SEPARATE endpoint id, not the same one.
+    generateVideo/index.ts:99-104 builds its whole tier logic on the comment rather than the
+    id — "Hailuo 2.3 (the 'standard' tier engine) is image-to-video only", therefore
+    `tierUpgraded = requestedQuality === 'standard' && !isI2V`, so a text-only standard
+    request is force-promoted to premium and billed 15 credits instead of 5 (index.ts:102-104).
+    Both branches are therefore wrong, in opposite directions:
+    standard + image -> submitVideoHailuo (fal.service.ts:518-526) POSTs
+    {prompt, image_url, duration, aspect_ratio} to `fal-ai/minimax/video-01`, an endpoint that
+    does not accept image_url/duration/aspect_ratio;
+    standard + no image -> silently billed 3x as premium.
+    The live data matches the first branch exactly: the only two fal.ai video rows ever
+    created both carry metadata quality='standard', is_image_to_video=true, and both failed —
+    one "fal.ai reported ERROR via webhook", one "Gave up after 20 reconciliation attempts
+    with no terminal fal.ai status". This is the most probable single cause of the 0/2
+    lifetime success rate in P4-002.
+  expected_behavior: >
+    The model id, its comment, its declared capability and the tier routing built on it must
+    agree; and at least one real submit must be observed to succeed before the surface ships.
+  persona_impact:
+    power_migrant: "Uploads a reference image expecting image-to-video — the flagship Kling/Runway workflow — and gets a provider error. Or submits text-only and is charged triple, with a tooltip explaining the upcharge as though it were intentional."
+    casual_operator: "Both paths cost credits. One errors outright, the other quietly costs 3x what the pricing implied, and they have no vocabulary to tell the two apart."
+  severity: BLOCKER
+  blast_radius: ["P5", "P9"]
+  effort: S
+  effort_reasoning: "Correct the model ids against fal.ai's current catalog, split out the i2v endpoint, drop or invert the tier-upgrade rule. Small code change — but it requires actually running one submit to confirm."
+  confidence: MEDIUM
+  unverified_notes: >
+    The internal contradiction (id says video-01, comment says Hailuo 2.3, tier logic derives
+    from the comment) is HIGH confidence and provable from code alone. That this specific
+    mismatch is the exact cause of the two fal errors is MEDIUM — confirming it needs the raw
+    fal.ai error body, which the pipeline discards (see P4-013). Fastest verification: one
+    live curl to fal.ai queue submit with the same payload.
+  trace_id: "T-P4-06"
+  source_agent: "A5"
+
+- finding_id: P4-007
+  pillar: P4
+  capability: "Cost per output — inverted tier economics and unpriced duration"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/_shared/fal.service.ts:585-593"
+    - "supabase/functions/generateVideo/index.ts:32-33"
+    - "supabase/functions/generateVideo/index.ts:151-156"
+    - "supabase/functions/generateVideo/index.ts:174-177"
+    - "LIVE DB: generations.cost = 0 on all 32 video rows"
+  observed_behavior: >
+    Cost per output, from the code's own constants.
+    STANDARD tier — model `fal-ai/minimax/video-01`; FAL_COST_USD.videoHailouPerClip = $0.500
+    per clip (fal.service.ts:591), applied flat and duration-independent
+    (generateVideo/index.ts:155). Charged CREDITS_STD_VIDEO = 5 credits (index.ts:32).
+    => $0.500 provider cost / 5 credits = $0.100 of provider cost per credit.
+    PREMIUM tier — model `fal-ai/kling-video/v2.5/pro`; FAL_COST_USD.videoKlingPerSec = $0.070
+    per second (fal.service.ts:592) multiplied by duration (index.ts:154). 5s => $0.350;
+    10s => $0.700. Charged CREDITS_PRO_VIDEO = 15 credits (index.ts:33).
+    => 5s: $0.350 / 15 = $0.0233 per credit. 10s: $0.700 / 15 = $0.0467 per credit.
+    The tiers are economically INVERTED. "Premium" costs the business ~30% LESS in real
+    dollars than "standard" at the same 5s duration ($0.35 vs $0.50) while charging the user
+    3x the credits. Per credit, standard is 4.3x worse margin than premium-5s and 2.1x worse
+    than premium-10s. Duration is not priced on either tier: a 10s premium clip costs the
+    business exactly 2x a 5s one and the user exactly the same 15 credits.
+    Separately the figure is never persisted where it can be aggregated — index.ts:176 writes
+    cost_usd into `metadata` while the dedicated `generations.cost` column is 0 on all 32 live
+    video rows. No query can answer "what did video cost us".
+  expected_behavior: >
+    Credit pricing should track marginal provider cost, duration must be priced, and realised
+    cost must land in a numeric column so gross margin is observable.
+  persona_impact:
+    power_migrant: "Learns 10s costs the same as 5s and always requests 10s, doubling provider spend at zero extra revenue. Also sees a 'standard' tier that is both lower quality and worse value than premium — an incoherent menu."
+    casual_operator: "Picks 'standard' assuming it is the cheap safe default, and gets both the failing code path (P4-006) and the worst credit value in the product."
+  severity: MAJOR
+  blast_radius: ["P9"]
+  effort: S
+  effort_reasoning: "Re-derive the credit table from FAL_COST_USD, make duration a multiplier, and write cost into generations.cost. Contained to two files."
+  confidence: HIGH
+  unverified_notes: >
+    FAL_COST_USD values are the repo's own constants (fal.service.ts:585-593), not verified
+    against fal.ai's live price list. If those constants are stale the arithmetic shifts but
+    the structural inversion (flat credits vs per-second cost) does not. Verifying needs
+    fal.ai's current pricing page.
+  trace_id: "T-P4-07"
+  source_agent: "A5"
+
+- finding_id: P4-008
+  pillar: P4
+  capability: "THE DUPLICATE VIDEO UI — definitive routing verdict"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - ".next/server/app-paths-manifest.json (11 video route entries, all resolved from app/)"
+    - "app/(video-engine)/video/new/page.tsx:1-5"
+    - "app/(video-engine)/video/jobs/page.tsx:1-5"
+    - "app/(video-engine)/video/jobs/[id]/page.tsx:1-5"
+    - "app/app/video/new/page.jsx:1-9"
+    - "src/components/User/UserSidebar.jsx:53"
+    - "app/app/layout.jsx:1-5"
+    - "app/layout.jsx:1-35"
+    - "src/app/(video-engine)/video/new/page.tsx (byte-identical to app/ copy — diff -q reports no difference)"
+  observed_behavior: >
+    The premise that "one is presumably dead" is wrong — BOTH are routable and both are in
+    the compiled build. The built app-paths-manifest contains all six page routes:
+    /(video-engine)/video/new, /jobs, /jobs/[id]  AND  /app/video/new, /jobs, /jobs/[id].
+    Because `(video-engine)` is a Next.js route GROUP, its pages serve at
+    /video/new, /video/jobs, /video/jobs/[id] — distinct URLs from /app/video/*.
+    WHICH IS LIVE: /app/video/*. It is the only one linked — UserSidebar.jsx:53 renders
+    "Video Lab" -> /app/video/jobs with a BETA badge, and every internal navigate() in
+    src/components/video-engine/* and src/pages/VideoEngine/* targets /app/video/*. Its
+    pages mount the real SPA components (app/app/video/new/page.jsx:1,8 -> VideoSubmitPage)
+    under app/app/layout.jsx, which wraps NextAppProviders (auth/session).
+    WHICH IS DEAD-BUT-SERVING: /video/*. All three .tsx pages are literal placeholders —
+    `return <div>Submit Page - Coming Stage 8</div>`, `<div>Jobs Page - Coming Stage 8</div>`,
+    `<div>Job Detail - Coming Stage 8</div>`. Nothing links to them. There is NO
+    layout.tsx in the (video-engine) group, so they fall through to the ROOT app/layout.jsx,
+    which contains no auth provider and no session gate. They are therefore publicly
+    reachable unauthenticated URLs on the production domain that render the string
+    "Coming Stage 8".
+    A THIRD copy exists and is entirely dead: src/app/(video-engine)/** and src/api/video/**.
+    Next.js resolves the app directory as root `app/` (confirmed: every entry in
+    app-paths-manifest.json maps to app/..., none to src/app/...), so src/app/ is never
+    compiled. src/app/(video-engine)/video/new/page.tsx is byte-identical to the app/ copy.
+    Net: three copies of the video route tree, one live, one shipping a placeholder string
+    to anonymous visitors, one never compiled.
+  expected_behavior: >
+    One route tree per feature. Dead scaffolding must not ship, and no unauthenticated URL
+    on the production domain should render internal build-stage language.
+  persona_impact:
+    power_migrant: "If they guess /video/jobs (the obvious URL, and what the route group implies the team intended) they get 'Jobs Page - Coming Stage 8' — an unambiguous signal the product is a partially-built prototype."
+    casual_operator: "Any shared or bookmarked /video link lands on a blank white page with build-jargon text and no navigation to escape — a dead end with no way back."
+  severity: MAJOR
+  blast_radius: ["P10s"]
+  effort: XS
+  effort_reasoning: "Delete app/(video-engine)/ and src/app/ + src/api/video/. No behaviour depends on them."
+  confidence: HIGH
+  unverified_notes: >
+    Whether middleware separately blocks /video/* is not established here — no middleware
+    file was inspected. Even if it redirects, the placeholder pages remain compiled dead code.
+  trace_id: "T-P4-08"
+  source_agent: "A5"
+
+- finding_id: P4-009
+  pillar: P4
+  capability: "Generative video queue — completion, idempotency and reaper mechanics (the parts that are right, and the two holes)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "supabase/functions/generateVideo/index.ts:78-94"
+    - "supabase/functions/generateVideo/index.ts:186-208"
+    - "supabase/functions/_shared/videoJobFinalize.ts:30-68"
+    - "supabase/functions/_shared/videoJobFinalize.ts:70-99"
+    - "supabase/functions/job-webhook/index.ts:54-77"
+    - "supabase/functions/process-jobs/index.ts:27-82"
+    - "supabase/functions/cancel-video-job/index.ts:45-78"
+    - "supabase/migrations/20260712120000_week3_process_jobs_cron.sql:29-39"
+    - "LIVE DB: background_jobs job 68d203bb finished 20m51s after start with 'Gave up after 20 reconciliation attempts'"
+  observed_behavior: >
+    Full trace, attacked hop by hop.
+    SUBMIT: generateVideo/index.ts — auth (:67-69), rate limit (:70), prompt validation
+    (:73-74), request_id idempotency replay (:78-94), credit reservation BEFORE provider call
+    (:111-114), generations row born 'processing' (:162-180), background_jobs row born
+    'queued' (:189-203), fal.ai async submit with a capability-URL webhook (:210-223), then
+    an update to 'running' persisting fal's own status/response/cancel URLs (:230-253).
+    COMPLETION: two independent observers. job-webhook (fal pushes the payload) and
+    process-jobs (pg_cron sweep). Both funnel through one module, videoJobFinalize.ts.
+    WHAT IS GENUINELY RIGHT — this is the strongest-engineered queue in the codebase:
+    * Duplicate webhook: safe. finalizeCompleted/finalizeFailed do the terminal write as a
+      single conditional UPDATE guarded by `.eq("status","running")` (videoJobFinalize.ts:54-57,
+      74-76) and return whether THIS caller won. Only the winner touches generations/credits.
+    * Concurrent submit: safe. request_id replay (index.ts:79-94) returns the existing job.
+    * Credit correctness: deduct-at-submit with refunds on every terminal failure path
+      (index.ts:116-127, videoJobFinalize.ts:88-97, cancel-video-job:72-78).
+    * Cancel: honest. Marks cancelled under a status guard so a late webhook cannot resurrect
+      it (cancel-video-job:55-65), and best-effort cancels fal-side.
+    * Dropped webhook: covered by process-jobs, with a bounded attempt counter
+      (MAX_ATTEMPTS=20, process-jobs:38,64-68) that eventually fails-and-refunds rather than
+      polling forever. The pg_cron registration is real (migration 20260712120000:29-39,
+      1/min) and — critically — it is PROVEN RUNNING IN PRODUCTION by live data: job
+      68d203bb started 21:03:09 and finished 21:24:00 with exactly the "Gave up after 20
+      reconciliation attempts" message from process-jobs:65. 20m51s ≈ 20 sweeps at 1/min.
+      This is not a get_cron_job_status() claim; it is behavioural proof.
+    HOLE 1 — 'queued' is unreaped. process-jobs selects ONLY `status='running'`
+    (process-jobs:53) AND `started_at < staleBefore` (:54); started_at is written only on the
+    transition to running (index.ts:234), so it is NULL while queued and the filter excludes
+    the row twice over. If the edge function dies between the background_jobs insert (:189)
+    and the fal submit (:220) — Deno worker timeout, cold-start kill, deploy mid-request —
+    the row is stranded at 'queued' forever, its generations row stranded at 'processing',
+    and the reserved credits are NEVER refunded because no code path other than the
+    in-function catch (:257-265) can refund them. This is the identical stuck-state class P6
+    found in posts: a transient state with no reaper.
+    HOLE 2 — finalizeCompleted does its expensive work BEFORE claiming. It fetches the video
+    from fal (videoJobFinalize.ts:35-37) and uploads it to storage (:40-43) and only THEN
+    performs the guarded UPDATE (:47-57). Any throw in those first steps — fal CDN 5xx, an
+    expired fal result URL, a storage quota error — propagates to job-webhook's catch
+    (job-webhook:78-81), which deliberately returns HTTP 200 to fal.ai (:35-38) so fal will
+    NOT redeliver. The job stays 'running'. process-jobs is the only recovery, and it will
+    re-attempt the same fetch+upload; if the cause is persistent it burns all 20 attempts and
+    then fails a job whose video fal actually rendered — precisely the failure recorded live
+    on 2026-08-19. It also means the video is downloaded and uploaded to storage up to 20
+    times, and a race loser (videoJobFinalize.ts:59) has already paid for a full download and
+    upload before discovering it lost.
+  expected_behavior: >
+    Every non-terminal state needs a reaper, not just the one the happy path passes through.
+    The claim should be taken before expensive I/O so a transient provider or storage error
+    cannot strand a job or duplicate an upload.
+  persona_impact:
+    power_migrant: "A job stranded at 'queued' shows a spinner that never resolves and silently keeps their credits. They have no cancel affordance that works on it (cancel-video-job does handle 'queued', but the UI only surfaces cancel from the running state) and no way to tell it apart from a slow render."
+    casual_operator: "Sees a video that has been 'generating' since they submitted it, is down the credits, and has no error to report to support. They assume they were charged for nothing — which is exactly what happened."
+  severity: MAJOR
+  blast_radius: ["P6", "P9"]
+  effort: M
+  effort_reasoning: "Extend the process-jobs sweep to cover 'queued' (using created_at, since started_at is NULL there), and move the status claim above the fetch/upload in finalizeCompleted. Both are contained, but the second changes the failure semantics and needs care."
+  confidence: HIGH
+  unverified_notes: >
+    No background_jobs row has ever been stranded at 'queued' in production — the table has
+    only ever held 2 rows, both terminal (LIVE DB). The hole is therefore proven by code
+    reading, not yet by an observed incident. That is a function of near-zero traffic, not of
+    the hole being closed.
+  trace_id: "T-P4-09"
+  source_agent: "A5"
+
+- finding_id: P4-010
+  pillar: P4
+  capability: "Orphaned clip rows — the clip pipeline's stuck-state class (same as P6's frozen posts)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "LIVE DB: video_clips — 43 rows: 23 'complete', 16 'failed', 4 'pending'"
+    - "LIVE DB: the 4 'pending' clips all belong to job a62038d2, created 2026-06-17, storage_path NULL, public_url NULL"
+    - "LIVE DB: video_jobs a62038d2 status='failed', error_message='Job timed out after 90 minutes'"
+    - "supabase/functions/process-jobs/index.ts:52-53"
+  observed_behavior: >
+    The clip-repurposing pipeline has its own frozen-state class, and unlike the generative
+    queue's it has already HAPPENED in production. Job a62038d2 failed on 2026-06-17 with
+    "Job timed out after 90 minutes". Its four child `video_clips` rows were left at
+    render_status='pending' with storage_path NULL and public_url NULL, and they are still
+    'pending' today, 2026-08-21 — over two months. The parent job's failure was never
+    cascaded to its children.
+    Nothing reaps them: process-jobs filters on `job_type='video_generation'`
+    (process-jobs:52) and `background_jobs`, a completely different table from `video_clips`;
+    it has no visibility into the clip pipeline at all. The clip pipeline's only timeout is
+    the worker's own 90-minute job-level one, which terminated the parent and stopped.
+    Also of note: 16 of 43 clips (37%) are 'failed' and one 'complete' clip has no
+    public_url, so even within completed jobs individual clip renders fail routinely and
+    without a retry path.
+  expected_behavior: >
+    Terminal failure of a parent job must cascade to its children in the same transaction or
+    via a sweep, so no row can sit in a transient state indefinitely. Per-clip render
+    failures need retry, not silent 37% loss.
+  persona_impact:
+    power_migrant: "Opens a job from June and sees four clips permanently rendering. Individual clip failure with no retry button means a 'successful' job still silently loses a third of the output they paid for."
+    casual_operator: "Cannot tell a permanently-stuck clip from one that is still working, so they wait, then leave. Nothing in the UI says the job died two months ago."
+  severity: MAJOR
+  blast_radius: ["P5", "P6"]
+  effort: S
+  effort_reasoning: "Cascade child clip rows to 'failed' when the parent job terminates, and add a sweep for pending clips whose parent is terminal. Contained to the worker's job finalisation and one query."
+  confidence: HIGH
+  unverified_notes: >
+    The cascade logic lives in the worker's job finalisation (video-worker/job_runner.py),
+    which is adjacent to A6's scope — this finding rests on the live row state, which is
+    unambiguous, rather than on reading A6's stage code.
+  trace_id: "T-P4-10"
+  source_agent: "A5"
+
+- finding_id: P4-011
+  pillar: P4
+  capability: "Storage & delivery — two incompatible models; generative output is world-readable forever"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/_shared/videoJobFinalize.ts:4"
+    - "supabase/functions/_shared/videoJobFinalize.ts:39-45"
+    - "supabase/functions/_shared/videoJobFinalize.ts:61-66"
+    - "app/api/video/clips/[id]/refresh-url/route.ts:13"
+    - "app/api/video/clips/[id]/refresh-url/route.ts:52-68"
+  observed_behavior: >
+    The two video systems store and deliver output on opposite security models.
+    CLIP ENGINE — bucket `video-clips`, PRIVATE. Delivery is a signed URL with
+    SIGNED_URL_EXPIRY = 172800 seconds (refresh-url/route.ts:13), i.e. 48 hours. THIS IS WHY
+    refresh-url EXISTS: the URL persisted in `video_clips.public_url` is a time-limited
+    signature, so after 48 hours every stored link 404s and the row needs re-signing
+    (route.ts:52-68 re-signs and overwrites public_url). The column name `public_url` is
+    actively misleading — it holds an expiring credential, and any copy of it a user pasted
+    elsewhere (a Slack message, a scheduled post, a shared doc) silently dies after two days.
+    GENERATIVE ENGINE — bucket `generated_assets`, PUBLIC. videoJobFinalize.ts:45 calls
+    `getPublicUrl(fileName)` and writes that unsigned, non-expiring URL into BOTH
+    generations.output_url and generations.storage_path (:64). Anyone who ever obtains the
+    URL retains permanent unauthenticated access; there is no revocation. The object key is
+    `${job.user_id}/${Date.now()}_${fal_model_id}.mp4` (:39), so the owner's raw user UUID is
+    embedded in a world-readable URL — a cross-user correlation handle leaked with every
+    shared video.
+    Schema semantics are also broken by :64 — `storage_path` is set to a full public URL
+    rather than a storage key, which is why legacy rows contain pollinations.ai and
+    googleapis.com URLs in a column named for a path (see P4-002).
+    EGRESS: the public bucket is served directly from Supabase storage with no CDN in front,
+    no signed-URL throttle, and no hotlink protection. Every play, every re-play, and every
+    third-party embed bills Supabase egress against the account with no per-user cap and no
+    attribution back to the user who generated it. Uploads are also duplicated per
+    reconciliation attempt (see P4-009 Hole 2), so a single stuck job can write the same
+    video up to 20 times.
+  expected_behavior: >
+    One storage model for both pipelines. User-generated media should be private with
+    short-lived signed URLs minted at render time (never persisted as if permanent), object
+    keys should not embed user identifiers, and egress should sit behind a CDN with a cap.
+  persona_impact:
+    power_migrant: "Discovers that clip links they pasted into a scheduling tool or a client email are dead after 48 hours, while generative videos are permanently public to anyone with the link. Neither behaviour is documented, and the inconsistency between them is indefensible on a client account."
+    casual_operator: "Shares a video link, and two days later a colleague reports it is broken — with no explanation anywhere in the product and no obvious way to get a working link again."
+  severity: MAJOR
+  blast_radius: ["P6", "P10s"]
+  effort: M
+  effort_reasoning: "Unify on private buckets with mint-on-read signed URLs, stop persisting URLs as durable values, and re-key objects away from raw user ids. Touches both pipelines plus every consumer that reads a stored URL."
+  confidence: HIGH
+  unverified_notes: >
+    That `generated_assets` is actually a public bucket is inferred from the code calling
+    getPublicUrl (which only yields working URLs for public buckets) plus the live
+    generations rows holding /storage/v1/object/public/generated_assets/ URLs. Bucket ACLs
+    were not read directly — that requires the storage admin API, not PostgREST.
+  trace_id: "T-P4-11"
+  source_agent: "A5"
+
+- finding_id: P4-012
+  pillar: P4
+  capability: "Pipeline depth — stage-by-stage enumeration of the GENERATIVE pipeline"
+  status: MISSING
+  maturity: L1
+  evidence:
+    - "supabase/functions/generateVideo/index.ts:129-149"
+    - "supabase/functions/_shared/llm.ts:357-373"
+    - "src/stores/SessionStore.js:2612-2641"
+    - "supabase/functions/_shared/fal.service.ts:34-35"
+    - "supabase/functions/_shared/videoJobFinalize.ts:30-66"
+    - "grep for elevenlabs|voiceover|text-to-speech|tts|musicgen|background_music|soundtrack across src/ app/ supabase/ video-worker/ — ZERO hits"
+    - "grep for 'audio' in fal.service.ts and generateVideo/index.ts — ZERO hits"
+  observed_behavior: >
+    Enumerated every stage a competitor ships, against this pipeline.
+    1. PROMPT -> SCRIPT: MISSING. There is no script/beat/narrative stage anywhere. The user
+       supplies one free-text prompt and that is the entire creative input.
+    2. PROMPT ENHANCEMENT: BUILT. generateVideo/index.ts:131-149 calls callPromptEngine with
+       a per-tier system prompt ("You are an expert AI video generation prompt engineer …
+       Add cinematography language: shot type, camera movement, lighting, pacing / Max 150
+       words"), model forced to claude-haiku-4-5-20251001 (llm.ts:366), max_tokens 200,
+       temperature 0.6, 15s timeout (llm.ts:372). See P4-013 for how it fails.
+    3. SHOT PLANNING / STORYBOARD / MULTI-SHOT: MISSING. FalVideoDuration is the literal
+       union "5" | "10" (fal.service.ts:35). One prompt produces exactly one continuous
+       single-shot clip of 5 or 10 seconds. There is no concept of a sequence, a shot list,
+       character or style continuity between shots, or a timeline.
+    4. FIRST-FRAME APPROVAL: BUILT — and the one genuinely differentiated idea here.
+       SessionStore.js:2617-2641 generates a still image first (billed as an image, separate
+       category) so the user can approve the opening frame before paying for the animate
+       step. This is a real, sensible cost-control affordance.
+    5. GENERATION: BUILT-BUT-BROKEN — see P4-006, 0/2 lifetime success.
+    6. ASSEMBLY / STITCHING: MISSING for generative output. Nothing concatenates two
+       generated clips. (The clip engine has stitch.py, but it operates on a downloaded
+       source video and shares no code with this path — see P4-001.)
+    7. AUDIO / VOICEOVER / MUSIC / SOUND DESIGN: MISSING ENTIRELY. Greps for elevenlabs,
+       voiceover, text-to-speech, tts, musicgen, background_music and soundtrack across
+       src/, app/, supabase/ and video-worker/ return ZERO hits, and the word "audio" does
+       not appear in fal.service.ts or generateVideo/index.ts at all. Neither model in use
+       returns an audio track. **Every video this product generates is silent.**
+    8. CAPTIONS / SUBTITLES: MISSING for generative output. (Captions exist only in the
+       clip engine, via the worker's caption_generator.py.)
+    9. RENDER / ENCODE: N/A — the provider returns a finished mp4; there is no local encode,
+       no aspect re-frame, no watermark, no brand overlay, no intro/outro.
+    10. STORAGE: BUILT (videoJobFinalize.ts:39-45) — see P4-011.
+    11. DELIVERY: BUILT-BUT-INADEQUATE — public permanent URL, see P4-011.
+    Net: of eleven stages, four are MISSING outright (script, shot planning, audio,
+    captions), one is missing for this pipeline (assembly), and the one that generates is
+    unproven. What exists is: one prompt -> one Haiku rewrite -> one silent 5-or-10-second
+    single-shot clip -> a public URL.
+  expected_behavior: >
+    A user coming from Runway, Kling or Veo expects at minimum: multi-shot sequences with
+    continuity, native or added audio, burned-in captions for social, and an editable
+    timeline. Veo-class tools generate synchronised dialogue and sound effects natively;
+    a silent 5-second single shot is a 2024-era capability being shipped in late 2026.
+  persona_impact:
+    power_migrant: "Gets a silent, captionless, single-shot 5-second clip and cannot assemble, score, or subtitle it inside the product. They must take it to CapCut or Premiere to make anything postable, which defeats the entire premise of a content OS."
+    casual_operator: "Told they can 'generate video for social', receives a mute five-second clip with no words on screen, and has no idea what to do with it — no template, no caption, no music, nothing that resembles the videos they see on their feed."
+  severity: BLOCKER
+  blast_radius: ["P1", "P5", "P6"]
+  effort: XL
+  effort_reasoning: "Audio, captions, shot planning and assembly are each a substantial subsystem. This is the gap between a provider wrapper and a video product; it is quarters of work, not sprints."
+  confidence: HIGH
+  unverified_notes: >
+    Whether fal.ai's current catalog offers an audio-capable video model that could close
+    stage 7 with a model swap was not checked — that requires fal.ai's live model list.
+  trace_id: "T-P4-12"
+  source_agent: "A5"
+
+- finding_id: P4-013
+  pillar: P4
+  capability: "Prompt enhancement fails silently — the systemic silent-AI-failure class, inside the video path"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/generateVideo/index.ts:131-149"
+    - "supabase/functions/_shared/llm.ts:344-355"
+    - "supabase/functions/_shared/llm.ts:372-378"
+    - "supabase/functions/generateVideo/index.ts:170"
+  observed_behavior: >
+    The entire prompt-enhancement stage is wrapped in `try { … } catch (_) { finalPrompt =
+    rawPrompt; }` (generateVideo/index.ts:132,146-148). The catch binds nothing, logs
+    nothing, and records nothing. Every failure mode collapses into the same silent
+    degradation:
+    * Anthropic 4xx/5xx -> llm.ts:377 throws -> swallowed.
+    * The 15-second AbortSignal timeout (llm.ts:372) -> swallowed.
+    * ANTHROPIC_API_KEY unset -> llm.ts:345-355 silently reroutes to Groq — the provider
+      established elsewhere in this audit as having failed 100% for 2+ days — and that
+      failure is then also swallowed here.
+    The only trace that enhancement happened is generateVideo/index.ts:170, which writes
+    `enhanced_prompt: finalPrompt !== rawPrompt ? finalPrompt : null`. So a silently
+    degraded generation is indistinguishable in the database from a user who legitimately
+    passed `enhance_prompt: false` — both store NULL. There is no error counter, no log
+    line, no flag, and nothing in the UI.
+    The consequence is not cosmetic. The system prompt's whole job is to inject
+    cinematography language — "shot type, camera movement, lighting, pacing"
+    (index.ts:140) — which is the difference between a usable and an unusable generation on
+    these models. When it silently no-ops, the user pays 5 or 15 credits for a materially
+    worse video and is told nothing. Because the fal path has never succeeded (P4-002),
+    nobody has ever been able to notice the quality difference.
+  expected_behavior: >
+    A degraded AI stage must be recorded and surfaced. At minimum: log the error, stamp
+    `enhancement_failed` on the generation row, and either tell the user their prompt was
+    used verbatim or let them retry before spending credits.
+  persona_impact:
+    power_migrant: "Cares deeply about prompt fidelity and would want to see the enhanced prompt before spending. Silent fallback means they cannot tell whether a bad result came from their prompt or from a dead enhancement stage — the single most frustrating class of bug for someone iterating."
+    casual_operator: "Relies entirely on enhancement to compensate for a naive prompt. When it silently no-ops they get a visibly worse video, blame themselves, and conclude the product is bad at video."
+  severity: MAJOR
+  blast_radius: ["P1", "P2"]
+  effort: XS
+  effort_reasoning: "Log the caught error and persist an enhancement_failed flag on the generations row; optionally surface it. A few lines."
+  confidence: HIGH
+  unverified_notes: >
+    Whether ANTHROPIC_API_KEY is actually set in Supabase edge-function secrets is
+    UNVERIFIED (secrets are not readable from the repo). If it is not, every video prompt is
+    silently routed to Groq, which is the known-failing provider — which would mean prompt
+    enhancement has been dead for the entire life of the fal path.
+  trace_id: "T-P4-13"
+  source_agent: "A5"
+
+- finding_id: P4-014
+  pillar: P4
+  capability: "Clip jobs cannot be cancelled once started, and DELETE conflates cancel with destroy"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "app/api/video/jobs/[id]/route.ts:15-16"
+    - "app/api/video/jobs/[id]/route.ts:98-106"
+    - "app/api/video/jobs/[id]/route.ts:110-130"
+    - "src/lib/video-engine/worker-client.ts:7"
+    - "src/lib/video-engine/worker-client.ts:42-63"
+    - "LIVE DB: video_jobs a62038d2 error_message='Job timed out after 90 minutes'"
+  observed_behavior: >
+    CANCEL IS EFFECTIVELY IMPOSSIBLE. CANCELLABLE_STATUSES = ['queued'] (route.ts:15). Every
+    other active status — downloading, transcribing, analyzing, rendering (:16) — returns
+    HTTP 409 "This job is currently being processed and cannot be cancelled. Wait for it to
+    complete or fail." (:101-105). Live evidence shows a job running 90 minutes before the
+    worker's own timeout fired. A user who pastes the wrong URL is therefore locked out for
+    up to an hour and a half with their credits spent and no way to stop it. The mid-job
+    cancel that the shared brief lists as a required unhappy path simply does not exist for
+    this pipeline. (The GENERATIVE pipeline does have honest cancel — cancel-video-job — so
+    the two halves of P4 differ on a table-stakes affordance.)
+    CANCEL IS ALSO DESTRUCTIVE. When the status IS 'queued', the same DELETE handler notifies
+    the worker (:99) and then unconditionally deletes the storage prefix (:110-119) and the
+    video_jobs row itself (:121-125). There is no way to cancel and keep the record. One
+    endpoint means both "stop this" and "erase this from my history", and the user cannot
+    ask for the first without the second.
+    THE CANCEL NOTIFICATION IS FIRE-AND-FORGET. notifyJobCancelled has a 3-second timeout
+    (worker-client.ts:7) and returns false on any error (:59-62); route.ts:99 awaits it and
+    DISCARDS the boolean. The row is deleted regardless. If the worker is unreachable — the
+    default local state, WORKER_WEBHOOK_URL=http://localhost:8001 — the job row vanishes
+    while the worker may still be mid-processing, leaving it writing clip rows against a
+    deleted parent.
+    NO STATUS GUARD ON THE RACE. Between the SELECT at :87-92 and the DELETE at :121-125 the
+    worker can claim the job and move it queued -> downloading. The DELETE carries no
+    `.eq('status', …)` guard, so it proceeds anyway. This is the exact race the generative
+    pipeline solves correctly with its claim pattern (videoJobFinalize.ts:54-57); the clip
+    pipeline does not apply it.
+  expected_behavior: >
+    Cancel must work at every stage, must be separate from delete, must confirm the worker
+    actually stopped, and must be guarded against the claim race.
+  persona_impact:
+    power_migrant: "Pastes a two-hour podcast by mistake and is told to wait for it to finish. Then discovers the only escape is an endpoint that deletes the job from their history entirely. Both behaviours are below Opus Clip's baseline."
+    casual_operator: "Realises immediately they used the wrong link, finds no stop button that works, watches a progress bar for up to 90 minutes, and loses the credits with no explanation."
+  severity: MAJOR
+  blast_radius: ["P5"]
+  effort: M
+  effort_reasoning: "Requires a cooperative cancel signal the worker checks between stages, splitting DELETE into cancel and delete, and adding a status guard. Touches both the API and the worker's job loop."
+  confidence: HIGH
+  unverified_notes: >
+    Whether the worker honours /webhook/cancel-job mid-stage is UNVERIFIED — the handler
+    lives in video-worker/main.py and the stage loop is A6's scope. The API-side finding
+    stands regardless, since the API refuses to even send the signal outside 'queued'.
+  trace_id: "T-P4-14"
+  source_agent: "A5"
+
+- finding_id: P4-015
+  pillar: P4
+  capability: "What the user sees during a long job and on failure"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "src/components/video-engine/JobStatusPipeline.jsx:6-13"
+    - "src/components/video-engine/JobStatusPipeline.jsx:68-80"
+    - "src/components/video-engine/JobStatusPipeline.jsx:122-138"
+    - "src/components/video-engine/JobStatusPipeline.jsx:164-210"
+    - "src/components/video-engine/JobStatusPipeline.jsx:212-220"
+    - "video-worker/database.py:136-155"
+    - "src/hooks/video-engine/useJobRealtime.js"
+  observed_behavior: >
+    THE CLIP PIPELINE'S WAIT UI IS THE BEST-BUILT SURFACE IN P4 and is close to competitive.
+    Six named stages with per-stage descriptions and honest time estimates ("Downloading —
+    1-3 minutes", "Rendering — 2-5 minutes") (JobStatusPipeline.jsx:6-13); a live elapsed
+    timer (:68-80, :136); a real download percentage with an indeterminate fallback bar
+    (:164-187); per-clip render progress "Rendering clip 3 of 5" driven by actual child rows
+    (:189-210); a realtime connection indicator that degrades to "Reconnecting…" with a
+    WifiOff icon (:122-129); and, on failure, stage-accurate marking so the user sees WHICH
+    stage broke (:25-40) plus a "Try again" button that pre-fills the original URL (:108-117).
+    TWO DEFECTS UNDERMINE IT.
+    (a) THE ERROR PANEL PRINTS THE RAW WORKER ERROR. Line 215 renders `{errorMessage}`
+    verbatim under the heading "What went wrong". That is how the live database's yt-dlp
+    tracebacks reach the user's screen — "Sign in to confirm you're not a bot. Use
+    --cookies-from-browser or --cookies for the authentication. See
+    https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-",
+    "mkl_malloc: failed to allocate memory", "[SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC]
+    decryption failed or bad record mac (_ssl.c:2700)". There is no translation layer between
+    the worker's exception text and the end user. One live message is the empty string
+    ("Stitched video upload failed: "), which renders a heading with nothing under it.
+    (b) THE REFUND PROMISE IS HARDCODED, NOT DERIVED. Line 217 states unconditionally
+    "Credits for this job have been refunded." It is static copy inside the `isFailed &&
+    errorMessage` branch, wired to no refund state. The worker's refund is conditional
+    (`should_refund`, video-worker/database.py:136-146) and can itself fail — database.py:150-155
+    catches the failure, logs "credit_refund_failed_manual_review_required", and continues.
+    In both of those cases the UI still tells the user their credits came back. The product
+    makes a financial assertion it has not verified.
+    THE GENERATIVE PIPELINE HAS NO EQUIVALENT UI. Its wait state is the generic Studio
+    progress bar seeded at a hardcoded 10% with the label "Queuing video job..."
+    (SessionStore.js:2650-2661) — no stages, no estimate, no elapsed timer, and no indication
+    that a fal render normally takes 1-5 minutes.
+  expected_behavior: >
+    Provider and system errors must be mapped to user-actionable language with a recovery
+    step. Any statement about money must be read from the ledger, never asserted. And the
+    flagship generative path should have at least the wait affordances the secondary clip
+    path already has.
+  persona_impact:
+    power_migrant: "Reads a yt-dlp traceback and instantly downgrades their assessment of the product to 'someone's weekend project'. Then finds the generative path gives even less feedback than the clip path — a bare percentage with no stage."
+    casual_operator: "Is told credits were refunded, does not check, and only later notices the balance is wrong — the most trust-destroying possible failure. Meanwhile 'DECRYPTION_FAILED_OR_BAD_RECORD_MAC' gives them nothing they could act on or report."
+  severity: MAJOR
+  blast_radius: ["P9"]
+  effort: S
+  effort_reasoning: "An error-code-to-copy mapping table plus reading the actual refund transaction before rendering the claim. Contained to one component and one query."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P4-15"
+  source_agent: "A5"
+
+- finding_id: P4-016
+  pillar: P4
+  capability: "Duration defaults to the most expensive option and is never priced"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/services/media.service.js:306"
+    - "src/services/media.service.js:323"
+    - "src/stores/SessionStore.js:2683"
+    - "src/config/mediaGenerationOptions.js:66"
+    - "supabase/functions/generateVideo/index.ts:151-155"
+  observed_behavior: >
+    createVideoJob declares `duration = 6` as its default (media.service.js:306) and
+    SessionStore passes `settings.duration || 6` (SessionStore.js:2683) — so 6 is the value
+    whenever the user has not explicitly chosen. But 6 is not a value either model accepts:
+    the only legal durations are 5 and 10 (mediaGenerationOptions.js:66;
+    FalVideoDuration = "5" | "10"). Line 323 resolves the conflict with
+    `Number(duration) > 5 ? '10' : '5'`, so the unconfigured default silently becomes **10
+    seconds** — the maximum.
+    Combined with P4-007 (duration is not priced), this means the default request costs the
+    business double: a premium 10s clip is $0.70 of fal spend versus $0.35 for 5s, charged
+    the identical 15 credits. Every user who never touches the duration control is
+    automatically on the worst-margin configuration, by default, silently.
+    The magic number 6 appears to be a leftover from a provider whose clips were ~6 seconds;
+    it survives as a default that resolves to something no part of the UI ever offered.
+  expected_behavior: >
+    Defaults should be the cheapest sane option, must be a value the UI actually presents,
+    and duration must affect price.
+  persona_impact:
+    power_migrant: "Notices 10s and 5s cost the same and always picks 10s deliberately — rational for them, structurally unprofitable for the business."
+    casual_operator: "Never sees the control, is silently placed on the maximum duration, and would have been perfectly happy with 5 seconds."
+  severity: MINOR
+  blast_radius: ["P9"]
+  effort: XS
+  effort_reasoning: "Change the default to 5 and make credits a function of duration. Two lines plus the credit table."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P4-07"
+  source_agent: "A5"
+
+- finding_id: P4-017
+  pillar: P4
+  capability: "Clip-engine rate limiting fails open, races, and is trivially bypassable"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "src/lib/video-engine/rate-limiter.ts:6-7"
+    - "src/lib/video-engine/rate-limiter.ts:20-23"
+    - "src/lib/video-engine/rate-limiter.ts:41-44"
+    - "src/lib/video-engine/rate-limiter.ts:33-39"
+    - "app/api/video/submit/route.ts:136-150"
+    - "app/api/video/jobs/[id]/route.ts:121-125"
+  observed_behavior: >
+    checkSubmissionRateLimit enforces MAX_CONCURRENT_JOBS = 2 and HOURLY_SUBMISSION_LIMIT = 10
+    (rate-limiter.ts:6-7) against an expensive, credit-consuming, provider-billed pipeline.
+    Three defects:
+    (a) FAILS OPEN. Both count queries return `{ allowed: true }` on ANY error
+    (:20-23, :41-44). A Supabase blip, a statement timeout, or any induced error disables
+    rate limiting completely rather than denying. For a limiter whose purpose is cost
+    control, open is the wrong direction to fail.
+    (b) TOCTOU RACE. The limiter counts (rate-limiter.ts:14-18) and the submit route then
+    inserts (submit/route.ts:141-150) with no lock, no unique constraint, and no atomic
+    check-and-insert. N concurrent requests all observe the same pre-insert count and all
+    pass, so the concurrency cap is advisory only under exactly the condition it exists to
+    handle. The generative pipeline avoids this class of problem with an atomic
+    reserveCredits; the clip pipeline does not.
+    (c) THE HOURLY LIMIT IS SELF-ERASING. It counts `video_jobs` rows created in the last
+    hour (:33-39). DELETE /api/video/jobs/[id] hard-deletes the row
+    (jobs/[id]/route.ts:121-125). A user who deletes their jobs resets their own hourly quota
+    — the limiter counts exactly the rows the user is allowed to destroy.
+    The credit floor is no backstop either: submit checks `balance < MIN_CREDITS_TO_SUBMIT`
+    (submit/route.ts:128) but does not RESERVE anything (see P4-018), so the same race lets
+    two jobs past a 5-credit balance.
+  expected_behavior: >
+    Deny on error, enforce concurrency with an atomic constraint or advisory lock, and count
+    against an append-only ledger the user cannot delete.
+  persona_impact:
+    power_migrant: "Scripting the API — normal behaviour for this persona — trivially exceeds both caps and racks up provider cost, with no server-side backstop."
+    casual_operator: "Unaffected directly, but they absorb the consequences when abuse forces the caps down for everyone or exhausts the free tier's budget."
+  severity: MAJOR
+  blast_radius: ["P9", "P10s"]
+  effort: S
+  effort_reasoning: "Fail closed, move the counter to credit_transactions (append-only), and add a partial unique index or advisory lock for the concurrency cap."
+  confidence: HIGH
+  unverified_notes: >
+    Whether Supabase RLS or an edge-level WAF imposes a separate global limit was not
+    checked; this finding is about the application-level limiter only.
+  trace_id: "T-P4-03"
+  source_agent: "A5"
+
+- finding_id: P4-018
+  pillar: P4
+  capability: "Clip-engine credits are non-atomic read-modify-write, and the docstring contradicts the code"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "video-worker/database.py:329-380"
+    - "video-worker/database.py:341-369"
+    - "video-worker/database.py:178-201"
+    - "video-worker/stages/download.py:271"
+    - "app/api/video/submit/route.ts:113-134"
+    - "supabase/functions/_shared/generationIdempotency.ts (reserveCredits — the correct pattern, used by the generative path)"
+  observed_behavior: >
+    The two halves of P4 handle money with completely different rigour.
+    GENERATIVE: atomic reserveCredits at submit, refund via the `refund_credits` RPC
+    (generateVideo/index.ts:111-127).
+    CLIP: deduct_credits (database.py:329-380) does a plain SELECT balance (:341-345), a
+    comparison in Python (:353), an arithmetic step in Python (:362-363), and a separate
+    UPDATE (:365-369). There is no RPC, no transaction, no optimistic-concurrency guard, and
+    no `WHERE balance = <observed>` predicate. Two concurrent deductions read the same
+    balance and the second UPDATE overwrites the first — one deduction is lost and the user
+    gets free processing. Combined with P4-017's racing concurrency cap, this is reachable
+    rather than theoretical.
+    THE DOCSTRING CONTRADICTS THE CODE. refund_credits at database.py:178-201 documents
+    itself as "Updates balance and lifetime_consumed atomically via RPC" (:181) — and the
+    implementation immediately beneath it is a SELECT (:185-186) followed by an UPDATE
+    (:199-201) with no RPC anywhere. This is a doc/code disagreement inside a single
+    function, and it is about money.
+    That same refund path also corrupts a lifetime metric: `new_lifetime_consumed =
+    max(0, current.data["lifetime_consumed"] - amount)` (:196) DECREMENTS lifetime_consumed
+    on a refund, so a value defined as cumulative goes backwards and can be floored at 0.
+    TIMING GAP: submit only CHECKS the balance (submit/route.ts:128-134); the actual
+    deduction happens much later, inside the download stage (download.py:271), once the true
+    duration is known. Everything between — queueing, the full source download, its bandwidth
+    and disk — is performed before the user has paid, and is unrecoverable if the deduction
+    then fails for insufficient credits.
+  expected_behavior: >
+    All credit movement through one atomic RPC with a balance guard, reservation at submit,
+    and monotonic lifetime counters. The generative path already demonstrates the pattern;
+    the clip path should not have its own.
+  persona_impact:
+    power_migrant: "Two parallel submissions can be charged once. They will find this before the business does, and the ledger they see in the credit dashboard will not reconcile."
+    casual_operator: "Sees a lifetime-consumed figure that decreases after a refund, and occasionally a job that dies after several minutes of apparent progress because the charge failed at the download stage."
+  severity: MAJOR
+  blast_radius: ["P9"]
+  effort: M
+  effort_reasoning: "Move both deduct and refund onto the existing atomic credit RPCs and reserve at submit. Straightforward, but it changes the worker's failure semantics and needs a reconciliation of existing balances."
+  confidence: HIGH
+  unverified_notes: >
+    download.py is inside video-worker/stages/ (A6's scope); it is cited here only for the
+    single call site of deduct_credits, not for its clipping logic. The atomicity finding
+    rests on database.py, which is shared infrastructure.
+  trace_id: "T-P4-03"
+  source_agent: "A5"
+
+- finding_id: P4-019
+  pillar: P4
+  capability: "Dead and misleading operator surfaces shipped inside the app bundle"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/pages/VideoEngine/VideoEngineLab.jsx:14"
+    - "src/pages/VideoEngine/VideoEngineLab.jsx:16-35"
+    - "src/pages/VideoEngine/VideoEngineLab.jsx:37-60"
+    - "src/pages/VideoEngine/VideoEngineLab.jsx:104-145"
+    - "app/api/health/video-schema/route.ts:5-30"
+    - "src/api/video/** and src/app/(video-engine)/** (never compiled — see P4-008)"
+  observed_behavior: >
+    VideoEngineLab.jsx is a build-status dashboard that renders hardcoded rows —
+    "Stage 1 / Database foundation / Implemented", "Stage 2 / Python worker skeleton /
+    Implemented ... stage stubs ... are present" (:16-35) — alongside a manual-setup
+    checklist telling the reader to "Use Python 3.12 for the worker venv" and "Run pip
+    install -r requirements.txt inside video-worker" (:37-60). It polls
+    `WORKER_HEALTH_URL = "http://localhost:8001/health"` (:14) — a literal localhost URL that
+    can never resolve for any deployed user — and exposes a manual re-check button (:174).
+    It is UNROUTED: greps for `VideoEngineLab` across src/ and app/ return no importer, so it
+    is dead code carried in the source tree. Its content is also stale by its own admission,
+    describing a three-stage build against a pipeline the same repo documents as eleven
+    stages, and calling stages "stubs" that P4-003 shows have really run in production.
+    Alongside it, /api/health/video-schema (route.ts:5-30) probes the existence and
+    accessibility of video_jobs, video_clips, video_transcripts, user_credits and
+    credit_transactions. It is a schema-disclosure endpoint whose purpose is developer
+    convenience, and no auth check appears in its handler.
+    Together with the three duplicated route trees in P4-008, P4's source surface contains
+    substantially more scaffolding than product.
+  expected_behavior: >
+    Build-progress dashboards, localhost-pinned health widgets and schema probes belong in a
+    developer tool or behind an admin gate, not compiled into a customer bundle.
+  persona_impact:
+    power_migrant: "If any of this becomes reachable they see internal build-stage language and setup instructions aimed at the developer — conclusive evidence they are using a prototype, and a nudge to probe the health endpoints."
+    casual_operator: "Never sees it. The harm is indirect: it is why the team's mental model of what is 'Implemented' is three stages out of date."
+  severity: MINOR
+  blast_radius: ["P10s"]
+  effort: XS
+  effort_reasoning: "Delete the unrouted page; gate or remove the health route."
+  confidence: HIGH
+  unverified_notes: >
+    Whether /api/health/video-schema is auth-gated by middleware rather than in the handler
+    was not verified — only the handler was read, and it contains no check.
+  trace_id: "T-P4-08"
+  source_agent: "A5"
+
+- finding_id: P4-020
+  pillar: P4
+  capability: "Worker deployment is unverified and the app's only pointer to it is localhost"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - ".env.local:35 (WORKER_WEBHOOK_URL=http://localhost:8001)"
+    - "src/lib/video-engine/worker-client.ts:5"
+    - "src/lib/video-engine/worker-client.ts:7"
+    - "app/api/video/submit/route.ts:157-160"
+    - "video-worker/railway.toml:1-10"
+    - "video-worker/Dockerfile:1-25"
+    - "video-worker/poller.py:15-45"
+  observed_behavior: >
+    worker-client.ts:5 resolves the worker as `process.env.WORKER_WEBHOOK_URL ||
+    'http://localhost:8001'` — a localhost default baked into the client, matching
+    .env.local:35. Railway deployment config exists (railway.toml:1-10, restartPolicy
+    ON_FAILURE with max 3 retries; Dockerfile installs ffmpeg) but nothing in the repo
+    records the deployed URL, so production configuration is UNVERIFIED, and if the env var
+    is ever missing in a deployed environment the app silently posts job notifications into
+    its own loopback.
+    THE MITIGATION IS REAL, THOUGH. notifyJobSubmitted is genuinely best-effort — its failure
+    is a console.warn and a `worker_notified: false` field in the 201 response
+    (submit/route.ts:157-168); the job row is created regardless. And poller.py:15-45 runs an
+    independent claim loop every WORKER_POLL_INTERVAL_SECONDS (5) calling claim_next_job(),
+    so a job whose notification never landed is still picked up within seconds. The webhook
+    is an optimisation, not the transport. That is the right design.
+    THE RESIDUAL PROBLEM IS OBSERVABILITY. `worker_notified: false` is returned to the client
+    and, on the evidence of the submit UI, never surfaced. The app has no way to distinguish
+    "worker deployed and healthy" from "worker down and every job silently accumulating in
+    queued" — the only health check is the unrouted localhost widget in P4-019. Live data is
+    consistent with either reading: zero video_jobs rows for the last 7 weeks (P4-003).
+    A 3-second timeout (worker-client.ts:7) on an inter-service call over the public internet
+    is also tight enough to fail routinely on a cold Railway container, making
+    worker_notified: false the expected rather than exceptional case.
+  expected_behavior: >
+    A deployed worker's URL should be configuration with no localhost fallback, its health
+    should be visible to operators and reflected in the submit UI, and the queue depth of
+    unclaimed jobs should be alertable.
+  persona_impact:
+    power_migrant: "Submits and sees a job sit at 'In Queue' indefinitely with the UI's own copy promising 'Usually seconds', with nothing anywhere telling them the worker is not running."
+    casual_operator: "Waits on a queued job that will never move, has no error to act on, and concludes the product is broken — which, in that state, it is."
+  severity: MAJOR
+  blast_radius: ["P5"]
+  effort: S
+  effort_reasoning: "Remove the localhost fallback, fail loudly on missing config, raise the timeout, and surface worker health plus queue depth. Small, but it needs the deployed URL confirmed first."
+  confidence: MEDIUM
+  unverified_notes: >
+    Whether the Railway worker is currently running, and what WORKER_WEBHOOK_URL is set to in
+    the production Next.js environment, cannot be determined from the repo. Resolving this
+    needs the Railway dashboard and the production env. This is the single largest open
+    question in P4's clip half.
+  trace_id: "T-P4-03"
+  source_agent: "A5"

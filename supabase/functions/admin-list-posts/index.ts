@@ -164,25 +164,36 @@ function isOrgAdminRole(rawRole: string | null | undefined) {
   return String(rawRole || "").trim().toLowerCase() === "org_admin";
 }
 
+/**
+ * LOCK L1.5 — admin status is resolved from `admin_roles` ONLY.
+ *
+ * This function previously did:
+ *     adminRoleResult.data?.role || profileResult.data?.role
+ *
+ * i.e. it fell back to `profiles.role`, a user-facing column that was
+ * self-writable. On 2026-08-21 that was write-confirmed: an ordinary account
+ * PATCHed its own profiles.role from "parent" to "admin" and received HTTP 200.
+ * Combined with isSuperAdminRole() accepting a bare "admin" string, any user
+ * could grant themselves the moderation panel.
+ *
+ * `profiles.organization_id` is likewise not an authorization source — an
+ * org_admin's scope must come from their admin_roles grant, or they have none.
+ *
+ * Every other admin function uses the shared guard in _shared/org.ts. This one
+ * was hand-rolled, which is how it drifted. Prefer the shared helper for any
+ * new admin surface.
+ */
 async function resolveAdminScope(adminClient: ReturnType<typeof createAdminClient>, userId: string): Promise<AdminScope> {
-  const [adminRoleResult, profileResult] = await Promise.all([
-    adminClient
-      .from("admin_roles")
-      .select("role, organization_id")
-      .eq("user_id", userId)
-      .maybeSingle(),
-    adminClient
-      .from("profiles")
-      .select("role, organization_id")
-      .eq("id", userId)
-      .maybeSingle(),
-  ]);
+  const adminRoleResult = await adminClient
+    .from("admin_roles")
+    .select("role, organization_id")
+    .eq("user_id", userId)
+    .maybeSingle();
 
   if (adminRoleResult.error) throw adminRoleResult.error;
-  if (profileResult.error) throw profileResult.error;
 
-  const resolvedRole = adminRoleResult.data?.role || profileResult.data?.role || null;
-  const organizationId = adminRoleResult.data?.organization_id ?? profileResult.data?.organization_id ?? null;
+  const resolvedRole = adminRoleResult.data?.role || null;
+  const organizationId = adminRoleResult.data?.organization_id ?? null;
 
   if (isSuperAdminRole(resolvedRole)) {
     return {

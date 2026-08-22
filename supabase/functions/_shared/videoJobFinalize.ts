@@ -32,7 +32,10 @@ export async function finalizeCompleted(adminClient: DatabaseClient, job: Backgr
   const videoUrl = falResult?.video?.url;
   if (!videoUrl) throw new Error("fal.ai result had no video URL");
 
-  const videoRes = await fetch(videoUrl);
+  const videoRes = await fetch(videoUrl, {
+    // LOCK L5.9 — download generated video; bounded so a hung transfer fails cleanly.
+    signal: AbortSignal.timeout(180_000),
+  });
   if (!videoRes.ok) throw new Error("Failed to fetch generated video from fal.ai");
   const videoBlob = await videoRes.blob();
 

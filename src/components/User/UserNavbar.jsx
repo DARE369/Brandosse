@@ -129,7 +129,8 @@ function BrandosseFlowLogo() {
 
 export default function UserNavbar({
   searchQuery = "",
-  onSearchQueryChange = () => {},
+  // LOCK L2.5 — default null (not a no-op) so an unwired search can be detected.
+  onSearchQueryChange = null,
   searchResults = [],
   searchLoading = false,
   onSearchSelect = () => {},
@@ -514,6 +515,19 @@ export default function UserNavbar({
         </a>
       </div>
 
+      {/*
+        LOCK L2.5 — render search ONLY when a real handler is supplied.
+
+        All four callers (CreditsPage, VideoJobDetailPage, VideoJobsPage,
+        VideoSubmitPage) render <UserNavbar /> with no props, so `value` was
+        permanently "" and `onChange` was a no-op default: the box was
+        rendered, focusable, and physically incapable of accepting a
+        keystroke. A control that cannot do anything must not be shown.
+
+        Guarded rather than deleted so a future caller that DOES wire it
+        gets working search, instead of the component silently lacking it.
+      */}
+      {typeof onSearchQueryChange === 'function' ? (
       <div className={searchWrapClassName} ref={searchRef}>
         <Search size={14} className="navbar-search-icon" aria-hidden="true" />
 
@@ -601,6 +615,7 @@ export default function UserNavbar({
           </div>
         )}
       </div>
+      ) : null}
 
       <div className="navbar-actions">
         <button

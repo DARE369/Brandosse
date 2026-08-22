@@ -237,9 +237,32 @@ async def run_analyze(job: dict, transcript: dict) -> list[dict]:
         job=job,
     )
 
-    # Call Claude with retry logic
+    # Call Claude with retry logic.
+    #
+    # LOCK L1.4 — the key now comes from `config`, not a raw os.environ read.
+    # Previously this bypassed WorkerConfig entirely, which meant the startup
+    # credential validation could not protect this stage: a worker with no
+    # Anthropic key booted cleanly and failed here at job runtime instead.
+    # Routing through config makes the startup guarantee real.
+    #
+    # This stage deliberately has NO mock branch. Clip scoring is the product's
+    # core intelligence; a silent fallback to fabricated scores is never an
+    # acceptable degradation. (The old mock path lived in utils/llm_client.py,
+    # which returned hardcoded scores and fixed timestamps. That module was dead
+    # code and was DELETED under LOCK L3.2 on 2026-08-22, along with
+    # clip_selector.py, transcript_parser.py and video_reframer.py — ~1,015
+    # lines that no longer had a caller.) If the real API is unavailable the job
+    # must fail loudly, which it does below.
     clips_analysis = None
-    client = AsyncAnthropic(api_key=os.environ.get("WORKER_ANTHROPIC_API_KEY"))
+
+    if not config.anthropic_api_key:
+        raise AnalysisError(
+            "WORKER_ANTHROPIC_API_KEY is not configured — clip analysis cannot run. "
+            "This stage never falls back to simulated scores.",
+            job_id,
+        )
+
+    client = AsyncAnthropic(api_key=config.anthropic_api_key)
 
     for attempt in range(3):
         try:

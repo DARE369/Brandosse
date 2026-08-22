@@ -65,7 +65,10 @@ export async function uploadFromRemoteUrl(args: {
 }): Promise<{ publicUrl: string; storagePath: string; contentType: string }> {
   const { supabaseAdmin, bucket, objectPath, sourceUrl, fallbackContentType } = args;
 
-  const sourceResponse = await fetch(sourceUrl);
+  const sourceResponse = await fetch(sourceUrl, {
+    // LOCK L5.9 — download provider asset (may be video); bounded so a hung transfer fails cleanly.
+    signal: AbortSignal.timeout(180_000),
+  });
   if (!sourceResponse.ok) {
     throw new Error(`Failed downloading provider asset (${sourceResponse.status})`);
   }

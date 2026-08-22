@@ -1,0 +1,142 @@
+# A1 — Codebase cartography (structure, duplication, dead code)
+# source_agent: A1 (agent runs killed; completed directly by the orchestrator)
+# Verified first-hand 2026-08-21. Structure only — feature maturity belongs to the pillar auditors.
+
+- finding_id: ARCH-001
+  pillar: P10
+  capability: "duplicate dead Next.js app tree (src/app + src/api)"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/app/** — 14 files including layout.jsx, page.jsx, api/webhooks/stripe/route.ts, api/credits/purchase/route.ts, api/video/submit/route.ts"
+    - "src/api/video/** — 3 further duplicate route files"
+    - "app/** — the routed tree (Next.js resolves root app/ when both app/ and src/app/ exist)"
+    - "tsconfig.json:33-40 include covers src/**/*.ts — so the dead tree IS type-checked"
+    - "diff app/api/webhooks/stripe/route.ts src/app/api/webhooks/stripe/route.ts — differs ONLY in import style (@/lib/... vs ../../../../lib/...), 133 lines each"
+  observed_behavior: >
+    A complete second copy of the App Router tree lives under src/app/ and src/api/,
+    17 files in total, including the Stripe webhook handler and the credits purchase
+    route. Next.js routes the root app/ directory when both exist, so none of src/app/
+    is reachable. The copies are functionally identical to their live counterparts and
+    differ only in import-resolution style. Because tsconfig includes src/**, the dead
+    tree is still type-checked, so it looks maintained and will not be flagged by the
+    compiler as unused.
+  expected_behavior: >
+    One routed tree. Dead duplicates of payment and webhook handlers must not exist —
+    the failure mode is an engineer editing the unreachable copy and observing no
+    effect, which is expensive to diagnose precisely because the code looks correct.
+  persona_impact:
+    power_migrant: "No direct user impact; raises the cost and risk of every future change to billing or video routes."
+    casual_operator: "None directly."
+  severity: MAJOR
+  blast_radius: ["P4", "P10"]
+  effort: XS
+  effort_reasoning: "Delete src/app/ and src/api/ after confirming no import path reaches into them. Low risk, immediate clarity gain."
+  confidence: HIGH
+  unverified_notes: "A prior agent reported these as byte-identical; direct diff shows they differ in import style only. Substance unchanged: the tree is dead."
+  trace_id: "T-ARCH-01"
+  source_agent: "A1/orchestrator"
+
+- finding_id: ARCH-002
+  pillar: P9
+  capability: "design-system fragmentation — four styling systems plus a partial ui-v2 migration"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "package.json:22,26,34,55 — Tailwind 4.3, Chakra UI 3.29, Emotion, sass-embedded all present"
+    - "src/ui-v2/ — 23 primitives + 8 shell files"
+    - "src/styles/ — 25 legacy stylesheets"
+    - "audit/findings/A11-P9.yaml P9-003 — 12 of 17 substantive routes on ui-v2 (~71%)"
+    - "src/styles/responsive-contract.css:233 — .app-sidebar styled ONLY when nested under .calendar-v2-layout"
+    - "src/components/User/UserNavbar.jsx:494 — legacy shell renders className=app-navbar with no v2 wrapper"
+  observed_behavior: >
+    Four styling systems coexist, and the ui-v2 migration the founder has designated as
+    the target state is ~71% complete. The five holdout routes (billing/credits, design,
+    video/new, video/jobs, video/jobs/[id]) run on a separate legacy shell. The
+    incomplete migration is not merely cosmetic debt: it produces a live rendering
+    break, because the legacy shell reuses container class names (.app-navbar,
+    .app-sidebar) that are only styled under the v2 layout wrapper. See A11 P9-008.
+    Notably the /app/design GoldenReference page — intended as the canonical migration
+    target — is itself not on ui-v2.
+  expected_behavior: >
+    Founder decision at Gate 0: ui-v2 is the target and finishing the migration is
+    required for launch. Complete means all in-scope routes render ui-v2 primitives and
+    the legacy shell plus its stylesheets are deleted.
+  persona_impact:
+    power_migrant: "Encounters visibly inconsistent surfaces, including a broken one on a payment page. Reads as an unfinished product."
+    casual_operator: "Same visual break; more likely to interpret it as the site being broken rather than unpolished."
+  severity: MAJOR
+  blast_radius: ["P9"]
+  effort: L
+  effort_reasoning: "5 of 17 routes to migrate, plus deletion of the legacy shell and its stylesheets, plus rebuilding the GoldenReference page on ui-v2. Sizing assumes the 12 migrated routes established the patterns."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-ARCH-02"
+  source_agent: "A1/orchestrator"
+
+- finding_id: ARCH-003
+  pillar: P10
+  capability: "residual dead modules and duplicate page directories"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/legacy/supabase.js — sole occupant of a directory named legacy"
+    - "src/pages/Calendar/CalendarPage.jsx vs src/pages/CalendarPage/components/ — two similarly named directories"
+    - "video-worker/utils/clip_selector.py (292 lines), llm_client.py (242), transcript_parser.py, video_reframer.py — imported by nothing (verified by grep across video-worker excluding venv)"
+    - "src/services/OptimalTimesService.js — 466 lines, imported nowhere (audit/findings/A3-P2.yaml P2-003)"
+    - "supabase/functions/generate-caption/ — never called by any UI (audit/findings/A4-P3.yaml P3-005)"
+  observed_behavior: >
+    Dead code is distributed across every layer rather than isolated: a legacy Supabase
+    client, two confusingly co-named Calendar directories, roughly 800 lines of unused
+    Python in the video worker, a 466-line unused scheduling service, and a fully wired
+    edge function no UI invokes. Individually minor; collectively they are the surface
+    signature of the audit-wide pattern that the recurring defect in this codebase is
+    disconnection rather than absence.
+  expected_behavior: >
+    Dead code should be deleted, not retained. Its presence inflates apparent progress
+    and makes it genuinely difficult to determine what ships — a problem this audit hit
+    repeatedly, since sophisticated-looking modules turned out to be unreachable.
+  persona_impact:
+    power_migrant: "No direct impact; slows every future improvement they would benefit from."
+    casual_operator: "None directly."
+  severity: MINOR
+  blast_radius: ["P2", "P3", "P5"]
+  effort: S
+  effort_reasoning: "Deletion is fast. The judgment cost is deciding, per module, whether to delete or reconnect — several of these are candidates for reconnection rather than removal, which is a roadmap decision, not a cleanup one."
+  confidence: HIGH
+  unverified_notes: "A full unreferenced-module sweep across all of src/ was not performed; these are the instances surfaced during pillar audits. A complete pass would likely find more."
+  trace_id: "T-ARCH-03"
+  source_agent: "A1/orchestrator"
+
+- finding_id: ARCH-004
+  pillar: P10
+  capability: "application architecture — client SPA behind an App Router shell"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "app/** — 1,958 lines of route shells; src/** — 93,829 lines of client application"
+    - "app/[...path]/page.jsx:1-11 — route shell mounts @/pages/NotFoundPage inside a provider wrapper"
+    - "tsconfig.json:21-26 — @/* aliases to src/*"
+    - "audit/findings/A11-P9.yaml (dev-mode load 3-12s first visit, 3-5s repeat; production figure UNVERIFIED)"
+  observed_behavior: >
+    Next.js 16 App Router is used almost exclusively as a routing and provider shell.
+    Substantially all logic, data fetching and rendering happen client-side in src/**.
+    The consequence is that every screen is client-fetched, so server components, server
+    actions and streaming SSR are effectively unused, and the initial payload carries
+    the application rather than the page.
+  expected_behavior: >
+    Not inherently wrong — a client SPA is a legitimate architecture. But it is a
+    deliberate trade being made implicitly, and it forecloses the cheapest available
+    wins for time-to-first-value and cost per request, both of which the founder cares
+    about. It should be an explicit decision with a measured production baseline.
+  persona_impact:
+    power_migrant: "Perceives the product as slower than server-rendered competitors, particularly on first load."
+    casual_operator: "First-load latency is the highest-leverage churn factor for this persona, and it is currently unmeasured in production."
+  severity: MAJOR
+  blast_radius: ["P9", "P10"]
+  effort: XL
+  effort_reasoning: "Converting meaningful surfaces to server components is a structural change across 94k lines. Sizing reflects that; a targeted conversion of only the highest-traffic routes would be M and should be evaluated first."
+  confidence: MEDIUM
+  unverified_notes: "Production cold-load and bundle size are UNVERIFIED — dev-mode figures are not evidence. Agent A13 is measuring the real bundle; this finding must be re-rated against that data before it enters the roadmap."
+  trace_id: "T-ARCH-04"
+  source_agent: "A1/orchestrator"

@@ -4,18 +4,29 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const ROOT = process.cwd();
+// LOCK L0.7 — updated 2026-08-22.
+//
+// Four of these targets had not existed since the ui-v2 migration
+// (UserDashboard.jsx, both CalendarPage modals, CalendarStore.js), so this
+// guard had been failing on "Expected file does not exist" for months. Nobody
+// noticed because it was wired into no workflow — the precise definition of
+// verification theatre. It now runs in CI (.github/workflows/ci.yml).
+//
+// Repointed at the files that actually replaced them.
 const TARGET_FILES = [
-  "src/pages/Dashboard/UserDashboard.jsx",
+  "src/pages/Dashboard/PersonalDashboardPage.jsx",   // was UserDashboard.jsx
+  "src/hooks/useDashboardData.js",                   // dashboard data layer
   "src/hooks/useRealtimeKPIs.js",
   "src/components/User/UserNavbar.jsx",
-  "src/pages/CalendarPage/components/ScheduleModal.jsx",
-  "src/pages/CalendarPage/components/BulkScheduleModal.jsx",
+  "src/calendar/components/ScheduleModal.jsx",       // was CalendarPage/components/
+  "src/calendar/services/calendarService.js",        // was CalendarStore.js
+  "src/calendar/hooks/useScheduleAction.js",
+  "src/pages/Calendar/CalendarPage.jsx",
   "src/admin/pages/AdminModeration/AdminModerationPage.jsx",
   "src/admin/components/ContentModeration/PublicationModal.jsx",
   "src/admin/components/ContentModeration/ModerationQueue.jsx",
   "src/admin/components/ContentModeration/FilterBar.jsx",
   "src/admin/utils/apiService.js",
-  "src/stores/CalendarStore.js",
 ];
 
 const LIFECYCLE = "draft|scheduled|publishing|published|failed|processing|completed";

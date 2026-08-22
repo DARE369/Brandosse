@@ -32,20 +32,11 @@ import { PROMPT_LIMIT } from "../../components/GenerateStudio/shared/constants";
 import {
   UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton,
   Card, Badge, Skeleton, EmptyState, Button, Modal, Drawer, Dropdown, MobileNavDrawer,
-  NotificationBell, AvatarMenu,
-} from "../../ui-v2";
+  NotificationBell, AvatarMenu, NAV_ITEMS,} from "../../ui-v2";
 import PostProductionPanel from "./PostProductionPanel";
 import SessionHistoryDrawer from "./SessionHistoryDrawer";
 import StudioLightbox from "./StudioLightbox";
 import styles from "./StudioPage.module.css";
-
-const NAV_ITEMS = [
-  { key: "dashboard", label: "Dashboard", href: "/app/dashboard" },
-  { key: "studio", label: "Studio", href: "/app/generate" },
-  { key: "library", label: "Library", href: "/app/library" },
-  { key: "calendar", label: "Calendar", href: "/app/calendar" },
-  { key: "brand-kit", label: "Brand Kit", href: "/app/settings/brand-kit" },
-];
 
 function ThemeToggleButton() {
   const { isDark, toggleTheme } = useUiV2Theme();
@@ -111,7 +102,7 @@ function StudioBody({ brandKit }) {
     isGenerating, generationProgress, progressLabel, error, settings, postProduction,
     updateSettings, startGeneration, approveGeneration, cancelPendingGeneration, pendingGeneration, startCarouselGeneration, approveCarousel, cancelPendingCarousel, pendingCarousel, startEditGeneration,
     startVideoGeneration, generateVideoFirstFrame, enhancePrompt, selectGeneration, hydratePostProductionFromGeneration,
-    regeneratePostMetadata, optimizeSeo, scoreSeo, updatePostProduction, saveDraft, saveDraftPrompt, autosaveSessionDraft, publishContent,
+    regeneratePostMetadata, generateCaption, optimizeSeo, scoreSeo, updatePostProduction, saveDraft, saveDraftPrompt, autosaveSessionDraft, publishContent,
     videoJobState, dismissVideoJob, setVideoJobMinimized, promptSeed, consumePromptSeed,
     cancelActiveGeneration, lastBatchOutcome, retryFailedVariants,
     regenerateVariant, regenerateSlides, regeneratingIds, checkScheduleConflict,
@@ -546,13 +537,32 @@ function StudioBody({ brandKit }) {
      always recoverable from here even without re-entering publish stage. */
   const handleRegenerateMetadata = useCallback(async () => {
     try {
-      await regeneratePostMetadata(["title", "caption", "hashtags"]);
+      // LOCK L4.3 — the caption comes from generate-caption, not
+      // generate-post-metadata.
+      //
+      // SessionStore.generateCaption() loads the brand kit and passes the
+      // user's five most recent captions as anti-repetition context, and its
+      // edge function carries the best caption prompt in the repository. It was
+      // called by NOTHING. Meanwhile this handler regenerated the caption via
+      // generate-post-metadata, which has no history — so pressing Regenerate
+      // repeatedly could return near-identical copy (audit finding P3-005).
+      //
+      // Split rather than replaced: title and hashtags stay on the metadata
+      // path, which self-persists to the post row and owns
+      // workflow_state.metadata_status through the whole lifecycle. Only the
+      // caption moves. Two calls instead of one, which is the deliberate cost
+      // of the better prompt and the repetition guard.
+      //
+      // Ordered so the caption lands last: generate-post-metadata also writes a
+      // caption, and whichever runs last wins.
+      await regeneratePostMetadata(["title", "hashtags"]);
+      await generateCaption(postProduction?.selectedPlatforms?.[0] || "instagram");
     } catch (err) {
       if (!applyRateLimit("regenerateMetadata", err)) {
         toast.error(err?.message || "Could not regenerate caption & title.");
       }
     }
-  }, [regeneratePostMetadata, applyRateLimit]);
+  }, [regeneratePostMetadata, generateCaption, postProduction, applyRateLimit]);
 
   const handleRescore = useCallback(async () => {
     try {

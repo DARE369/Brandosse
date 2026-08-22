@@ -1,0 +1,360 @@
+# A10 — P8 Analytics & Feedback Loop audit
+# In-progress file, appended incrementally per finding.
+
+- finding_id: P8-001
+  pillar: P8
+  capability: "trending_topics data source (daily-analysis edge function)"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "supabase/functions/daily-analysis/index.ts:337-372"
+    - "supabase/functions/daily-analysis/index.ts:340-341"
+  observed_behavior: >
+    The `updateTrendingTopics()` function (index.ts:337-372) writes a hardcoded
+    JS constant `mockTrends` (index.ts:346-365) into the `trending_topics` table
+    via `.upsert(mockTrends)` (index.ts:367), once per platform (instagram,
+    tiktok, youtube, facebook). The array contains exactly two fixed entries
+    every single invocation: topic "AI Tools" (trend_score: 95, category "Tech")
+    and topic "Content Creation Tips" (trend_score: 88, category "Education"),
+    both stamped `source: 'manual'` and `valid_until: now + 24h`. The code's own
+    comment admits this: "In production, you'd call actual trend APIs here. For
+    now, using mock data or Groq analysis" (index.ts:340-341) — but no Groq call
+    or any external HTTP call exists anywhere in this file. This is not a
+    labeled placeholder in the UI — the row's `source` field says 'manual', not
+    'mock' or 'fake', so any downstream consumer displaying `source` would
+    represent it as legitimate curation.
+
+    LIVE-DB CONFIRMATION (read-only query, 2026-08-20): `trending_topics` holds
+    exactly 1200 rows. `select=source&limit=1000` shows source='manual' on all
+    1000 sampled rows (100%) — zero rows from any other pipeline. A
+    created_at.desc sample of the 20 newest rows shows entries today at
+    2026-08-20T02:00:07 and yesterday at 2026-08-19T02:00:04, and the oldest 5
+    rows (created_at.asc) are from 2026-03-24T02:00:15 — i.e. this exact
+    fabrication has been running once a day, every day, at ~2AM UTC, for
+    roughly 5 months straight (149 days x 8 rows/day [2 topics x 4 platforms]
+    ≈ 1192, matching the 1200 total). Every sampled row's `topic` is one of
+    exactly two literal strings: "AI Tools" or "Content Creation Tips" — this
+    is not a stale one-time seed, it is a live, continuously-operating
+    fabrication pipeline that has been overwriting/appending fake "trend"
+    data into a user-facing table daily since March 2026.
+  expected_behavior: >
+    "Trending topics" implies real platform trend data (from a trends API, a
+    scraper, or at minimum an LLM call grounded in real signals). A competitor's
+    trending-topics feature pulls from actual platform/category signals, not two
+    static strings hardcoded at build time.
+  persona_impact:
+    power_migrant: "Would recognize instantly that 'AI Tools' / 'Content Creation Tips' never change and treat any trend-based suggestion as fake, destroying trust in every other analytics number on the page."
+    casual_operator: "Has no way to know the trend is fabricated — sees 'AI Tools' recommended as trending and may act on stale/generic advice weeks after it was 'discovered', believing it's live data."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P3"]
+  effort: L
+  effort_reasoning: "Requires integrating a real trends data source (platform API or licensed trend feed), a migration to dedupe/purge ~1200 fabricated rows accumulated over 5 months, and unscheduling/rewriting the cron job; not a quick patch."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P8-01"
+  source_agent: "A10"
+
+- finding_id: P8-002
+  pillar: P8
+  capability: "daily-analysis cron scheduling -- CORRECTS shared ground truth: the job DOES run"
+  status: STUBBED
+  maturity: L2
+  evidence:
+    - "supabase/functions/daily-analysis/index.ts:337-372 (updateTrendingTopics, the fabrication path)"
+    - "Live query 2026-08-20: get_cron_job_status() RPC returns EXACTLY 3 jobs (process-scheduled-posts, process-risk-alerts, credit-monthly-reset) -- daily-analysis/trending-topics job is absent from this RPC's output"
+    - "Live query 2026-08-20: trending_topics row timestamps (created_at.desc) show fresh inserts today (2026-08-20T02:00:07) and yesterday (2026-08-19T02:00:04); oldest rows (created_at.asc) are 2026-03-24T02:00:15 -- a daily ~2AM UTC cadence matching the pg_cron comment block's '0 2 * * *' schedule (index.ts:384) exactly, running continuously for ~5 months"
+  observed_behavior: >
+    CORRECTION TO SHARED GROUND TRUTH: the brief states "daily-analysis is NOT
+    scheduled and therefore never runs," sourced from get_cron_job_status()
+    returning only 3 named jobs. Live data DISPROVES this for at least the
+    trending_topics write path: rows are inserted every single day at ~2AM UTC
+    on a schedule that exactly matches the '0 2 * * *' cron expression
+    documented in the function's own comment block (index.ts:383-393), and has
+    been running since 2026-03-24 (~5 months, ~1200 accumulated rows). This
+    means EITHER (a) get_cron_job_status() is an incomplete view -- it may only
+    surface a hardcoded allowlist of job names rather than the full
+    `cron.job` table, so a 4th live job (e.g. the SQL comment's own
+    'daily-calendar-analysis' name) is invisible to it, or (b) some other
+    external scheduler (Vercel cron, GitHub Actions, uptime-monitor-as-cron)
+    hits this edge function's HTTP endpoint daily. Either way, the pipeline
+    that also drives `optimal_posting_times` and `ghost_slots`
+    (analyzeUserOptimalTimes / generateGhostSlotsForUser, index.ts:109-324)
+    is being invoked daily by SOMETHING -- yet optimal_posting_times has 0
+    live rows and ghost_slots has 0 live rows (both confirmed empty in this
+    audit's own live queries, see P8-006). That is only explicable if
+    analyzeUserOptimalTimes/generateGhostSlotsForUser are silently no-op'ing
+    for every user (most likely because `profiles.status='active'` matches
+    zero/few rows, or because ghost_slots_enabled is false for all users, or
+    because the <5-published-posts-per-platform guard at index.ts:130/141
+    always trips given the live reality of only 9 published posts across the
+    whole system) while updateTrendingTopics() -- which has no such gate --
+    runs unconditionally and keeps writing fake rows regardless.
+  expected_behavior: >
+    A monitoring/cron-status RPC that claims to enumerate scheduled jobs
+    should enumerate ALL scheduled jobs, not a hardcoded subset -- any
+    dashboard or audit relying on get_cron_job_status() to assess "what runs
+    in this system" will silently miss jobs, which is itself a monitoring
+    integrity gap. Separately, the trending-topics fabrication should never
+    run at all, scheduled or not.
+  persona_impact:
+    power_migrant: "Would immediately distrust the whole analytics/insights surface on discovering a 5-month-old silently-running fake-data cron untracked by the system's own cron monitor."
+    casual_operator: "Never sees this directly, but is the one whose optimal_posting_times/ghost_slots silently never populate while trending_topics keeps polluting with fake entries -- an invisible, asymmetric failure."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P3"]
+  effort: M
+  effort_reasoning: "Locating the actual live cron/trigger mechanism (outside get_cron_job_status()'s visibility) requires DB-admin access this audit doesn't have (read-only); disabling it once found is small, but see P8-001 for the full fix."
+  confidence: HIGH
+  unverified_notes: "Could not directly query pg_catalog.cron.job or the Supabase dashboard's cron UI (read-only REST access only) to name the actual job/trigger responsible; inferred from the exact 2AM UTC daily cadence matching the code's own documented schedule."
+  trace_id: "T-P8-01"
+  source_agent: "A10"
+
+- finding_id: P8-003
+  pillar: P8
+  capability: "optimal_posting_times / ghost_slots -- silently dead despite the writer pipeline running daily"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "Live query 2026-08-20: optimal_posting_times Content-Range: */0 (0 rows)"
+    - "Live query 2026-08-20: ghost_slots Content-Range: */0 (0 rows)"
+    - "supabase/functions/daily-analysis/index.ts:130-141 (posts.length < 5 guard, and platformPosts.length < 5 guard, per platform)"
+    - "supabase/functions/daily-analysis/index.ts:238-241 (ghost slots skipped entirely if calendar_settings.ghost_slots_enabled is falsy)"
+  observed_behavior: >
+    Despite the daily-analysis pipeline demonstrably running every day (see
+    P8-002), both `optimal_posting_times` and `ghost_slots` are completely
+    empty live (0 rows each). This is consistent with ground truth's separate
+    finding of only 9 published posts system-wide across all users -- far
+    below the >=5-published-posts-per-platform gate at index.ts:130 and the
+    >=5-filtered-platform-posts gate at index.ts:141 that
+    analyzeUserOptimalTimes() requires before it writes anything, and
+    generateGhostSlotsForUser() additionally requires
+    calendar_settings.ghost_slots_enabled=true (index.ts:232-241) which may be
+    off by default. The net effect: the ONLY part of this pipeline that
+    unconditionally writes regardless of real data volume is the fabricated
+    trending_topics path (P8-001) -- the two paths that COULD have been real
+    (optimal times / ghost slots, both gated on genuine published-post
+    engagement data) never produce output because there isn't enough real
+    data, while the fabricated path runs anyway because it has no such gate.
+  expected_behavior: >
+    A functioning MVP should either lower the data threshold with an
+    honest low-confidence label, or show an explicit empty-state ("not enough
+    published posts yet") in any UI surface that would consume these tables --
+    but no UI surface in src/pages/AnalyticsPage or app/app/analytics
+    reads optimal_posting_times, ghost_slots, or trending_topics at all (see
+    P8-007), so this emptiness is currently invisible rather than surfaced.
+  persona_impact:
+    power_migrant: "Would expect 'best time to post' recommendations from day one on any serious scheduling tool; finds nothing, with no indication of why or what's needed to unlock it."
+    casual_operator: "Never encounters this feature at all since nothing in the UI surfaces these tables -- a silently absent capability, not even a broken one from their perspective."
+  severity: MAJOR
+  blast_radius: ["P2", "P3"]
+  effort: M
+  effort_reasoning: "Requires both lowering/rethinking the sample-size gate for a cold-start product and building the missing UI consumer."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P8-01"
+  source_agent: "A10"
+
+- finding_id: P8-004
+  pillar: P8
+  capability: "LLM-hallucinated trending topics (OptimalTimesService.js, alternate/dead implementation)"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/services/OptimalTimesService.js:397-455"
+    - "src/services/OptimalTimesService.js:419 (prompt: \"What are the top 5 trending topics on ${platform} right now?\")"
+    - "src/services/OptimalTimesService.js:443 (source: 'groq_analysis')"
+    - "grep for OptimalTimesService/analyzeTrendingTopics/analyzeOptimalTimes/analyzeAllPlatforms/getRecommendedTime across src/ and app/ returns only OptimalTimesService.js itself -- zero callers"
+  observed_behavior: >
+    A second, parallel implementation of trend/optimal-time analysis exists in
+    the frontend service layer (not the edge function). analyzeTrendingTopics()
+    asks Groq's LLM "What are the top 5 trending topics on {platform} right
+    now?" with no web search, no real trends API, and no grounding data -- a
+    pure LLM guess/hallucination -- then writes the result to trending_topics
+    tagged source: 'groq_analysis' (line 443), which reads as more credible
+    provenance than the edge function's 'manual' tag even though neither is
+    real trend data. This entire module (analyzeOptimalTimes, getRecommendedTime,
+    analyzeAllPlatforms, analyzeTrendingTopics) has zero callers anywhere in
+    src/ or app/ -- it is dead code, exported as a default object (lines
+    461-466) that nothing imports.
+  expected_behavior: >
+    Either wire this to something real (which still wouldn't fix the
+    hallucination problem -- an ungrounded LLM call is not a trends source) or
+    remove it. Dead code implementing a duplicate, differently-fabricated
+    version of the same feature as daily-analysis/index.ts indicates the
+    trending-topics feature was attempted twice and abandoned both times.
+  persona_impact:
+    power_migrant: "N/A directly (dead code) but reinforces that the whole trending-topics capability was never finished -- two half-built, mutually-inconsistent attempts, neither shipped."
+    casual_operator: "No direct impact since it never runs, but if a future dev wires it up by mistake, casual users would receive confidently-worded fake trends with no way to tell they're LLM guesses."
+  severity: MINOR
+  blast_radius: ["P1", "P3"]
+  effort: XS
+  effort_reasoning: "Deleting dead code is trivial; the real fix (a grounded trends source) is the same L effort as P8-001."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P8-01"
+  source_agent: "A10"
+
+- finding_id: P8-005
+  pillar: P8
+  capability: "trending_topics / optimal_posting_times / ghost_slots -- zero UI consumers anywhere in the app"
+  status: MISSING
+  maturity: L1
+  evidence:
+    - "grep 'trending_topics|optimal_posting_times|ghost_slots' across src/ -- only match is src/services/OptimalTimesService.js (itself uncalled, see P8-003)"
+    - "grep 'trending_topics|optimal_posting_times|ghost_slots' across app/ -- zero matches"
+    - "grep 'ghostSlot|GhostSlot|optimalTime|OptimalTime|trendingTopic|TrendingTopic' (camelCase variants) across src/ -- only match is OptimalTimesService.js"
+    - "src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:1-533 (full file) -- no reference to any of these three tables"
+  observed_behavior: >
+    None of the three tables that daily-analysis/index.ts exists to populate
+    (trending_topics, optimal_posting_times, ghost_slots) are read by any
+    component, page, or hook in src/ or app/. The Analytics page
+    (PersonalAnalyticsPage.jsx) does not surface trending topics, optimal
+    posting time recommendations, or ghost-slot suggestions anywhere. Neither
+    does the Calendar page (not grepped directly here but included in the
+    src/-wide search, zero hits). This means P8-001's fabricated data, even
+    though it is actively written to the DB every day, is not currently being
+    shown to any user through any UI path this audit could find -- it is
+    fabricated AND presently inert from a user-facing standpoint, which is
+    the one mitigating fact about an otherwise severe finding.
+  expected_behavior: >
+    Either the tables should feed a real UI surface (trending-topic
+    suggestions in Studio's content ideation, optimal-time hints in
+    Calendar's scheduler, ghost-slot suggestions on the Calendar grid -- all
+    of which are documented product-vision features per FUNCTIONAL-SPEC.md
+    per the shared ground truth) or the entire write pipeline should be
+    decommissioned. Running a nightly fabrication job that writes to a table
+    nothing reads is pure waste and risk with no offsetting value.
+  persona_impact:
+    power_migrant: "Sees no trending-topics or optimal-time feature in the product at all today, despite backend scaffolding suggesting it was planned -- a missing table-stakes capability, not a broken one."
+    casual_operator: "Same -- the capability simply isn't part of their experience; no confusion because there's nothing to encounter."
+  severity: MAJOR
+  blast_radius: ["P1", "P2", "P3"]
+  effort: L
+  effort_reasoning: "Building a real UI consumer plus fixing the underlying data source (P8-001) is a multi-week feature, not a patch."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P8-01"
+  source_agent: "A10"
+
+- finding_id: P8-006
+  pillar: P8
+  capability: "attribution chain: generations -> posts -> external_post_id -> metrics -- breaks at the last hop, permanently"
+  status: MISSING
+  maturity: L0
+  evidence:
+    - "supabase/functions/publish-post/index.ts:212 (external_post_id := result.platformPostId written on successful publish -- confirms the chain DOES get an external post id up to this point)"
+    - "grep 'platform_analytics' across all .ts/.tsx/.js/.jsx/.sql/.py in the repo: only 3 hits -- supabase/migrations/20260227090000_calendar_library_alignment.sql (adds an FK constraint, does not write rows), supabase/functions/daily-analysis/index.ts (READS via join at index.ts:120, never inserts), src/services/OptimalTimesService.js (READS via join at line 30, never inserts, and is dead code per P8-003)"
+    - "supabase/migrations/20260227090000_calendar_library_alignment.sql:211-215 (platform_analytics.post_id FK -> posts.id ON DELETE SET NULL -- proves the schema was designed to carry metrics per-post, but nothing populates it)"
+    - "Live query 2026-08-20: platform_analytics Content-Range: */0 (0 rows)"
+    - "find supabase/functions -maxdepth 1 -type d | grep -iE 'metric|analytic|insight|engagement|stat' -- no matching edge function exists"
+    - "grep for platform_analytics/graph.facebook/insights across video-worker/ (Python) -- no matches"
+  observed_behavior: >
+    The ID chain generations -> posts -> external_post_id is real and does get
+    populated on a successful publish (publish-post/index.ts:212). But the
+    final hop -- external_post_id -> real engagement metrics -- does not
+    exist anywhere in this codebase. No edge function, cron job, worker, or
+    script ever calls a platform API (Meta Graph API insights, TikTok
+    analytics API, YouTube Analytics API, etc.) to fetch views/likes/
+    comments/shares for a published post and write them into
+    platform_analytics. The table's only FK and only join references treat it
+    as a read source that is assumed to be populated by something -- that
+    something was never built. Combined with P8-001 (trending_topics is 100%
+    fabricated) and the live confirmation that platform_analytics has 0 rows,
+    this settles the audit's decisive question: THERE IS NO REAL ENGAGEMENT
+    DATA ANYWHERE IN THIS SYSTEM. Every table designed to hold real
+    performance signal (platform_analytics, analytics_summary) is empty; the
+    one table that is populated (trending_topics) is 100% hardcoded fake data
+    written by a job the system's own monitoring can't see (P8-002).
+  expected_behavior: >
+    A functioning analytics feature requires, at minimum, a scheduled job that
+    calls each connected platform's insights/analytics API for every published
+    post's external_post_id and upserts the result into platform_analytics.
+    This does not exist even as a stub -- it is a fully MISSING capability,
+    not a broken one.
+  persona_impact:
+    power_migrant: "This is disqualifying. Every competitor (Buffer, Later, Hootsuite) leads with real post-level engagement metrics; a product with literally zero real engagement data anywhere is not in the same category."
+    casual_operator: "Sees no engagement numbers at all on the Analytics page (confirmed in P8-011/page trace) so at least isn't actively misled by a fake number here -- but has no way to know if their content is actually working."
+  severity: BLOCKER
+  blast_radius: ["P1", "P2", "P3"]
+  effort: XL
+  effort_reasoning: "Requires building OAuth-scoped metrics fetchers per platform (Meta Graph API, TikTok, YouTube Analytics, etc.), a scheduled sync job, rate-limit handling, and backfill -- a multi-week project per platform, compounded by the fact that only 1 of 22 connected accounts (TikTok via Zernio) is even a real, working connection to fetch from."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P8-01"
+  source_agent: "A10"
+
+- finding_id: P8-007
+  pillar: P8
+  capability: "table-stakes analytics affordances: export, date-range comparison, per-post engagement drill-down"
+  status: STUBBED
+  maturity: L2
+  evidence:
+    - "grep 'export|csv|download|CSV|Export' in src/pages/AnalyticsPage/ -- zero matches (only the JS keyword 'export default' on line 526)"
+    - "src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:385-388 (range toggle: only two fixed options, 30 or 90 days -- no custom range, no period-over-period comparison, no prior-period delta shown anywhere in the stat cards)"
+    - "src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:472-486 (failed-post rows navigate to /app/calendar?postId=... ) and src/pages/Calendar/CalendarPage.jsx:260-283 (deep-link opens the post in Calendar's caption-audit view, not any performance/engagement view)"
+  observed_behavior: >
+    Present: per-platform breakdown table (published/scheduled/failed/health
+    per platform) and a 30-vs-90-day range TOGGLE. Missing: no CSV/export of
+    any kind; no period-over-period comparison (e.g. "vs previous 30 days",
+    a delta arrow, or trend indicator on any stat card -- each stat card
+    shows an absolute count only); no per-post engagement drill-down (clicking
+    a post routes to Calendar's edit/audit view, not a metrics detail page --
+    consistent with P8-008 since there is no engagement data to drill into).
+  expected_behavior: >
+    Category-leading analytics tools (Buffer, Later, Hootsuite, Sprout)
+    universally offer CSV/PDF export, period-over-period % change indicators,
+    and a per-post detail view with impressions/engagement breakdown. None
+    of these three exist here.
+  persona_impact:
+    power_migrant: "Export is a hard requirement for reporting to clients/stakeholders; its total absence is an immediate churn trigger independent of the data-fabrication issues."
+    casual_operator: "Doesn't need export, but the lack of any 'up/down vs last period' signal on the stat cards makes it hard to tell at a glance whether things are improving."
+  severity: MAJOR
+  blast_radius: ["P1"]
+  effort: M
+  effort_reasoning: "Export and period comparison are self-contained UI+query additions once real data exists; per-post drill-down is blocked entirely on P8-008 (no metrics to drill into)."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P8-01"
+  source_agent: "A10"
+
+- finding_id: P8-008
+  pillar: P8
+  capability: "analytics page empty/error/loading states, and a stale disclaimer referencing nonexistent data"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:391-400 (error state: alert box + Retry button)"
+    - "src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:402-405 (loading state: 4 skeleton stat cards)"
+    - "src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:436-441, 448-449, 468-469, 499-500 (four distinct EmptyState components, one per section, each with a specific title/description; the 'Nothing tracked yet' state even includes a CTA button routing to /app/generate)"
+    - "src/pages/AnalyticsPage/PersonalAnalyticsPage.jsx:383 (header subcopy: 'Publishing here is simulated, so engagement figures are illustrative — counts and statuses are real.')"
+  observed_behavior: >
+    This is the strongest-built part of the P8 slice: real loading/error/empty
+    states exist per-section (not one blanket spinner), the error state has a
+    working retry action, and the zero-post empty state has a clear CTA back
+    into Studio. However, the header subcopy at line 383 refers to
+    "engagement figures" being "illustrative" -- but this page renders NO
+    engagement figures anywhere (no likes/views/comments/shares appear in the
+    stat cards, platform table, or post lists per the full file read). This
+    is stale copy, almost certainly left over from an earlier version of the
+    page that did render fabricated/illustrative engagement numbers before
+    the rebuild (see the file's own top-of-file comment, lines 15-20, which
+    explicitly documents that a "discovery readiness" aggregate was
+    deliberately left out rather than fabricated). The disclaimer now warns
+    about something that isn't there, which is confusing in the opposite
+    direction: a careful power-user reading it would go looking for the
+    "illustrative" engagement numbers this text promises and not find them.
+  expected_behavior: >
+    Copy should describe what's actually on the page. If no engagement data
+    exists, say so plainly ("engagement metrics aren't available yet -- no
+    platform sync is connected") rather than a stale reference to illustrative
+    figures that were removed.
+  persona_impact:
+    power_migrant: "Reads the disclaimer, looks for the engagement numbers it promises, finds none -- a small but real trust/consistency ding on top of the larger fabrication findings."
+    casual_operator: "Unlikely to parse the subtle wording; harmless to them but reduces overall polish."
+  severity: MINOR
+  blast_radius: ["P1"]
+  effort: XS
+  effort_reasoning: "One-line copy fix."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P8-01"
+  source_agent: "A10"

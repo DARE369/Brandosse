@@ -27,6 +27,41 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // ── LOCK L1.7 — service-role only ──────────────────────────────────────────
+  //
+  // This function had NO auth guard. Supabase accepts any valid project JWT by
+  // default, including the anon key — which ships in the client bundle and is
+  // public. Verified live 2026-08-21: a POST carrying only the public anon key
+  // returned HTTP 200 and disclosed all 12 active user IDs in the response.
+  //
+  // Two problems, both closed here:
+  //   1. Enumeration — user UUIDs are the lookup key for other endpoints, so
+  //      handing out the full list is useful material for a follow-on attack.
+  //   2. Unauthenticated resource abuse — every call iterates each active
+  //      profile with several queries, with no rate limit behind it.
+  //
+  // This is a scheduled batch job with no legitimate caller other than cron, so
+  // the correct audience is service-role only. Pattern copied from
+  // credit-monthly-reset/index.ts:19-26, which had it right all along.
+  //
+  // The matching cron registration (20260821200000) supplies a service-role
+  // token from Vault. Apply that migration BEFORE deploying this guard, or the
+  // nightly run will 401 in the gap.
+  const authHeader = req.headers.get('Authorization')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!serviceKey) {
+    return new Response(
+      JSON.stringify({ error: 'Server misconfigured' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+  if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+
   try {
     // Create Supabase client
     const supabase = createClient(
@@ -334,41 +369,42 @@ function generatePrompt(pillar, trend) {
 // TRENDING TOPICS UPDATE
 // ============================================================================
 
-async function updateTrendingTopics(supabase) {
-  console.log('📈 Updating trending topics...')
+/**
+ * DISABLED 2026-08-21 — LOCK L1.3 (Completion Lockdown, Wave 1).
+ *
+ * This function used to write two hardcoded topic strings — "AI Tools" and
+ * "Content Creation Tips" — across four platforms, every single day. It had
+ * been doing so since roughly 2026-03-24: ~1,200 rows in `trending_topics`,
+ * containing exactly two distinct topics in total.
+ *
+ * That is fabricated market data presented through a table named
+ * `trending_topics`. Nothing downstream currently reads it (verified: no UI
+ * consumer exists), so no user has been shown it — but it was one wiring
+ * change away from presenting invented trends as real market insight, which is
+ * a trust problem rather than merely a quality one.
+ *
+ * It also ran completely unmonitored for ~5 months, because
+ * `get_cron_job_status()` filters `cron.job` through a hardcoded three-name
+ * allowlist that does not include this job (see LOCK L0.3).
+ *
+ * WHY THIS IS NOT REPLACED WITH REAL TREND INGESTION HERE:
+ * real trend data requires a new third-party integration, which the Completion
+ * Lock defers until lockdown lifts (see audit/11-lockdown-plan.md). The correct
+ * interim behaviour is to write nothing and say so loudly, rather than to keep
+ * fabricating. An empty table is honest; a table of invented trends is not.
+ *
+ * TO RE-ENABLE: implement a real trend source, then delete this guard. Do not
+ * simply restore the previous body.
+ */
+async function updateTrendingTopics(_supabase) {
+  console.warn(
+    '[daily-analysis] trending-topics update SKIPPED — the previous implementation ' +
+    'fabricated data (2 hardcoded topics x 4 platforms, daily). Disabled under ' +
+    'LOCK L1.3. Real trend ingestion is deferred until the completion lockdown lifts. ' +
+    'See audit/11-lockdown-plan.md.'
+  )
 
-  // In production, you'd call actual trend APIs here
-  // For now, using mock data or Groq analysis
-
-  const platforms = ['instagram', 'tiktok', 'youtube', 'facebook']
-  
-  for (const platform of platforms) {
-    const mockTrends = [
-      {
-        platform,
-        topic: 'AI Tools',
-        category: 'Tech',
-        trend_score: 95,
-        keywords: ['ai', 'artificial intelligence', 'automation'],
-        source: 'manual',
-        valid_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        platform,
-        topic: 'Content Creation Tips',
-        category: 'Education',
-        trend_score: 88,
-        keywords: ['content', 'tips', 'tutorial', 'how to'],
-        source: 'manual',
-        valid_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      },
-    ]
-
-    await supabase.from('trending_topics').upsert(mockTrends)
-  }
-
-  console.log('✅ Trending topics updated')
-  return true
+  return { skipped: true, reason: 'fabricated-data-writer-disabled-L1.3' }
 }
 
 /* ============================================================================

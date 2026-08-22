@@ -79,6 +79,68 @@ function useElapsedTime(isActive) {
   return `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
 }
 
+/**
+ * LOCK L2.7 — translate a provider error into something the user can act on.
+ *
+ * This surface previously rendered `errorMessage` verbatim, so users saw raw
+ * yt-dlp output. It also carried a hardcoded line saying credits "have been
+ * refunded", which was wired to no refund state at all — the UI asserted a
+ * financial fact it had no knowledge of. Both are fixed here: the message is
+ * humanised, the raw text is demoted to a collapsed details block, and the
+ * refund claim is gone.
+ *
+ * Ordered most-specific first. Unknown errors fall through to a generic
+ * message rather than a guess.
+ */
+function explainJobError(raw, stage) {
+  const text = String(raw || '').toLowerCase();
+
+  // The dominant real-world failure: 4 of 9 lifetime job failures.
+  if (text.includes('sign in to confirm') || text.includes('not a bot') || text.includes('cookies-from-browser')) {
+    return {
+      message: 'YouTube blocked the download. It does this to servers it does not recognise, and it is not something you did wrong.',
+      nextStep: 'Try uploading the video file directly instead of pasting a link.',
+    };
+  }
+  if (text.includes('requested format is not available') || text.includes('no video formats')) {
+    return {
+      message: 'That video is not available in a format we can download.',
+      nextStep: 'Try a different source, or upload the file directly.',
+    };
+  }
+  if (text.includes('private') || text.includes('members-only') || text.includes('unavailable')) {
+    return {
+      message: 'That video is private, restricted, or unavailable in this region.',
+      nextStep: 'Use a publicly viewable video, or upload the file directly.',
+    };
+  }
+  if (text.includes('no audio')) {
+    return {
+      message: 'That video has no audio track, so it cannot be transcribed into clips.',
+      nextStep: 'Clipping needs speech to find moments worth cutting.',
+    };
+  }
+  if (text.includes('timed out') || text.includes('timeout')) {
+    return {
+      message: 'Processing took too long and was stopped.',
+      nextStep: 'Shorter videos process more reliably. Try again, or use a shorter source.',
+    };
+  }
+  if (text.includes('api key') || text.includes('unauthorized') || text.includes('401')) {
+    return {
+      message: 'The video service is not configured correctly. This is a problem on our side, not yours.',
+      nextStep: null,
+    };
+  }
+
+  return {
+    message: stage
+      ? `Something went wrong while we were at the "${stage}" step.`
+      : 'Something went wrong while processing this video.',
+    nextStep: 'You can try again, or upload the file directly.',
+  };
+}
+
 export default function JobStatusPipeline({ status, errorMessage, errorStage, sourceTitle, sourceUrl, isConnected, downloadProgress, clips = [] }) {
   const { navigate } = useAppNavigation();
   const isFailed = status === "failed";
@@ -91,6 +153,12 @@ export default function JobStatusPipeline({ status, errorMessage, errorStage, so
   const totalClips = clips.length;
   const doneClips = clips.filter((c) => c.render_status === "complete" || c.render_status === "failed").length;
   const renderPercent = totalClips > 0 ? Math.round((doneClips / totalClips) * 100) : 0;
+
+  // Derived once — this was being recomputed three times per render.
+  const failureExplanation = React.useMemo(
+    () => explainJobError(errorMessage, errorStage),
+    [errorMessage, errorStage],
+  );
 
   return (
     <section className="ve-page ve-status-page" aria-labelledby="ve-status-title">
@@ -212,10 +280,22 @@ export default function JobStatusPipeline({ status, errorMessage, errorStage, so
       {isFailed && errorMessage ? (
         <div className="ve-error-panel" role="alert">
           <strong>What went wrong</strong>
-          <p>{errorMessage}</p>
-          <p className="ve-error-hint">
-            Credits for this job have been refunded. Submit the same URL to try again.
-          </p>
+          <p>{failureExplanation.message}</p>
+          {failureExplanation.nextStep ? (
+            <p className="ve-error-hint">{failureExplanation.nextStep}</p>
+          ) : null}
+          {/*
+            LOCK L2.7 — the raw provider error is available but demoted.
+            It used to be the ONLY thing shown, which meant users saw yt-dlp
+            stack output verbatim ("Sign in to confirm you're not a bot. Use
+            --cookies-from-browser"). That is the single most common real
+            failure on this pipeline — 4 of 9 lifetime failures — and it is
+            meaningless to the person reading it.
+          */}
+          <details className="ve-error-details">
+            <summary>Technical detail</summary>
+            <pre>{errorMessage}</pre>
+          </details>
         </div>
       ) : null}
     </section>

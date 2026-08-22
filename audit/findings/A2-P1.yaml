@@ -1,0 +1,220 @@
+# A2 — Pillar P1 (Idea conception / ideation), personal dashboard only
+# Slice: supabase/functions/{prompt-suggestions,ai-generate-brief,enhance-prompt}/,
+#        src/services/{suggestedPrompts,intentExtractor,briefBuilder,brandKitConversation}.js
+# E2E trace (T-P1-01): GenerationCanvas.jsx idea input -> intentExtractor.checkIntentAmbiguity
+#   (local heuristic, no LLM) -> [optional] IntentClarificationPanel -> SessionStore.startGeneration
+#   -> generationPipeline.runGenerationPipeline -> briefBuilder.buildGenerationBrief -> groqClient
+#   .callGroqContentPlan -> generate-content-plan edge fn -> content_plans table insert.
+#   Trace stops at the content_plans write per scope (A4 owns generation quality, P3).
+
+- finding_id: P1-001
+  pillar: P1
+  capability: "trend/real-world signal ingestion for ideation"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "supabase/functions/daily-analysis/index.ts:349-380 (updateTrendingTopics) — comment reads 'In production, you'd call actual trend APIs here / For now, using mock data or Groq analysis', then hardcodes exactly TWO literal topics ('AI Tools', 'Content Creation Tips') per platform with source:'manual' and fabricated trend_score 95/88"
+    - "live query GET /rest/v1/trending_topics?select=created_at,topic,platform&order=created_at.desc&limit=5 -> newest rows created_at=2026-08-20T02:00:07Z (today), topic='AI Tools'/'Content Creation Tips' — same two strings as the hardcoded mock"
+    - "live query GET /rest/v1/trending_topics?select=id with Prefer: count=exact -> Content-Range: 0-999/1200 total rows, all traceable to the same 2-topic template repeated per platform per day since Jan 2026"
+    - "grep -rn trending_topics src/ supabase/functions/ app/ -> only writer/reader is daily-analysis/index.ts and OptimalTimesService.js:447 (also a writer); zero personal-dashboard ideation code (prompt-suggestions, enhance-prompt, suggestedPrompts.js) ever reads this table"
+  observed_behavior: "A real, currently-running cron pipeline (upserting fresh rows as of the day of this audit) exists end-to-end for 'trending topics' — but every row it has ever written, for 7+ months, is one of two hardcoded placeholder strings per platform. This is the ONLY real-world-signal ingestion pipeline anywhere in the codebase, and it ingests nothing real. Separately, none of the user-facing ideation surfaces (prompt-suggestions, enhance-prompt) read this table at all, so even if it contained real trends they would not reach a user typing an idea."
+  expected_behavior: "A content-ops tool competing on 'idea conception' needs actual trend/competitor/platform signal (even a single real trends API, e.g. a hashtag/topic velocity feed) feeding into the suggestions a user sees — this is the L1-vs-L4 dividing line called out in the audit brief."
+  persona_impact:
+    power_migrant: "Has used tools with real trend feeds (e.g. platform trend APIs, competitor scraping); discovering the 'trending_topics' table is two hardcoded strings recycled since January is a trust-destroying find, not a missing-feature disappointment."
+    casual_operator: "Never sees trending_topics surfaced anywhere in personal-dashboard ideation UI, so is unaffected today — but any onboarding copy or marketing claiming 'trend-aware suggestions' would be actively false for them."
+  severity: MAJOR
+  blast_radius: ["P2"]
+  effort: L
+  effort_reasoning: "Requires integrating a real trend-data source (or removing the fabricated table/cron and being honest about scope), plus wiring it into the actual suggestion-generation edge functions, which currently have no code path that would even consume it."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-02"
+  source_agent: "A2"
+
+- finding_id: P1-002
+  pillar: P1
+  capability: "AI prompt suggestions (idea starters)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/prompt-suggestions/index.ts:29-45 (buildSystemPrompt) — quoted: 'You are an elite social media creative strategist. Generate N unique image/video generation prompt suggestions... Return ONLY JSON.'"
+    - "supabase/functions/prompt-suggestions/index.ts:107-118 — user prompt is only a random UUID seed + ISO timestamp + brand-kit text fields; no external data of any kind"
+    - "supabase/functions/prompt-suggestions/index.ts:1-4 imports — no enforceRateLimit import/call, unlike its sibling enhance-prompt/index.ts:5,179 which does call enforceRateLimit"
+    - "supabase/functions/prompt-suggestions/index.ts:111-116 — callLlm({ preferredProvider: 'groq', ... maxTokens: 900 }), no credit/usage recording anywhere in the file (contrast with ai-generate-brief/index.ts:120-128 recordCreditUsage)"
+  observed_behavior: "Suggestions are pure LLM brainstorm seeded only by a random UUID + brand-kit text fields — no trend data, no competitor data, no per-user performance history. The endpoint requires only requireUser() auth; any authenticated user can invoke it at will with no rate limit and no credit deduction, unlike every other AI-cost edge function in the repo."
+  expected_behavior: "Idea suggestions from a category leader are informed by real signal (trend, audience, or the user's own top-performing past content) and the AI cost surface is metered the same way every other generative call in the app is."
+  persona_impact:
+    power_migrant: "Gets the same 'elite creative strategist' generic prompt style every competitor's free-tier chatbot produces; nothing here reflects their actual audience or what has worked before."
+    casual_operator: "Gets usable, on-brand-ish suggestions quickly (this part works) but has no way to know the free unlimited calls have no guardrail — not a user-visible problem, but a real cost exposure for the operator."
+  severity: MAJOR
+  blast_radius: []
+  effort: M
+  effort_reasoning: "Rate limiting is a small, mechanical addition (reuse enforceRateLimit as enhance-prompt already does); making suggestions genuinely signal-informed is the larger lift shared with P1-001."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-01"
+  source_agent: "A2"
+
+- finding_id: P1-003
+  pillar: P1
+  capability: "client-side fallback tier for prompt suggestions"
+  status: STUBBED
+  maturity: L2
+  evidence:
+    - "src/services/groqClient.js:7-8 — 'const BROWSER_GROQ_TOKEN = ''; const GROQ_TOKEN = BROWSER_GROQ_TOKEN;' (hardcoded empty, with a comment: 'Browser-exposed provider keys are intentionally disabled')"
+    - "src/services/groqClient.js:154-164,221-224 — hasGroq() is always false, so providerOrder() is always [], so callWithFailover always throws synchronously: 'No browser LLM provider is configured...'"
+    - "src/services/suggestedPrompts.js:61-69 (generateSuggestedPrompts) — 3-tier chain: edge fn -> getGroqFallbackPrompts() -> buildLastResortPrompts(); tier 2 (getGroqFallbackPrompts, lines 113-126) calls callGroqJSON, which per above always throws and is caught at line 123 returning [] silently"
+    - "src/services/suggestedPrompts.js:177-188 (buildLastResortPrompts) — 4 literal hardcoded template strings with a Date.now()-derived numeric suffix appended, not AI-generated at all"
+    - "src/services/suggestedPrompts.js:190-193 (clearSuggestionsCache) removes key 'socialai_suggestions_${userId}_${mode}', but the actual stored key at line 29 is 'socialai_suggestions_${userId}_${mode}_${today}' — the two never match, so this function is a permanent no-op; grep confirms it also has zero callers anywhere in src/"
+  observed_behavior: "The documented 3-tier resilience design (edge function -> browser Groq -> hardcoded last resort) is actually 2-tier in practice: the middle tier is dead code that always no-ops due to a hardcoded empty API key. When the edge function is unavailable or rate-limited, users silently get 4 literal, non-AI, template strings with a number appended, indistinguishable in the UI from real AI suggestions. The cache-invalidation utility is separately broken (wrong key) and unused."
+  expected_behavior: "A fallback tier that is presented as 'AI suggestions' should either be real AI output or the UI should clearly label degraded/offline suggestions as such, not silently substitute fixed template strings."
+  persona_impact:
+    power_migrant: "Would notice the same 4 template phrases (with only a trailing number changing) reappearing whenever the edge function hiccups, and lose trust that 'suggestions' are AI at all."
+    casual_operator: "Has no way to know the 4 prompts shown are canned templates, not personalized AI output — actively misleading in the STUBBED-vs-real sense the audit flags."
+  severity: MAJOR
+  blast_radius: []
+  effort: S
+  effort_reasoning: "Either wire a real server-side fallback (skip the dead browser tier) or clearly label last-resort prompts as non-AI in the UI; fixing the cache-key bug is trivial."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-01"
+  source_agent: "A2"
+
+- finding_id: P1-004
+  pillar: P1
+  capability: "brand kit conversation (AI-assisted onboarding, upstream of every ideation prompt)"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "src/components/BrandKit/BrandKitConversation.jsx:4,52-59 — finalizeConversation() calls callGroqJSON(prompt, ...) directly from the browser after all 6 questions are answered"
+    - "src/services/groqClient.js:7-8,154-164,221-224 — same hardcoded-empty GROQ_TOKEN as P1-003 means callGroqJSON always throws before any network call is made"
+    - "src/components/BrandKit/BrandKitConversation.jsx:90-95 — the throw is caught and shown to the user as a chat bubble: 'I could not process the conversation: No browser LLM provider is configured. Use the Supabase Edge Function path for LLM calls. Please try again.'"
+    - "src/services/brandKitConversation.js:1-8,122-137 (CONVERSATION_QUESTIONS, buildFinalConversationInferencePrompt) confirm this is the intended AI-extraction step, not a placeholder by design"
+  observed_behavior: "Every user who goes through the 6-question conversational brand-kit setup answers all 6 questions and then deterministically hits a hard failure at the final 'extract structured brand kit' step, 100% of the time, in every environment (dev and prod alike, since the token is hardcoded, not env-gated). There is an 'Edit manually' escape hatch (line 105-112) that bypasses the AI path entirely, but the advertised AI-conversation onboarding path itself never completes."
+  expected_behavior: "A conversational onboarding flow that asks 6 questions must be able to finish and produce a brand kit; this is table-stakes for the flow to exist at all, and this brand kit is the context every downstream ideation prompt (prompt-suggestions, enhance-prompt, content-plan) depends on for personalization."
+  persona_impact:
+    power_migrant: "Invests time answering 6 onboarding questions and gets a dead-end error, then has to redo the whole setup manually — a first-impression failure that reads as an unfinished product."
+    casual_operator: "The exact user this conversational flow was designed for (no vocabulary lesson, just answer questions) hits an incomprehensible technical error message ('No browser LLM provider is configured') after doing everything asked of them."
+  severity: BLOCKER
+  blast_radius: ["P1-001", "P1-002", "P3"]
+  effort: S
+  effort_reasoning: "Route this call through an edge function (the pattern already used correctly by enhance-prompt and prompt-suggestions) instead of a browser-side Groq call with a hardcoded empty key — a well-understood fix given the working pattern already exists elsewhere in this same slice."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-03"
+  source_agent: "A2"
+
+- finding_id: P1-005
+  pillar: P1
+  capability: "AI-generated campaign/content brief from an idea"
+  status: MISSING
+  maturity: L1
+  evidence:
+    - "supabase/functions/ai-generate-brief/index.ts:18-25,41-53 — the only brief-generation edge function requires organization_id + brand_project_id and gates on requireActiveOrgMember/org_owner|org_admin|editor roles; no personal-dashboard (non-org) equivalent exists"
+    - "src/services/llmClient.js:16-18 — generateBrief() is the only client wrapper for this function"
+    - "grep -rn generateBrief src app -> only match is the definition itself in llmClient.js; zero importers/callers anywhere in the codebase (org or personal)"
+  observed_behavior: "The one 'idea -> structured brief' AI capability in the repo is both exclusively org-scoped (out of this audit's personal-dashboard focus per the org exclusion) and completely unwired to any UI — not even the org UI calls it. For the personal dashboard specifically, there is no equivalent capability at all: a user typing an idea goes straight into the image/video generation pipeline (T-P1-01) with no intermediate 'multi-post campaign brief' step."
+  expected_behavior: "Category-leading tools let a single idea/campaign concept expand into a structured multi-post brief (topics, cadence, platform mix) before committing to individual generations — this exists in the codebase only as dead, org-only code."
+  persona_impact:
+    power_migrant: "Expects to turn one campaign idea into a week's worth of planned content in one step; finds no such capability in the personal dashboard at all."
+    casual_operator: "Unaffected directly — never encounters this gap because the single-idea-to-single-generation flow is the only path presented."
+  severity: MAJOR
+  blast_radius: ["P2"]
+  effort: L
+  effort_reasoning: "Needs a personal-dashboard-scoped brief-generation edge function (the org one can't be reused as-is due to its org role/credit gating) plus new UI to consume it."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-01"
+  source_agent: "A2"
+
+- finding_id: P1-006
+  pillar: P1
+  capability: "idea capture / save an idea for later (idea backlog)"
+  status: MISSING
+  maturity: L1
+  evidence:
+    - "src/stores/SessionStore.js:1165-1204 (saveDraftPrompt) — writes a single 'draft_prompt' field into the ACTIVE session's metadata, overwriting whatever was there before; explicitly does not create a new session, and explicitly is one slot, not a list"
+    - "src/stores/SessionStore.js:1206-1211 (comment) confirms this is autosave for the current textbox, not a saved-ideas feature"
+    - "grep -i 'save.*idea|idea.*bank|SavedIdea|IdeaBank' across src/ -> no matches beyond the draft-prompt mechanism above"
+  observed_behavior: "There is no way for a user to capture an idea (a fragment, a note, a half-formed prompt) and browse a list of saved ideas later. The only persistence mechanism is a single overwritable 'current draft' tied 1:1 to whatever session is active — saving a second idea silently destroys the first."
+  expected_behavior: "A content-ops tool's ideation stage should let a user jot down multiple ideas over time and revisit them as a backlog/swipe file, independent of any single generation session."
+  persona_impact:
+    power_migrant: "Used to a swipe-file/idea-bank pattern elsewhere; discovers that 'saving' an idea here actually means overwriting the one and only draft slot, and loses content."
+    casual_operator: "Has a good idea mid-week but no other content session open yet; there is no lightweight way to jot it down without starting a full generation session."
+  severity: MAJOR
+  blast_radius: []
+  effort: M
+  effort_reasoning: "Needs a real backlog table (or a list-valued draft store) plus list/browse UI; the session-scoped single draft can't be trivially extended without a data model change."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-01"
+  source_agent: "A2"
+
+- finding_id: P1-007
+  pillar: P1
+  capability: "analytics/performance feedback into next idea (closed loop)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L1
+  evidence:
+    - "src/services/historyLoader.js:20-46 (loadUserHistory) — selects only prompt, media_type, metadata, created_at from the generations table, filtered to status='completed'; formats as a plain text list of past prompts"
+    - "src/services/historyLoader.js:42 — 'items = data.map(g => `- ${g.media_type}: \"${g.prompt.slice(0,100)}\"`)' — no join to platform_analytics, analytics_summary, or any engagement/performance table"
+    - "src/services/generationPipeline.js:152-157,163-164 — this history string is passed straight into buildGenerationBrief -> callGroqContentPlan as 'history_summary', with no performance weighting"
+  observed_behavior: "The 'history' context that reaches the content-plan brief is only a list of recent prompt texts (used so the model avoids repeating itself), never what performed well. The audit brief's hard constraint 2 ('insights must mechanically influence the next cycle') is not met at the idea/brief stage — nothing about which past posts got engagement flows back into what gets suggested or planned next."
+  expected_behavior: "A closed-loop content system should weight or reference top-performing past content (by real engagement data) when generating new ideas/briefs, not just avoid literal repetition."
+  persona_impact:
+    power_migrant: "Expects 'do more of what worked' as a baseline feature of any analytics-driven tool; finds the system has no mechanism to know what 'worked' at all during ideation."
+    casual_operator: "Doesn't notice the gap directly, but experiences it as suggestions that don't seem to get smarter over time despite using the product regularly."
+  severity: MAJOR
+  blast_radius: ["P5"]
+  effort: L
+  effort_reasoning: "Requires joining generation/post history to real analytics data and redesigning the history_summary construction and prompt to make use of it — a cross-pillar (P1/P5) change."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-01"
+  source_agent: "A2"
+
+- finding_id: P1-008
+  pillar: P1
+  capability: "input validation on prompt/brand-kit payload size"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "supabase/functions/enhance-prompt/index.ts:181-192 — only checks 'if (!prompt) throw ...'; no max-length check on body.prompt before it is embedded in the LLM user payload"
+    - "supabase/functions/prompt-suggestions/index.ts:98-107 — body.brandKit is passed to buildBrandContext with no size bound before being embedded in the system/user prompt"
+    - "supabase/functions/_shared/http.ts:22-28 (parseJsonBody) — no body-size limit at the shared parsing layer either"
+  observed_behavior: "A user (or a script hitting the edge function directly, bypassing any client-side textarea limit) can submit an arbitrarily large prompt or brandKit blob; it is passed through to the LLM call uncapped, with only maxTokens bounding the output side."
+  expected_behavior: "User-supplied text destined for a paid LLM call should have a server-side length cap with a clear 4xx error, independent of whatever the UI enforces client-side."
+  persona_impact:
+    power_migrant: "Unlikely to hit this directly, but would expect a professional tool to reject oversized input with a clear message rather than silently spending tokens."
+    casual_operator: "Could accidentally paste a huge block of text and get a slow/expensive call with no warning, rather than a helpful 'that's too long' message."
+  severity: MINOR
+  blast_radius: []
+  effort: XS
+  effort_reasoning: "A simple length check + 400 response in both edge functions."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-01"
+  source_agent: "A2"
+
+- finding_id: P1-009
+  pillar: P1
+  capability: "NEXT_PUBLIC_ENABLE_PROMPT_SUGGESTIONS_EDGE_IN_DEV flag semantics"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "src/services/suggestedPrompts.js:15-22 (shouldUsePromptSuggestionsEdge) — 'if (!isRuntimeDev()) return true; return ENABLE_PROMPT_SUGGESTIONS_EDGE_IN_DEV;'"
+    - "src/utils/runtimeEnv.js:31-33 (isRuntimeDev) — 'return processEnv.NODE_ENV !== \"production\";'"
+    - ".env.local:8 NEXT_PUBLIC_ENABLE_PROMPT_SUGGESTIONS_EDGE_IN_DEV= (empty/unset); .env.example:29 sets it to \"false\""
+  observed_behavior: "This flag only ever changes behavior when NODE_ENV !== 'production' (local dev). In production the edge function is always attempted regardless of the flag's value, so the flag cannot be used to kill-switch the feature in production if the edge function needs to be pulled — its only real effect is suppressing edge calls during local development to avoid burning Groq quota/auth issues while iterating."
+  expected_behavior: "Not a defect per se, but the name ('...IN_DEV') and .env.example default correctly communicate a dev-only convenience flag, not a production feature flag — worth confirming this is understood, since a flag with this naming pattern is often mistaken for an environment-wide kill switch."
+  persona_impact:
+    power_migrant: "N/A — invisible to end users."
+    casual_operator: "N/A — invisible to end users; this is purely a developer-experience note."
+  severity: MINOR
+  blast_radius: []
+  effort: XS
+  effort_reasoning: "Documentation/naming clarity only; no functional change needed unless a true production kill-switch is desired."
+  confidence: HIGH
+  unverified_notes: ""
+  trace_id: "T-P1-01"
+  source_agent: "A2"

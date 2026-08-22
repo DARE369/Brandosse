@@ -1,0 +1,195 @@
+# P4i — Image generation
+# source_agent: A7 (agent killed 4x by API/session limits; completed directly by the orchestrator)
+# Closes the last P0 coverage gap (D7 item E7). Verified first-hand against code + live DB, 2026-08-21.
+
+- finding_id: P4i-001
+  pillar: P4i
+  capability: "credit accounting integrity on the image path — THE MONEY QUESTION"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L4
+  evidence:
+    - "supabase/functions/generateImage/index.ts:185-211 (balance check, reserveCredits, refund closure)"
+    - "supabase/functions/generateImage/index.ts:360 (await refundCreditsIfReserved() in the single top-level catch)"
+    - "supabase/functions/generateImage/index.ts:199-201 (creditsReserved flag prevents double refund)"
+    - "supabase/functions/generateImage/index.ts:193-196 (comment documents the concurrency race being closed)"
+    - "supabase/functions/editImage/index.ts:104-111 (same pattern, CREDITS_PER_EDIT=3)"
+    - "supabase/functions/upscaleImage/index.ts:68-76 (same pattern, CREDITS_PER_UPSCALE=2)"
+    - "supabase/functions/_shared/generationIdempotency.ts (reserveCredits + findCachedGeneration)"
+  observed_behavior: >
+    ANSWER TO THE AUDIT PRIMARY QUESTION: users are NOT charged for failed image
+    generations. This was the single largest unknown remaining in the audit and it
+    resolves cleanly in the product favour.
+    All three image endpoints follow an identical, correct pattern: check balance ->
+    reserve credits atomically BEFORE any provider work -> install a refund closure ->
+    invoke that closure from the single top-level catch, which every failure path after
+    reservation flows through. A creditsReserved boolean guards against double refund,
+    and the refund call has its own try/catch so a failed refund is logged rather than
+    masking the original error.
+    The code comment at :193-196 explicitly documents closing the concurrency race
+    where two simultaneous requests both pass an advisory balance check and both bill.
+    findCachedGeneration provides idempotency so a repeated identical request does not
+    double-charge.
+    This is the best-engineered money-handling code found anywhere in this audit.
+  expected_behavior: >
+    Meets the bar. The only reason this is not rated COMPLETE is the charter rule that
+    COMPLETE requires assessment against a written D4 definition, plus the residual
+    verification note below.
+  persona_impact:
+    power_migrant: "Credit behaviour is trustworthy and predictable — no silent losses on failed generations, which is exactly what they check first."
+    casual_operator: "Protected from the failure mode they would never detect on their own."
+  severity: MINOR
+  blast_radius: []
+  effort: XS
+  effort_reasoning: "No remediation required. Flagged only so the pattern here is used as the reference standard when fixing the video path."
+  confidence: HIGH
+  unverified_notes: "Refund correctness was verified by code trace, not by executing a failing generation and observing the balance. A live test would raise confidence to certainty. Also unverified: whether a provider call that hangs indefinitely (no timeout, see P10q-005) leaves credits reserved without refund — the catch only fires if the promise settles."
+  trace_id: "T-P4i-01"
+  source_agent: "A7/orchestrator"
+
+- finding_id: P4i-002
+  pillar: P4i
+  capability: "image generation unit economics"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L4
+  evidence:
+    - "supabase/functions/generateImage/index.ts:26 (CREDITS_PER_IMAGE = 1)"
+    - "supabase/functions/editImage/index.ts:25 (CREDITS_PER_EDIT = 3)"
+    - "supabase/functions/upscaleImage/index.ts:22 (CREDITS_PER_UPSCALE = 2)"
+    - "supabase/functions/_shared/fal.service.ts:585-594 (imageFluxPerMP $0.030, imageIdeogramBalanced $0.060, imageRecraft $0.040, imageEditKontext $0.040, imageUpscale $0.040)"
+    - "src/lib/video-engine/credit-packages.ts (credit price $0.099-$0.150)"
+  observed_behavior: >
+    Margins are positive at every credit tier, unlike the video path.
+    At the cheapest tier ($0.099/credit):
+      Image  — revenue $0.099 vs cost $0.030 (flux) to $0.060 (ideogram) = 39-70% margin
+      Edit   — revenue $0.297 vs cost $0.040 = 87% margin
+      Upscale — revenue $0.198 vs cost $0.040 = 80% margin
+    The pricing ladder is also correctly ordered: the more expensive operations charge
+    proportionally more, which is exactly what the video path fails to do (P10o-001,
+    where standard costs the business more per credit than premium).
+    Cost per credit here is $0.010-0.060, versus $0.100 for standard video generation —
+    so image generation sits between clipping ($0.0033) and video ($0.100) and does not
+    break the credit model.
+  expected_behavior: >
+    Meets the bar. Image generation is one of the two pillars whose economics work
+    as designed.
+  persona_impact:
+    power_migrant: "Pricing feels proportionate to what they receive."
+    casual_operator: "Cheap enough that a single credit per image is easy to reason about."
+  severity: MINOR
+  blast_radius: []
+  effort: XS
+  effort_reasoning: "No change needed. Should be the template when repricing video generation (D6 item C9)."
+  confidence: HIGH
+  unverified_notes: "Internal cost estimates were not reconciled against live fal.ai invoices. The video-side estimate was found to be 79% above market (Hailuo $0.500 internal vs $0.280 actual), so image estimates may also be conservative — which would make margins BETTER, not worse."
+  trace_id: "T-P4i-02"
+  source_agent: "A7/orchestrator"
+
+- finding_id: P4i-003
+  pillar: P4i
+  capability: "brand consistency in generated images"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "supabase/functions/generateImage/index.ts:67-81 (buildBrandContext)"
+    - "supabase/functions/generateImage/index.ts:228 (brandContext passed into the enhancer user prompt)"
+    - "supabase/functions/generateImage/index.ts:230-236 (callPromptEngine with model-aware system prompt)"
+  observed_behavior: >
+    Brand kit MECHANICALLY reaches the image prompt — this is not decorative.
+    buildBrandContext extracts seven fields: brand_name, target_audience, brand_voice,
+    tone_descriptors, visual_style_keywords, photo_style_notes, and
+    avoid_visual_elements (a negative-constraint field, which is a genuinely
+    sophisticated touch most tools omit). These are joined and injected into a
+    model-aware prompt-enhancement pass whose system prompt is selected per image model
+    (flux / ideogram / recraft), because each responds to different prompt vocabulary.
+    The enhancement is explicitly a SINGLE pass — a code comment records that a previous
+    version double-enhanced an already-enhanced content-plan prompt, and that this was
+    corrected.
+    Gap: brand context reaches the prompt as TEXT ONLY. Colors, fonts and logo are not
+    applied as a deterministic post-process, so brand adherence is a probabilistic
+    request to the model rather than a guarantee.
+  expected_behavior: >
+    Text injection is the right foundation. For true brand consistency, exact brand
+    colors and logo placement need deterministic compositing rather than model
+    persuasion — a generative model will not reliably hit a specific hex value.
+  persona_impact:
+    power_migrant: "Output is on-brand in feel but not exact. They will notice colors drifting from the brand palette across a set of images."
+    casual_operator: "Well served — gets recognisably on-brand images with no configuration."
+  severity: MAJOR
+  blast_radius: ["P3"]
+  effort: M
+  effort_reasoning: "Deterministic overlay compositing for logo and brand colors on top of generated output. The brand data is already loaded and structured; only the compositing step is missing."
+  confidence: HIGH
+  unverified_notes: "Actual visual brand adherence was not assessed — that requires generating images against a real brand kit and judging output, which needs a live generation run."
+  trace_id: "T-P4i-03"
+  source_agent: "A7/orchestrator"
+
+- finding_id: P4i-004
+  pillar: P4i
+  capability: "live image output provenance"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "live DB generations where media_type=image: 127 rows — 113 completed, 10 failed, 4 processing"
+    - "provider distribution: 22 fal-ai, 105 null (legacy rows predating provider tracking)"
+    - "storage_path hosts: 60 supabase.co (owned), 32 image.pollinations.ai (hotlinked), 14 picsum.photos, 5 source.unsplash.com, 3 images.unsplash.com, 13 none"
+  observed_behavior: >
+    Image generation demonstrably works: 60 of 127 rows (47%) are real assets stored in
+    the product own Supabase bucket, and 22 rows carry an explicit fal-ai provider.
+    This is a materially healthier picture than the video path, where only 1 of 32 rows
+    was an owned asset.
+    Two data-quality concerns remain:
+    (a) 22 rows point at picsum.photos (a Lorem-Ipsum placeholder image service) and
+        Unsplash (stock photography). These are development placeholders sitting in the
+        same table as real generations, with status completed.
+    (b) 32 rows hotlink to image.pollinations.ai rather than storing the asset. Those
+        are real generations, but the product does not own the file — if pollinations
+        changes or expires a URL, the user library breaks retroactively.
+    The 10 failed rows are healthy evidence that failures are recorded rather than
+    hidden.
+  expected_behavior: >
+    Every completed generation should reference an asset the product owns and controls.
+    Placeholder and stock-photo rows should not carry completed status in the same
+    table as genuine output.
+  persona_impact:
+    power_migrant: "Discovers historical library items breaking when a third-party URL rotates, and loses trust in the library as durable storage."
+    casual_operator: "Sees images silently disappear from their library with no explanation."
+  severity: MAJOR
+  blast_radius: ["P9"]
+  effort: M
+  effort_reasoning: "Ingest hotlinked assets into Supabase storage on completion, and reclassify the placeholder rows. The storage upload path already exists for the 60 owned rows."
+  confidence: HIGH
+  unverified_notes: "Whether the pollinations hotlinks are still resolving was not tested. Whether the picsum/unsplash rows are reachable by real users or are isolated QA data was not determined — a user_id join would settle it."
+  trace_id: "T-P4i-04"
+  source_agent: "A7/orchestrator"
+
+- finding_id: P4i-005
+  pillar: P4i
+  capability: "client/server credit-cost disagreement"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "supabase/functions/generateImage/index.ts:26 — server charges CREDITS_PER_IMAGE = 1"
+    - "src/services/media.service.js:275 — client fallback: generationCost: data.credits_used ?? 3"
+    - "supabase/functions/generateImage/index.ts:355 — server returns credits_used in the response"
+  observed_behavior: >
+    The server charges 1 credit per image and returns credits_used in its response. The
+    client carries a hardcoded fallback of 3 for use when that field is absent. The
+    server is authoritative for billing, so this is a DISPLAY defect rather than an
+    overcharge — but if the response shape ever changes or the field is dropped, the UI
+    silently reports triple the true cost.
+    This is the same class of defect as the stale defaults found elsewhere in the audit:
+    a fallback value that was correct at some point and was never revisited.
+  expected_behavior: >
+    The client should render only the server-reported cost, and surface an explicit
+    unknown state rather than guessing a number when the field is missing.
+  persona_impact:
+    power_migrant: "Would notice credit maths not reconciling against their balance and lose confidence in the metering."
+    casual_operator: "Would believe images cost 3x what they do, and ration usage unnecessarily."
+  severity: MINOR
+  blast_radius: ["P9"]
+  effort: XS
+  effort_reasoning: "Remove the hardcoded fallback; render an explicit unknown state instead."
+  confidence: HIGH
+  unverified_notes: "Whether the ?? 3 fallback is ever actually reached in practice was not traced — it depends on whether any response path omits credits_used."
+  trace_id: "T-P4i-05"
+  source_agent: "A7/orchestrator"

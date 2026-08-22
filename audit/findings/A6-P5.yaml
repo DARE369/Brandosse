@@ -1,0 +1,451 @@
+# A6 — P5 VIDEO CLIPPING — launch-readiness audit findings
+# Written incrementally. Evidence = video-worker/**, app/**, supabase/functions/**.
+
+- finding_id: P5-001
+  pillar: P5
+  capability: "worker deployment target / production reachability"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - ".env.local:35"
+    - ".env.example:69"
+    - "video-worker/.env:14"
+    - "video-worker/railway.toml:1-10"
+    - "video-worker/main.py:176-185"
+  observed_behavior: >-
+    WORKER_WEBHOOK_URL is literally "http://localhost:8001" in .env.local:35 and the
+    same value is the committed default in .env.example:69 — there is no production
+    worker URL anywhere in the repo. video-worker/.env sets
+    WORKER_TEMP_DIR=C:/tmp/video-engine, a Windows path, proving the only configured
+    worker instance is the developer's local machine. railway.toml exists and is
+    well-formed (Dockerfile builder, /health healthcheck, ON_FAILURE restart) but a
+    config file is not a deployment; nothing in the repo references a deployed
+    Railway hostname. main.py:178 does read Railway's injected PORT, so the container
+    would boot if deployed — it simply is not.
+  expected_behavior: >-
+    Opus Clip / Vizard / Klap accept an upload from any browser and return clips
+    without the user's laptop being involved. The worker must run on always-on
+    infrastructure with a public HTTPS URL configured in the app environment.
+  persona_impact:
+    power_migrant: "Submits a job from a deployed app; nothing ever leaves 'queued' because no worker is polling. Reads this as a dead product and leaves."
+    casual_operator: "Sees a spinner or a queued card with no explanation and no ETA; has no vocabulary to diagnose 'the worker isn't running'."
+  severity: BLOCKER
+  blast_radius: ["P4", "P6"]
+  effort: M
+  effort_reasoning: >-
+    Railway config already exists; real work is provisioning the service, setting ~10
+    WORKER_* secrets, mounting persistent/ephemeral disk sized for 4K source video,
+    and pointing WORKER_WEBHOOK_URL at it. Non-trivial because of disk and ffmpeg
+    sizing, not because of code.
+  confidence: HIGH
+  unverified_notes: >-
+    Cannot verify from the repo whether a Railway project exists outside git. Even if
+    it does, the app is configured to talk to localhost, so the webhook trigger path
+    is broken regardless.
+  trace_id: "T-P5-01"
+  source_agent: "A6"
+
+- finding_id: P5-002
+  pillar: P5
+  capability: "transcription — Groq API key not configured for the worker"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "video-worker/.env:1-20"
+    - "video-worker/config.py:18"
+    - "video-worker/stages/transcribe.py:43-44"
+    - "video-worker/.env.template:1-30"
+    - ".env.local:18"
+  observed_behavior: >-
+    transcribe.py:43-44 hard-fails with TranscriptionError("WORKER_GROQ_API_KEY is not
+    set.") when the key is absent. video-worker/.env contains WORKER_ANTHROPIC_API_KEY,
+    WORKER_REPLICATE_API_TOKEN (empty) and WORKER_WEBHOOK_SECRET but has NO
+    WORKER_GROQ_API_KEY line at all. video-worker/.env.template also omits it — it
+    still documents the superseded Replicate transcription path
+    (WORKER_REPLICATE_API_TOKEN / WORKER_USE_MOCK_REPLICATE) that transcribe.py no
+    longer uses. A GROQ_API_KEY does exist at .env.local:18 but the Python worker
+    loads only video-worker/.env via config.py's load_dotenv().
+  expected_behavior: >-
+    Every credential the live pipeline requires is present in the worker's own env and
+    documented in its template; a missing key surfaces at startup, not at stage 2 of a
+    paid job.
+  persona_impact:
+    power_migrant: "Pays credits, waits through download of a 40-minute video, then gets a raw key-name error. Loses trust in the whole pipeline instantly."
+    casual_operator: "Gets the string 'WORKER_GROQ_API_KEY is not set.' surfaced as their failure reason — meaningless and alarming."
+  severity: BLOCKER
+  blast_radius: ["P5"]
+  effort: XS
+  effort_reasoning: "Add one env var to the worker env and the template; optionally validate it in config.py at startup alongside ffmpeg."
+  confidence: HIGH
+  unverified_notes: >-
+    The key could be injected by the Railway environment rather than the file. Cannot
+    confirm; but the local worker — the only one configured — cannot transcribe.
+  trace_id: "T-P5-01"
+  source_agent: "A6"
+
+- finding_id: P5-003
+  pillar: P5
+  capability: "moment selection — LLM rubric scoring (the LIVE path)"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "video-worker/stages/analyze.py:28-63"
+    - "video-worker/stages/analyze.py:149-187"
+    - "video-worker/stages/analyze.py:242-253"
+    - "video-worker/stages/analyze.py:305-345"
+    - "video-worker/stages/analyze.py:192-204"
+  observed_behavior: >-
+    ANSWER TO THE CORE QUESTION: this is genuine LLM moment selection, NOT naive
+    chunking. There is no fixed-interval slicing anywhere in the live path. Claude
+    (model "claude-sonnet-4-6", a real current-generation model ID, 1M context,
+    $3/$15 per MTok) receives a ~10-second-bucketed timed transcript built at
+    analyze.py:132-147 and returns explicit start_secs/end_secs float boundaries
+    plus four sub-scores. The rubric at analyze.py:35-60 is genuinely engineered -
+    HOOK (0-100, first 3 seconds), FLOW (story completeness), VALUE (usefulness),
+    TREND (short-form fit), each with explicit score-band descriptions, and a fixed
+    weighting HOOK*0.35 + FLOW*0.25 + VALUE*0.25 + TREND*0.15. The weights are NOT
+    trusted from the model - analyze.py:313-319 recomputes overall_score
+    server-side from the clamped sub-scores, so a hallucinated aggregate cannot
+    leak through. Prompt instructions 3-8 (analyze.py:160-170) demand
+    sentence-boundary cuts, non-overlapping clips, a hook-style title, a
+    platform-ready caption, and a why_this_works rationale. snap_to_word_boundary
+    (analyze.py:192-204) then snaps both edges to real Whisper word timestamps, so
+    the cut lands on a word boundary rather than a round number.
+    Where it falls short of the category leaders - (a) the model sees ONLY text,
+    with no audio energy, no pause/laughter detection, no visual or scene signal
+    and no speaker diarization, so a silent visual gag or an emphatic delivery is
+    invisible to the scorer; (b) it is a single zero-shot call with no
+    self-critique, no over-generate-then-rerank, and no code-side verification
+    that the returned clips actually do not overlap - prompt rule 5 is stated and
+    never enforced; (c) temperature is left at the API default with no seed, so the
+    same video re-run yields different clips - there is no determinism story;
+    (d) no prompt caching is set on the request (analyze.py:248-253 passes no
+    cache_control), so the 900-token system prompt is re-billed on every attempt
+    including all three retries.
+  expected_behavior: >-
+    Opus Clip's virality score and Vizard's scoring both fuse transcript semantics
+    with audio and visual signals and re-rank an over-generated candidate set, and
+    both guarantee non-overlapping output. A user comparing side by side will
+    notice missed visual moments and occasional duplicate/overlapping clips.
+  persona_impact:
+    power_migrant: "Recognises the four-dimension score as competitive on paper, then finds it misses the visually funny moment and returns different clips on a re-run of the same video - reads as unreliable rather than smart."
+    casual_operator: "Gets plausible clips with readable titles and a why_this_works line, which is genuinely useful; the weakness stays invisible until two returned clips overlap and the cards look near-identical."
+  severity: MAJOR
+  blast_radius: ["P5"]
+  effort: L
+  effort_reasoning: >-
+    Adding audio-energy and scene signals means a second analysis pass over the
+    media plus a fused scoring step; enforcing non-overlap is XS by comparison.
+    The overall lift is large because it changes the input representation.
+  confidence: HIGH
+  unverified_notes: >-
+    No clip-quality benchmark exists anywhere in the repo, so how good the picks
+    actually are is untested. The determinism claim rests on the absence of a
+    temperature/seed parameter in the request, not on an observed re-run.
+  trace_id: "T-P5-01"
+  source_agent: "A6"
+
+- finding_id: P5-004
+  pillar: P5
+  capability: "analysis — output-token truncation on long videos"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "video-worker/stages/analyze.py:248-253"
+    - "video-worker/stages/analyze.py:256-300"
+    - "video-worker/stages/analyze.py:87-94"
+    - "video-worker/stages/transcribe.py:16"
+  observed_behavior: >-
+    The transcript is sent WHOLE - there is no chunking and no truncation anywhere
+    in build_analyze_prompt. Input overflow is not the risk - claude-sonnet-4-6 has
+    a 1M context and even a 3-hour transcript is roughly 40-60K tokens. The real
+    failure is on the OUTPUT side. max_tokens is pinned to 4096 at analyze.py:250
+    while the prompt asks for up to 15 clips (analyze.py:88-89), each carrying a
+    title, a caption, a why_this_works sentence and five numbers. Fifteen such
+    objects sit right at the 4096-token boundary. When the response is cut off,
+    stop_reason is never inspected - analyze.py:256 reads message.content[0].text
+    directly, the brace-slicing at 263-266 hands truncated JSON straight to
+    json.loads, the JSONDecodeError branch at 281 retries the IDENTICAL prompt with
+    the IDENTICAL max_tokens three times, and the job then dies at 284 with
+    "Claude returned invalid JSON after 3 attempts" - three full input billings for
+    a failure guaranteed to repeat. The request is also non-streaming, so a long
+    generation additionally risks the SDK HTTP timeout.
+  expected_behavior: >-
+    Long videos are exactly where a clipping product earns its keep. A competitor
+    processes a two-hour podcast without a hard failure. The fix is to raise
+    max_tokens, stream, check stop_reason == "max_tokens", and degrade to fewer
+    clips rather than erroring out.
+  persona_impact:
+    power_migrant: "Uploads the 90-minute podcast that is the entire reason they bought the tool; the job fails with a JSON error. This is the single most likely first-session churn event."
+    casual_operator: "Sees 'Claude returned invalid JSON after 3 attempts' as their failure message - completely opaque, and their credits were already spent on download and transcription."
+  severity: BLOCKER
+  blast_radius: ["P5"]
+  effort: S
+  effort_reasoning: "Raise max_tokens to ~16000, switch to client.messages.stream plus get_final_message, add a stop_reason guard, and on truncation re-ask for fewer clips. Localised to one function."
+  confidence: MEDIUM
+  unverified_notes: >-
+    Have not measured an actual 15-clip response against the 4096 cap. The absence
+    of any stop_reason check is certain from the code; how often it is hit is an
+    estimate, not a measurement. Needed - one real long-video run with usage logged.
+  trace_id: "T-P5-01"
+  source_agent: "A6"
+
+- finding_id: P5-005
+  pillar: P5
+  capability: "clip duration limits — module constants override user settings"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "video-worker/stages/analyze.py:15-16"
+    - "video-worker/stages/analyze.py:96-122"
+    - "video-worker/stages/analyze.py:326-341"
+    - "video-worker/stages/analyze.py:387-388"
+  observed_behavior: >-
+    MIN_CLIP_SECONDS = 15 and MAX_CLIP_SECONDS = 240 are module constants applied
+    unconditionally at analyze.py:326-337, AFTER the prompt has already told Claude
+    to honour the user's own min_duration_secs / max_duration_secs
+    (analyze.py:99-115). The two disagree. A user who asks for 10-second clips has
+    every returned clip silently skipped by the `continue` at line 334 with only a
+    clip_too_short_skipped log line, and if that drops all of them the job dies at
+    line 388 with "No valid clips could be created from Claude response". A user
+    who asks for five-minute clips gets a hard truncation to 240s mid-sentence at
+    line 336. Worse, line 341 - end_secs = max(start_secs + 10, min(end_secs,
+    total_duration)) - can manufacture a 10-second clip immediately after the
+    15-second minimum was enforced, so the floor is not actually a floor. None of
+    this surfaces to the user; it is silent skipping, not a warning.
+  expected_behavior: >-
+    Either the user-set duration bounds are the authority, or the UI states the
+    hard product limits up front. Silently discarding output that matches what the
+    user explicitly asked for is the worst of both options.
+  persona_impact:
+    power_migrant: "Sets 10-second clips for TikTok hooks, gets zero clips and a generic failure, and cannot tell that their own setting caused it."
+    casual_operator: "Never touches the setting so is usually unaffected - until a video of short exchanges yields nothing and the failure reads as the product being broken."
+  severity: MAJOR
+  blast_radius: ["P5"]
+  effort: XS
+  effort_reasoning: "Derive the effective min/max from the job fields with the constants as fallbacks, and fix the +10 clamp on line 341."
+  confidence: HIGH
+  unverified_notes: >-
+    Have not confirmed which duration values the UI actually permits; the job-field
+    reads at analyze.py:74-77 prove the columns are consumed by the prompt builder.
+  trace_id: "T-P5-01"
+  source_agent: "A6"
+
+- finding_id: P5-006
+  pillar: P5
+  capability: "aspect-ratio and platform export presets"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "video-worker/stages/render.py:37-51"
+    - "video-worker/stages/render.py:340-348"
+    - "video-worker/utils/ffmpeg_utils.py:13-14"
+    - "video-worker/utils/ffmpeg_utils.py:299-312"
+    - "video-worker/stages/render.py:455-461"
+    - "video-worker/utils/caption_generator.py:47"
+  observed_behavior: >-
+    RATIO_MAP (render.py:37-43) offers 9:16, 4:5, 1:1, 16:9 and 3:4, and
+    _render_single_clip reads the job's aspect_ratio at render.py:341 and derives
+    out_w/out_h from it. Those values then only ever reach the CROP - crop_width =
+    target_w and crop_height = out_h (render.py:455-461, 535-541, 552-558). The
+    final scale is hardcoded - ffmpeg_utils.py:13-14 defines OUTPUT_WIDTH=1080 and
+    OUTPUT_HEIGHT=1920, and lines 303 and 310 emit a bare `scale=1080:1920` with no
+    force_original_aspect_ratio and no pad. So selecting 1:1 crops a 1080x1080
+    square and then stretches it to 1080x1920 - a 1.78x anamorphic distortion in
+    which faces are visibly elongated. 16:9 is worse - a 1920x1080 crop stretched
+    into 1080x1920. Only 9:16 survives, and only by coincidence of matching the
+    hardcoded constant. The one code path that does honour out_w/out_h is
+    _render_split_layout (render.py:226-256), which encodes at the raw 608x1080 -
+    a different resolution from every other clip in the same job.
+    There are no platform presets in any sense a competitor would recognise - no
+    per-platform duration caps, no safe-zone insets for the TikTok/Reels UI
+    chrome, no per-platform bitrate or file-size targets. Captions sit at a fixed
+    margin_v (caption_generator.py:47) that takes no account of where a platform
+    overlays its own buttons.
+  expected_behavior: >-
+    Selecting 1:1 or 16:9 must produce an undistorted 1:1 or 16:9 file. Category
+    leaders additionally ship per-platform presets with safe zones so burned-in
+    text is never covered by the platform's own UI.
+  persona_impact:
+    power_migrant: "Picks 1:1 for LinkedIn, gets a stretched clip, and concludes the render pipeline is amateur. This is a single-glance disqualifier."
+    casual_operator: "Stays on the 9:16 default and never hits the distortion - but their captions end up partly hidden behind TikTok's right-hand button rail because no safe zone exists."
+  severity: MAJOR
+  blast_radius: ["P5", "P6"]
+  effort: M
+  effort_reasoning: "Threading out_w/out_h through render_clip_to_file and using scale+pad with aspect preservation is small; real per-platform safe-zone presets are a design plus implementation task."
+  confidence: HIGH
+  unverified_notes: >-
+    Have not rendered a 1:1 job to observe the distortion; the conclusion follows
+    directly from an unconditional scale=1080:1920 with no aspect preservation.
+  trace_id: "T-P5-02"
+  source_agent: "A6"
+
+# ── P5-007 onward: completed by the orchestrator after A6 was killed mid-run ──
+# All verified first-hand against code + live DB (read-only), 2026-08-21.
+
+- finding_id: P5-007
+  pillar: P5
+  capability: "video ingestion — YouTube bot detection blocks the primary input path"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "live DB video_jobs: 15 rows total — 10 failed, 5 complete"
+    - "live DB video_jobs.error_message: 'Failed to retrieve video: ERROR: [youtube] UZTzoNOXyo8: Sign in to confirm you are not a bot. Use --cookies-from-browser'"
+    - "video-worker/config.py:24-26 (youtube_cookies field exists precisely to mitigate this)"
+    - "video-worker/.env: WORKER_YOUTUBE_COOKIES is ABSENT (grep count 0)"
+  observed_behavior: >
+    The dominant real-world failure of the clipping pipeline is YouTube bot detection.
+    Two thirds of all jobs ever run (10 of 15) failed, and the recurring error is
+    yt-dlp being blocked with "Sign in to confirm you are not a bot" — the standard
+    datacenter-IP block. The codebase ANTICIPATED this: config.py:24-26 defines a
+    youtube_cookies setting with a comment explaining it prevents bot detection on
+    server IPs. That variable is not set in the worker environment. The mitigation
+    was designed and never configured.
+  expected_behavior: >
+    Category leaders (Opus Clip, Vizard, Klap) accept a YouTube URL as the primary
+    input and it works. If YouTube ingestion is unreliable, the product must either
+    solve it (rotating residential proxies / cookie rotation) or stop advertising URL
+    ingestion and lead with direct upload.
+  persona_impact:
+    power_migrant: "Pastes a YouTube URL — the single most common action in this category — and it fails. They will not try a second time; this is the first impression of the whole pillar."
+    casual_operator: "Receives an opaque yt-dlp error mentioning --cookies-from-browser, which is meaningless to them. No recovery path is offered."
+  severity: BLOCKER
+  blast_radius: ["P4", "P9"]
+  effort: L
+  effort_reasoning: "Setting cookies is quick but fragile and degrades within weeks. A durable fix needs rotating residential proxies or an ingestion provider, plus cookie refresh automation. Sizing reflects the durable fix, not the band-aid."
+  confidence: HIGH
+  unverified_notes: "Production (Railway) env may set WORKER_YOUTUBE_COOKIES — UNVERIFIED, needs Railway dashboard. The 10 live failures are real regardless of local config."
+  trace_id: "T-P5-07"
+  source_agent: "A6/orchestrator"
+
+- finding_id: P5-008
+  pillar: P5
+  capability: "transcription — required Groq key absent from worker config"
+  status: STUBBED
+  maturity: L1
+  evidence:
+    - "video-worker/stages/transcribe.py:13-15 (GROQ_ENDPOINT, GROQ_MODEL=whisper-large-v3-turbo)"
+    - "video-worker/stages/transcribe.py:43 (guard: if not config.groq_api_key)"
+    - "video-worker/config.py:18 (groq_api_key defaults to empty string)"
+    - "video-worker/.env: WORKER_GROQ_API_KEY is ABSENT (grep count 0)"
+  observed_behavior: >
+    Transcription is the second stage of the pipeline and everything downstream
+    (moment selection, captions) depends on it. It requires WORKER_GROQ_API_KEY, which
+    is absent from the worker environment entirely — the config default is an empty
+    string. The code does fail loudly rather than silently (an explicit guard at
+    transcribe.py:43), which is correct behavior and worth crediting. But with no key
+    configured, no job can progress past transcription in this environment.
+    This independently confirms A6 finding P5-002.
+  expected_behavior: >
+    A required credential for a core pipeline stage must be present, and its absence
+    must be caught by a startup or health check rather than at job runtime.
+  persona_impact:
+    power_migrant: "Every job dies at stage two. The product does not function at all for its headline capability."
+    casual_operator: "Same, with an error they cannot act on."
+  severity: BLOCKER
+  blast_radius: ["P4"]
+  effort: XS
+  effort_reasoning: "Set one environment variable. The cost is trivial; the impact is total. The real work is the startup validation that should have caught it (see P5-010)."
+  confidence: HIGH
+  unverified_notes: "Production Railway env may set it — UNVERIFIED. Note the app-side Groq key is ALSO currently failing 100% (finding P3-001), so even a configured key warrants verification against the live Groq API."
+  trace_id: "T-P5-08"
+  source_agent: "A6/orchestrator"
+
+- finding_id: P5-009
+  pillar: P5
+  capability: "transcription engine quality and long-video handling"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L3
+  evidence:
+    - "video-worker/stages/transcribe.py:14 (whisper-large-v3-turbo)"
+    - "video-worker/stages/transcribe.py:15 (CHUNK_DURATION_SECS=1800, ~14MB at 64kbps, under the Groq 25MB limit)"
+    - "video-worker/stages/transcribe.py:20-30 (word-level timestamps returned)"
+    - "video-worker/stages/transcribe.py:36-41 (empty-audio guard with a human-readable message)"
+  observed_behavior: >
+    This stage is genuinely well engineered and is the strongest code in the pillar.
+    Groq whisper-large-v3-turbo with word-level timestamps, automatic 30-minute
+    chunking so any video length is supported, and an explicit empty-audio guard that
+    explains the problem in plain language. Word-level timing is exactly what karaoke
+    captions require, so the design is coherent end to end.
+  expected_behavior: >
+    Matches category expectations. The gaps are operational (no key configured, P5-008)
+    rather than architectural.
+  persona_impact:
+    power_migrant: "Would find transcription quality acceptable; whisper-large-v3 is a credible tier and word-level timing enables the caption style they expect."
+    casual_operator: "Invisible and correct — no configuration demanded of them."
+  severity: MINOR
+  blast_radius: []
+  effort: XS
+  effort_reasoning: "No structural work needed. Multi-language behavior and accuracy on poor audio remain untested."
+  confidence: HIGH
+  unverified_notes: "Real-world accuracy UNVERIFIED — no job has run since 2026-07-02. Non-English handling untested. Groq Whisper pricing must be confirmed for the cost model."
+  trace_id: "T-P5-09"
+  source_agent: "A6/orchestrator"
+
+- finding_id: P5-010
+  pillar: P5
+  capability: "worker configuration safety — mock defaults to TRUE"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "video-worker/config.py:21-22 (use_mock_anthropic and use_mock_replicate both default=True)"
+    - "video-worker/.env: WORKER_USE_MOCK_ANTHROPIC=false, WORKER_USE_MOCK_REPLICATE=false (explicitly set locally)"
+    - "video-worker/config.py:14-15,29 (supabase_url, service_key, webhook_secret are required — worker refuses to start without them)"
+  observed_behavior: >
+    The mock flags default to TRUE. If a deployment environment simply omits
+    WORKER_USE_MOCK_ANTHROPIC, the worker silently runs in mock mode and produces
+    fake output while appearing healthy. This is fail-open in the wrong direction:
+    the safe default for a production worker is real mode with a hard failure on a
+    missing key, not a silent fallback to simulation.
+    Credit where due: supabase_url, service_key and webhook_secret ARE required and
+    the worker refuses to start without them — so the pattern of strict validation
+    already exists in this file and simply was not applied to the mock flags or to
+    the API keys.
+  expected_behavior: >
+    Mock mode must default to FALSE and be opt-in for local development. Any missing
+    credential required by an enabled stage should fail at startup, not at job runtime.
+  persona_impact:
+    power_migrant: "Could receive simulated output believing it real — the most damaging possible failure for trust in an AI product."
+    casual_operator: "Cannot distinguish mock output from real output at all."
+  severity: MAJOR
+  blast_radius: ["P4", "P10"]
+  effort: XS
+  effort_reasoning: "Flip two defaults and extend the existing startup validation to cover keys for enabled stages. The validation pattern is already present at config.py:14-15."
+  confidence: HIGH
+  unverified_notes: "Whether the Railway deployment sets these flags explicitly is UNVERIFIED."
+  trace_id: "T-P5-10"
+  source_agent: "A6/orchestrator"
+
+- finding_id: P5-011
+  pillar: P5
+  capability: "pipeline throughput and real-world usage"
+  status: BUILT-BUT-INADEQUATE
+  maturity: L2
+  evidence:
+    - "live DB video_jobs: 15 rows ever; newest 2026-07-02, oldest 2026-06-13"
+    - "live DB video_clips: 43 rows (from the 5 complete jobs, ~8.6 clips per job)"
+    - "video-worker/config.py:33 (max_concurrent_jobs default 2)"
+    - "video-worker/config.py:35 (stuck_job_threshold_minutes default 45)"
+  observed_behavior: >
+    The pipeline HAS produced real output — 5 complete jobs yielding 43 clips, so the
+    end-to-end path demonstrably worked at least once. But it has not run at all since
+    2026-07-02, roughly seven weeks. Total lifetime volume is 15 jobs. Concurrency is
+    capped at 2 jobs per worker instance.
+    Notably, the worker DOES implement stuck-job detection (45-minute threshold) —
+    the exact safeguard the publishing pipeline lacks (see P6-003). The engineering
+    standard is inconsistent across the codebase rather than uniformly low.
+  expected_behavior: >
+    For a launch surface, 2 concurrent jobs per instance will not absorb bursty demand;
+    video rendering is minutes-long and CPU-bound. Scaling strategy and queue-depth
+    behavior need to be established before launch.
+  persona_impact:
+    power_migrant: "Expects to queue several videos at once. At concurrency 2 with multi-minute renders, wait times become unacceptable with even a handful of active users."
+    casual_operator: "One video at a time is fine; they will not notice the ceiling."
+  severity: MAJOR
+  blast_radius: ["P10"]
+  effort: M
+  effort_reasoning: "Horizontal scaling of the Railway worker plus queue-depth handling and user-visible position/ETA. The stuck-job mechanism already exists to build on."
+  confidence: HIGH
+  unverified_notes: "Per-job wall-clock duration UNVERIFIED — needs job timestamps or logs. Cost per clip UNVERIFIED pending Groq Whisper and Anthropic pricing; that arithmetic belongs in the D2 unit-economics work."
+  trace_id: "T-P5-11"
+  source_agent: "A6/orchestrator"
