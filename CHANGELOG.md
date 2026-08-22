@@ -81,8 +81,32 @@ existed. See [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md).
   raw text is demoted to a collapsed block.
 - **A search box that could not accept input** — rendered on four routes with
   no-op default props. Now rendered only when a real handler is supplied.
+- **The signup page promised 100 free credits over a database that grants 30**
+  (L5.15). The number was hardcoded into three marketing surfaces; the header
+  pill reads `user_credits.balance`, so a new account watched the promise break
+  within seconds of arriving. The 100 came from `profiles.credits`, a column
+  that gates nothing. All three now read one constant, and
+  `check-credit-grant.cjs` fails the build if it and the migration's grant
+  trigger ever disagree again.
+- **A loading state dressed as an empty state** (L5.15). The support-ticket list
+  rendered "Loading tickets" inside a dashed "nothing here" box while the fetch
+  was still in flight — telling a slow connection it had no tickets, which may
+  be false. Now a skeleton.
+- **The credits page rendered a balance of 0 on any fetch failure** (L5.15).
+  `.catch(() => {})` made a failed load visually identical to an empty account,
+  on the one page whose job is telling you what you have. It now says it could
+  not load, and offers a retry. The post-payment refresh had the same silent
+  catch and now says the payment went through even when the refresh did not.
 
 ### Quality — Changed
+
+- **15 of 19 empty states were dead ends** (L5.15, DoC-9). A new account is
+  nothing but empty states, so these are the product's first impression: they
+  said there was nothing there and left the user to work out what to do about
+  it. Every one now offers a real control, or declares in code why it has none
+  ("No failures" is the outcome you want). Six hand-rolled boxes in the video
+  engine moved onto the shared primitive so the guard can see them at all.
+  `check-empty-states.cjs`
 
 - **Default Claude model** `claude-3-5-sonnet-latest` → `claude-sonnet-5`
   (P3-010). Same list price, current generation. With Groq failing 100% since
@@ -119,6 +143,25 @@ existed. See [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md).
   and cannot promote itself. The highest-value test in the repository.
 - **`scripts/security/stuck-records-probe.mjs`**, **`secret-scan.mjs`**,
   **`oauth-state.test.mjs`**.
+- **`tests/e2e/time-to-first-value.spec.js`** — registers a genuinely new
+  account on every run and walks the path a stranger walks: signup → onboarding
+  wizard → Studio → a real generated post, asserting the whole thing lands under
+  five minutes (measured: 93–99s). Every other test in the suite signs in as an
+  account that already has data, so none of them can see what a new user sees.
+  It also asserts the wizard actually intercepts a new signup — 209 lines that
+  render for nobody if the redirect ever moves — and that the prompt typed in
+  the wizard survives the handoff into Studio. Test accounts are deleted
+  afterwards, walking the foreign-key chain by hand because deleting a user with
+  content is refused outright (see horizon register H13).
+- **`scripts/check-empty-states.cjs`** and **`scripts/check-credit-grant.cjs`**,
+  both wired into CI. Each was verified by breaking the code deliberately and
+  confirming it failed — a guard that has never failed has not been tested.
+- **Four e2e tests repointed** after months of silent failure. They targeted
+  `.bd-kpi-card`, `.studio-bar__textarea` and `.sidebar-logout-btn`, classes
+  that exist in zero files since the ui-v2 migration. Now written against roles
+  and text, and the dashboard test asserts each of the seven nav labels by name
+  — which is what would have caught the drift L5.7 fixed. Fourth instance of
+  **verification nobody watches decays to zero.**
 - **`engineering/`** — versioning, agentic code review, documentation, and
   production-readiness standards, loaded into every session via `CLAUDE.md`.
 

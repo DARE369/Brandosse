@@ -171,7 +171,7 @@ The largest wave. Everything here works but fails its D4 bar.
 | **L5.12** | Complete the brand-kit conversation | M | DoC-5 |
 | **L5.13** | Analytics export + date-range comparison | M | DoC-6 |
 | **L5.14** | Cost-per-user tracking + per-user video ceiling | M | DoC-10 |
-| **L5.15** | Onboarding to first value ≤5 min; empty states everywhere | M | DoC-9 |
+| **L5.15** ✅ | Onboarding to first value ≤5 min; empty states everywhere | M | **TTFV measured at 93–99s against the 300s bar** — signup → wizard → Studio → a real generated post, walked by a genuinely new account in `tests/e2e/time-to-first-value.spec.js`. **15 of 19 empty states were dead ends**; every one now offers a control or declares in code why it has none. Found and fixed on the way: the signup page promised 100 free credits over a database that grants 30. Guards: `check-empty-states.cjs`, `check-credit-grant.cjs` |
 
 **Gate 5 — every existing capability meets its D4 bar**, with a test proving it and a guard keeping it.
 

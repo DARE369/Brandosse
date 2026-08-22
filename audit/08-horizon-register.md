@@ -79,6 +79,22 @@ A structured brief object flowing from ideation through generation.
 **Why parked:** `ai-generate-brief` is MISSING and the brief would be a new artifact type.
 **Trigger:** ideation and planning both at L4 and the idea→plan handoff still measures LOSSY.
 
+## H13 · Make an account deletable
+**Dated:** 2026-08-22 · **Origin:** discovered while building the L5.15 first-run test
+Deleting a user that owns content fails outright. 56 of the 96 foreign keys to `auth.users` in this schema carry no `ON DELETE CASCADE`, so Postgres raises 23503 and refuses the whole delete.
+
+**Evidence (live, 2026-08-22):** `DELETE /auth/v1/admin/users/<id>` on an account with one generated post returned 500 `23503 — violates foreign key constraint "posts_user_id_fkey" on table "posts"`. Clearing `posts` then exposed the next layer: `sessions` blocked by `content_plans`. Four tables had to be emptied in dependency order before the user could be removed — `posts → generations → content_plans → sessions`.
+
+**What this means:** the admin "Delete Account" control at `src/admin/components/UserDetailsPanel/UserDetailsPanel.jsx:250` cannot succeed for any user who has ever generated anything. A right-to-erasure request currently has no working path.
+
+**Why parked:** the fix is a migration rewriting FK constraints across ~56 relationships — a schema change, not completion work — and the surface that needs it is admin, which is outside this audit's scope. Doing it carelessly is worse than not doing it: `CASCADE` on the wrong FK silently destroys data that should have been retained.
+
+**Trigger:** the first deletion request, or admin entering scope — whichever comes first. Not before, but not much after either: this one has a legal clock attached rather than a product one.
+
+**Interim:** `tests/e2e/time-to-first-value.spec.js` resolves the chain itself for its own test accounts, so the suite does not leak users. That is a workaround inside a test, not a fix.
+
+---
+
 ---
 
 ## Register discipline
