@@ -1,5 +1,6 @@
 import { readEnv } from "./env.ts";
 import { createHttpError } from "./org.ts";
+import { reportToSentry } from "./sentry.ts";
 
 export type LlmMessage = {
   role: "system" | "user" | "assistant";
@@ -229,13 +230,24 @@ export async function callLlm(options: {
       // it is the tripwire that should have caught that outage on day one.
       // Wire an alert to `llm_provider_fallback` when error tracking lands
       // (LOCK E1).
-      console.error("[llm] llm_provider_fallback", JSON.stringify({
+      const fallbackDetail = {
         event: "llm_provider_fallback",
         failed_provider: provider.provider,
         failed_model: provider.model,
         reason: lastError.message.slice(0, 200),
         remaining_providers: providers.length - providers.indexOf(provider) - 1,
-      }));
+      };
+      console.error("[llm] llm_provider_fallback", JSON.stringify(fallbackDetail));
+
+      // LOCK L0.4 — the console alone is what let the Groq outage run for days.
+      // Nobody reads edge-function logs unprompted; an alert has to arrive.
+      // Fire-and-forget: reporting must not add latency to the user's request,
+      // and the fallback below is about to serve them anyway.
+      void reportToSentry(lastError, {
+        event: "llm_provider_fallback",
+        level: "error",
+        extra: fallbackDetail,
+      });
     }
   }
 

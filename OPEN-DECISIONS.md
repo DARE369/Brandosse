@@ -92,21 +92,6 @@ fees before a single generation** — ~40% of revenue.
 
 ---
 
-## 🟡 OD-2 — Error tracking provider (L0.4)
-**Opened:** 2026-08-22 · **Blocks:** L0.4, and two Regression Register guards
-**Status:** OPEN
-
-Sentry's free Developer plan is $0 — 5,000 errors/month, 10,000 performance
-units, 30-day retention, 1 user. At current scale (14 users, 188 posts) that is
-ample and likely to stay so until real launch traffic. Next tier is Team at
-$26/month.
-
-Needs a founder account; nothing else blocks it. Until it exists, two guards
-cannot be armed: **provider-fallback alerting** (the tripwire whose absence hid
-the Groq outage for days) and **cost-deviation alerting**.
-
----
-
 ## 🟡 OD-3 — Repository visibility
 **Opened:** 2026-08-22 · **Status:** OPEN
 
@@ -137,3 +122,4 @@ Two consequences:
 | 2026-08-21 | Video generation (P4) **cut from v1** | Never produced a video (1 real asset in 32 attempts); negative margin at the cheapest credit tier; repairing it makes unit economics worse, not better (P10o-002). D5 §3 |
 | 2026-08-21 | Worker migrates **Railway → Fly.io**, after lockdown | Infrastructure relocation, not new capability. Sequenced as Wave 7 so the first Fly deploy is also the first *working* deploy |
 | 2026-08-22 | Worker env vars **not** set on Railway | No point configuring a host being decommissioned. Deferred to Wave 7 |
+| 2026-08-22 | **OD-2 CLOSED — Sentry chosen** for error tracking | Free Developer plan: 5,000 errors/mo, 30-day retention, 1 user — ample at current scale (14 users) and likely until real launch traffic. Configured for Next.js *and* Supabase Edge Functions; verified by planting two deliberate failures, both ingested HTTP 200. Python worker deferred to Wave 7, since it cannot boot today anyway |

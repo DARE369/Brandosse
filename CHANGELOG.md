@@ -121,10 +121,28 @@ existed. See [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md).
 - `src/legacy/supabase.js`, the empty `src/pages/CalendarPage/` tree, and stale
   bytecode.
 
+### Observability — Added
+
+- **Sentry instrumentation** (L0.4). Next.js server, client, edge runtime, and
+  React render errors (`app/global-error.tsx` — those never reach
+  `onRequestError`, so a white-screening user was invisible). Configured for
+  low noise and no content leakage: errors at 100%, traces at 5%,
+  `sendDefaultPii` off with a header/body scrubber, no session replay, and a
+  tunnel route so ad blockers cannot silently drop reports.
+- **Edge-function reporting** via a dependency-free `_shared/sentry.ts`. The
+  Next.js SDK does not cover Supabase Edge Functions, so the
+  `llm_provider_fallback` tripwire — the single alert most likely to have caught
+  the Groq outage — was writing to a console nobody reads. It now reports.
+  Hand-rolled rather than pulling the SDK into 51 separately-bundled Deno
+  functions; it never throws, never blocks, and is bounded at 5s.
+- Verified by planting two deliberate failures, both ingested HTTP 200. Per the
+  lockdown's demonstration rule, a lock is not closed until a planted failure is
+  actually caught.
+
 ### Known gaps
 
-- **L0.4 error tracking** is not built; two guards (provider-fallback and
-  cost-deviation alerting) wait on it.
+- **The Python worker is not instrumented.** Deferred to Wave 7 with the Fly
+  migration, since it cannot boot today regardless (missing `WORKER_GROQ_API_KEY`).
 - **Edge functions are not deployed** except `daily-analysis`, and have not been
   type-checked by Deno.
 - Wave 5 has 14 items remaining, including real multi-platform publishing
