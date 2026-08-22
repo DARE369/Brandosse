@@ -81,9 +81,19 @@ primary_region = "lhr"
 
 # Scratch space for downloads, extracted audio and rendered clips. Nothing here
 # is durable state — the job record lives in Postgres and finished clips are
-# uploaded to Supabase Storage — but it must be big enough for the largest
-# source the product accepts.
+# uploaded to Supabase Storage — but it must hold the largest source the product
+# accepts while it is being worked on.
+#
+# 25GB, not the 50 first drafted. Budget for one 60-minute job: source 1-3GB,
+# extracted audio under 1GB, ffmpeg intermediates roughly another source-worth,
+# rendered clips a few hundred MB — call it 8GB. MAX_CONCURRENT_JOBS is 2, so
+# ~16GB peak, and 25 leaves real headroom.
+#
+# Sized down deliberately because Fly volumes extend but never shrink, and are
+# billed on provisioned size rather than used. Starting at 50 would have meant
+# paying for 25GB of nothing, permanently, to buy headroom that `fly volumes
+# extend` provides on demand.
 [[mounts]]
   source = "video_worker_data"
   destination = "/data"
-  initial_size = "50gb"
+  initial_size = "25gb"
