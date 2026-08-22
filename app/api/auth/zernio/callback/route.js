@@ -1,5 +1,5 @@
 /**
- * GET /api/auth/zernio/callback?platform=...&profileId=...
+ * GET /api/auth/zernio/callback?platform=...&profileId=...&state=<signed>
  *
  * Zernio owns the OAuth exchange itself (we never see platform access
  * tokens), so this route doesn't exchange a code — it just needs to find out
@@ -22,8 +22,9 @@
  * whatever's new for the requested platform — a defensive catch-all so a
  * doc/behavior mismatch doesn't hard-fail the connect.
  *
- * platform/profileId are read from our OWN redirect_url (see connect/route.js)
- * as the source of truth for which Brandosse user this belongs to; accountId/
+ * IDENTITY: comes from the signed `state` minted by connect/route.js (LOCK
+ * L1.6). profileId is cross-checked against it but is NOT trusted on its own —
+ * it is a caller-supplied lookup key, not an authorization token. accountId/
  * username, when present, come from Zernio's redirect.
  *
  * On success: redirects to /app/settings?connected=<platform>
@@ -31,6 +32,7 @@
  */
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyOAuthState } from '../../../_lib/oauthState';
 
 const ZERNIO_BASE = 'https://zernio.com/api/v1';
 const SUCCESS_URL = (platform) => `/app/settings?connected=${platform}`;
@@ -121,8 +123,27 @@ export async function GET(request) {
   }
 
   try {
+    // ── LOCK L1.6 — identity comes from the SIGNED STATE, never the query ────
+    //
+    // This route previously derived the target user by looking up the
+    // caller-supplied `profileId` in profiles.zernio_profile_id, with no
+    // session check and no CSRF state. Anyone able to induce a victim to load
+    // this URL — or who learned their zernio_profile_id — could attach an
+    // account they control to that victim's workspace. Because
+    // `connected_accounts` is what the publisher dispatches to, the victim's
+    // scheduled content would then publish to the attacker's account.
+    //
+    // The state is signed in /connect using the id of the user we
+    // authenticated there, so only this server can mint one.
+    const state = searchParams.get('state');
+    const verified = verifyOAuthState(state, { platform });
+    const userId = verified.uid;
+
     const supabase = createServiceClient();
 
+    // profileId is still cross-checked, but purely as a consistency assertion:
+    // it must resolve to the SAME user the signed state names. A mismatch means
+    // the two halves of the flow disagree, so refuse rather than guess.
     const { data: profileRow, error: profileErr } = await supabase
       .from('profiles')
       .select('id')
@@ -130,7 +151,7 @@ export async function GET(request) {
       .maybeSingle();
     if (profileErr) throw profileErr;
     if (!profileRow?.id) throw new Error('unknown_zernio_profile');
-    const userId = profileRow.id;
+    if (profileRow.id !== userId) throw new Error('oauth_state_profile_mismatch');
 
     if (step === 'select_page') {
       // Facebook/LinkedIn/Pinterest-style page-selection isn't wired yet —

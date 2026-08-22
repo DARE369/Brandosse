@@ -535,7 +535,7 @@ WORKER_ANTHROPIC_API_KEY=sk-ant-...
 WORKER_REPLICATE_API_KEY=...
 
 # Webhook Secret (for verifying requests from Next.js)
-WORKER_WEBHOOK_SECRET=d1ae45e2feb84565bb630e65a42670b0
+WORKER_WEBHOOK_SECRET=<set-in-railway-and-vercel-never-commit>  # rotated 2026-08-21; the previous literal value was exposed here
 
 # Mock Mode (for development)
 WORKER_USE_MOCK_ANTHROPIC=true

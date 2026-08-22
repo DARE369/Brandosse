@@ -23,7 +23,19 @@ async def lifespan(app: FastAPI):
     """Runs on startup and shutdown."""
     # Startup
     log.info("worker_starting", port=config.port, temp_dir=config.temp_dir)
-    
+
+    # Fail fast on missing credentials for enabled stages (LOCK L1.4 / L0.6).
+    # A worker that boots without a Groq key accepts jobs and fails every one
+    # of them at transcription — the exact state the audit found in production.
+    # Refuse to start instead, the same way the ffmpeg check below does.
+    config.validate_runtime_credentials()
+    log.info("credentials_verified",
+             mock_anthropic=config.use_mock_anthropic,
+             mock_replicate=config.use_mock_replicate)
+
+    for warning in config.warn_on_degraded_config():
+        log.warning("degraded_config", detail=warning)
+
     # Ensure temp directory exists
     os.makedirs(config.temp_dir, exist_ok=True)
 

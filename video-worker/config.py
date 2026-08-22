@@ -18,8 +18,16 @@ class WorkerConfig(BaseSettings):
     groq_api_key: str = Field(default="", alias="WORKER_GROQ_API_KEY")
     anthropic_api_key: str = Field(default="", alias="WORKER_ANTHROPIC_API_KEY")
     replicate_api_token: str = Field(default="", alias="WORKER_REPLICATE_API_TOKEN")
-    use_mock_anthropic: bool = Field(default=True, alias="WORKER_USE_MOCK_ANTHROPIC")
-    use_mock_replicate: bool = Field(default=True, alias="WORKER_USE_MOCK_REPLICATE")
+
+    # Mock switches — MUST default to False (LOCK L1.4).
+    # These previously defaulted to True, which meant any environment that
+    # simply omitted the variable ran in mock mode: the worker produced
+    # fabricated AI output (hardcoded clip scores and timestamps) while
+    # reporting itself healthy. That is fail-open in the wrong direction — a
+    # missing config value must never silently downgrade real AI to simulation.
+    # Mock mode is now opt-in, for local development only.
+    use_mock_anthropic: bool = Field(default=False, alias="WORKER_USE_MOCK_ANTHROPIC")
+    use_mock_replicate: bool = Field(default=False, alias="WORKER_USE_MOCK_REPLICATE")
     
     # YouTube cookies (Netscape format) — paste content of cookies.txt exported
     # from a logged-in browser. Prevents bot detection on server IPs.
@@ -38,6 +46,82 @@ class WorkerConfig(BaseSettings):
 
     class Config:
         populate_by_name = True
+
+    def validate_runtime_credentials(self) -> None:
+        """
+        Fail fast at startup when a credential required by an ENABLED stage is
+        missing (LOCK L1.4 / L0.6).
+
+        Previously these keys were only checked at job runtime, so a worker with
+        no Groq key would boot cleanly, accept jobs, and fail every one of them
+        at stage 2 (transcription). The audit found exactly that state:
+        WORKER_GROQ_API_KEY absent, so no job could ever complete.
+
+        This mirrors the strictness already applied to supabase_url,
+        supabase_service_key and webhook_secret, which are required fields —
+        the pattern existed, it just was not applied to the API keys.
+        """
+        missing = []
+
+        # Transcription (stages/transcribe.py) always runs and always needs Groq.
+        if not self.groq_api_key:
+            missing.append(
+                "WORKER_GROQ_API_KEY — required by stages/transcribe.py; "
+                "without it no job can progress past transcription"
+            )
+
+        # Clip analysis (stages/analyze.py) needs Anthropic unless mocked.
+        if not self.use_mock_anthropic and not self.anthropic_api_key:
+            missing.append(
+                "WORKER_ANTHROPIC_API_KEY — required by stages/analyze.py "
+                "when WORKER_USE_MOCK_ANTHROPIC is false"
+            )
+
+        # NOTE: WORKER_REPLICATE_API_TOKEN is deliberately NOT fatal. The audit
+        # could not establish that any live worker stage calls Replicate (the
+        # video path goes through fal.ai), so refusing to boot without it would
+        # block startup on a credential that may not be needed. It is reported
+        # as a warning below instead. Promote it to fatal if a Replicate-backed
+        # stage is confirmed.
+
+        if missing:
+            raise RuntimeError(
+                "Worker refusing to start — missing required credentials:\n  - "
+                + "\n  - ".join(missing)
+                + "\n\nSet them in the environment, or explicitly enable mock mode "
+                  "for local development (WORKER_USE_MOCK_ANTHROPIC=true)."
+            )
+
+    def warn_on_degraded_config(self) -> list[str]:
+        """
+        Non-fatal warnings for configuration that does not stop the worker but
+        is known to cause a high failure rate in production.
+        """
+        warnings = []
+
+        # The audit found 10 of 15 lifetime jobs failed on YouTube bot
+        # detection, which this variable exists specifically to mitigate.
+        if not self.youtube_cookies:
+            warnings.append(
+                "WORKER_YOUTUBE_COOKIES is not set — YouTube ingestion will be "
+                "blocked by bot detection on datacenter IPs for most videos."
+            )
+
+        if self.use_mock_anthropic:
+            warnings.append(
+                "WORKER_USE_MOCK_ANTHROPIC is TRUE — clip analysis will return "
+                "FABRICATED scores and timestamps. Never enable this in production."
+            )
+
+        if not self.use_mock_replicate and not self.replicate_api_token:
+            warnings.append(
+                "WORKER_REPLICATE_API_TOKEN is not set — any Replicate-backed "
+                "stage will fail at runtime. Non-fatal: no live worker stage is "
+                "known to call Replicate."
+            )
+
+        return warnings
+
 
 # Singleton instance — imported by all other modules
 config = WorkerConfig()
