@@ -68,6 +68,7 @@ jobs:
           OAUTH_STATE_SECRET: ci-placeholder-oauth-signing-key-for-tests-only
 
       # LOCK L0.7 — the eight guard scripts that existed and never ran.
+      # Later locks append their own below; all of them are blocking.
       - name: check-env-security
         run: node scripts/check-env-security.cjs
       - name: check-status-literals
@@ -84,6 +85,13 @@ jobs:
         run: node scripts/check-e2e-env.cjs
       - name: check-production-ready
         run: node scripts/check-production-ready.cjs
+
+      # LOCK L5.15 — the first-run surface: what a brand-new account is shown,
+      # and whether the signup page tells it the truth about its credits.
+      - name: check-empty-states
+        run: node scripts/check-empty-states.cjs
+      - name: check-credit-grant
+        run: node scripts/check-credit-grant.cjs
 
   # ── Build ─────────────────────────────────────────────────────────────────
   build:
