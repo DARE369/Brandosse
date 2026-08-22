@@ -9,7 +9,7 @@ Fixed = defect corrected. Proven = an automated check shows it is correct now. G
 *Every serious finding in this codebase was working code that silently degraded — Groq failed 100% for days, trend data was fabricated for five months, 20 posts froze for four months. **None was detected.** A fix without a detector has a demonstrated half-life here.*
 
 **2. Code is the source of truth. Documentation is a claim.**
-Where a doc and the code disagree, **the doc is a bug** — fix or delete it. This repo has 107 docs in `docs/`, many contradicted by the code they describe. Do not trust them; verify against code. Do not add to them (see `engineering/03-documentation.md`).
+Where a doc and the code disagree, **the doc is a bug** — fix or delete it. This repo has **264 markdown files under `docs/`** (170 tracked). Measured 2026-08-22: 38 current-state docs still make claims the code contradicts — dead providers, deleted directories, `-latest` model IDs. Do not trust them; verify against code. Do not add to them (see `engineering/03-documentation.md`).
 
 **3. Nothing may silently no-op, show fabricated data, or lose user content.**
 All three were being violated when the audit ran.
@@ -17,7 +17,7 @@ All three were being violated when the audit ran.
 ## Non-negotiables
 
 - **Evidence or silence.** Every claim about what exists carries `file:line`. Cannot cite it → write `UNVERIFIED`. Never infer behaviour from a filename, route name, README, comment, type, or UI label. **A component that renders is not a feature that works** — trace to the handler, worker, DB write, or third-party call.
-- **Check the caller, not just the code.** This repo's dominant defect is *disconnection, not absence*: `OptimalTimesService.js` (466 lines, imported nowhere), `generate-caption` (correct, called by nothing), `week_plan` (generated, handler missing), `clip_selector.py` (292 lines, dead). Before writing something new, check whether it already exists unwired.
+- **Check the caller, not just the code.** This repo's dominant defect is *disconnection, not absence*. Still true today: `OptimalTimesService.js` — 466 lines, imported nowhere (verified 2026-08-22). Closed by the lockdown, and worth knowing because each was working code nobody could reach: `generate-caption` was correct and called by nothing (L4.3), `week_plan` was generated and thrown away (L2.4), `clip_selector.py` was 292 dead lines (L3.2, deleted). Before writing something new, check whether it already exists unwired.
 - **Migrations are the only way schema changes.** No SQL Editor edits. **Never `supabase db push` without a diff** — live schema is drifted (89 tables live vs 65 in migrations). Migrations must be idempotent, transactional, and assert their post-condition.
 - **RLS changes require the behavioural probe**, not policy reading: `node scripts/security/cross-tenant-probe.mjs`. Service-role reads bypass RLS and prove nothing.
 - **Fail closed.** Mock modes are opt-in and never default. Missing credentials refuse startup rather than failing at runtime.
