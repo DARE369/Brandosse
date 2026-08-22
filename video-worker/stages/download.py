@@ -32,8 +32,12 @@ YTDLP_BASE_OPTIONS = {
     'no_warnings': False,
     'extract_flat': False,
     'merge_output_format': 'mp4',
-    # Use iOS player client — bypasses YouTube's bot detection on server IPs
-    # without requiring cookies. Falls back to web if iOS is unavailable.
+    # NOTE: this used to say the iOS client "bypasses YouTube's bot detection on
+    # server IPs without requiring cookies". That stopped being true. Tested from
+    # the Fly host on 2026-08-22: ios, web AND android all returned "Sign in to
+    # confirm you're not a bot". The client list is still worth keeping — it
+    # costs nothing and helps on some sources — but it is NOT a substitute for
+    # WORKER_YOUTUBE_COOKIES, and believing it was is why cookies were never set.
     'extractor_args': {'youtube': {'player_client': ['ios', 'web']}},
 }
 
@@ -106,6 +110,20 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
 
     except yt_dlp.utils.DownloadError as e:
         error_str = str(e).lower()
+
+        # Bot detection first, because it MASQUERADES as other failures. On a
+        # datacenter IP YouTube returns a challenge instead of a format list,
+        # yt-dlp then reports "Requested format is not available", and the real
+        # cause never reaches the user. Verified on Fly 2026-08-22: every player
+        # client (ios, web, android) got "Sign in to confirm you're not a bot",
+        # while the job record said the format was wrong.
+        if 'not a bot' in error_str or 'sign in to confirm' in error_str or 'confirm you' in error_str:
+            raise DownloadError(
+                "YouTube blocked this download as automated traffic. The worker runs on a "
+                "datacenter IP, which YouTube challenges by default. Set WORKER_YOUTUBE_COOKIES "
+                "to a valid cookie export to authenticate these requests.",
+                job_id,
+            )
 
         if 'private video' in error_str:
             raise DownloadError("This video is private and cannot be accessed.", job_id)
@@ -180,6 +198,26 @@ def _download_with_ytdlp(url: str, output_path_template: str, job_id: str, cooki
             raise DownloadError("Download appeared to succeed but output file not found.", job_id)
 
     except yt_dlp.utils.DownloadError as e:
+        error_str = str(e).lower()
+        # Same classification as the metadata handler above. This is the path
+        # that actually fired on 2026-08-22 and reported "Requested format is not
+        # available" — a format selector failing because the challenge response
+        # carried no formats, which reads as a bug in our selector rather than a
+        # missing credential.
+        if 'not a bot' in error_str or 'sign in to confirm' in error_str or 'confirm you' in error_str:
+            raise DownloadError(
+                "YouTube blocked this download as automated traffic. The worker runs on a "
+                "datacenter IP, which YouTube challenges by default. Set WORKER_YOUTUBE_COOKIES "
+                "to a valid cookie export to authenticate these requests.",
+                job_id,
+            )
+        if 'requested format is not available' in error_str:
+            raise DownloadError(
+                "No usable video format was returned for this URL. This is usually YouTube "
+                "refusing an unauthenticated datacenter request rather than a genuine format "
+                "problem — check WORKER_YOUTUBE_COOKIES before investigating the selector.",
+                job_id,
+            )
         raise DownloadError(f"Download failed: {str(e)[:300]}", job_id)
 
 
