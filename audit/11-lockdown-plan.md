@@ -52,7 +52,7 @@ The standards every later wave is judged against. Done first so the rules exist 
 | **L-1.3** | [`engineering/03-documentation.md`](../engineering/03-documentation.md) — what to write, what to **delete** | ✅ |
 | **L-1.4** | [`engineering/04-production-readiness.md`](../engineering/04-production-readiness.md) — Definition of Done, Regression Register, release gate | ✅ |
 | **L-1.5** | `CLAUDE.md` updated so the standards load into **every session** | ✅ |
-| **L-1.6** | `docs/` triage — 107 files → keep-and-verify / rewrite / delete | ⬜ *runs during Wave 5* |
+| **L-1.6** | `docs/` triage — keep-and-verify / rewrite / delete | ⬜ **STILL OPEN.** Counted 2026-08-22: **264 markdown files under `docs/`** (94 top-level, 170 tracked) against the 107 the charter recorded. It grew. `check-docs-canonical.cjs` only asserts 9 canonical files exist — it does not test any doc against the code, so nothing here is verified |
 
 **Three design choices worth noting**, because they invert the usual advice:
 
@@ -69,11 +69,11 @@ The standards every later wave is judged against. Done first so the rules exist 
 | Lock | What | Proven by | Guarded by |
 |---|---|---|---|
 | **L0.1** ✅ | CI runs checks, not just a build | **Green on Ubuntu 2026-08-22** — first time the guards have ever executed outside Windows. Doing so immediately exposed that `npm ci` had been failing on `main` for months | `.github/workflows/ci.yml`, required on every PR |
-| **L0.2** | Cross-tenant test harness | Log in as user A, attempt B's rows across all 89 tables | Blocking CI job |
+| **L0.2** ✅ | Cross-tenant test harness | `cross-tenant-probe.mjs` — anon-key JWT across 18 tables, 0 foreign rows | Runs in the scheduled `live-invariants` job |
 | **L0.3** | Un-blind job monitoring | Delete the 3-name allowlist at `20260710110000_...sql:55` | `healthCheck` enumerates *all* `cron.job` rows; alerts on unknown/failing |
 | **L0.4** ✅ | Error tracking + alerting | **Two planted failures ingested, HTTP 200** — one via the Next.js path, one simulating `llm_provider_fallback` from the edge runtime | Next.js (server/client/edge/render) + all 51 Supabase Edge Functions via `_shared/sentry.ts`. **Python worker deferred to Wave 7** — it cannot boot today regardless |
-| **L0.5** | Secret scanning | A test commit containing a fake key fails CI | Pre-commit hook + CI job |
-| **L0.6** | Startup env validation | Worker and edge functions refuse to start with a missing required key | Extend the pattern already at `video-worker/config.py:14-15` |
+| **L0.5** ✅ | Secret scanning | `secret-scan.mjs` passes; structural placeholder test added after a prose false positive | CI job on every push |
+| **L0.6** ✅ | Startup env validation | `video-worker/config.py` raises on a missing required key; mock flags default False | `check-env-contract.cjs`, both directions | <!-- was: Extend the pattern already at `video-worker/config.py:14-15` |
 | **L0.7** ✅ | Wire the 8 existing guard scripts | All 8 pass; 4 had been failing for months against files deleted during the ui-v2 migration, and repointing `check-status-literals` immediately found two genuine violations | CI job on every PR |
 
 **Gate 0 — the lock is functional.** Deliberately break something (revoke a key, freeze a post, stage a fake secret) and confirm the machinery catches it **within one CI run or one alert cycle**. Until a planted failure is caught, Wave 0 is not done.
@@ -103,8 +103,8 @@ Everything here is a case where the product actively misinforms the user. **This
 
 | Lock | What | Proven by | Guarded by |
 |---|---|---|---|
-| **L2.1** 🟡 | Account badge derives from capability + `health_score`, not `connection_status` alone | Code done — `toAccountCard` now runs hard-blocked → degraded → state → unknown, with **no assume-healthy branch** | Migration `20260821220000` **awaiting apply** |
-| **L2.2** 🟡 | Surface accounts that cannot publish | `can_publish` / `publish_block_reason` computed **in the view**, so every consumer inherits it | Same migration — post-condition rejects any false positive |
+| **L2.1** ✅ | Account badge derives from capability + `health_score`, not `connection_status` alone | Code done — `toAccountCard` now runs hard-blocked → degraded → state → unknown, with **no assume-healthy branch** | Migration `20260821220000` **applied and verified 2026-08-22** — `can_publish` + `publish_block_reason` present in `connected_accounts_health_summary` |
+| **L2.2** ✅ | Surface accounts that cannot publish | `can_publish` / `publish_block_reason` computed **in the view**, so every consumer inherits it | Same migration — post-condition rejects any false positive |
 | **L2.3** ✅ | Reapers + backfill | **PASS** — 24 stranded rows recovered (20 posts / 4 clips); cron confirmed active | `scripts/security/stuck-records-probe.mjs` |
 | **L2.4** ✅ | The 4 no-op calendar AI actions | `week_plan`, `add_draft_post`, `delete_post` implemented; `suggest_slots` confirms honestly; unknown types now warn loudly | Unhandled type → visible error, never silence |
 | **L2.5** ✅ | Dead header search box | Rendered only when a real handler is supplied; default changed from a no-op to `null` so "unwired" is detectable | Guard in `UserNavbar.jsx` |
@@ -121,9 +121,9 @@ Fast, and it makes everything after it easier to reason about.
 
 | Lock | What | Size |
 |---|---|---|
-| **L3.1** | `src/app/**` + `src/api/**` — unroutable duplicate incl. a dead Stripe webhook | 17 files |
-| **L3.2** | `clip_selector.py`, `llm_client.py`, `transcript_parser.py`, `video_reframer.py` | ~800 lines |
-| **L3.3** | `src/legacy/supabase.js`; resolve the duplicate `Calendar` / `CalendarPage` directories | — |
+| **L3.1** ✅ | `src/app/**` + `src/api/**` — unroutable duplicate incl. a dead Stripe webhook | 17 files |
+| **L3.2** ✅ | `clip_selector.py`, `llm_client.py`, `transcript_parser.py`, `video_reframer.py` | ~800 lines |
+| **L3.3** ✅ | `src/legacy/supabase.js`; resolve the duplicate `Calendar` / `CalendarPage` directories | — |
 
 **Guarded by:** a CI check for unreferenced modules, so dead code cannot silently re-accumulate.
 
@@ -140,9 +140,9 @@ Fast, and it makes everything after it easier to reason about.
 | **L4.1** ⏭ | Set `WORKER_GROQ_API_KEY` | Deferred to **Wave 7** (Fly migration) — not set on Railway |
 | **L4.2** ⏭ | Set `WORKER_YOUTUBE_COOKIES` | Deferred to **Wave 7** |
 | **L4.3** ✅ | Reconnect `generate-caption` | Caption-only regeneration now routes to `SessionStore.generateCaption()`, which loads the brand kit and passes the 5 most recent captions as anti-repetition context. Title/hashtags stay on the metadata path |
-| **L4.4** 🟡 | Revisions to `content_versions` | `snapshotCurrentVersion()` added and wired before every caption overwrite (best-effort, never blocks the user). **Migration `20260822090000` awaiting apply** — owners had read but not INSERT |
+| **L4.4** ✅ | Revisions to `content_versions` | `snapshotCurrentVersion()` added and wired before every caption overwrite (best-effort, never blocks the user). **Migration `20260822090000` applied and verified 2026-08-22** — owner INSERT returns 201, another user's generation returns 403 |
 | **L4.5** ✅ | Render `health_score` / `last_failure_reason` | Done in Wave 2 (L2.1) |
-| **L4.6** 🟡 | Ghost-slot gate chain | Root cause found: `profiles.status` is NULL on the 2 oldest accounts (QA + **admin**), silently excluding them from every `status='active'` filter. **Migration `20260822100000` awaiting apply** |
+| **L4.6** ✅ | Ghost-slot gate chain | Root cause found: `profiles.status` is NULL on the 2 oldest accounts (QA + **admin**), silently excluding them from every `status='active'` filter. **Migration `20260822100000` applied and verified 2026-08-22** — 0 profiles with NULL status |
 | **L4.7** ✅ | Model pinning + fallback alerting | Default `claude-3-5-sonnet-latest` → `claude-sonnet-5` (same price, current generation); second stale default at `:325` also fixed; **provider fallback now logs `llm_provider_fallback` at error level** — the tripwire whose absence hid the Groq outage |
 
 **Guarded by:** L0.6 startup validation for the env vars; a test asserting `generate-caption` is on the live path; a test asserting a revision row is written per regenerate.
