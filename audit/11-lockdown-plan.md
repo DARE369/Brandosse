@@ -162,7 +162,7 @@ The largest wave. Everything here works but fails its D4 bar.
 | **L5.3** | Clipping: fix analysis truncation; platform export presets | M | DoC-2 |
 | **L5.4** | Text: instruction-based refinement replacing blind overwrite | M | DoC-3 |
 | **L5.5** | Bulk calendar operations | M | DoC-4 |
-| **L5.6** | Finish ui-v2 migration (5 routes) + delete legacy shell — fixes the unstyled billing page | **L** | DoC-9 |
+| **L5.6** ✅ | Finish ui-v2 migration | **L** | All 4 remaining pages migrated; **0 of 47 in-scope pages** now reference the legacy shell. Fixes the unstyled-nav defect on `billing/credits` and the three video routes. Introduced `ui-v2/shell/AppShell` because 9 pages hand-wrote the header block and 10 defined an identical ThemeToggleButton — copying it a fifth time would have deepened the duplication L5.7 had just fixed |
 | **L5.7** ✅ | Shared nav component | S | 9 pages each declared their own `NAV_ITEMS` and had drifted — 5 showed Analytics, 4 did not. Single definition in `ui-v2/shell/navItems.js`, plus the Videos entry that no page listed |
 | **L5.8** ⏸ | **Reprice video generation**; remove the silent 3× tier upgrade | M | **BLOCKED on OD-1** — repricing cannot be settled without the per-connected-account cost, which is ~3× the entire rest of the cost model |
 | **L5.9** ✅ | Timeouts on all provider calls | S | **28/28 bounded.** `zernio.service.ts` had 4 calls and 0 timeouts — the direct mechanism behind the frozen posts. Every value sits under the reaper threshold so a hung provider retries cleanly |
