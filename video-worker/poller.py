@@ -6,6 +6,7 @@ import asyncio
 from config import config
 from database import claim_next_job
 from job_runner import process_job
+from retention import maybe_sweep
 from logger import log
 
 # Tracks how many jobs are currently being processed
@@ -22,6 +23,11 @@ async def poll_loop() -> None:
     
     while True:
         try:
+            # Expire old clips (LOCK L7.4). Self-rate-limited to once an hour,
+            # and never raises — retention is a cost concern and must not be
+            # able to stop the pipeline that earns the money.
+            maybe_sweep()
+
             # Only poll if we have capacity for more jobs
             if len(_active_jobs) < config.max_concurrent_jobs:
                 job = claim_next_job()

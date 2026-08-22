@@ -218,7 +218,9 @@ async def run_analyze(job: dict, transcript: dict) -> list[dict]:
     # Delete any clip rows left over from a previous attempt on this job
     # (crash recovery resets status → queued without cleaning up old clips,
     # which would cause clip_count_mismatch and rendering the wrong rows).
-    delete_clips_for_job(job_id)
+    # user_id lets it remove the FILES too, not just the rows — a reprocessed
+    # job used to orphan its previous clips in storage forever (L7.4).
+    delete_clips_for_job(job_id, job.get("user_id") if isinstance(job, dict) else None)
 
     # Extract data from transcript
     full_text = transcript.get("full_text", "")

@@ -416,15 +416,31 @@ def download_from_supabase_storage(storage_path: str, local_path: str) -> tuple[
         return False, f"Storage download failed: {str(e)}"
 
 
-def delete_clips_for_job(job_id: str) -> int:
+def delete_clips_for_job(job_id: str, user_id: str | None = None) -> int:
     """
-    Delete all existing clip rows for a job before re-analyzing.
+    Delete all existing clip rows for a job before re-analyzing, AND the files
+    they point at.
 
-    Called at the start of run_analyze so that crash-recovered jobs
-    (status reset to queued by reset_stuck_jobs) don't accumulate duplicate
-    clip rows from previous attempts.  Returns the number of rows deleted.
+    Called at the start of run_analyze so that crash-recovered jobs (status
+    reset to queued by reset_stuck_jobs) don't accumulate duplicate clip rows
+    from previous attempts. Returns the number of rows deleted.
+
+    ── Why the file delete is here now ─────────────────────────────────────
+    This used to delete rows only. Every reprocessed job therefore orphaned its
+    previous clips in the video-clips bucket: storage that nothing referenced,
+    nothing could find, and nothing would ever remove. On a 1GB free-tier bucket
+    where one video's clips are 40-120MB, a few crash-recovery retries were
+    enough to matter (LOCK L7.4).
     """
     try:
+        if user_id:
+            # Import here rather than at module scope: retention imports
+            # database, and a top-level import would be circular.
+            from retention import purge_job_clips
+            removed = purge_job_clips(job_id, user_id)
+            if removed:
+                log.info("old_clip_files_deleted", job_id=job_id, files=removed)
+
         result = supabase.table("video_clips").delete().eq("job_id", job_id).execute()
         count = len(result.data) if result.data else 0
         if count > 0:
