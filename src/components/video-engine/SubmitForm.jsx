@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, Coins, Layers, Loader2, Send, Video, WifiOff } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Coins, FileVideo, Layers, Link2, Loader2, Send, Upload, Video, WifiOff } from "lucide-react";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useAuth } from "../../Context/AuthContext";
 import { VIDEO_ENGINE_CONSTANTS } from "../../lib/video-engine/constants";
@@ -7,12 +7,53 @@ import { useWorkerHealth } from "../../hooks/video-engine/useWorkerHealth";
 import { submitVideoJob } from "../../services/videoEngineApi";
 import { fetchUserJobs } from "../../services/videoEngineData";
 import ClipSettingsPanel from "./ClipSettingsPanel";
+import { supabase } from "../../services/supabaseClient";
 
 // Mirrors MAX_CONCURRENT_JOBS / activeStatuses in src/lib/video-engine/rate-limiter.ts
 // (the actual server-enforced limit) — kept in sync here only so the UI can
 // show real slot usage before submitting, not to duplicate the enforcement.
 const MAX_CONCURRENT_JOBS = 2;
 const ACTIVE_JOB_STATUSES = ["queued", "downloading", "transcribing", "analyzing", "rendering"];
+
+// ─── Upload source ───────────────────────────────────────────────────────────
+// The worker has always supported source_platform = 'upload'
+// (stages/download.py:203) and app/api/video/submit accepts it, but no UI could
+// ever create such a job and the bucket it reads from did not exist. This is
+// that missing third of the feature.
+//
+// It matters more than convenience: uploading is the ONLY ingestion path that
+// does not depend on YouTube tolerating a datacenter IP. Link ingestion is kept,
+// and kept honest about being the less reliable of the two.
+const SOURCE_BUCKET = "video-source-cache";
+
+// Enforced by the bucket itself (supabase/migrations/20260822210000). Stated up
+// front rather than discovered at the end of a failed upload — this is the
+// project's plan ceiling, not a preference.
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+const ACCEPTED_VIDEO_TYPES = [
+  "video/mp4", "video/quicktime", "video/x-matroska",
+  "video/webm", "video/x-msvideo", "video/mpeg",
+];
+
+function formatBytes(bytes) {
+  if (!bytes) return "0 MB";
+  return `${(bytes / 1048576).toFixed(bytes < 10485760 ? 1 : 0)} MB`;
+}
+
+/** Reject before uploading, so a doomed file never costs the user the wait. */
+function validateFile(file) {
+  if (!file) return "Choose a video file.";
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return `That file is ${formatBytes(file.size)}. The limit is ${formatBytes(MAX_UPLOAD_BYTES)} — `
+      + "compress it, trim it, or paste a link instead.";
+  }
+  if (file.size === 0) return "That file is empty.";
+  if (file.type && !ACCEPTED_VIDEO_TYPES.includes(file.type)) {
+    return `${file.type || "That file type"} is not a supported video format. Use MP4, MOV, MKV, WebM or AVI.`;
+  }
+  return "";
+}
 
 function getUrlParam() {
   try {
@@ -109,6 +150,13 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
   const [activeJobsCount, setActiveJobsCount] = useState(0);
   const debounceRef = useRef(null);
 
+  // "upload" is the default because it is the path that actually works — it
+  // needs nothing from YouTube. See SOURCE_BUCKET above.
+  const [sourceMode, setSourceMode] = useState("upload");
+  const [file, setFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
   const [prefs, dispatchPrefs] = useReducer(prefsReducer, initialPrefs);
 
   useEffect(() => {
@@ -128,7 +176,49 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
 
   const detected = useMemo(() => detectPlatform(debouncedUrl), [debouncedUrl]);
   const hasEnoughCredits = initialCredits >= VIDEO_ENGINE_CONSTANTS.MIN_CREDITS_REQUIRED;
-  const canSubmit = !isSubmitting && !slotsFull && hasEnoughCredits && ["youtube", "twitter"].includes(detected);
+  const linkReady = ["youtube", "twitter"].includes(detected);
+  const fileReady = Boolean(file) && !validateFile(file);
+  const canSubmit = !isSubmitting && !isUploading && !slotsFull && hasEnoughCredits
+    && (sourceMode === "upload" ? fileReady : linkReady);
+
+  function handleFileChange(event) {
+    const chosen = event.target.files?.[0] || null;
+    setFile(chosen);
+    // Validate immediately so the problem is visible while the file picker is
+    // still fresh in mind, not after pressing submit.
+    setError(chosen ? validateFile(chosen) : "");
+  }
+
+  /**
+   * Put the file in the user's own folder and hand the worker the path.
+   *
+   * The path shape is load-bearing: the storage policies scope every operation
+   * to (storage.foldername(name))[1] = auth.uid(), so `{user_id}/{uuid}.{ext}`
+   * is what makes one user unable to read another's unpublished source video.
+   */
+  async function uploadSource(chosen) {
+    const ext = (chosen.name.split(".").pop() || "mp4").toLowerCase().slice(0, 5);
+    const objectPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(SOURCE_BUCKET)
+      .upload(objectPath, chosen, {
+        contentType: chosen.type || "video/mp4",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      // The bucket enforces the size limit too; say which failure this was.
+      if (/exceeded|too large|413/i.test(uploadError.message || "")) {
+        throw new Error(
+          `Upload rejected: the file is larger than the ${formatBytes(MAX_UPLOAD_BYTES)} limit.`,
+        );
+      }
+      throw new Error(`Upload failed: ${uploadError.message || "unknown error"}`);
+    }
+
+    return objectPath;
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -138,9 +228,26 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
     setIsSubmitting(true);
 
     try {
+      let sourceUrl = url.trim();
+      let sourcePlatform = detected;
+
+      if (sourceMode === "upload") {
+        const problem = validateFile(file);
+        if (problem) throw new Error(problem);
+        setIsUploading(true);
+        try {
+          // The job stores the storage PATH, not a public URL — the bucket is
+          // private and the worker reads it with the service role.
+          sourceUrl = await uploadSource(file);
+          sourcePlatform = "upload";
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
       const payload = {
-        url:      url.trim(),
-        platform: detected,
+        url:      sourceUrl,
+        platform: sourcePlatform,
         // Only send non-default preferences so the API applies DB defaults
         ...(prefs.aspectRatio  !== "9:16"    && { aspect_ratio:       prefs.aspectRatio }),
         ...(prefs.captionStyle !== "karaoke"  && { caption_style:      prefs.captionStyle }),
@@ -174,7 +281,7 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
           </button>
           <p className="ve-kicker">Video engine</p>
           <h1 id="ve-submit-title">Process a video</h1>
-          <p>Paste a YouTube or Twitter/X URL and turn the strongest moments into ready-to-post clips.</p>
+          <p>Upload a video, or paste a link, and turn its strongest moments into ready-to-post clips.</p>
         </div>
 
         <div className="ve-icon-shell" aria-hidden="true">
@@ -183,20 +290,73 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
       </div>
 
       <form className="ve-submit-card" onSubmit={handleSubmit} noValidate>
-        <label className="ve-field" htmlFor="ve-url-input">
-          <span>Video URL</span>
-          <input
-            id="ve-url-input"
-            type="url"
-            value={url}
-            onChange={(event) => { setUrl(event.target.value); setError(""); }}
-            placeholder="https://www.youtube.com/watch?v=..."
-            autoFocus
-            autoComplete="off"
-            aria-describedby="ve-url-hint"
-            aria-invalid={detected === "unknown" ? "true" : "false"}
-          />
-        </label>
+        <div className="ve-source-modes" role="tablist" aria-label="Where the video comes from">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={sourceMode === "upload"}
+            className={`ve-source-mode ${sourceMode === "upload" ? "is-active" : ""}`}
+            onClick={() => { setSourceMode("upload"); setError(""); }}
+          >
+            <Upload size={16} aria-hidden="true" />
+            <span>Upload a file</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={sourceMode === "link"}
+            className={`ve-source-mode ${sourceMode === "link" ? "is-active" : ""}`}
+            onClick={() => { setSourceMode("link"); setError(""); }}
+          >
+            <Link2 size={16} aria-hidden="true" />
+            <span>Paste a link</span>
+          </button>
+        </div>
+
+        {sourceMode === "upload" ? (
+          <label className="ve-field ve-field-file" htmlFor="ve-file-input">
+            <span>Video file</span>
+            <input
+              id="ve-file-input"
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_VIDEO_TYPES.join(",")}
+              onChange={handleFileChange}
+              aria-describedby="ve-url-hint"
+            />
+            {file ? (
+              <span className="ve-file-chosen">
+                <FileVideo size={15} aria-hidden="true" />
+                {file.name} — {formatBytes(file.size)}
+              </span>
+            ) : (
+              <span className="ve-field-hint">
+                MP4, MOV, MKV, WebM or AVI, up to {formatBytes(MAX_UPLOAD_BYTES)}.
+              </span>
+            )}
+          </label>
+        ) : (
+          <label className="ve-field" htmlFor="ve-url-input">
+            <span>Video URL</span>
+            <input
+              id="ve-url-input"
+              type="url"
+              value={url}
+              onChange={(event) => { setUrl(event.target.value); setError(""); }}
+              placeholder="https://www.youtube.com/watch?v=..."
+              autoComplete="off"
+              aria-describedby="ve-url-hint"
+              aria-invalid={detected === "unknown" ? "true" : "false"}
+            />
+            {/* Said before they submit, not after it fails. YouTube blocks
+                datacenter IPs and the block moves; uploading does not depend on
+                anyone's tolerance. */}
+            <span className="ve-field-hint">
+              Links can fail — YouTube blocks automated downloads from servers, and when it
+              does there is nothing this app can do about it. Uploading the file always works.
+            </span>
+          </label>
+        )}
 
         <div className="ve-submit-meta" id="ve-url-hint">
           <div className="ve-meta-row">
@@ -242,7 +402,7 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
           </div>
         ) : null}
 
-        {detected ? (
+        {sourceMode === "link" && detected ? (
           <div
             className={`ve-inline-status ve-inline-${platformCopy[detected].tone}`}
             aria-live="polite"
@@ -274,7 +434,7 @@ export default function SubmitForm({ initialCredits = 0, creditError = "" }) {
 
         <button className="ve-primary-btn" type="submit" disabled={!canSubmit}>
           {isSubmitting ? <Loader2 size={17} className="ve-spin" aria-hidden="true" /> : <Send size={17} aria-hidden="true" />}
-          <span>{isSubmitting ? "Starting job…" : "Process video"}</span>
+          <span>{isUploading ? "Uploading…" : isSubmitting ? "Starting job…" : "Process video"}</span>
           {!isSubmitting ? <ArrowRight size={16} aria-hidden="true" /> : null}
         </button>
       </form>
