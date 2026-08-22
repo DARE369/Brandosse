@@ -99,6 +99,11 @@ jobs:
       - name: check-doc-citations
         run: node scripts/check-doc-citations.cjs
 
+      # LOCK L7.1 — the repo must describe exactly one host. Two deploy
+      # configs is how a service runs in two places and is debugged in a third.
+      - name: check-single-deploy-target
+        run: node scripts/check-single-deploy-target.cjs
+
       # LOCK L6.3 — every variable the code reads, across web/edge/worker, must
       # be written down in .env.example. Three were not, and all three were
       # already set in production — so nothing was broken, and nobody setting up

@@ -26,15 +26,20 @@ jobs:
             exit 1
           fi
 
-      - name: Check Railway (video worker)
+      # Named for the job it does, not the vendor doing it (L7.1). The previous
+      # name was RAILWAY_WORKER_URL, which would have gone on reporting green
+      # against a decommissioned host after the Fly migration — or, worse,
+      # against a Railway box still running while Fly served real traffic.
+      - name: Check video worker
         run: |
-          if [ -z "${{ secrets.RAILWAY_WORKER_URL }}" ]; then
-            echo "::error::RAILWAY_WORKER_URL secret is not set on this repo (Settings → Secrets and variables → Actions)"
+          if [ -z "${{ secrets.WORKER_HEALTH_URL }}" ]; then
+            echo "::error::WORKER_HEALTH_URL secret is not set (Settings → Secrets and variables → Actions)."
+            echo "::error::Set it to the worker's base URL, e.g. https://brandosse-video-worker.fly.dev"
             exit 1
           fi
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RAILWAY_WORKER_URL }}/health")
-          echo "Railway /health → $STATUS"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "${{ secrets.WORKER_HEALTH_URL }}/health")
+          echo "worker /health → $STATUS"
           if [ "$STATUS" != "200" ]; then
-            echo "::error::Railway worker returned $STATUS — expected 200"
+            echo "::error::Video worker returned $STATUS — expected 200"
             exit 1
           fi

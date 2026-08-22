@@ -1,0 +1,83 @@
+# video-worker/fly.toml — LOCK L7.1
+#
+# Replaces railway.toml, deleted in the same change. The repo describes exactly
+# one host; two deploy configs is how a service ends up running in two places
+# and being debugged in a third.
+#
+# Deploy:  flyctl deploy --config video-worker/fly.toml --dockerfile video-worker/Dockerfile
+#
+# ── Why the sizing is what it is ────────────────────────────────────────────
+# This is not a web service that happens to be slow. Every job downloads a
+# source video, extracts audio, transcribes it, then renders vertical clips with
+# burned-in captions — ffmpeg and OpenCV, CPU-bound, on files that can be
+# gigabytes. DoC-2's bar (L7.5) is "a 60-minute source renders without OOM or
+# disk-full", and the defaults would not have met it:
+#
+#   cpu      shared-cpu-4x. ffmpeg saturates whatever it is given; rendering is
+#            the slowest stage and the one users wait on.
+#   memory   4GB. OpenCV holds frames in memory, and WORKER_MAX_CONCURRENT_JOBS
+#            defaults to 2 — so budget for two renders at once, not one.
+#   volume   A 60-minute source plus extracted audio plus rendered clips does
+#            not fit in a machine's rootfs. WORKER_TEMP_DIR points at a real
+#            volume so a long video fails on its own merits, not on disk.
+#
+# ── Why it never scales to zero ─────────────────────────────────────────────
+# The worker is not only an HTTP service. It runs a polling loop that picks up
+# queued jobs and a reaper for stuck ones. Suspending it when no HTTP request is
+# in flight would stop both, and queued jobs would sit until something happened
+# to wake it — which is precisely the "20 posts frozen for four months" failure
+# this lockdown exists to prevent. min_machines_running = 1, deliberately.
+
+app = "brandosse-video-worker"
+primary_region = "cdg"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Fly injects PORT; main.py:190 reads it and falls back to WORKER_PORT.
+  WORKER_PORT = "8001"
+  # Points at the mounted volume below rather than the machine's rootfs.
+  WORKER_TEMP_DIR = "/data/video-engine"
+  WORKER_LOG_LEVEL = "INFO"
+  # Two at a time is what the memory budget above is sized for. Raising this
+  # without raising memory is how you get an OOM under load rather than a queue.
+  WORKER_MAX_CONCURRENT_JOBS = "2"
+
+[http_service]
+  internal_port = 8001
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  # See "Why it never scales to zero" above. This is load-bearing.
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    # The HTTP surface is a webhook and a health check. Real work happens in the
+    # polling loop, so request concurrency is not the thing to tune.
+    soft_limit = 20
+    hard_limit = 40
+
+# Fly's own check, independent of the app's polling loop, so a wedged worker is
+# visible as unhealthy rather than merely quiet.
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "60s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-4x"
+  memory = "4gb"
+
+# Scratch space for downloads, extracted audio and rendered clips. Nothing here
+# is durable state — the job record lives in Postgres and finished clips are
+# uploaded to Supabase Storage — but it must be big enough for the largest
+# source the product accepts.
+[[mounts]]
+  source = "video_worker_data"
+  destination = "/data"
+  initial_size = "50gb"
