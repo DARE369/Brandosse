@@ -93,6 +93,13 @@ jobs:
       - name: check-credit-grant
         run: node scripts/check-credit-grant.cjs
 
+      # LOCK L6.3 — every variable the code reads, across web/edge/worker, must
+      # be written down in .env.example. Three were not, and all three were
+      # already set in production — so nothing was broken, and nobody setting up
+      # a fresh environment could have known to set them.
+      - name: check-env-contract
+        run: node scripts/check-env-contract.cjs
+
   # ── Build ─────────────────────────────────────────────────────────────────
   build:
     name: Build check
@@ -161,6 +168,21 @@ jobs:
       # read nothing it does not own, and cannot promote itself.
       - name: Cross-tenant isolation
         run: node scripts/security/cross-tenant-probe.mjs
+
+      # LOCK L6.4 — the other half of tenant isolation. The read probe above
+      # proves nobody can SEE another account; this proves nobody can CHANGE
+      # one. Separate RLS policies, separate verdicts. It registers two
+      # throwaway accounts and attacks one from the other, so a leak damages
+      # nothing real, and deletes both afterwards.
+      - name: Cross-tenant writes
+        run: node scripts/security/cross-tenant-write-probe.mjs
+
+      # LOCK L6.3 — which edge functions answer without a JWT. There was no
+      # config.toml at all, so the setting was whatever the CLI defaulted to on
+      # the day each was deployed. Fails both ways: an unlisted function that
+      # answers is an exposure, a listed one that refuses is a dead integration.
+      - name: Edge function auth
+        run: node scripts/security/edge-auth-probe.mjs
 
       # LOCK L2.3 — no record may sit in a non-terminal state past its timeout.
       # 20 posts were frozen for up to 139 days before the reaper existed.
