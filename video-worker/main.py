@@ -13,7 +13,7 @@ from config import config
 from database import reset_stuck_jobs
 from poller import poll_loop, trigger_poll
 from uploads import (
-    MAX_UPLOAD_BYTES, assert_disk_headroom, local_path_for,
+    assert_disk_headroom, local_path_for, max_upload_bytes,
     reap_orphaned_uploads, verify_ticket,
 )
 from logger import log
@@ -182,11 +182,12 @@ async def upload_source(
 
     verify_ticket(x_upload_user, x_upload_id, expires_at, x_upload_signature)
 
+    limit = max_upload_bytes()
     declared = int(request.headers.get("content-length") or 0)
-    if declared > MAX_UPLOAD_BYTES:
+    if declared > limit:
         raise HTTPException(
             status_code=413,
-            detail=f"File is larger than the {MAX_UPLOAD_BYTES // (1024**3)}GB limit.",
+            detail=f"File is larger than the {limit / 1e9:.1f}GB limit for this worker.",
         )
     assert_disk_headroom(declared or 0)
 
@@ -200,7 +201,7 @@ async def upload_source(
                 # Content-Length is a claim by the client. Enforce the real
                 # limit against what actually arrives, or a lying header walks
                 # straight past the check above.
-                if written > MAX_UPLOAD_BYTES:
+                if written > limit:
                     raise HTTPException(status_code=413, detail="Upload exceeded the size limit.")
                 handle.write(chunk)
     except HTTPException:
