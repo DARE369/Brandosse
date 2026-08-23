@@ -6,6 +6,7 @@
 import asyncio
 import math
 import os
+import re
 
 import yt_dlp
 
@@ -66,13 +67,68 @@ def calculate_credits(duration_secs: int) -> int:
     return max(minutes * CREDITS_PER_MINUTE, MIN_CREDITS_REQUIRED)
 
 
+def _repair_cookie_newlines(raw: str) -> str:
+    """
+    Netscape cookie files are newline-delimited, but the Fly secrets dashboard
+    (and many secret UIs) strip newlines out of a pasted multi-line value — the
+    whole file arrives as ONE line with the tabs intact. The Netscape parser
+    then sees a single malformed line and loads zero cookies, and YouTube says
+    "sign in" exactly as if no cookies were set at all. Measured 2026-08-23: a
+    correctly-exported 24-row cookie file pasted into the Fly dashboard arrived
+    as 1 line / 144 tabs, and the pipeline failed with a message telling the
+    user to set the variable they had just set.
+
+    Every data row has the shape:
+        domain \t flag \t path \t flag \t expiry \t name \t value
+    optionally prefixed with '#HttpOnly_' on the domain. Values never contain
+    tabs (the format forbids it), so "domain TAB TRUE|FALSE TAB" is reliably a
+    row start and never occurs inside a value. If the input already has real
+    newlines this is a no-op; otherwise the rows are rebuilt, so a mangled
+    paste self-heals instead of silently downgrading to guest access.
+    """
+    if raw.count("\n") > 3:
+        return raw  # already multi-line, nothing to fix
+
+    # Sometimes newlines survive as the literal two-character sequence \n.
+    unescaped = raw.replace("\\n", "\n").replace("\\t", "\t")
+    if unescaped.count("\n") > 3:
+        return unescaped
+
+    # Newlines were deleted outright: rebuild the rows.
+    body = raw.replace("# Netscape HTTP Cookie File", "")
+    body = re.sub(r"#\s*https?://\S+", "", body)
+    rebuilt = re.sub(
+        r"(#HttpOnly_)?(\.?[A-Za-z0-9.-]+)\t(TRUE|FALSE)\t",
+        lambda m: "\n" + (m.group(1) or "") + m.group(2) + "\t" + m.group(3) + "\t",
+        body,
+    ).strip()
+    rows = [ln for ln in rebuilt.splitlines() if ln.strip() and "\t" in ln]
+    return "# Netscape HTTP Cookie File\n" + "\n".join(rows) + "\n"
+
+
 def _write_cookies_file(temp_dir: str) -> str | None:
-    """Write WORKER_YOUTUBE_COOKIES env var to a temp file for yt-dlp."""
+    """Write WORKER_YOUTUBE_COOKIES to a temp file for yt-dlp, repairing a
+    newline-stripped paste first (see _repair_cookie_newlines)."""
     if not config.youtube_cookies:
         return None
+    content = _repair_cookie_newlines(config.youtube_cookies)
+
+    rows = [ln for ln in content.splitlines() if "\t" in ln and not ln.startswith("#")]
+    if not rows:
+        # Refuse loudly rather than hand yt-dlp a file it will parse to zero
+        # cookies — that failure reads as "sign in required" and points the
+        # user everywhere except at the actual export.
+        log.warning(
+            "youtube_cookies_unparseable",
+            message="WORKER_YOUTUBE_COOKIES contains no valid cookie rows even "
+                    "after repair — the export is malformed. Proceeding as guest.",
+        )
+        return None
+    log.info("youtube_cookies_loaded", rows=len(rows))
+
     cookies_path = os.path.join(temp_dir, "yt_cookies.txt")
     with open(cookies_path, "w") as f:
-        f.write(config.youtube_cookies)
+        f.write(content)
     return cookies_path
 
 

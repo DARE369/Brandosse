@@ -54,24 +54,36 @@ handled in the worker image:
    player client (web, tv, mweb, web_embedded, android). Per-video enforcement
    varies.
 
-### The one action outstanding (user)
+### Cookies — WORKING since 2026-08-23 evening
 
-`WORKER_YOUTUBE_COOKIES` currently holds cookies that YouTube has **rotated
-dead** ("The provided YouTube account cookies are no longer valid"). They were
-exported from a browser session that stayed open — YouTube rotates such
-cookies within hours, by design.
+Fresh burner-account cookies were exported correctly ("Get cookies.txt
+LOCALLY" on a logged-in youtube.com tab, window closed immediately) and set on
+Fly. **All previously bot-blocked test videos now extract: 3/3**, including
+the ones that failed on every player client that morning.
 
-**Correct procedure:** log into a **burner** Google account in a
-private/incognito window → export cookies (Get cookies.txt extension) →
-**close the window immediately** and never reuse that session → set the export
-as the `WORKER_YOUTUBE_COOKIES` secret on Fly. Valid cookies + PO tokens + the
-EJS solver is the standard working combination on datacenter IPs.
+Two export traps got fixed in code so cookie refreshes stay easy:
+
+1. **HttpOnly cookies missing** — some exporter extensions cannot read the
+   protected login cookies (`LOGIN_INFO`, `__Secure-1PSID`, `__Secure-3PSID`),
+   producing a file that looks valid but authenticates nothing. Use
+   "Get cookies.txt LOCALLY" specifically.
+2. **The Fly dashboard strips newlines from pasted secrets** — a correct
+   24-row export arrived as one line and parsed to zero cookies. The worker
+   now self-heals this (`video-worker/stages/download.py:70`
+   `_repair_cookie_newlines`, unit-tested four ways) and logs
+   `youtube_cookies_loaded` with the row count, or warns loudly when the
+   export is genuinely unparseable instead of silently going guest.
+
+**Cookie refresh procedure (when they eventually expire):** burner account →
+private window → youtube.com logged in → export → close window immediately →
+paste into the Fly secret → `fly secrets deploy` (setting a secret while the
+machine sleeps leaves it *Staged*, not deployed).
 
 ### Escalation tiers if cookies prove insufficient
 
 | tier | cost | note |
 |---|---|---|
-| Valid burner cookies (above) | free | expected to unblock most videos |
+| Valid burner cookies (above) | free | ✅ **confirmed working 2026-08-23** |
 | Rotate Fly machine → new IP | free | new IP starts unflagged; degrades with use |
 | Residential/mobile proxy | ~$1–8/GB | conflicts with the $5/mo ceiling — **founder decision** |
 | Transcript-first architecture | rebuild | different product shape; horizon item |
