@@ -7,6 +7,7 @@ import asyncio
 import math
 import os
 import re
+import time
 
 import yt_dlp
 
@@ -24,7 +25,18 @@ MIN_CREDITS_REQUIRED = 5
 YTDLP_BASE_OPTIONS = {
     # iOS player serves combined mp4 streams — don't restrict by ext so the
     # selector works across both iOS and web player clients.
-    'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+    # Degrade, never fail. Each '/' is a fallback tried in order: preferred
+    # 1080p merge, then a combined 1080p stream, then ANY video+audio merge
+    # regardless of height, then any single stream at all. Only a source with
+    # literally no usable format reaches the end — and that is a real failure
+    # worth reporting, unlike "no format matched my height filter", which is
+    # our constraint failing rather than the video being unavailable.
+    'format': (
+        'bestvideo[height<=1080]+bestaudio'
+        '/best[height<=1080]'
+        '/bestvideo*+bestaudio'
+        '/best'
+    ),
     'no_playlist': True,
     # Resilience for large sources. A 20-minute video failed mid-transfer with
     # "The read operation timed out. Giving up after 3 retries" (2026-08-23),
@@ -76,6 +88,14 @@ YTDLP_BASE_OPTIONS = {
         'youtubepot-bgutilscript': {'script_path': ['/opt/bgutil/server/build/generate_once.js']},
     },
 }
+
+
+# Pauses before re-walking the whole ladder. YouTube's format poisoning is
+# TRANSIENT and applied per request: the same source failed and then returned
+# 304 usable formats minutes later with unchanged code. When every client is
+# poisoned at once, no client choice helps and only waiting does. Costs at most
+# ~35s on a job that would otherwise fail outright; the first pass has no pause.
+YOUTUBE_RETRY_PAUSES = [0, 12, 25]
 
 
 # Fallback ladder. YouTube's SABR enforcement is applied PER REQUEST, not per
@@ -207,43 +227,97 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
     if cookies_path:
         opts['cookiefile'] = cookies_path
 
-    # Walk the ladder on "came back with nothing usable" errors. The last rung
-    # re-raises so the classifier below still produces a real user-facing
-    # message rather than a generic retry failure.
+    # ── Never let FORMAT selection decide whether METADATA succeeds ──────────
+    #
+    # This is the structural fix for a failure that recurred all day and
+    # survived four separate patches (PO tokens, cookies, the tv client, a
+    # client fallback ladder). Every one of those changed WHICH CLIENT we
+    # asked; none could help, because the failure was in what we asked FOR.
+    #
+    # This stage needs a title and a duration. Both come from the video page,
+    # and neither depends on a downloadable media format existing. But these
+    # opts inherited the DOWNLOAD selector — bestvideo[height<=1080]+bestaudio
+    # /... — and yt-dlp applies it during extract_info. So any moment YouTube
+    # returned formats that did not match (SABR streams carrying no URL,
+    # formats with no height metadata, an audio-only response), the job died at
+    # PREFLIGHT with "Requested format is not available" — on a video that had
+    # downloaded fine twenty minutes earlier.
+    #
+    # Proven 2026-08-23 by forcing the condition with an unmatchable selector:
+    # metadata failed on ALL FOUR ladder rungs, because every rung carried the
+    # same selector, and succeeded immediately once the selector was dropped.
+    # A fallback that varies the client cannot rescue a constraint that does
+    # not vary. Format availability is now the DOWNLOAD stage's problem alone,
+    # which is the only stage that actually needs a format.
+    opts.pop('format', None)
+    opts['ignore_no_formats_error'] = True
+
+    # Walk the ladder on "came back with nothing usable" errors, then walk it
+    # again after a pause. YouTube's poisoning is TRANSIENT, not per-video:
+    # this exact source failed at 09:10 and returned 304 usable formats a few
+    # minutes later, unchanged code. Switching clients cannot help when every
+    # client is poisoned in the same instant — only waiting can. Two passes
+    # cost at most ~35s on a job that would otherwise have failed outright.
     last_error = None
-    for rung, clients in enumerate(CLIENT_LADDER):
-        try:
-            probe = _opts_with_clients(opts, clients)
-            with yt_dlp.YoutubeDL(probe) as ydl:
-                info = ydl.extract_info(url, download=False)
-            if info and info.get('duration') is not None:
-                log.info(
-                    "preflight_success",
-                    title=info.get('title', 'Untitled Video'),
-                    duration_secs=int(info['duration']),
-                    clients='+'.join(clients),
+    non_retryable = False
+    for attempt, pause in enumerate(YOUTUBE_RETRY_PAUSES):
+        if pause:
+            log.info("youtube_transient_retry", waiting_secs=pause, attempt=attempt)
+            time.sleep(pause)
+
+        for rung, clients in enumerate(CLIENT_LADDER):
+            try:
+                probe = _opts_with_clients(opts, clients)
+                # process=False skips format selection ENTIRELY. Popping
+                # 'format' is not enough: yt-dlp then applies its OWN default
+                # selector and can still raise "Requested format is not
+                # available". Title and duration come from the page, so this
+                # stage never needs a format to exist at all.
+                with yt_dlp.YoutubeDL(probe) as ydl:
+                    info = ydl.extract_info(url, download=False, process=False)
+
+                if info and info.get('duration') is not None:
+                    log.info(
+                        "preflight_success",
+                        title=info.get('title', 'Untitled Video'),
+                        duration_secs=int(info['duration']),
+                        clients='+'.join(clients),
+                        rung=rung,
+                        attempt=attempt,
+                    )
+                    return {
+                        "title": info.get('title', 'Untitled Video'),
+                        "duration_secs": int(info['duration']),
+                    }
+            except Exception as e:  # noqa: BLE001 - classified by the handler below
+                last_error = e
+                if not _is_retryable_format_error(str(e)):
+                    # Private, deleted, geo-blocked: neither another client nor
+                    # another minute changes the answer. Stop both loops and let
+                    # the classifier below turn it into a real message.
+                    non_retryable = True
+                    break
+                log.warning(
+                    "metadata_client_rung_failed",
                     rung=rung,
+                    clients='+'.join(clients),
+                    attempt=attempt,
+                    error=str(e)[:100],
                 )
-                return {
-                    "title": info.get('title', 'Untitled Video'),
-                    "duration_secs": int(info['duration']),
-                }
-        except Exception as e:  # noqa: BLE001 - classified below
-            last_error = e
-            if not _is_retryable_format_error(str(e)):
-                break
-            log.warning(
-                "metadata_client_rung_failed",
-                rung=rung,
-                clients='+'.join(clients),
-                error=str(e)[:100],
-            )
+
+        if non_retryable:
+            break
 
     # Every rung exhausted (or a non-retryable error): fall through to the
     # original path so the error classifier produces the right message.
     try:
+        if last_error is not None:
+            # Re-raise into the classifier rather than making another network
+            # call that will fail the same way and cost another round trip.
+            raise last_error
+
         with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            info = ydl.extract_info(url, download=False, process=False)
 
             if info is None:
                 raise DownloadError(

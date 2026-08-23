@@ -136,6 +136,54 @@ Cost of the win: 1080p sources are several times larger, so downloads and
 renders take longer on a 1-vCPU machine. That strengthens the case for a bigger
 machine (see [SCALING.md](SCALING.md)) rather than weakening the quality gain.
 
+## The recurring "format is not available" failure — root cause (2026-08-23)
+
+This failure recurred all day and survived four patches: PO tokens, fresh
+cookies, the `tv` client, and a four-rung client fallback ladder. Every one of
+those changed WHICH CLIENT was asked. None could work, because the failure was
+in what was asked FOR.
+
+`_get_video_metadata` inherited the DOWNLOAD format selector from
+`YTDLP_BASE_OPTIONS`, and yt-dlp applies that selector inside `extract_info`.
+So the preflight stage — which only needs a title and a duration, both of which
+come from the video page — could be failed by the absence of a matching
+downloadable format. Any moment YouTube returned SABR streams without URLs, or
+formats without height metadata, a perfectly downloadable video died at
+preflight.
+
+Proven by forcing the condition with a selector that can never match:
+
+    metadata, format selector applied   FAIL on all 4 ladder rungs
+    metadata, selector dropped          OK, title + duration returned
+
+A fallback that varies the client cannot rescue a constraint that does not
+vary. That is why four patches in a row appeared to work and then failed again.
+
+**The fix has three parts, because the problem had two halves.**
+
+*Half one — a constraint that never should have applied.* The metadata probe now
+extracts with `process=False`, which skips format selection entirely. Dropping
+the `format` key alone was NOT enough: yt-dlp then applies its own default
+selector and can still raise the same error. Title and duration come from the
+page, so this stage now cannot be failed by format availability at all. The
+download stage's selector separately degrades through four fallbacks to a bare
+`best`, so a height filter can never fail a source that has *something* usable.
+
+*Half two — the failure is transient, so waiting is the only cure.* The same
+source failed and then returned 304 usable formats minutes later on unchanged
+code. When every client is poisoned in the same instant, switching clients
+cannot help. The ladder is now walked up to three times with pauses
+(`YOUTUBE_RETRY_PAUSES = [0, 12, 25]`), costing at most ~35s on a job that
+previously failed outright. Errors that will never change — private, deleted,
+geo-blocked — still stop on the FIRST attempt with the correct message rather
+than burning the retries.
+
+Both proven by fault injection on the live worker: a first pass poisoned on all
+four rungs recovered on retry; a private video stopped after one call.
+
+**Guarded:** `scripts/check-metadata-format-decoupling.cjs`, in CI, verified by
+deliberately restoring the coupling and by removing the `/best` fallback.
+
 ## Long renders vs. scale-to-zero (fixed 2026-08-23)
 
 Fly's proxy stops this machine after a few minutes without edge traffic. A
