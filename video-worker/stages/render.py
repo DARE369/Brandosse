@@ -809,7 +809,14 @@ async def run_render(
     # source file from N ffmpeg processes concurrently, causing disk I/O thrash that
     # turns a 5-minute job into hours. 2 at a time keeps I/O sane while still
     # overlapping MediaPipe + encode work across clips.
-    MAX_CONCURRENT_RENDERS = 2
+    # ONE render at a time on this machine size. This was 2, and on the
+    # shared-cpu-1x box two ffmpeg encodes thrash a single vCPU so hard that
+    # neither finishes before Fly's idle-stop kills the machine (observed
+    # 2026-08-23: two 3-minute clips, 15+ minutes, zero completed). Sequential
+    # is the same total CPU but each clip COMMITS as it finishes, so an
+    # interruption loses at most one clip of progress instead of all of them.
+    # Raise this only together with the machine size (L7.5).
+    MAX_CONCURRENT_RENDERS = 1
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_RENDERS)
 
     async def _render_with_semaphore(db_row, clip_score_data):

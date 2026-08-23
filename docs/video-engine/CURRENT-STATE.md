@@ -94,3 +94,20 @@ assume unlimited pulls.
 
 **The upload path is the permanent fallback** and is fully working —
 browser → HMAC ticket → Fly volume → pipeline (`video-worker/uploads.py`).
+
+## Long renders vs. scale-to-zero (fixed 2026-08-23)
+
+Fly's proxy stops this machine after a few minutes without edge traffic. A
+long render is pure internal work, so the proxy idle-stopped the machine
+MID-JOB — graceful shutdown, job stranded in `rendering`, both clips lost.
+Three fixes, layered so any one failing still leaves the others:
+
+1. **Sequential renders** (`MAX_CONCURRENT_RENDERS = 1`) — two encodes on one
+   shared vCPU thrash so hard neither finishes; one at a time commits each
+   clip as it completes, bounding any interruption to one clip of loss.
+2. **Self-keepalive** — while a job is active the poller pings the app's own
+   public URL every 60s, resetting the proxy's idle clock
+   (`video-worker/poller.py`). Idle machines still scale to zero.
+3. **Requeue on cancellation** — if shutdown interrupts a job anyway, it goes
+   back to `queued` instead of stranding; reruns are idempotent because
+   analyze deletes the job's clips before inserting.
