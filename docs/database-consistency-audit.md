@@ -1,3 +1,10 @@
+> **Historical record. Not a description of the system as it is now.**
+> Kept because what was decided and why still matters; do not follow anything
+> here as instructions. It predates the 2026-08 launch audit and the
+> completion lockdown — several providers named here (Pollinations, Magnific,
+> Freepik, Replicate, Grok) are gone, and files it cites have been deleted.
+> Current state: verify against code. What changed: [`CHANGELOG.md`](/CHANGELOG.md).
+
 ﻿# Database Consistency Audit (2026-02-20)
 
 ## 1) Runtime Errors Fixed
@@ -35,7 +42,7 @@
 
 - Fixed calendar realtime subscription runtime error:
   - Root cause: `subscribeToUpdates()` destructured `supabase.auth.getUser()` without `await`.
-  - Fix: removed the invalid destructuring call in `src/stores/CalendarStore.js`.
+  - Fix: removed the invalid destructuring call in `src/calendar/services/calendarService.js`.
 
 ## 2) Schema -> Code Usage Mapping
 

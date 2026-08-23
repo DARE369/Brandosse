@@ -841,3 +841,60 @@
 .cal3-month-cell__add {
   min-width: 44px; min-height: 44px;
 }
+
+
+/* ── LOCK L5.5 — bulk selection in the agenda view ──────────────────────── */
+
+.post-row-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.post-row-wrap > .post-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.post-row-wrap.is-selected {
+  background: var(--color-surface-hover, rgba(127, 127, 127, 0.08));
+  border-radius: var(--radius-md, 8px);
+}
+
+/* 20px + padding keeps the hit area at 44px, per the mobile touch-target
+   standard — this view is the mobile default. */
+.post-row__select {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-inline-start: var(--space-2);
+  padding: 12px;
+  cursor: pointer;
+  accent-color: var(--color-accent, #eb3514);
+}
+
+/* Sticks to the bottom so it stays reachable in a long agenda without
+   scrolling back up to a toolbar. */
+.agenda-bulkbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.agenda-bulkbar__count {
+  font-size: 13px;
+  font-weight: 600;
+  margin-inline-end: auto;
+}
+
+.agenda-bulkbar__danger {
+  color: var(--color-danger, #d92d20);
+}

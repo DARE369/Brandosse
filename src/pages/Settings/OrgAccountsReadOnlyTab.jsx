@@ -138,7 +138,13 @@ export default function OrgAccountsReadOnlyTab({ onToast }) {
       {loading ? (
         <Card><div className={styles.loading}>Loading organization accounts…</div></Card>
       ) : groups.length === 0 ? (
-        <Card><EmptyState dashed title="No shared accounts" description="No organization accounts are shared with your memberships yet." /></Card>
+        <Card>
+          <EmptyState
+            title="No shared accounts"
+            description="No organization has shared an account with you yet. An organization admin has to do that from their side — this tab is read-only."
+            noAction="only an org admin can share an account; this user has no action available"
+          />
+        </Card>
       ) : (
         groups.map((group) => {
           const membership = group.membership;

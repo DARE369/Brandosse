@@ -27,3 +27,15 @@
   flex-wrap: wrap;
   margin-top: 16px;
 }
+
+/* `noAction` — nothing to prompt for, so nothing that looks like a gap to fill.
+   Recedes instead of asking. */
+.calm {
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  padding: 30px 20px;
+}
+.calm .title {
+  color: var(--uiv2-text-secondary);
+  font-weight: var(--uiv2-weight-medium);
+}

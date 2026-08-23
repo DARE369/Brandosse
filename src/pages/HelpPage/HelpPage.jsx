@@ -267,7 +267,19 @@ function HelpBody() {
                   </Card>
                 ))
               ) : (
-                <Card><EmptyState dashed title="No help articles found" description="Try a different search term or submit a support ticket." /></Card>
+                <Card>
+                  <EmptyState
+                    dashed
+                    title={`No help articles match "${faqQuery.trim()}"`}
+                    description="Nothing in the help centre matches that search. Clear it to browse everything, or ask us directly."
+                    actions={(
+                      <>
+                        <Button size="sm" variant="subtle" onClick={() => setFaqQuery("")}>Clear search</Button>
+                        <Button size="sm" onClick={handleOpenForm}>Submit a support ticket</Button>
+                      </>
+                    )}
+                  />
+                </Card>
               )}
 
               <Card>
@@ -348,7 +360,10 @@ function HelpBody() {
               ) : null}
 
               {loadingComplaints ? (
-                <Card><EmptyState dashed title="Loading tickets" description="Fetching your support ticket history." /></Card>
+                // Loading is not emptiness. A dashed "nothing here" box while the
+                // fetch is still in flight tells a slow connection it has no
+                // tickets, which may be false.
+                <Card><Skeleton height="120px" radius="var(--uiv2-radius-md)" /></Card>
               ) : complaints.length ? (
                 complaints.map((complaint) => {
                   const isExpanded = expandedTicketId === complaint.id;
@@ -408,7 +423,14 @@ function HelpBody() {
                   );
                 })
               ) : (
-                <Card><EmptyState dashed title="No support tickets yet" description="You have not submitted any support tickets yet." /></Card>
+                <Card>
+                  <EmptyState
+                    dashed
+                    title="No support tickets yet"
+                    description="If something breaks or you're stuck, open a ticket here and we'll reply by email."
+                    actions={<Button size="sm" onClick={handleOpenForm}>Submit a support ticket</Button>}
+                  />
+                </Card>
               )}
             </div>
           )}

@@ -39,9 +39,16 @@ if (/env\s*:\s*{/.test(nextConfig) || /\bVITE_/.test(nextConfig)) {
   issues.push("next.config.mjs must not inject runtime env aliases or legacy VITE_* values.");
 }
 
-const buildIdPath = path.join(rootDir, ".next", "BUILD_ID");
-if (fs.existsSync(path.join(rootDir, ".next")) && !fs.existsSync(buildIdPath)) {
-  issues.push(".next exists but .next/BUILD_ID is missing. Stop dev servers, clear .next, and run npm run build.");
+const nextDir = path.join(rootDir, ".next");
+const buildIdPath = path.join(nextDir, "BUILD_ID");
+// A running dev server creates .next/dev and never writes BUILD_ID, so a
+// developer with `npm run dev` up would fail this check every time. A guard
+// that cries wolf gets ignored — and an ignored guard is worse than none, which
+// is the whole reason this lockdown exists. Only flag a .next that is neither a
+// production build NOR an active dev server: that is a genuinely broken build.
+const isDevServerArtifact = fs.existsSync(path.join(nextDir, "dev"));
+if (fs.existsSync(nextDir) && !fs.existsSync(buildIdPath) && !isDevServerArtifact) {
+  issues.push(".next exists but has neither BUILD_ID nor a dev-server marker — the build is incomplete. Clear .next and run npm run build.");
 }
 
 if (issues.length > 0) {

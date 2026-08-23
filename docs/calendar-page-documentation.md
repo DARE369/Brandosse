@@ -1,4 +1,12 @@
 # Calendar Page Documentation
+> **Superseded on routing — the Vite/React-Router scaffolding it cites is gone.**
+> `src/main.jsx`, `src/App.jsx`, `src/router/router.jsx`,
+> `src/next/RouterCompat.jsx`, `src/next/NextRouteClients.jsx`,
+> `src/next/NextAppBridge.jsx`, `src/next/ReactRouterRuntime.jsx` and
+> `src/Context/ReactRouterNavigationProvider.jsx` were all removed when the
+> Next.js App Router migration finished. Routing now lives in [`app/`](/app).
+> Anything else here is unverified — flagged, not fixed.
+
 
 Updated: 2026-02-25  
 Scope: User-facing calendar and scheduling workflow (`/app/calendar`) and its direct dependencies across Generate, Dashboard/Navbar, Settings, Supabase tables, and automation jobs.
@@ -18,9 +26,9 @@ It currently supports:
 
 Main files:
 
-- `src/pages/CalendarPage/CalendarPageV2.jsx`
+- `src/pages/Calendar/CalendarPage.jsx`
 - `src/pages/CalendarPage/components/*`
-- `src/stores/CalendarStore.js`
+- `src/calendar/services/calendarService.js`
 - `src/services/OptimalTimesService.js`
 
 ---
@@ -35,7 +43,7 @@ Main files:
   - `src/router/router.jsx:62`
   - `src/components/User/UserSidebar.jsx:36`
 - Dashboard quick action "Schedule a Post" navigates to `/app/calendar`:
-  - `src/pages/Dashboard/UserDashboard.jsx:510`
+  - `src/pages/Dashboard/PersonalDashboardPage.jsx:510`
 
 ### 2.2 Upstream dependency (Generate -> Calendar)
 
@@ -71,19 +79,19 @@ This means calendar lifecycle correctness directly affects dashboard metrics, no
 On page load:
 
 1. Fetch scheduled/history posts:
-   - `src/pages/CalendarPage/CalendarPageV2.jsx:59`
-   - `src/stores/CalendarStore.js:34`
+   - `src/pages/Calendar/CalendarPage.jsx:59`
+   - `src/calendar/services/calendarService.js:34`
    - Includes statuses: `scheduled`, `published`, `publishing`, `failed`
-   - `src/stores/CalendarStore.js:49`
+   - `src/calendar/services/calendarService.js:49`
 2. Fetch drafts (`status='draft'`):
-   - `src/pages/CalendarPage/CalendarPageV2.jsx:60`
-   - `src/stores/CalendarStore.js:64`
-   - `src/stores/CalendarStore.js:76`
+   - `src/pages/Calendar/CalendarPage.jsx:60`
+   - `src/calendar/services/calendarService.js:64`
+   - `src/calendar/services/calendarService.js:76`
 3. Fetch/create calendar settings:
-   - `src/pages/CalendarPage/CalendarPageV2.jsx:61`
-   - `src/stores/CalendarStore.js:363`
+   - `src/pages/Calendar/CalendarPage.jsx:61`
+   - `src/calendar/services/calendarService.js:363`
 4. Fetch ghost slots when enabled:
-   - `src/pages/CalendarPage/CalendarPageV2.jsx:66`
+   - `src/pages/Calendar/CalendarPage.jsx:66`
 
 ### 3.2 Main component composition
 
@@ -98,7 +106,7 @@ On page load:
 ### 3.3 State owner
 
 - Zustand store `useCalendarStore` owns posts, drafts, ghost slots, settings, and view/date state:
-  - `src/stores/CalendarStore.js`
+  - `src/calendar/services/calendarService.js`
 
 ---
 
@@ -107,7 +115,7 @@ On page load:
 ### 4.1 Calendar views and navigation
 
 - View modes: Month, Week, Day:
-  - `src/pages/CalendarPage/CalendarPageV2.jsx:204`
+  - `src/pages/Calendar/CalendarPage.jsx:204`
 - Date navigation (prev/next/today) in `CalendarView`.
 - Month view supports drag-drop rescheduling.
 - Week/day views are read-only cards (no drag-drop):
@@ -117,20 +125,20 @@ On page load:
 ### 4.2 Rescheduling/scheduling
 
 - Drag-drop reschedules by updating `scheduled_at`:
-  - `src/pages/CalendarPage/CalendarPageV2.jsx:98`
+  - `src/pages/Calendar/CalendarPage.jsx:98`
 - Clicking a post/draft opens `ScheduleModal`.
 - Save from modal routes to:
   - update existing post (`updatePost`)
   - accept ghost slot (`acceptGhostSlot`)
   - create new post (`createPost`)
-  - `src/pages/CalendarPage/CalendarPageV2.jsx:290`
+  - `src/pages/Calendar/CalendarPage.jsx:290`
 
 ### 4.3 Draft management
 
 - Left rail lists drafts and opens scheduler on click.
 - Empty state points users to Generate page:
-  - `src/pages/CalendarPage/components/DraftsSidebar.jsx:38`
-  - `src/pages/CalendarPage/components/DraftsSidebar.jsx:39`
+  - `src/calendar/components/UnscheduledRail.jsx:38`
+  - `src/calendar/components/UnscheduledRail.jsx:39`
 
 ### 4.4 Ghost slots (AI suggestions)
 
@@ -159,9 +167,9 @@ Preview is distributed across surfaces:
 - Generate page pre-publish preview:
   - `src/components/Generate/PostProductionPanel.jsx` (media preview card)
 - Draft rail thumbnail preview:
-  - `src/pages/CalendarPage/components/DraftsSidebar.jsx`
+  - `src/calendar/components/UnscheduledRail.jsx`
 - Calendar post card thumbnail preview:
-  - `src/pages/CalendarPage/components/PostCard.jsx`
+  - `src/calendar/components/CalendarListView.jsx`
 - Bulk schedule review preview:
   - `src/pages/CalendarPage/components/BulkScheduleModal.jsx`
 
@@ -184,7 +192,7 @@ Reference points:
 - `src/components/Generate/PostProductionPanel.jsx:596`
 - `src/stores/SessionStore.js:1013`
 - `src/stores/SessionStore.js:1022`
-- `src/stores/CalendarStore.js:34`
+- `src/calendar/services/calendarService.js:34`
 
 ## 5.2 Draft scheduling path: Draft rail -> Schedule modal
 
@@ -195,11 +203,11 @@ Reference points:
 
 Reference points:
 
-- `src/pages/CalendarPage/components/DraftsSidebar.jsx:46`
+- `src/calendar/components/UnscheduledRail.jsx:46`
 - `src/pages/CalendarPage/components/ScheduleModal.jsx:75`
 - `src/pages/CalendarPage/components/ScheduleModal.jsx:79`
-- `src/pages/CalendarPage/CalendarPageV2.jsx:290`
-- `src/pages/CalendarPage/CalendarPageV2.jsx:319`
+- `src/pages/Calendar/CalendarPage.jsx:290`
+- `src/pages/Calendar/CalendarPage.jsx:319`
 
 ## 5.3 Ghost slot -> scheduled post
 
@@ -209,8 +217,8 @@ Reference points:
 
 Reference points:
 
-- `src/pages/CalendarPage/CalendarPageV2.jsx:108`
-- `src/stores/CalendarStore.js:176`
+- `src/pages/Calendar/CalendarPage.jsx:108`
+- `src/calendar/services/calendarService.js:176`
 
 ## 5.4 Bulk scheduling process
 
@@ -258,7 +266,7 @@ So calendar schema/policy setup is not versioned in repo yet.
 2. Scheduled publishing worker (`scheduled -> publishing -> published/failed`) is still needed.
 3. Analytics sync job to populate `platform_analytics` is still needed.
 4. Optional RPC helper used by store (`get_best_posting_time`) is referenced but not defined in repo SQL:
-   - `src/stores/CalendarStore.js:330`
+   - `src/calendar/services/calendarService.js:330`
 
 ---
 
@@ -269,7 +277,7 @@ So calendar schema/policy setup is not versioned in repo yet.
 1. Draft lifecycle is incomplete in active user flow.
 
 - Calendar expects `posts.status='draft'`:
-  - `src/stores/CalendarStore.js:76`
+  - `src/calendar/services/calendarService.js:76`
 - Main publish path writes only `scheduled` or `published`:
   - `src/stores/SessionStore.js:1011`
 - `POST_STATUS` does not include `draft`:
@@ -280,9 +288,9 @@ Impact: Draft rail can remain empty unless drafts are inserted outside the visib
 2. Rescheduling lifecycle can overwrite terminal states.
 
 - Calendar includes `published`, `publishing`, `failed` in editable posts:
-  - `src/stores/CalendarStore.js:49`
+  - `src/calendar/services/calendarService.js:49`
 - Schedule modal save forces `status: 'scheduled'` on existing posts:
-  - `src/pages/CalendarPage/CalendarPageV2.jsx:296`
+  - `src/pages/Calendar/CalendarPage.jsx:296`
 
 Impact: Historical/published records can be unintentionally moved back to scheduled.
 
@@ -298,15 +306,15 @@ Impact: Some 6-row months are truncated.
 1. Draft relation mismatch for platform metadata.
 
 - Draft query does not join `connected_accounts`:
-  - `src/stores/CalendarStore.js:64`
+  - `src/calendar/services/calendarService.js:64`
 - UI expects `draft.connected_accounts`:
-  - `src/pages/CalendarPage/components/DraftsSidebar.jsx:70`
+  - `src/calendar/components/UnscheduledRail.jsx:70`
   - `src/pages/CalendarPage/components/BulkScheduleModal.jsx:47`
 
 2. Realtime calendar subscription exists but is not wired from page.
 
 - Store has `subscribeToUpdates`:
-  - `src/stores/CalendarStore.js:447`
+  - `src/calendar/services/calendarService.js:447`
 - `CalendarPageV2` does not call it.
 
 3. Bulk scheduler manual mode is not implemented (disabled).
@@ -329,9 +337,9 @@ Impact: Some 6-row months are truncated.
 ## 7.3 P2 gaps (cleanup and polish)
 
 1. Legacy calendar component still in tree:
-   - `src/pages/CalendarPage/components/CalendarGrid.jsx`
+   - `src/calendar/components/CalendarGrid.jsx`
 2. UI copy says drafts are draggable, but draft cards are click-to-schedule only:
-   - `src/pages/CalendarPage/components/DraftsSidebar.jsx:32`
+   - `src/calendar/components/UnscheduledRail.jsx:32`
 3. Trend feed currently uses manual mock source in daily analysis:
    - `supabase/functions/daily-analysis/index.ts:353`
 
@@ -362,13 +370,13 @@ Key contract rules for calendar:
 ## 8.2 What calendar already matches
 
 1. Breakpoint-driven compact behavior at 1180px:
-   - `src/pages/CalendarPage/CalendarPageV2.jsx:15`
+   - `src/pages/Calendar/CalendarPage.jsx:15`
 2. Draft drawer/backdrop mechanics:
-   - `src/pages/CalendarPage/CalendarPageV2.jsx:148`
+   - `src/pages/Calendar/CalendarPage.jsx:148`
    - `src/styles/responsive-contract.css:227`
 3. Drag-drop disabled on compact/touch layouts:
-   - `src/pages/CalendarPage/CalendarPageV2.jsx:274`
-   - `src/pages/CalendarPage/CalendarPageV2.jsx:252`
+   - `src/pages/Calendar/CalendarPage.jsx:274`
+   - `src/pages/Calendar/CalendarPage.jsx:252`
 4. Schedule modal responsive contract is implemented in shared CSS:
    - `src/styles/responsive-contract.css:421`
 
@@ -383,7 +391,7 @@ This conflicts with "no critical action hidden behind hover-only affordances" on
 2. Draft interaction copy is misleading.
 
 - UI says "Drag to calendar or click to schedule":
-  - `src/pages/CalendarPage/components/DraftsSidebar.jsx:32`
+  - `src/calendar/components/UnscheduledRail.jsx:32`
 - Draft drag source is not implemented.
 
 3. Calendar visual layer still has duplicated/legacy styling rules in `CalendarV2.css` that partially overlap the responsive contract.

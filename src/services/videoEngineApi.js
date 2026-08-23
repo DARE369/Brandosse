@@ -38,6 +38,19 @@ export async function submitVideoJob({ url, platform, ...prefs }) {
   return parseApiResponse(response);
 }
 
+/**
+ * Get a short-lived signed ticket for uploading source video straight to the
+ * worker (LOCK L7.4).
+ *
+ * The worker's shared secret never reaches the browser — the server signs an
+ * HMAC bound to this user and one upload id, and the worker verifies it without
+ * calling back here.
+ */
+export async function requestUploadTicket() {
+  const response = await videoEngineFetch("/api/video/upload-ticket", { method: "POST" });
+  return parseApiResponse(response);
+}
+
 export async function refreshClipUrl(clipId) {
   const response = await videoEngineFetch(`/api/video/clips/${clipId}/refresh-url`);
   return parseApiResponse(response);

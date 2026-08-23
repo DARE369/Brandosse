@@ -8,7 +8,7 @@ This page is the personal content inventory. It combines posts, media assets, te
 - Access: authenticated user under protected app shell.
 
 ## Component Composition
-- `src/pages/LibraryPage/LibraryPageV2.jsx`
+- `src/pages/Library/LibraryPage.jsx`
 - Shared shell: `UserNavbar`, `UserSidebar`
 - Embedded modals:
   - Upload modal

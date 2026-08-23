@@ -604,7 +604,12 @@ function LibraryBody() {
                       )}
                     />
                   ) : filteredAssets.length === 0 ? (
-                    <EmptyState dashed title="No assets found" description="Try changing filters or upload new content." />
+                    <EmptyState
+                      dashed
+                      title="No assets found"
+                      description="You have assets, but none match the current filters."
+                      actions={<Button size="sm" variant="subtle" onClick={resetFilters}>Clear filters</Button>}
+                    />
                   ) : viewMode === "grid" ? (
                     <>
                       <div className={styles.assetGrid}>

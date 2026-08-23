@@ -45,8 +45,18 @@ export default function CalendarListView({
   formatDateKey,
   formatInTimeZone,
   onOpenGroup,
+  // LOCK L5.5 — bulk operations. Every calendar action worked on exactly one
+  // post, which is the first thing a Power Migrant coming from Publer or Buffer
+  // reaches for and does not find (audit findings P2-005/006).
+  onBulkReschedule,
+  onBulkDelete,
 }) {
   const [search, setSearch] = useState('');
+  // Keyed by groupKey, because a "row" here is a GROUP of posts (one piece of
+  // content fanned out to several platforms). Selecting a row must act on every
+  // post in it, or a cross-posted item would be half-rescheduled.
+  const [selectedKeys, setSelectedKeys] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [platformFilter, setPlatformFilter] = useState('all');
 
@@ -76,6 +86,51 @@ export default function CalendarListView({
       .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
       .map(([dayKey, dayItems]) => ({ dayKey, items: dayItems }));
   }, [groups, statusFilter, platformFilter, search, timezone]);
+
+  // ── LOCK L5.5 — bulk selection ────────────────────────────────────────────
+  //
+  // Selection is pruned to what is currently VISIBLE. Without this, filtering
+  // to "failed", selecting rows, then clearing the filter would silently act on
+  // posts the user can no longer see — and a bulk delete is precisely the wrong
+  // place for an invisible selection.
+  const visibleKeys = useMemo(
+    () => new Set(dayGroups.flatMap(({ items }) => items.map((g) => g.groupKey))),
+    [dayGroups],
+  );
+  const effectiveSelected = useMemo(
+    () => [...selectedKeys].filter((k) => visibleKeys.has(k)),
+    [selectedKeys, visibleKeys],
+  );
+  const selectedCount = effectiveSelected.length;
+
+  const selectedGroups = useMemo(() => {
+    const byKey = new Map(dayGroups.flatMap(({ items }) => items.map((g) => [g.groupKey, g])));
+    return effectiveSelected.map((k) => byKey.get(k)).filter(Boolean);
+  }, [dayGroups, effectiveSelected]);
+
+  const toggleKey = (groupKey) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedKeys(new Set());
+
+  const runBulk = async (fn) => {
+    if (bulkBusy || selectedGroups.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await fn(selectedGroups);
+      clearSelection();
+    } finally {
+      // Always clear busy, even if the handler threw — otherwise one failure
+      // leaves the bar permanently disabled with no way back.
+      setBulkBusy(false);
+    }
+  };
 
   return (
     <div className="agenda-view">
@@ -130,8 +185,25 @@ export default function CalendarListView({
               const timeLabel = primary.scheduled_at
                 ? formatInTimeZone(primary.scheduled_at, timezone, { hour: 'numeric', minute: '2-digit', hour12: true })
                 : '';
+              const isSelected = selectedKeys.has(group.groupKey);
               return (
-                <button key={group.groupKey} type="button" className="post-row" onClick={() => onOpenGroup?.(group)}>
+                <div
+                  key={group.groupKey}
+                  className={`post-row-wrap${isSelected ? ' is-selected' : ''}`}
+                >
+                  {/* LOCK L5.5 — the checkbox is a SIBLING of the row button,
+                      not a child: a checkbox nested inside a <button> is invalid
+                      HTML and cannot be clicked independently of the row. */}
+                  {(onBulkReschedule || onBulkDelete) ? (
+                    <input
+                      type="checkbox"
+                      className="post-row__select"
+                      checked={isSelected}
+                      onChange={() => toggleKey(group.groupKey)}
+                      aria-label={`Select ${primary.title || primary.caption?.slice(0, 40) || 'post'}`}
+                    />
+                  ) : null}
+                <button type="button" className="post-row" onClick={() => onOpenGroup?.(group)}>
                   <span className="post-row__thumb">
                     {primary.generations?.storage_path ? (
                       // Same media_type branch PostDetailDrawer.jsx already
@@ -157,11 +229,67 @@ export default function CalendarListView({
                     </span>
                   </span>
                 </button>
+                </div>
               );
             })}
           </div>
         ))}
       </div>
+
+      {/*
+        LOCK L5.5 — the bulk action bar.
+        Appears only when something is selected, so it never occupies space it
+        has not earned. Counts are taken from the VISIBLE selection, so the
+        number shown is always the number that will actually be acted on.
+      */}
+      {selectedCount > 0 && (onBulkReschedule || onBulkDelete) ? (
+        <div className="agenda-bulkbar" role="region" aria-label="Bulk actions">
+          <span className="agenda-bulkbar__count">
+            {selectedCount} selected
+          </span>
+
+          {onBulkReschedule ? (
+            <>
+              <button
+                type="button"
+                className="ui-button ui-button-ghost ui-button-sm"
+                disabled={bulkBusy}
+                onClick={() => runBulk((g) => onBulkReschedule(g, 1))}
+              >
+                +1 day
+              </button>
+              <button
+                type="button"
+                className="ui-button ui-button-ghost ui-button-sm"
+                disabled={bulkBusy}
+                onClick={() => runBulk((g) => onBulkReschedule(g, 7))}
+              >
+                +1 week
+              </button>
+            </>
+          ) : null}
+
+          {onBulkDelete ? (
+            <button
+              type="button"
+              className="ui-button ui-button-ghost ui-button-sm agenda-bulkbar__danger"
+              disabled={bulkBusy}
+              onClick={() => runBulk((g) => onBulkDelete(g))}
+            >
+              Delete
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            className="ui-button ui-button-ghost ui-button-sm"
+            disabled={bulkBusy}
+            onClick={clearSelection}
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -2,12 +2,11 @@
 
 import React from "react";
 import { Loader2, Plus, RefreshCw } from "lucide-react";
-import UserNavbar from "../../components/User/UserNavbar";
-import UserSidebar from "../../components/User/UserSidebar";
 import JobsList from "../../components/video-engine/JobsList";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useAuth } from "../../Context/AuthContext";
 import { fetchUserJobs } from "../../services/videoEngineData";
+import { AppShell, EmptyState, Button } from "../../ui-v2";
 
 export default function VideoJobsPage() {
   const { navigate } = useAppNavigation();
@@ -32,10 +31,7 @@ export default function VideoJobsPage() {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="dashboard-shell">
-      <UserNavbar />
-      <UserSidebar />
-      <main className="dashboard-content ve-app-content" id="main-content">
+    <AppShell activeKey="video" mainClassName="ve-app-content">
         <section className="ve-page">
           <div className="ve-list-header">
             <div>
@@ -55,18 +51,15 @@ export default function VideoJobsPage() {
               <span>Loading your videos…</span>
             </div>
           ) : error ? (
-            <div className="ve-empty-state ve-empty-large">
-              <strong>{error}</strong>
-              <button className="ve-secondary-btn ve-retry-btn" type="button" onClick={loadJobs}>
-                <RefreshCw size={15} aria-hidden="true" />
-                Try again
-              </button>
-            </div>
+            <EmptyState
+              title="Couldn't load your videos"
+              description={`${error} Nothing has been lost — this is a loading problem, and your renders keep running.`}
+              actions={<Button onClick={loadJobs}><RefreshCw size={15} aria-hidden="true" /> Try again</Button>}
+            />
           ) : (
             <JobsList initialJobs={jobs} />
           )}
         </section>
-      </main>
-    </div>
+    </AppShell>
   );
 }

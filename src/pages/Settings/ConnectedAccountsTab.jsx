@@ -136,7 +136,13 @@ export default function ConnectedAccountsTab({ onToast }) {
           </div>
         </Card>
       ) : !loading ? (
-        <Card><EmptyState dashed title="No accounts connected yet" description="Connect a platform below to start scheduling and publishing." /></Card>
+        <Card>
+          <EmptyState
+            title="No accounts connected yet"
+            description="Pick a platform from the grid below to connect it. Until then, posts can be generated and scheduled but not published."
+            noAction="the platform grid that does this is the next section on the page"
+          />
+        </Card>
       ) : null}
 
       {!loading ? (

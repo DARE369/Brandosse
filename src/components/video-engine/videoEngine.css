@@ -983,3 +983,60 @@
   font-size: 0.85rem;
   line-height: 1.4;
 }
+
+/* ── Source mode: upload vs link (L7.4) ─────────────────────────────────────
+   Upload is first and default because it is the path that does not depend on
+   YouTube tolerating a datacenter IP. */
+.ve-source-modes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.ve-source-mode {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, rgba(127, 127, 127, 0.25));
+  background: transparent;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.ve-source-mode:hover {
+  border-color: var(--color-border-hover, rgba(127, 127, 127, 0.45));
+}
+.ve-source-mode.is-active {
+  border-color: var(--color-accent, #eb3514);
+  color: var(--color-accent, #eb3514);
+  background: var(--color-accent-wash, rgba(235, 53, 20, 0.08));
+}
+.ve-field-file input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--color-border-strong, rgba(127, 127, 127, 0.45));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.ve-field-hint,
+.ve-file-chosen {
+  display: block;
+  margin-top: 7px;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary, #6b7280);
+  line-height: 1.45;
+}
+.ve-file-chosen {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-success, #16a34a);
+  font-weight: 600;
+}

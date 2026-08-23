@@ -12,6 +12,10 @@ import uvicorn
 from config import config
 from database import reset_stuck_jobs
 from poller import poll_loop, trigger_poll
+from uploads import (
+    MAX_UPLOAD_BYTES, assert_disk_headroom, local_path_for,
+    reap_orphaned_uploads, verify_ticket,
+)
 from logger import log
 
 # ─────────────────────────────────────────────
@@ -80,9 +84,15 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+    # Was ["http://localhost:5173"] — the Vite dev server, which this app has
+    # not used since the Next.js migration. Browsers now upload source video
+    # directly to this service, so the real app origins have to be here or every
+    # upload is blocked by CORS before it starts.
     allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
+        o.strip() for o in (
+            os.environ.get("WORKER_ALLOWED_ORIGINS")
+            or "http://localhost:3000,http://localhost:3001"
+        ).split(",") if o.strip()
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
@@ -131,6 +141,80 @@ async def worker_status(x_worker_secret: str = Header(None)):
         "active_job_ids": list(_active_jobs),
         "poll_interval_seconds": config.poll_interval_seconds
     }
+
+
+@app.post("/upload")
+async def upload_source(
+    request: Request,
+    x_upload_user: str = Header(None),
+    x_upload_id: str = Header(None),
+    x_upload_expires: str = Header(None),
+    x_upload_signature: str = Header(None),
+    x_upload_ext: str = Header(None),
+):
+    """
+    Accept a source video straight from the user's browser onto the volume.
+
+    Authenticated by a signed ticket rather than the shared worker secret,
+    because the caller is a browser and the secret must never reach one. See
+    uploads.py for the reasoning and the signature contract.
+
+    The body is streamed to disk in chunks. A 2GB file read into memory would
+    OOM a 4GB machine that is also running two ffmpeg renders — and the OOM
+    killer would take the renders, not just the upload.
+    """
+    try:
+        expires_at = int(x_upload_expires or 0)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Malformed ticket expiry")
+
+    verify_ticket(x_upload_user, x_upload_id, expires_at, x_upload_signature)
+
+    declared = int(request.headers.get("content-length") or 0)
+    if declared > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File is larger than the {MAX_UPLOAD_BYTES // (1024**3)}GB limit.",
+        )
+    assert_disk_headroom(declared or 0)
+
+    path = local_path_for(x_upload_user, x_upload_id, (x_upload_ext or "mp4").lower())
+    written = 0
+
+    try:
+        with open(path, "wb") as handle:
+            async for chunk in request.stream():
+                written += len(chunk)
+                # Content-Length is a claim by the client. Enforce the real
+                # limit against what actually arrives, or a lying header walks
+                # straight past the check above.
+                if written > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Upload exceeded the size limit.")
+                handle.write(chunk)
+    except HTTPException:
+        if os.path.exists(path):
+            os.remove(path)
+        raise
+    except Exception as exc:
+        if os.path.exists(path):
+            os.remove(path)
+        log.error("upload_failed", upload_id=str(x_upload_id)[:8], error=str(exc)[:120])
+        raise HTTPException(status_code=500, detail="Upload failed while writing to disk.")
+
+    if written == 0:
+        os.remove(path)
+        raise HTTPException(status_code=400, detail="Uploaded file was empty.")
+
+    log.info(
+        "upload_stored",
+        upload_id=str(x_upload_id)[:8],
+        user_id=str(x_upload_user)[:8],
+        size_mb=round(written / (1024 * 1024), 1),
+    )
+
+    # The job's source_url. download.py recognises this scheme and skips
+    # fetching entirely — the file is already on the machine that needs it.
+    return {"ok": True, "source_url": f"worker://{x_upload_user}/{x_upload_id}", "bytes": written}
 
 
 @app.post("/webhook/job-submitted")

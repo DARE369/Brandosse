@@ -69,3 +69,19 @@
   .footer { flex-direction: column; }
   .footer > button { width: 100%; }
 }
+
+/* LOCK L5.4 — caption refinement chips. Sits directly under the regenerate
+   row, so "change this" reads as an alternative to "start over". */
+.refineRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.refineLabel {
+  font-size: 12px;
+  color: var(--uiv2-text-secondary);
+  margin-right: 2px;
+}

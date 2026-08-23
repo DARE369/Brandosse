@@ -135,6 +135,53 @@ function buildPlatformRows(posts, accounts) {
     .sort((a, b) => (b.totalPosts + b.accounts) - (a.totalPosts + a.accounts));
 }
 
+/**
+ * LOCK L5.13 — CSV export.
+ *
+ * Metricool gives export away on its free tier; its absence here is a
+ * table-stakes gap, not a nice-to-have (audit D2 §2).
+ *
+ * HONESTY NOTE: this exports what the product actually knows — post lifecycle
+ * (status, scheduled/published time, platform, account, failure reason). It
+ * deliberately does NOT include engagement columns, because no engagement data
+ * exists anywhere in the system: `platform_analytics` has 0 rows and no code
+ * calls a platform insights API (audit P8-001/006). Emitting empty "likes" and
+ * "reach" columns would imply a capability the product does not have, which is
+ * the class of defect Wave 2 removed.
+ */
+function escapeCsvCell(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  // Quote whenever the value could break the row, and double any embedded
+  // quotes — the standard CSV escape.
+  if (/["\n\r,]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+function buildPostsCsv(posts, accounts) {
+  const accountById = new Map(accounts.map((a) => [a.id, a]));
+  const header = [
+    "post_id", "status", "platform", "account",
+    "created_at", "scheduled_at", "published_at",
+    "title", "caption", "error_message",
+  ];
+  const rows = posts.map((p) => {
+    const account = accountById.get(p.account_id);
+    return [
+      p.id,
+      p.status,
+      p.platform || "",
+      account?.display_name || account?.account_name || "",
+      p.created_at || "",
+      p.scheduled_at || "",
+      p.published_at || "",
+      p.title || "",
+      p.caption || "",
+      p.error_message || "",
+    ].map(escapeCsvCell).join(",");
+  });
+  return [header.join(","), ...rows].join("\r\n");
+}
+
 // Weekly buckets of PUBLISHED posts within the selected range, most-recent
 // week last (chart reads left-to-right, oldest to newest).
 function buildWeeklySeries(posts, rangeDays) {
@@ -337,6 +384,26 @@ function AnalyticsBody() {
     };
   }, [data, range]);
 
+  // LOCK L5.13 — download the current range as CSV.
+  //
+  // Built and revoked client-side: the data is already loaded, so a round trip
+  // would add latency and a failure mode for no benefit. The object URL is
+  // revoked right after the click rather than leaking a blob for the life of
+  // the page.
+  const handleExportCsv = useCallback(() => {
+    const csv = buildPostsCsv(data.posts, data.accounts);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `brandosse-posts-last-${range}-days-${stamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [data, range]);
+
   const creditPct = credits.lifetimePurchased > 0
     ? Math.max(0, Math.min(100, Math.round((credits.balance / credits.lifetimePurchased) * 100)))
     : 100;
@@ -375,6 +442,19 @@ function AnalyticsBody() {
             <div className={styles.rangeToggle}>
               <button type="button" className={[styles.rangeBtn, range === 30 ? styles.rangeBtnActive : ""].join(" ")} onClick={() => setRange(30)}>Last 30 days</button>
               <button type="button" className={[styles.rangeBtn, range === 90 ? styles.rangeBtnActive : ""].join(" ")} onClick={() => setRange(90)}>Last 90 days</button>
+              {/* LOCK L5.13 — export. Disabled with nothing to export rather
+                  than handing the user an empty file (LOCK L2.5). */}
+              <button
+                type="button"
+                className={styles.rangeBtn}
+                onClick={handleExportCsv}
+                disabled={data.posts.length === 0}
+                title={data.posts.length === 0
+                  ? "Nothing to export in this range"
+                  : `Export ${data.posts.length} posts as CSV`}
+              >
+                Export CSV
+              </button>
             </div>
           </div>
 
@@ -424,7 +504,12 @@ function AnalyticsBody() {
                   <span className={styles.rangeLabel}>{range === 90 ? "Last 12 weeks" : "Last 4 weeks"}</span>
                 </div>
                 {model.weeklySeries.every((s) => s.count === 0) ? (
-                  <EmptyState dashed title="Nothing published yet" description="Publish a post to start filling this chart." />
+                  <EmptyState
+                    dashed
+                    title="Nothing published yet"
+                    description="This chart counts posts that actually went out. Schedule one and it will appear here after it publishes."
+                    actions={<Button size="sm" onClick={() => navigate("/app/calendar")}>Schedule a post</Button>}
+                  />
                 ) : (
                   <WeeklyChart series={model.weeklySeries} />
                 )}
@@ -436,7 +521,12 @@ function AnalyticsBody() {
                     <span className={styles.sectionLabel}>By platform</span>
                   </div>
                   {model.platformRows.length === 0 ? (
-                    <EmptyState dashed title="No platform activity yet" description="Create or schedule content for a platform to start filling this in." />
+                    <EmptyState
+                      dashed
+                      title="No platform activity yet"
+                      description="Nothing has been created or scheduled for a platform yet, so there is nothing to break down."
+                      actions={<Button size="sm" onClick={() => navigate("/app/generate")}><Sparkles size={14} aria-hidden="true" /> Create content</Button>}
+                    />
                   ) : (
                     <div className={styles.platformTable}>
                       <div className={[styles.platformRow, styles.platformHeadRow].join(" ")}>
@@ -456,7 +546,11 @@ function AnalyticsBody() {
                     <span className={styles.sectionLabel}>Failed posts in this period</span>
                   </div>
                   {model.failedPosts.length === 0 ? (
-                    <EmptyState dashed title="No failures" description="Nothing failed to publish in this period." />
+                    <EmptyState
+                      title="No failures"
+                      description="Nothing failed to publish in this period."
+                      noAction="this empty state is the good outcome — there is nothing for the user to fix"
+                    />
                   ) : (
                     <div className={styles.failedList}>
                       {model.failedPosts.slice(0, 8).map((post) => (

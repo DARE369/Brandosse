@@ -9,7 +9,7 @@ This page is the scheduling board for personal posts. It shows scheduled/publish
 - Alias route `/app/analytics` redirects here.
 
 ## Component Composition
-- `src/pages/CalendarPage/CalendarPageV2.jsx`
+- `src/pages/Calendar/CalendarPage.jsx`
 - Shared shell: `UserNavbar`, `UserSidebar`
 - Main feature components:
   - `CalendarView`
@@ -21,7 +21,7 @@ This page is the scheduling board for personal posts. It shows scheduled/publish
   - `SelectFromLibraryModal`
 
 ## State, Hooks, Services
-- Primary store: `CalendarStore` (`src/stores/CalendarStore.js`)
+- Primary store: `CalendarStore` (`src/calendar/services/calendarService.js`)
 - Local UI state for filters, layout mode, modals, selected post.
 - Uses navigation handoffs to generate/library.
 

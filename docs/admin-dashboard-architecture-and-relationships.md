@@ -1,4 +1,9 @@
 # Admin Dashboard Architecture and Relationship Reference
+> **Superseded on routing — the Vite/React-Router scaffolding it cites is gone.**
+> `src/router/router.jsx` was removed when the Next.js App Router migration
+> finished. Routing now lives in [`app/`](/app). Anything else here is
+> unverified — flagged, not fixed.
+
 
 Historical note:
 - This document is still useful for background context, but parts of it are now stale.
@@ -780,7 +785,7 @@ The user dashboard at `/app/dashboard` is the user's personal summary surface.
 
 Files:
 
-- `src/pages/Dashboard/UserDashboard.jsx`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx`
 - `src/components/Dashboard/RealtimeKPICards.jsx`
 - `src/hooks/useRealtimeKPIs.js`
 
@@ -1100,7 +1105,7 @@ If Claude is extending the admin system, these are the highest-value anchor file
 - `src/admin/pages/AdminUsersPage.jsx`
 - `src/admin/pages/AdminModeration/AdminModerationPage.jsx`
 - `src/admin/pages/AdminAnalyticsPage.jsx`
-- `src/pages/Dashboard/UserDashboard.jsx`
+- `src/pages/Dashboard/PersonalDashboardPage.jsx`
 - `src/hooks/useRealtimeKPIs.js`
 - `src/constants/statuses.js`
 - `supabase/migrations/20260227103000_generation_post_unification_and_rls.sql`

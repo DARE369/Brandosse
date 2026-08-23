@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Coins, Loader2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Coins, X } from "lucide-react";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { CREDIT_PACKAGES } from "../../lib/video-engine/credit-packages";
 import { fetchCreditBalance, purchaseCredits } from "../../services/videoEngineApi";
 import CreditPackageCard from "./CreditPackageCard";
+import { EmptyState } from "../../ui-v2";
 const transactionLabels = {
   purchase: "Purchase",
   consumption: "Used",
@@ -52,7 +53,12 @@ export default function CreditDashboard({ initialBalance = 0, initialTransaction
         setBalance(data.balance ?? 0);
         setTransactions(data.transactions ?? []);
       })
-      .catch(() => {});
+      .catch(() => {
+        // The payment succeeded — only the refresh failed. Say so, rather than
+        // leaving the pre-purchase balance on screen looking like the money
+        // went nowhere.
+        setError("Payment went through, but we couldn't refresh your balance. Reload the page to see it.");
+      });
   }, [banner]);
 
   async function handlePurchase(creditPackage) {
@@ -119,11 +125,14 @@ export default function CreditDashboard({ initialBalance = 0, initialTransaction
       <div className="ve-transactions">
         <h2>Transaction history</h2>
         {transactions.length === 0 ? (
-          <div className="ve-empty-state">
-            <Loader2 size={22} aria-hidden="true" />
-            <strong>No transactions yet</strong>
-            <span>Purchases and usage will appear here.</span>
-          </div>
+          // Was a hand-rolled box with a Loader2 spinner as its icon — an empty
+          // state that looked like it was still loading. On the ui-v2 primitive
+          // now, so the L5.15 guard can see it at all.
+          <EmptyState
+            title="No transactions yet"
+            description="Every credit you buy or spend gets a line here, with the balance after it."
+            noAction="the credit packages that create the first transaction are directly above"
+          />
         ) : (
           <div className="ve-table-wrap">
             <table>

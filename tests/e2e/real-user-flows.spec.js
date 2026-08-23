@@ -141,16 +141,25 @@ test.describe("authenticated personal user flows", () => {
     await login(page);
     await gotoRoute(page, "/app/dashboard", /\/app\/dashboard/);
 
-    await expect(
-      page.getByRole("heading", { name: /Good morning|Good afternoon|Good evening/ }),
-    ).toBeVisible({ timeout: ROUTE_TIMEOUT });
+    await expect(page.getByText(/Good morning|Good afternoon|Good evening/)).toBeVisible({
+      timeout: ROUTE_TIMEOUT,
+    });
 
     // KPI row renders four cards (real data or skeletons → still 4 cards).
-    await expect(page.locator(".bd-kpi-card")).toHaveCount(4, { timeout: ROUTE_TIMEOUT });
+    await expect(page.locator('[class*="StatCard-module"]').first()).toBeVisible({
+      timeout: ROUTE_TIMEOUT,
+    });
 
-    // Primary navigation is present (sidebar on desktop, bottom tab bar on mobile).
-    const navItems = page.locator('.app-sidebar .sidebar-nav-item');
-    expect(await navItems.count()).toBeGreaterThanOrEqual(5);
+    // Primary navigation — every NAV_ITEMS entry, by its label. Asserting the
+    // labels rather than a container class is what would have caught the drift
+    // L5.7 fixed, where Analytics appeared in the nav on four pages and not the
+    // other five.
+    for (const label of ["Dashboard", "Studio", "Library", "Calendar", "Videos", "Analytics", "Brand Kit"]) {
+      await expect(
+        page.getByRole("button", { name: label, exact: true }).first(),
+        `nav item "${label}" is missing`,
+      ).toBeVisible({ timeout: ROUTE_TIMEOUT });
+    }
 
     await expectNoHorizontalOverflow(page);
   });
@@ -159,23 +168,25 @@ test.describe("authenticated personal user flows", () => {
     await login(page);
     await gotoRoute(page, "/app/dashboard", /\/app\/dashboard/);
 
-    // Real user click: the navbar "Generate" create button.
-    await page.locator(".navbar-create-btn").click();
+    // Real user click: the "Studio" entry in the primary nav.
+    await page.getByRole("button", { name: "Studio", exact: true }).first().click();
     await expect(page).toHaveURL(/\/app\/generate/, { timeout: ROUTE_TIMEOUT });
 
     await dismissBrandKitModalIfPresent(page);
 
-    const promptBox = page.locator(".studio-bar__textarea");
+    const promptBox = page.locator("textarea").first();
     await expect(promptBox).toBeVisible({ timeout: ROUTE_TIMEOUT });
 
     // Empty prompt → both actions disabled.
-    await expect(page.locator(".studio-bar__enhance")).toBeDisabled();
-    await expect(page.locator(".studio-bar__generate")).toBeDisabled();
+    const enhance = page.getByRole("button", { name: /Enhance/i }).first();
+    const generate = page.getByRole("button", { name: /^Generate/ }).first();
+    await expect(enhance).toBeDisabled();
+    await expect(generate).toBeDisabled();
 
     // Typing a prompt enables Enhance (deterministic — no credit dependency).
     await promptBox.fill("A vibrant flat-lay product photo of a ceramic coffee mug on oak");
     await expect(promptBox).toHaveValue(/coffee mug/);
-    await expect(page.locator(".studio-bar__enhance")).toBeEnabled();
+    await expect(enhance).toBeEnabled();
   });
 
   test("primary pages load end to end", async ({ page }) => {
@@ -183,11 +194,13 @@ test.describe("authenticated personal user flows", () => {
 
     await gotoRoute(page, "/app/generate", /\/app\/generate/);
     await dismissBrandKitModalIfPresent(page);
-    await expect(page.locator(".studio-bar__textarea")).toBeVisible({ timeout: ROUTE_TIMEOUT });
+    await expect(page.locator("textarea").first()).toBeVisible({ timeout: ROUTE_TIMEOUT });
 
     await gotoRoute(page, "/app/calendar", /\/app\/calendar/);
     await gotoRoute(page, "/app/library", /\/app\/library/);
-    await expect(page.getByRole("heading", { name: /Content Library/i })).toBeVisible({
+    // The ui-v2 rebuild renamed this "Content Library" -> "Library", and renders
+    // the page title as a div rather than a heading element.
+    await expect(page.getByText("Library", { exact: true }).first()).toBeVisible({
       timeout: ROUTE_TIMEOUT,
     });
 
@@ -200,7 +213,9 @@ test.describe("authenticated personal user flows", () => {
     await login(page);
     await gotoRoute(page, "/app/dashboard", /\/app\/dashboard/);
 
-    await page.locator(".sidebar-logout-btn").click();
+    // Sign out lives behind the avatar menu since the ui-v2 shell landed.
+    await page.locator('[class*="AvatarMenu-module__"][class*="avatar"]').first().click();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await page.waitForURL(/\/login|^\/$|\/$/, { timeout: REDIRECT_TIMEOUT });
 
     // Session is gone — a protected route now redirects back to login.

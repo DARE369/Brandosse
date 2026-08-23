@@ -1,0 +1,106 @@
+# video-worker/fly.toml — LOCK L7.1
+#
+# Replaces railway.toml, deleted in the same change. The repo describes exactly
+# one host; two deploy configs is how a service ends up running in two places
+# and being debugged in a third.
+#
+# Deploy:  flyctl deploy --config video-worker/fly.toml --dockerfile video-worker/Dockerfile
+#
+# ── Sizing: a $5/month ceiling, not a performance target ───────────────────
+# This was shared-cpu-4x / 4GB / 25GB always-on — about $31/month, sized for
+# L7.5's production bar ("a 60-minute source renders without OOM"). That is the
+# right target for production and the wrong one for a product with no revenue
+# and a $5 monthly allowance to stay inside.
+#
+#   cpu/mem   shared-cpu-1x, 1GB. Enough for ffmpeg on short sources with one
+#             job at a time. It will NOT render a 60-minute video — that is the
+#             trade, and it is deliberate.
+#   volume    3GB. Holds one source plus its intermediates. Volumes GROW but
+#             never shrink, so starting small is the only reversible direction.
+#   jobs      MAX_CONCURRENT_JOBS=1. Two renders in 1GB is an OOM, and the OOM
+#             killer takes both.
+#
+# Before production, reverse all three. It is a config change and a redeploy,
+# not a rewrite — and L7.5 stays open until it is done.
+
+# ── Why it DOES now scale to zero ──────────────────────────────────────────
+# This previously said min_machines_running = 1 was load-bearing, because the
+# worker runs a polling loop and a reaper, and sleeping stops both. That
+# argument is still correct — for production.
+#
+# It is suspended here for cost, with eyes open. The app pings
+# /webhook/job-submitted on every submission (worker-client.ts:29) and an
+# inbound request wakes a stopped machine, so the normal path — submit, wake,
+# process — works.
+#
+# What is genuinely lost: a job that appears WITHOUT a webhook (a retry, or a
+# row written directly) waits until something else wakes the machine. And the
+# clip-retention sweep only runs while awake. Both are acceptable while nobody
+# is paying; neither is acceptable once somebody is.
+
+app = "brandosse-video-worker"
+# lhr, because Supabase for this project is in AWS eu-west-1 (Ireland) —
+# confirmed from supabase/.temp/pooler-url: aws-1-eu-west-1.pooler.supabase.com.
+# Fly has no Dublin region, and London is the nearest. This is the region that
+# matters: every rendered clip is uploaded to Supabase Storage and every stage
+# writes job progress to Postgres, so worker-to-database latency dominates,
+# not worker-to-user. A volume cannot be moved between regions afterwards.
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Fly injects PORT; main.py:190 reads it and falls back to WORKER_PORT.
+  WORKER_PORT = "8001"
+  # Points at the mounted volume below rather than the machine's rootfs.
+  WORKER_TEMP_DIR = "/data/video-engine"
+  WORKER_LOG_LEVEL = "INFO"
+  # Two at a time is what the memory budget above is sized for. Raising this
+  # without raising memory is how you get an OOM under load rather than a queue.
+  WORKER_MAX_CONCURRENT_JOBS = "1"
+
+[http_service]
+  internal_port = 8001
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # See "Why it never scales to zero" above. This is load-bearing.
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    # The HTTP surface is a webhook and a health check. Real work happens in the
+    # polling loop, so request concurrency is not the thing to tune.
+    soft_limit = 20
+    hard_limit = 40
+
+# Fly's own check, independent of the app's polling loop, so a wedged worker is
+# visible as unhealthy rather than merely quiet.
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "60s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
+
+# Scratch space for downloads, extracted audio and rendered clips. Nothing here
+# is durable state — the job record lives in Postgres and finished clips go to
+# Supabase Storage — but it must hold one source plus its intermediates while
+# they are being worked on.
+#
+# 3GB, down from 25GB. At $0.15/GB/month that is $0.45 instead of $3.75, and
+# 25GB of provisioned-but-empty disk is billed exactly the same as 25GB of full
+# one. Sized for one short source at a time, matching MAX_CONCURRENT_JOBS=1.
+#
+# Volumes GROW but never shrink, so small is the only reversible direction:
+# `fly volumes extend` raises it on demand, nothing lowers it.
+[[mounts]]
+  source = "video_worker_data"
+  destination = "/data"
+  initial_size = "3gb"

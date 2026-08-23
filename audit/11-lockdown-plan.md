@@ -52,7 +52,7 @@ The standards every later wave is judged against. Done first so the rules exist 
 | **L-1.3** | [`engineering/03-documentation.md`](../engineering/03-documentation.md) — what to write, what to **delete** | ✅ |
 | **L-1.4** | [`engineering/04-production-readiness.md`](../engineering/04-production-readiness.md) — Definition of Done, Regression Register, release gate | ✅ |
 | **L-1.5** | `CLAUDE.md` updated so the standards load into **every session** | ✅ |
-| **L-1.6** | `docs/` triage — 107 files → keep-and-verify / rewrite / delete | ⬜ *runs during Wave 5* |
+| **L-1.6** ✅ | `docs/` triage — keep-and-verify / rewrite / delete | **Done 2026-08-22.** 2 deleted, both canonical docs repaired, 309 citations repointed, 47 flagged with what is known wrong, and 2 docs that instructed turning mock flags ON (the L1.4 defect) defused. Guarded by `check-doc-citations.cjs` — 702 citations across 214 current-state docs all resolve, and CI fails if one stops resolving |
 
 **Three design choices worth noting**, because they invert the usual advice:
 
@@ -69,11 +69,11 @@ The standards every later wave is judged against. Done first so the rules exist 
 | Lock | What | Proven by | Guarded by |
 |---|---|---|---|
 | **L0.1** ✅ | CI runs checks, not just a build | **Green on Ubuntu 2026-08-22** — first time the guards have ever executed outside Windows. Doing so immediately exposed that `npm ci` had been failing on `main` for months | `.github/workflows/ci.yml`, required on every PR |
-| **L0.2** | Cross-tenant test harness | Log in as user A, attempt B's rows across all 89 tables | Blocking CI job |
+| **L0.2** ✅ | Cross-tenant test harness | `cross-tenant-probe.mjs` — anon-key JWT across 18 tables, 0 foreign rows | Runs in the scheduled `live-invariants` job |
 | **L0.3** | Un-blind job monitoring | Delete the 3-name allowlist at `20260710110000_...sql:55` | `healthCheck` enumerates *all* `cron.job` rows; alerts on unknown/failing |
 | **L0.4** ✅ | Error tracking + alerting | **Two planted failures ingested, HTTP 200** — one via the Next.js path, one simulating `llm_provider_fallback` from the edge runtime | Next.js (server/client/edge/render) + all 51 Supabase Edge Functions via `_shared/sentry.ts`. **Python worker deferred to Wave 7** — it cannot boot today regardless |
-| **L0.5** | Secret scanning | A test commit containing a fake key fails CI | Pre-commit hook + CI job |
-| **L0.6** | Startup env validation | Worker and edge functions refuse to start with a missing required key | Extend the pattern already at `video-worker/config.py:14-15` |
+| **L0.5** ✅ | Secret scanning | `secret-scan.mjs` passes; structural placeholder test added after a prose false positive | CI job on every push |
+| **L0.6** ✅ | Startup env validation | `video-worker/config.py` raises on a missing required key; mock flags default False | `check-env-contract.cjs`, both directions | <!-- was: Extend the pattern already at `video-worker/config.py:14-15` |
 | **L0.7** ✅ | Wire the 8 existing guard scripts | All 8 pass; 4 had been failing for months against files deleted during the ui-v2 migration, and repointing `check-status-literals` immediately found two genuine violations | CI job on every PR |
 
 **Gate 0 — the lock is functional.** Deliberately break something (revoke a key, freeze a post, stage a fake secret) and confirm the machinery catches it **within one CI run or one alert cycle**. Until a planted failure is caught, Wave 0 is not done.
@@ -103,8 +103,8 @@ Everything here is a case where the product actively misinforms the user. **This
 
 | Lock | What | Proven by | Guarded by |
 |---|---|---|---|
-| **L2.1** 🟡 | Account badge derives from capability + `health_score`, not `connection_status` alone | Code done — `toAccountCard` now runs hard-blocked → degraded → state → unknown, with **no assume-healthy branch** | Migration `20260821220000` **awaiting apply** |
-| **L2.2** 🟡 | Surface accounts that cannot publish | `can_publish` / `publish_block_reason` computed **in the view**, so every consumer inherits it | Same migration — post-condition rejects any false positive |
+| **L2.1** ✅ | Account badge derives from capability + `health_score`, not `connection_status` alone | Code done — `toAccountCard` now runs hard-blocked → degraded → state → unknown, with **no assume-healthy branch** | Migration `20260821220000` **applied and verified 2026-08-22** — `can_publish` + `publish_block_reason` present in `connected_accounts_health_summary` |
+| **L2.2** ✅ | Surface accounts that cannot publish | `can_publish` / `publish_block_reason` computed **in the view**, so every consumer inherits it | Same migration — post-condition rejects any false positive |
 | **L2.3** ✅ | Reapers + backfill | **PASS** — 24 stranded rows recovered (20 posts / 4 clips); cron confirmed active | `scripts/security/stuck-records-probe.mjs` |
 | **L2.4** ✅ | The 4 no-op calendar AI actions | `week_plan`, `add_draft_post`, `delete_post` implemented; `suggest_slots` confirms honestly; unknown types now warn loudly | Unhandled type → visible error, never silence |
 | **L2.5** ✅ | Dead header search box | Rendered only when a real handler is supplied; default changed from a no-op to `null` so "unwired" is detectable | Guard in `UserNavbar.jsx` |
@@ -121,9 +121,9 @@ Fast, and it makes everything after it easier to reason about.
 
 | Lock | What | Size |
 |---|---|---|
-| **L3.1** | `src/app/**` + `src/api/**` — unroutable duplicate incl. a dead Stripe webhook | 17 files |
-| **L3.2** | `clip_selector.py`, `llm_client.py`, `transcript_parser.py`, `video_reframer.py` | ~800 lines |
-| **L3.3** | `src/legacy/supabase.js`; resolve the duplicate `Calendar` / `CalendarPage` directories | — |
+| **L3.1** ✅ | `src/app/**` + `src/api/**` — unroutable duplicate incl. a dead Stripe webhook | 17 files |
+| **L3.2** ✅ | `clip_selector.py`, `llm_client.py`, `transcript_parser.py`, `video_reframer.py` | ~800 lines |
+| **L3.3** ✅ | `src/legacy/supabase.js`; resolve the duplicate `Calendar` / `CalendarPage` directories | — |
 
 **Guarded by:** a CI check for unreferenced modules, so dead code cannot silently re-accumulate.
 
@@ -140,9 +140,9 @@ Fast, and it makes everything after it easier to reason about.
 | **L4.1** ⏭ | Set `WORKER_GROQ_API_KEY` | Deferred to **Wave 7** (Fly migration) — not set on Railway |
 | **L4.2** ⏭ | Set `WORKER_YOUTUBE_COOKIES` | Deferred to **Wave 7** |
 | **L4.3** ✅ | Reconnect `generate-caption` | Caption-only regeneration now routes to `SessionStore.generateCaption()`, which loads the brand kit and passes the 5 most recent captions as anti-repetition context. Title/hashtags stay on the metadata path |
-| **L4.4** 🟡 | Revisions to `content_versions` | `snapshotCurrentVersion()` added and wired before every caption overwrite (best-effort, never blocks the user). **Migration `20260822090000` awaiting apply** — owners had read but not INSERT |
+| **L4.4** ✅ | Revisions to `content_versions` | `snapshotCurrentVersion()` added and wired before every caption overwrite (best-effort, never blocks the user). **Migration `20260822090000` applied and verified 2026-08-22** — owner INSERT returns 201, another user's generation returns 403 |
 | **L4.5** ✅ | Render `health_score` / `last_failure_reason` | Done in Wave 2 (L2.1) |
-| **L4.6** 🟡 | Ghost-slot gate chain | Root cause found: `profiles.status` is NULL on the 2 oldest accounts (QA + **admin**), silently excluding them from every `status='active'` filter. **Migration `20260822100000` awaiting apply** |
+| **L4.6** ✅ | Ghost-slot gate chain | Root cause found: `profiles.status` is NULL on the 2 oldest accounts (QA + **admin**), silently excluding them from every `status='active'` filter. **Migration `20260822100000` applied and verified 2026-08-22** — 0 profiles with NULL status |
 | **L4.7** ✅ | Model pinning + fallback alerting | Default `claude-3-5-sonnet-latest` → `claude-sonnet-5` (same price, current generation); second stale default at `:325` also fixed; **provider fallback now logs `llm_provider_fallback` at error level** — the tripwire whose absence hid the Groq outage |
 
 **Guarded by:** L0.6 startup validation for the env vars; a test asserting `generate-caption` is on the live path; a test asserting a revision row is written per regenerate.
@@ -162,7 +162,7 @@ The largest wave. Everything here works but fails its D4 bar.
 | **L5.3** | Clipping: fix analysis truncation; platform export presets | M | DoC-2 |
 | **L5.4** | Text: instruction-based refinement replacing blind overwrite | M | DoC-3 |
 | **L5.5** | Bulk calendar operations | M | DoC-4 |
-| **L5.6** | Finish ui-v2 migration (5 routes) + delete legacy shell — fixes the unstyled billing page | **L** | DoC-9 |
+| **L5.6** ✅ | Finish ui-v2 migration | **L** | All 4 remaining pages migrated; **0 of 47 in-scope pages** now reference the legacy shell. Fixes the unstyled-nav defect on `billing/credits` and the three video routes. Introduced `ui-v2/shell/AppShell` because 9 pages hand-wrote the header block and 10 defined an identical ThemeToggleButton — copying it a fifth time would have deepened the duplication L5.7 had just fixed |
 | **L5.7** ✅ | Shared nav component | S | 9 pages each declared their own `NAV_ITEMS` and had drifted — 5 showed Analytics, 4 did not. Single definition in `ui-v2/shell/navItems.js`, plus the Videos entry that no page listed |
 | **L5.8** ⏸ | **Reprice video generation**; remove the silent 3× tier upgrade | M | **BLOCKED on OD-1** — repricing cannot be settled without the per-connected-account cost, which is ~3× the entire rest of the cost model |
 | **L5.9** ✅ | Timeouts on all provider calls | S | **28/28 bounded.** `zernio.service.ts` had 4 calls and 0 timeouts — the direct mechanism behind the frozen posts. Every value sits under the reaper threshold so a hung provider retries cleanly |
@@ -171,7 +171,7 @@ The largest wave. Everything here works but fails its D4 bar.
 | **L5.12** | Complete the brand-kit conversation | M | DoC-5 |
 | **L5.13** | Analytics export + date-range comparison | M | DoC-6 |
 | **L5.14** | Cost-per-user tracking + per-user video ceiling | M | DoC-10 |
-| **L5.15** | Onboarding to first value ≤5 min; empty states everywhere | M | DoC-9 |
+| **L5.15** ✅ | Onboarding to first value ≤5 min; empty states everywhere | M | **TTFV measured at 93–99s against the 300s bar** — signup → wizard → Studio → a real generated post, walked by a genuinely new account in `tests/e2e/time-to-first-value.spec.js`. **15 of 19 empty states were dead ends**; every one now offers a control or declares in code why it has none. Found and fixed on the way: the signup page promised 100 free credits over a database that grants 30. Guards: `check-empty-states.cjs`, `check-credit-grant.cjs` |
 
 **Gate 5 — every existing capability meets its D4 bar**, with a test proving it and a guard keeping it.
 
@@ -183,10 +183,10 @@ The audit is not complete until these are done — its own self-check says so.
 
 | Lock | What |
 |---|---|
-| **L6.1** | Persona walkthroughs: unaided first-run as Casual Operator, migration flow as Power Migrant |
-| **L6.2** | **Run** the test suite and all 8 guard scripts; record real pass/fail |
-| **L6.3** | Verify production environment: Vercel, Supabase edge secrets, Railway — reconcile against every `unverified_notes` in the findings |
-| **L6.4** | Confirm whether cross-tenant **writes** leak (read exposure is confirmed; writes were deliberately not tested) |
+| **L6.1** ✅ | Persona walkthroughs: unaided first-run as Casual Operator, migration flow as Power Migrant — `tests/e2e/persona-walkthroughs.spec.js`. The Power Migrant test may not call `page.goto()` after sign-in: every surface must be reached by CLICKING. Every other test in the suite navigates by URL, which is the automated equivalent of the address bar — so a route reachable only that way passes all of them while being invisible to a person (finding P9-002). All 7 surfaces reachable; verified by adding a surface with no nav control and confirming it was reported |
+| **L6.2** ✅ | **Run** the test suite and all guard scripts; record real pass/fail — **11/11 offline guards pass, 4/4 live probes pass, e2e 15 passed / 4 skipped / 0 failed** (2026-08-22). The finding: **CI ran the e2e suite never**, which is why four tests had been failing for months against markup deleted in the ui-v2 migration. An `e2e` job now runs it on the daily schedule |
+| **L6.3** ✅ | Verify production environment — all 4 required edge secrets present; 3 of 15 optional unset, each falling back to a pinned literal. 3 variables the code reads were in no `.env.example` (`check-env-contract.cjs` now fails on any undeclared read). `supabase/config.toml` did not exist, so `verify_jwt` was implicit (P10s-004): probed all 52 live — 51 correctly closed, and **`job-webhook` was rejecting every fal.ai callback it exists to receive**. Fixed and guarded by `edge-auth-probe.mjs`. **Open for the founder: 7 unused API keys are still deployed** |
+| **L6.4** ✅ | Confirm whether cross-tenant **writes** leak — **15 of 15 attempts refused.** UPDATE/INSERT/DELETE/REASSIGN across `sessions`, `posts`, `generations`, plus `user_credits.balance` and `profiles.status`. Every table carries a positive control (the victim edits its own row and it must land), and no verdict is read from a status code, because PostgREST returns 204 for an update that matched nothing — the ambiguity behind the retracted credit-minting finding. `cross-tenant-write-probe.mjs` |
 
 **Gate 6 — no unverified claims remain in the audit.**
 

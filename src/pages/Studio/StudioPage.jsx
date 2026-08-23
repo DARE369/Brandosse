@@ -564,6 +564,26 @@ function StudioBody({ brandKit }) {
     }
   }, [regeneratePostMetadata, generateCaption, postProduction, applyRateLimit]);
 
+  // LOCK L5.4 — apply an instruction to the EXISTING caption.
+  //
+  // Distinct from handleRegenerateMetadata: that rewrites title, caption and
+  // hashtags from scratch. This one keeps the draft and changes only what was
+  // asked, so a user who likes their caption but wants it shorter does not
+  // lose the version they liked.
+  const handleRefineCaption = useCallback(async (instruction) => {
+    if (!instruction) return;
+    const toastId = toast.loading("Refining caption…");
+    try {
+      await generateCaption(postProduction?.selectedPlatforms?.[0] || "instagram", instruction);
+      toast.success("Caption refined", { id: toastId });
+    } catch (err) {
+      toast.dismiss(toastId);
+      if (!applyRateLimit("regenerateMetadata", err)) {
+        toast.error(err?.message || "Could not refine the caption.");
+      }
+    }
+  }, [generateCaption, postProduction, applyRateLimit]);
+
   const handleRescore = useCallback(async () => {
     try {
       await scoreSeo();
@@ -1780,7 +1800,22 @@ function StudioBody({ brandKit }) {
               )}
 
               {completedGenerations.length === 0 && studioStage !== "generating" && (
-                <EmptyState title="Nothing generated yet" description="Describe what you want on the left, then hit Generate." dashed />
+                // The prompt box sits beside this on desktop, but stacks above
+                // it (and often off-screen) on mobile — so this needs a real
+                // control, not just a sentence pointing at one.
+                <EmptyState
+                  dashed
+                  title="Nothing generated yet"
+                  description="Describe the post you want — the image and the caption are made together."
+                  actions={(
+                    <Button size="sm" onClick={() => {
+                      promptRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      promptRef.current?.focus();
+                    }}>
+                      Write a prompt
+                    </Button>
+                  )}
+                />
               )}
 
               {/* Post production — inline, directly under the results grid, the
@@ -1803,6 +1838,7 @@ function StudioBody({ brandKit }) {
                     onClose={() => setStudioStage("results")}
                     onGenerateAnother={() => setStudioStage("brief")}
                     onRegenerateMetadata={handleRegenerateMetadata}
+                    onRefineCaption={handleRefineCaption}
                     onRescore={handleRescore}
                     metadataRetryAfter={getRateLimitRemaining("regenerateMetadata")}
                     seoRetryAfter={getRateLimitRemaining("rescore")}
@@ -1959,7 +1995,12 @@ function StudioBody({ brandKit }) {
             ))}
           </div>
         ) : (
-          <EmptyState title="No video jobs" description="Video runs will show up here while processing." />
+          <EmptyState
+            dashed
+            title="No video jobs"
+            description="Video renders take a few minutes, so they run in the background and report back here."
+            actions={<Button size="sm" onClick={() => navigate("/app/video/new")}>Start a video</Button>}
+          />
         )}
       </Drawer>
 
@@ -2228,7 +2269,16 @@ function StudioBody({ brandKit }) {
             {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} height="96px" radius="8px" />)}
           </div>
         ) : sourcePickerItems.length === 0 ? (
-          <EmptyState title="No images yet" description="Generate an image first, then you can edit or animate it." />
+          <EmptyState
+            dashed
+            title="No images yet"
+            description="Editing and animating both start from an image you already made, and you haven't generated one yet."
+            actions={(
+              <Button size="sm" onClick={() => { setSourcePickerOpen(false); promptRef.current?.focus(); }}>
+                Write a prompt instead
+              </Button>
+            )}
+          />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8, maxHeight: "56vh", overflowY: "auto" }}>
             {sourcePickerItems.map((item) => (

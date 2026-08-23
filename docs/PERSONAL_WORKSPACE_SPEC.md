@@ -1,4 +1,15 @@
 # Personal Workspace — Technical Spec
+> **Superseded — verify against code before trusting anything here.**
+> Written before the 2026-08 launch audit. Known wrong as of 2026-08-22:
+> media generation is **fal.ai only** (Freepik, Magnific, Pollinations, Replicate
+> and Grok are gone, keys deleted from every environment); text generation is
+> Anthropic-first with a Groq fallback, model IDs pinned; and several files cited
+> here no longer exist — `src/services/freepik.service.js`,
+> `_shared/freepik.service.ts`, `src/config/magnificModels.js`,
+> `supabase/functions/start-generation`, `src/app/`, `src/api/`.
+> Current provider truth: [`TECHNICAL_CONSTRAINTS.md` §11](TECHNICAL_CONSTRAINTS.md).
+> This file has NOT been line-by-line verified — it is flagged, not fixed.
+
 
 Updated: 2026-06-23
 Scope: Everything a solo (non-org) user can do in Brandosse, **excluding the Calendar and the Library pages entirely** — those are documented separately. This spec stops at the point where a piece of content becomes a draft/scheduled/published `posts` row; what happens to it after that (calendar view, library browsing) is out of scope here.
@@ -67,7 +78,7 @@ Files: `src/components/User/UserNavbar.jsx`, `src/components/User/UserSidebar.js
 
 ## 4. Dashboard
 
-File: `src/pages/Dashboard/UserDashboard.jsx`
+File: `src/pages/Dashboard/PersonalDashboardPage.jsx`
 
 **What it shows, and where each number comes from** (all queries run in parallel, personal-scoped):
 

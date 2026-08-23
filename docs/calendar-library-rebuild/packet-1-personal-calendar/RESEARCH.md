@@ -179,7 +179,7 @@ One implementation-relevant detail for Phase 3 (not a blocker, just noting preci
 
 Codebase (file:line / migration name):
 - `package.json:27-67`
-- `src/pages/CalendarPage/CalendarPageV3.jsx:245-246` (sensor configuration)
+- `src/pages/Calendar/CalendarPage.jsx:245-246` (sensor configuration)
 - `src/pages/CalendarPage/v3/PostPanel.jsx:419-441` (existing non-drag date/time field path)
 - `supabase/migrations/20260227103000_generation_post_unification_and_rls.sql:76-187`
 - `supabase/migrations/20260324110000_org_pipeline_tables.sql:28`

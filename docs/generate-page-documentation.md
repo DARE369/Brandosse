@@ -1,3 +1,11 @@
+> **Superseded on routing — the Vite/React-Router scaffolding it cites is gone.**
+> `src/main.jsx`, `src/App.jsx`, `src/router/router.jsx`,
+> `src/next/RouterCompat.jsx`, `src/next/NextRouteClients.jsx`,
+> `src/next/NextAppBridge.jsx`, `src/next/ReactRouterRuntime.jsx` and
+> `src/Context/ReactRouterNavigationProvider.jsx` were all removed when the
+> Next.js App Router migration finished. Routing now lives in [`app/`](/app).
+> Anything else here is unverified — flagged, not fixed.
+
 ﻿# Generate Page Documentation
 
 Updated: 2026-02-17

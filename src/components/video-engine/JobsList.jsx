@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Plus, Video } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import JobCard from "./JobCard";
+import { EmptyState, Button } from "../../ui-v2";
 export default function JobsList({ initialJobs = [] }) {
   const { navigate } = useAppNavigation();
   const [jobs, setJobs] = useState(initialJobs);
@@ -12,15 +13,16 @@ export default function JobsList({ initialJobs = [] }) {
 
   if (jobs.length === 0) {
     return (
-      <div className="ve-empty-state ve-empty-large">
-        <Video size={36} aria-hidden="true" />
-        <strong>You haven't processed any videos yet.</strong>
-        <span>Submit your first video to get started.</span>
-        <button className="ve-primary-btn" type="button" onClick={() => navigate("/app/video/new")}>
-          <Plus size={17} aria-hidden="true" />
-          Process a video
-        </button>
-      </div>
+      <EmptyState
+        dashed
+        title="No videos yet"
+        description="Give it a long video and it finds the moments worth clipping. Renders run in the background, so you can leave the page."
+        actions={(
+          <Button onClick={() => navigate("/app/video/new")}>
+            <Plus size={15} aria-hidden="true" /> Process a video
+          </Button>
+        )}
+      />
     );
   }
 

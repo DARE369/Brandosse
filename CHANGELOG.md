@@ -16,6 +16,25 @@ existed. See [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md).
 
 ### Security — Fixed
 
+- **Cross-tenant WRITES were never tested** (L6.4). The audit proved nobody can
+  read another account and said in as many words that writes "were deliberately
+  not tested" — but RLS SELECT and RLS UPDATE/INSERT/DELETE are different
+  policies, so half the question had never been asked. Now asked: 15 of 15
+  attempts refused, across `sessions`, `posts`, `generations`, `user_credits`
+  and `profiles`. `scripts/security/cross-tenant-write-probe.mjs` registers two
+  throwaway accounts and attacks one from the other, because a write probe run
+  against real users finds out by damaging someone.
+- **`job-webhook` was rejecting every callback it exists to receive** (L6.3,
+  P10s-004). It is the URL handed to fal.ai when a video render is submitted;
+  fal.ai has no Supabase session, so the gateway refused each one with
+  `UNAUTHORIZED_NO_AUTH_HEADER` before the function ran. Videos still finished
+  via the `process-jobs` poller — which the function's own header calls the
+  FALLBACK — so the preferred path had never worked once and the fallback
+  covering for it is why nobody noticed. There was no `supabase/config.toml` at
+  all, so this setting had never been declared anywhere; there is now, and
+  `edge-auth-probe.mjs` fails both ways: an unlisted function that answers is an
+  exposure, a listed one that refuses is a dead integration.
+
 - **Cross-tenant data leak on `posts` and `generations`** (P10s-001/002). Any
   authenticated user could read every row in both tables with an ordinary JWT —
   verified live at 73 foreign posts from 6 users, and 39 foreign generations.
@@ -81,8 +100,32 @@ existed. See [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md).
   raw text is demoted to a collapsed block.
 - **A search box that could not accept input** — rendered on four routes with
   no-op default props. Now rendered only when a real handler is supplied.
+- **The signup page promised 100 free credits over a database that grants 30**
+  (L5.15). The number was hardcoded into three marketing surfaces; the header
+  pill reads `user_credits.balance`, so a new account watched the promise break
+  within seconds of arriving. The 100 came from `profiles.credits`, a column
+  that gates nothing. All three now read one constant, and
+  `check-credit-grant.cjs` fails the build if it and the migration's grant
+  trigger ever disagree again.
+- **A loading state dressed as an empty state** (L5.15). The support-ticket list
+  rendered "Loading tickets" inside a dashed "nothing here" box while the fetch
+  was still in flight — telling a slow connection it had no tickets, which may
+  be false. Now a skeleton.
+- **The credits page rendered a balance of 0 on any fetch failure** (L5.15).
+  `.catch(() => {})` made a failed load visually identical to an empty account,
+  on the one page whose job is telling you what you have. It now says it could
+  not load, and offers a retry. The post-payment refresh had the same silent
+  catch and now says the payment went through even when the refresh did not.
 
 ### Quality — Changed
+
+- **15 of 19 empty states were dead ends** (L5.15, DoC-9). A new account is
+  nothing but empty states, so these are the product's first impression: they
+  said there was nothing there and left the user to work out what to do about
+  it. Every one now offers a real control, or declares in code why it has none
+  ("No failures" is the outcome you want). Six hand-rolled boxes in the video
+  engine moved onto the shared primitive so the guard can see them at all.
+  `check-empty-states.cjs`
 
 - **Default Claude model** `claude-3-5-sonnet-latest` → `claude-sonnet-5`
   (P3-010). Same list price, current generation. With Groq failing 100% since
@@ -119,6 +162,41 @@ existed. See [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md).
   and cannot promote itself. The highest-value test in the repository.
 - **`scripts/security/stuck-records-probe.mjs`**, **`secret-scan.mjs`**,
   **`oauth-state.test.mjs`**.
+- **`tests/e2e/time-to-first-value.spec.js`** — registers a genuinely new
+  account on every run and walks the path a stranger walks: signup → onboarding
+  wizard → Studio → a real generated post, asserting the whole thing lands under
+  five minutes (measured: 93–99s). Every other test in the suite signs in as an
+  account that already has data, so none of them can see what a new user sees.
+  It also asserts the wizard actually intercepts a new signup — 209 lines that
+  render for nobody if the redirect ever moves — and that the prompt typed in
+  the wizard survives the handoff into Studio. Test accounts are deleted
+  afterwards, walking the foreign-key chain by hand because deleting a user with
+  content is refused outright (see horizon register H13).
+- **`scripts/check-empty-states.cjs`** and **`scripts/check-credit-grant.cjs`**,
+  both wired into CI. Each was verified by breaking the code deliberately and
+  confirming it failed — a guard that has never failed has not been tested.
+- **CI had never run the e2e suite at all** (L6.2). Nineteen Playwright tests
+  existed; the workflow ran guard scripts and a build and nothing else. That is
+  why four of them could fail for months against markup deleted in the ui-v2
+  migration without anyone knowing. An `e2e` job now runs the suite on the daily
+  schedule — scheduled rather than per-PR, because the first-run tests register
+  real accounts against production, which is the only way to see what a new user
+  sees. Recorded result on 2026-08-22: **15 passed, 4 skipped, 0 failed**;
+  11/11 offline guards and 4/4 live probes pass.
+- **`tests/e2e/persona-walkthroughs.spec.js`** (L6.1) — D4's two persona
+  acceptance tests, which had only ever been assessed by reading code. The Power
+  Migrant one may not call `page.goto()` after sign-in: every surface must be
+  reached by CLICKING. Every other test navigates by URL, which is the automated
+  equivalent of the address bar — so a route reachable only that way passes all
+  of them while being invisible to a person. That is finding P9-002 exactly, and
+  it was verified by adding a surface with no nav control and confirming the test
+  named it.
+- **Four e2e tests repointed** after months of silent failure. They targeted
+  `.bd-kpi-card`, `.studio-bar__textarea` and `.sidebar-logout-btn`, classes
+  that exist in zero files since the ui-v2 migration. Now written against roles
+  and text, and the dashboard test asserts each of the seven nav labels by name
+  — which is what would have caught the drift L5.7 fixed. Fourth instance of
+  **verification nobody watches decays to zero.**
 - **`engineering/`** — versioning, agentic code review, documentation, and
   production-readiness standards, loaded into every session via `CLAUDE.md`.
 

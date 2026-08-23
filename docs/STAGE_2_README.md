@@ -1,4 +1,12 @@
 # Stage 2 - Task System Implementation
+> **Superseded on routing — the Vite/React-Router scaffolding it cites is gone.**
+> `src/main.jsx`, `src/App.jsx`, `src/router/router.jsx`,
+> `src/next/RouterCompat.jsx`, `src/next/NextRouteClients.jsx`,
+> `src/next/NextAppBridge.jsx`, `src/next/ReactRouterRuntime.jsx` and
+> `src/Context/ReactRouterNavigationProvider.jsx` were all removed when the
+> Next.js App Router migration finished. Routing now lives in [`app/`](/app).
+> Anything else here is unverified — flagged, not fixed.
+
 
 ## Summary
 Stage 2 implemented a dedicated task workspace under Pipeline so members can see and update assigned work outside the calendar view. Admin task creation was integrated into the same Pipeline surface, and task status changes now flow through member/admin views with a pipeline notification badge. Database task policies were aligned so members can read assigned/created tasks, assignees can update status, and admin roles control task creation/deletion.

@@ -68,7 +68,7 @@ function ProjectSection({
       {expanded && (
         <div className={styles.sectionBody}>
           {sessions.length === 0 ? (
-            <div className={styles.emptySection}>No sessions here yet.</div>
+            <div className={styles.emptySection}>Nothing from this period — sessions are saved here automatically as you generate.</div>
           ) : (
             sessions.map((s) => (
               <div key={s.id} className={styles.pastRow}>

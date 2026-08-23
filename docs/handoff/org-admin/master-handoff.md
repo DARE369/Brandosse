@@ -1,4 +1,12 @@
 # Org Admin Master Handoff (Stage 3)
+> **Superseded on routing — the Vite/React-Router scaffolding it cites is gone.**
+> `src/main.jsx`, `src/App.jsx`, `src/router/router.jsx`,
+> `src/next/RouterCompat.jsx`, `src/next/NextRouteClients.jsx`,
+> `src/next/NextAppBridge.jsx`, `src/next/ReactRouterRuntime.jsx` and
+> `src/Context/ReactRouterNavigationProvider.jsx` were all removed when the
+> Next.js App Router migration finished. Routing now lives in [`app/`](/app).
+> Anything else here is unverified — flagged, not fixed.
+
 
 ## Plain-Language Overview
 The org-admin workspace is where organization owners and admins configure how their team operates. It controls who can join, what each role can do, how content review pipelines run, how brand rules are managed, how credits are governed, and how shared publishing accounts and task statuses are maintained.

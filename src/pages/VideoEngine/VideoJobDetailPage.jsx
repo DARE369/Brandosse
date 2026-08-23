@@ -2,12 +2,11 @@
 
 import React from "react";
 import { Loader2 } from "lucide-react";
-import UserNavbar from "../../components/User/UserNavbar";
-import UserSidebar from "../../components/User/UserSidebar";
 import JobDetailView from "../../components/video-engine/JobDetailView";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useAuth } from "../../Context/AuthContext";
 import { fetchJobDetail } from "../../services/videoEngineData";
+import { AppShell, EmptyState, Button } from "../../ui-v2";
 
 export default function VideoJobDetailPage({ jobId = null }) {
   const { navigate, pathname } = useAppNavigation();
@@ -31,10 +30,7 @@ export default function VideoJobDetailPage({ jobId = null }) {
   }, [id, user?.id]);
 
   return (
-    <div className="dashboard-shell">
-      <UserNavbar />
-      <UserSidebar />
-      <main className="dashboard-content ve-app-content" id="main-content">
+    <AppShell activeKey="video" mainClassName="ve-app-content">
         {loading ? (
           <div className="ve-page-loading">
             <Loader2 size={28} className="ve-spin ve-loading-icon" aria-hidden="true" />
@@ -42,12 +38,11 @@ export default function VideoJobDetailPage({ jobId = null }) {
           </div>
         ) : error ? (
           <section className="ve-page">
-            <div className="ve-empty-state ve-empty-large">
-              <strong>{error}</strong>
-              <button className="ve-primary-btn" type="button" onClick={() => navigate("/app/video/jobs")}>
-                Back to My videos
-              </button>
-            </div>
+            <EmptyState
+              title="Couldn't open this video"
+              description={`${error} It may have been deleted, or belong to another account.`}
+              actions={<Button onClick={() => navigate("/app/video/jobs")}>Back to My videos</Button>}
+            />
           </section>
         ) : detail ? (
           <JobDetailView
@@ -56,7 +51,6 @@ export default function VideoJobDetailPage({ jobId = null }) {
             sourceUrl={detail.job?.source_url}
           />
         ) : null}
-      </main>
-    </div>
+    </AppShell>
   );
 }

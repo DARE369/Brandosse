@@ -1,0 +1,30 @@
+# ── Supabase project configuration ──────────────────────────────────────────
+# Created 2026-08-22 for LOCK L6.3. Until now there was no config.toml at all,
+# so every function's JWT setting was implicit — which is what audit finding
+# P10s-004 flagged as unverified, and it stayed unverified because there was
+# nothing to read.
+#
+# Probed live 2026-08-22: all 52 deployed functions returned 401 to a request
+# with no Authorization header. That is correct for 51 of them and wrong for
+# exactly one.
+#
+# This file makes the setting explicit and reviewable. Anything not listed
+# keeps the default, verify_jwt = true.
+project_id = "ujkuwemwlhilzarbrozu"
+
+[functions.job-webhook]
+# fal.ai POSTs here when a video finishes rendering. fal.ai is a third party —
+# it has no Supabase session and never will — so the gateway was rejecting
+# every callback with UNAUTHORIZED_NO_AUTH_HEADER before the function's own
+# code ran. Video jobs still completed, but only through the process-jobs
+# pg_cron poller, which the function's own header describes as the FALLBACK.
+# The preferred path had never worked, and the fallback covering for it is why
+# nobody noticed.
+#
+# Opening this is safe because the function does not rely on the gateway for
+# authentication. It requires `job_id` and `token` in the URL, looks the job
+# up, and compares the token against payload.webhook_token — a per-job
+# crypto.randomUUID() written at submit time (generateVideo/index.ts:211).
+# A caller without that value gets "invalid token" and nothing happens. It also
+# refuses any job not in `running`, so replays are inert.
+verify_jwt = false

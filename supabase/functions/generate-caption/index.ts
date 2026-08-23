@@ -12,6 +12,10 @@ type GenerateCaptionRequest = {
   brandKit?: Record<string, unknown>;
   previousCaptions?: string[];
   tone?: string | null;
+  /** LOCK L5.4 — a refinement instruction, e.g. "shorter", "punchier". */
+  refineInstruction?: string | null;
+  /** The draft being refined. Required for refineInstruction to mean anything. */
+  currentCaption?: string | null;
 };
 
 const PLATFORM_LIMITS: Record<string, number> = {
@@ -92,7 +96,35 @@ serve(async (req) => {
       : [];
     const tone = String(body.tone || "").trim();
 
-    const systemPrompt = `You are an expert social media copywriter. Write a caption for the described content.
+    // LOCK L5.4 — refinement turns this from "write a caption" into "edit THIS
+    // caption". Before, "Regenerate" was the only affordance: a blind re-roll
+    // that discarded the user's draft and could not be steered. A Power Migrant
+    // expects to say "shorter" and keep everything else they liked.
+    const refineInstruction = String(body.refineInstruction || "").trim();
+    const currentCaption = String(body.currentCaption || "").trim();
+    // An instruction with nothing to apply it to is meaningless, so both are
+    // required before the mode switches.
+    const isRefinement = Boolean(refineInstruction && currentCaption);
+
+    const systemPrompt = isRefinement
+      ? `You are an expert social media copywriter REVISING an existing caption.
+
+The user has an existing caption they mostly like. Apply their requested change
+and nothing else.
+Rules:
+- Preserve the meaning, specific facts, and voice of the existing caption
+- Change ONLY what the instruction asks for
+- Do NOT start over or introduce a different angle — this is an edit, not a rewrite
+- Stay within the platform character limit (Instagram: 2200, Twitter/X: 280, LinkedIn: 3000)
+- Keep the existing hashtags unless the instruction concerns them
+- Do not invent facts about the brand
+Return ONLY valid JSON:
+{
+  "caption": "...",
+  "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
+  "platform": "instagram"
+}`
+      : `You are an expert social media copywriter. Write a caption for the described content.
 Rules:
 - Match the brand voice and tone descriptors exactly
 - Stay within platform character limit (Instagram: 2200, Twitter/X: 280, LinkedIn: 3000)
@@ -120,7 +152,16 @@ Return ONLY valid JSON:
             `Platform: ${platform}`,
             tone ? `Tone override: ${tone}` : "",
             `Brand context:\n${brandContext}`,
-            previousCaptions.length > 0 ? `Previous captions:\n- ${previousCaptions.join("\n- ")}` : "",
+            // LOCK L5.4 — in refinement mode the existing caption and the
+            // instruction lead, because together they ARE the task.
+            isRefinement ? `Existing caption to revise:\n${currentCaption}` : "",
+            isRefinement ? `Requested change: ${refineInstruction}` : "",
+            // Prior captions are deliberately dropped when refining: their job
+            // is anti-repetition when writing something NEW, and here the user
+            // has explicitly asked to keep most of what they already have.
+            !isRefinement && previousCaptions.length > 0
+              ? `Previous captions:\n- ${previousCaptions.join("\n- ")}`
+              : "",
             `Image/content description:\n${imageDescription}`,
           ].filter(Boolean).join("\n\n"),
         },
