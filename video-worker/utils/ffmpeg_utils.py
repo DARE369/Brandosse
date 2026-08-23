@@ -244,6 +244,8 @@ def render_with_tracking(
     ass_caption_path: Optional[str],
     output_path: str,
     hook_text_filter: str = "",
+    out_w: int = OUTPUT_WIDTH,
+    out_h: int = OUTPUT_HEIGHT,
 ) -> tuple[bool, str]:
     """
     Render a clip with face tracking-compatible crop coordinates.
@@ -263,6 +265,8 @@ def render_with_tracking(
     }
 
     return render_clip_to_file(
+        out_w=out_w,
+        out_h=out_h,
         source_video_path=source_video_path,
         start_time_secs=start_time_secs,
         duration_secs=duration_secs,
@@ -281,9 +285,11 @@ def render_clip_to_file(
     ass_caption_path: Optional[str],
     output_path: str,
     hook_text_filter: str = "",
+    out_w: int = OUTPUT_WIDTH,
+    out_h: int = OUTPUT_HEIGHT,
 ) -> tuple[bool, str]:
     """
-    Render a single clip to a 1080x1920 MP4 with optional burned captions.
+    Render a single clip to a vertical MP4 with optional burned captions.
 
     Returns (True, output_path) on success, (False, error_message) on failure.
     hook_text_filter: optional FFmpeg drawtext expression appended at the end
@@ -296,18 +302,46 @@ def render_clip_to_file(
 
     hook_suffix = f",{hook_text_filter}" if hook_text_filter else ""
 
+    # NEVER upscale past what the crop actually contains.
+    #
+    # This path hardcoded 1080x1920 and ignored the job's aspect ratio. On a
+    # 1280x720 screencast the crop is 404x720, so it was scaling to 7.1x the
+    # source pixels — 2.07 megapixels per frame carrying 0.29 megapixels of
+    # real detail. Upscaling invents nothing; it only multiplies encoding work,
+    # and on one shared vCPU that turned a 396s video into a 16-minute render.
+    #
+    # Keep the requested aspect ratio, but cap the size at the crop's native
+    # resolution.
+    # WORKER_ALLOW_UPSCALE=true restores the old behaviour for anyone who would
+    # rather match the platforms' recommended 1080x1920 and pay the render time.
+    # It buys no extra detail — only pixels — but platforms do prefer it, and on
+    # bigger hardware the cost is irrelevant.
+    allow_upscale = os.environ.get("WORKER_ALLOW_UPSCALE", "").lower() in ("1", "true", "yes")
+
+    if crop_h and out_h > crop_h and not allow_upscale:
+        native_h = crop_h - (crop_h % 2)
+        native_w = int(round(native_h * (OUTPUT_WIDTH / OUTPUT_HEIGHT)))
+        native_w -= native_w % 2
+        log.info(
+            "render_size_capped_to_native",
+            requested=f"{out_w}x{out_h}",
+            rendering=f"{native_w}x{native_h}",
+            work_ratio=round((native_w * native_h) / (out_w * out_h), 3),
+        )
+        out_w, out_h = native_w, native_h
+
     if ass_caption_path and os.path.exists(ass_caption_path):
         escaped_ass = ass_caption_path.replace("\\", "/").replace(":", "\\:")
         vf_chain = (
             f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y},"
-            f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},"
+            f"scale={out_w}:{out_h},"
             f"ass={escaped_ass}"
             f"{hook_suffix}"
         )
     else:
         vf_chain = (
             f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y},"
-            f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}"
+            f"scale={out_w}:{out_h}"
             f"{hook_suffix}"
         )
 
