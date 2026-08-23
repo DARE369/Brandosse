@@ -157,6 +157,25 @@ def _escape_drawtext_text(text: str) -> str:
     return text
 
 
+# Below this, hook text stops being readable on a phone and the words should be
+# dropped instead of shrunk further.
+HOOK_MIN_FONTSIZE = 15
+HOOK_MAX_FONTSIZE = 30
+
+
+def _fitted_fontsize(text: str, frame_w: int) -> int:
+    """
+    Largest readable drawtext size for `text` on a `frame_w`-wide frame.
+
+    drawtext cannot wrap, so the only fit control is size. Assumes ~0.6 x
+    fontsize average glyph width and targets 90% of the frame.
+    """
+    if not text:
+        return HOOK_MAX_FONTSIZE
+    raw = int(0.9 * frame_w / (0.6 * len(text)))
+    return max(HOOK_MIN_FONTSIZE, min(HOOK_MAX_FONTSIZE, raw))
+
+
 def _build_hook_text_filter(ai_title, frame_w: int = 608) -> str:
     """
     Build an FFmpeg drawtext filter string for the hook text overlay.
@@ -176,8 +195,17 @@ def _build_hook_text_filter(ai_title, frame_w: int = 608) -> str:
     # 404px-wide clip — the title was wider than the frame, so the centred
     # drawtext overflowed BOTH edges and read as garbage. Truncating by words
     # keeps whatever survives coherent; truncating by pixels would not.
+    # Trim only as far as readability requires, not to a fixed word count.
+    # A hard 7-word cap was sized for a 404px frame and cut "He sent 50
+    # DOPPELGANGERS to trap 100 cops" to "...to trap 100" — losing the noun and
+    # the joke. Sources now arrive at 1080p, so frames are wider and the font
+    # auto-fits: start with the whole title and drop trailing words only while
+    # the fitted size would fall below the readable floor.
     words = str(ai_title).strip().split()
-    hook_text = " ".join(words[:7])
+    hook_text = " ".join(words[:12])
+    while len(words) > 3 and _fitted_fontsize(hook_text, frame_w) <= HOOK_MIN_FONTSIZE:
+        words = words[:-1]
+        hook_text = " ".join(words)
 
     escaped = _escape_drawtext_text(hook_text)
     if not escaped:
@@ -188,7 +216,7 @@ def _build_hook_text_filter(ai_title, frame_w: int = 608) -> str:
     # frame width at ~0.6 x fontsize average glyph width, clamped to stay
     # readable (14px floor) and tasteful (30px ceiling). frame_w must be the
     # OUTPUT width — the filter runs after scaling.
-    fontsize = max(14, min(30, int(0.9 * frame_w / (0.6 * max(1, len(escaped))))))
+    fontsize = _fitted_fontsize(escaped, frame_w)
 
     return (
         f"drawtext="

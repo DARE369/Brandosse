@@ -111,10 +111,30 @@ the same video downloaded at 11:31 and failed at 11:52 with "Requested format
 is not available". The `tv` player client is outside the SABR experiment and
 fixed it (`video-worker/stages/download.py`).
 
-Known quality note (horizon, not a blocker): the tv client's combined formats
-top out low for some videos — this clip rendered from a 360p source. If clip
-sharpness matters commercially, prefer bestvideo+bestaudio merges from the tv
-formats or fall back across clients by resolution.
+**Resolved 2026-08-23 (and it was not a horizon item).** That "tv client tops
+out low" note was the single biggest quality defect in the product, not a
+future concern: `tv+ios+web` returned **5 formats, max 360p**, so every clip
+ever rendered was built from a 360p source no matter how good the render
+pipeline was. Probed against one video at one moment:
+
+| clients | formats | max height |
+|---|---|---|
+| tv+ios+web (old default) | 5 | **360p** |
+| mweb | 166 | 2160p |
+| web_safari | 143 | 1080p |
+| tv_embedded | 119 | — |
+
+Default is now `['mweb','web_safari','tv_embedded','web']`, and both the
+metadata probe and the download walk `CLIENT_LADDER`
+(`video-worker/stages/download.py`), advancing only on errors meaning "this
+client returned nothing usable" — a private or deleted video still fails
+immediately with the right message. Verified end to end: a 20-minute source
+rendered a clip at **608×1080** (was 404×720), sharp, with the hook fitting and
+karaoke captions highlighting correctly.
+
+Cost of the win: 1080p sources are several times larger, so downloads and
+renders take longer on a 1-vCPU machine. That strengthens the case for a bigger
+machine (see [SCALING.md](SCALING.md)) rather than weakening the quality gain.
 
 ## Long renders vs. scale-to-zero (fixed 2026-08-23)
 
