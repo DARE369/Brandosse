@@ -861,6 +861,7 @@ async def run_render(
             )
 
     render_tasks = []
+    already_complete = []
 
     for index, clip_score_data in enumerate(clips):
         clip_index = clip_score_data.get("clip_index", index)
@@ -873,6 +874,20 @@ async def run_render(
             log.error("no_db_row_for_clip", job_id=job_id, clip_index=clip_index)
             continue
 
+        # RESUME: a clip already rendered and uploaded is finished work. Each
+        # clip commits itself as it completes, so an interrupted job comes back
+        # with some already done. Re-encoding them wastes the scarcest resource
+        # this worker has — a single shared vCPU — and on an 11-clip job that
+        # difference decides whether the retry finishes at all.
+        if db_row.get("render_status") == "complete" and db_row.get("storage_path"):
+            log.info(
+                "clip_render_skipped_already_complete",
+                job_id=job_id,
+                clip_index=clip_index,
+            )
+            already_complete.append(db_row)
+            continue
+
         render_tasks.append(_render_with_semaphore(db_row, clip_score_data))
 
     if not render_tasks:
@@ -881,7 +896,8 @@ async def run_render(
     results = await asyncio.gather(*render_tasks, return_exceptions=True)
 
     # Tally results
-    rendered_clips = []
+    # Clips that survived a previous attempt count as rendered.
+    rendered_clips = list(already_complete)
     success_count = 0
     failed_count = 0
 
