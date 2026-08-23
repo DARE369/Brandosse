@@ -11,7 +11,9 @@ from config import config
 from database import (
     update_job_status,
     update_job_source_info,
-    fail_job
+    fail_job,
+    get_transcript_word_segments,
+    get_clips_for_job,
 )
 from stages.download import run_download
 from stages.transcribe import run_transcribe
@@ -56,18 +58,49 @@ async def _run_pipeline_stages(job: dict, temp_dir: str) -> tuple[int, int]:
         log.info("stage_complete", job_id=job_id, stage="download", duration=download_result["duration_secs"])
         
         # ── Stage 2: Transcribe ───────────────────────────────────
+        # RESUME: a transcript already in the database is finished work. Redoing
+        # it costs a Groq call and 1-3 minutes for a byte-identical result.
         update_job_status(job_id, "transcribing")
-        log.info("stage_start", job_id=job_id, stage="transcribe")
-        
-        transcript_data = await run_transcribe(job, download_result["audio_path"])
-        log.info("stage_complete", job_id=job_id, stage="transcribe", language=transcript_data["language"])
+        existing_words = get_transcript_word_segments(job_id)
+        if existing_words:
+            log.info(
+                "stage_resumed",
+                job_id=job_id,
+                stage="transcribe",
+                words=len(existing_words),
+                message="transcript already saved — skipping",
+            )
+            transcript_data = {
+                "word_segments": existing_words,
+                "language": None,
+                "full_text": "",
+                "duration": download_result["duration_secs"],
+            }
+        else:
+            log.info("stage_start", job_id=job_id, stage="transcribe")
+            transcript_data = await run_transcribe(job, download_result["audio_path"])
+            log.info("stage_complete", job_id=job_id, stage="transcribe",
+                     language=transcript_data["language"])
 
         # ── Stage 3: Analyze ──────────────────────────────────────
         # run_analyze persists each clip to video_clips itself as it scores them.
+        # RESUME: clips already scored are finished work, and re-running analyze
+        # deletes them (analyze.py clears the job's clips before inserting), so
+        # a restart would discard scoring the user already paid Claude for.
         update_job_status(job_id, "analyzing")
-        log.info("stage_start", job_id=job_id, stage="analyze")
-
-        selected_clips = await run_analyze(job, transcript_data)
+        existing_clips = get_clips_for_job(job_id)
+        if existing_clips:
+            log.info(
+                "stage_resumed",
+                job_id=job_id,
+                stage="analyze",
+                clips=len(existing_clips),
+                message="clips already scored — skipping",
+            )
+            selected_clips = existing_clips
+        else:
+            log.info("stage_start", job_id=job_id, stage="analyze")
+            selected_clips = await run_analyze(job, transcript_data)
 
         log.info("stage_complete", job_id=job_id, stage="analyze", clips_selected=len(selected_clips))
         
@@ -122,6 +155,24 @@ async def _run_pipeline_stages(job: dict, temp_dir: str) -> tuple[int, int]:
             credits_to_refund=credits_consumed
         )
         return credits_consumed, 0
+
+
+def _job_is_terminal(job_id: str) -> bool:
+    """
+    True when the job has reached a state that will not run again.
+
+    Only then may its working files be deleted. A job sitting back in 'queued'
+    after an interruption still needs whatever survived on disk.
+    """
+    try:
+        from database import supabase
+        row = supabase.table("video_jobs").select("status").eq("id", job_id).single().execute()
+        return (row.data or {}).get("status") in ("complete", "failed")
+    except Exception as e:
+        # If we cannot tell, clean up. Leaking disk on a 3GB volume is a worse
+        # failure than losing a resume opportunity.
+        log.warning("terminal_check_failed_cleaning", job_id=job_id, error=str(e)[:80])
+        return True
 
 
 async def process_job(job: dict) -> None:
@@ -179,8 +230,20 @@ async def process_job(job: dict) -> None:
                 credits_to_refund=0,  # refund logic in _run_pipeline_stages failed job path
             )
 
+    except asyncio.CancelledError:
+        # Shutdown interrupted this job. The poller requeues it — so KEEP the
+        # temp directory. Deleting it is what turned a resumable interruption
+        # into a full restart: observed 2026-08-23, a job that had already
+        # downloaded, transcribed and scored 11 clips was interrupted during
+        # render, lost its source file to this cleanup, restarted from stage 1,
+        # and then FAILED re-downloading a video it no longer needed. The work
+        # was all still in the database; only the file was gone.
+        log.warning("temp_dir_preserved_for_resume", job_id=job_id, path=temp_dir)
+        raise
+
     finally:
-        # ── Always clean up temp files ────────────────────────────
-        if os.path.exists(temp_dir):
+        # ── Clean up temp files on TERMINAL outcomes only ─────────
+        # A requeued job re-enters this function and reuses what survived.
+        if _job_is_terminal(job_id) and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir, ignore_errors=True)
             log.info("temp_dir_cleaned", job_id=job_id, path=temp_dir)
