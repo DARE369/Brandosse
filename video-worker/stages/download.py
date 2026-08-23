@@ -54,13 +54,20 @@ YTDLP_BASE_OPTIONS = {
     # costs nothing and helps on some sources — but it is NOT a substitute for
     # WORKER_YOUTUBE_COOKIES, and believing it was is why cookies were never set.
     'extractor_args': {
-        # 'tv' leads because YouTube intermittently forces SABR-only streaming
-        # on the web client (no plain https URLs) and skips ios formats — the
-        # SAME video downloaded at 11:31 and failed at 11:52 with "Requested
-        # format is not available". The tv client is not in the SABR experiment
-        # and its formats carry ordinary https URLs. Measured 2026-08-23: the
-        # SABR-failing video downloaded first try once tv was listed.
-        'youtube': {'player_client': ['tv', 'ios', 'web']},
+        # Client choice decides BOTH reliability and quality, and the previous
+        # list ['tv','ios','web'] was quietly terrible at both. Measured on the
+        # same video, same moment, 2026-08-23:
+        #
+        #   tv+ios+web    5 formats, max height  360p   <- what we were shipping
+        #   mweb        166 formats, max height 2160p
+        #   web_safari  143 formats, max height 1080p
+        #   tv_embedded 119 formats
+        #
+        # Five formats is why an intermittent SABR sweep could wipe out every
+        # option and fail the job, and 360p is why rendered clips looked soft —
+        # the pipeline was never given anything better to work with. The rich
+        # clients pick 1080p and leave ~160 fallbacks if some are poisoned.
+        'youtube': {'player_client': ['mweb', 'web_safari', 'tv_embedded', 'web']},
         # Script-mode PO-token provider (see Dockerfile). Without a token,
         # requests from this flagged datacenter IP get bot-checked regardless
         # of cookies or the solved JS challenge; with one, guest access is
@@ -69,6 +76,47 @@ YTDLP_BASE_OPTIONS = {
         'youtubepot-bgutilscript': {'script_path': ['/opt/bgutil/server/build/generate_once.js']},
     },
 }
+
+
+# Fallback ladder. YouTube's SABR enforcement is applied PER REQUEST, not per
+# video: the same source succeeded at 11:31, failed at 11:52, and succeeded
+# again at 13:10 with identical code. A single client set therefore cannot be
+# "the right one" — resilience comes from having somewhere else to go when the
+# current one comes back empty. Each rung uses a different mix so a sweep that
+# poisons one is unlikely to poison the next.
+CLIENT_LADDER = [
+    ['mweb', 'web_safari', 'tv_embedded', 'web'],   # richest format lists
+    ['web_safari', 'mweb'],
+    ['tv_embedded', 'web'],
+    ['tv', 'ios', 'web'],                            # the old default, last
+]
+
+# Errors that mean "this client came back with nothing usable" rather than
+# "this video cannot be downloaded at all". Only these are worth another rung;
+# a private or deleted video is not.
+_RETRYABLE_MARKERS = (
+    'requested format is not available',
+    'page needs to be reloaded',
+    'no video formats',
+    'unable to extract',
+)
+
+
+def _is_retryable_format_error(err: str) -> bool:
+    low = err.lower()
+    return any(m in low for m in _RETRYABLE_MARKERS)
+
+
+def _opts_with_clients(base: dict, clients: list) -> dict:
+    """Copy opts with the youtube player_client replaced. Deep enough that the
+    module-level YTDLP_BASE_OPTIONS is never mutated by a retry."""
+    opts = dict(base)
+    extractor_args = {k: dict(v) for k, v in (base.get('extractor_args') or {}).items()}
+    yt = dict(extractor_args.get('youtube') or {})
+    yt['player_client'] = clients
+    extractor_args['youtube'] = yt
+    opts['extractor_args'] = extractor_args
+    return opts
 
 
 def calculate_credits(duration_secs: int) -> int:
@@ -159,6 +207,40 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
     if cookies_path:
         opts['cookiefile'] = cookies_path
 
+    # Walk the ladder on "came back with nothing usable" errors. The last rung
+    # re-raises so the classifier below still produces a real user-facing
+    # message rather than a generic retry failure.
+    last_error = None
+    for rung, clients in enumerate(CLIENT_LADDER):
+        try:
+            probe = _opts_with_clients(opts, clients)
+            with yt_dlp.YoutubeDL(probe) as ydl:
+                info = ydl.extract_info(url, download=False)
+            if info and info.get('duration') is not None:
+                log.info(
+                    "preflight_success",
+                    title=info.get('title', 'Untitled Video'),
+                    duration_secs=int(info['duration']),
+                    clients='+'.join(clients),
+                    rung=rung,
+                )
+                return {
+                    "title": info.get('title', 'Untitled Video'),
+                    "duration_secs": int(info['duration']),
+                }
+        except Exception as e:  # noqa: BLE001 - classified below
+            last_error = e
+            if not _is_retryable_format_error(str(e)):
+                break
+            log.warning(
+                "metadata_client_rung_failed",
+                rung=rung,
+                clients='+'.join(clients),
+                error=str(e)[:100],
+            )
+
+    # Every rung exhausted (or a non-retryable error): fall through to the
+    # original path so the error classifier produces the right message.
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -265,6 +347,29 @@ def _download_with_ytdlp(url: str, output_path_template: str, job_id: str, cooki
     }
     if cookies_path:
         opts['cookiefile'] = cookies_path
+
+    # Same ladder as the metadata probe. A client set that answered the probe
+    # can still come back empty seconds later, so the download gets its own
+    # walk. Only `opts` is advanced here — the real download happens once,
+    # below, with whichever rung proved it can see usable formats.
+    for rung, clients in enumerate(CLIENT_LADDER[1:], start=1):
+        try:
+            with yt_dlp.YoutubeDL({**opts, 'skip_download': True, 'quiet': True}) as probe:
+                info = probe.extract_info(url, download=False)
+            if info and any(f.get('url') for f in (info.get('formats') or [])):
+                break  # this rung can see real formats; download with it
+            raise RuntimeError('no video formats with URLs')
+        except Exception as e:  # noqa: BLE001 - classified by the handler below
+            if not _is_retryable_format_error(str(e)):
+                break
+            log.warning(
+                "download_client_rung_retry",
+                job_id=job_id,
+                next_rung=rung,
+                clients='+'.join(clients),
+                error=str(e)[:100],
+            )
+            opts = _opts_with_clients(opts, clients)
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
