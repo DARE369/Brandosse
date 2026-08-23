@@ -47,7 +47,13 @@ YTDLP_BASE_OPTIONS = {
     # costs nothing and helps on some sources — but it is NOT a substitute for
     # WORKER_YOUTUBE_COOKIES, and believing it was is why cookies were never set.
     'extractor_args': {
-        'youtube': {'player_client': ['ios', 'web']},
+        # 'tv' leads because YouTube intermittently forces SABR-only streaming
+        # on the web client (no plain https URLs) and skips ios formats — the
+        # SAME video downloaded at 11:31 and failed at 11:52 with "Requested
+        # format is not available". The tv client is not in the SABR experiment
+        # and its formats carry ordinary https URLs. Measured 2026-08-23: the
+        # SABR-failing video downloaded first try once tv was listed.
+        'youtube': {'player_client': ['tv', 'ios', 'web']},
         # Script-mode PO-token provider (see Dockerfile). Without a token,
         # requests from this flagged datacenter IP get bot-checked regardless
         # of cookies or the solved JS challenge; with one, guest access is
