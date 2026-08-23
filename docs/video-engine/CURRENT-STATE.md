@@ -5,6 +5,9 @@
 deployed worker.** Everything else in this folder is the historical build
 journal — where it disagrees with this file or the code, it is wrong.
 
+Scaling analysis (what breaks at volume, and in what order):
+[SCALING.md](SCALING.md).
+
 ## Feature audit: original spec vs. what exists and works
 
 | Spec (pack) | Status | Evidence |
