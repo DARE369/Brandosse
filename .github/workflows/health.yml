@@ -15,16 +15,38 @@ jobs:
     steps:
       - name: Check Vercel (frontend)
         run: |
-          if [ -z "${{ secrets.NEXT_PUBLIC_APP_URL }}" ]; then
+          RAW="${{ secrets.NEXT_PUBLIC_APP_URL }}"
+          if [ -z "$RAW" ]; then
             echo "::error::NEXT_PUBLIC_APP_URL secret is not set on this repo (Settings → Secrets and variables → Actions)"
             exit 1
           fi
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.NEXT_PUBLIC_APP_URL }}/login")
+          # Normalise the secret before using it. A trailing slash builds
+          # "//login" and an http:// scheme triggers a scheme upgrade — both
+          # answer 308, which reads as an outage but is a typo in the secret.
+          URL="${RAW%/}"
+          case "$URL" in
+            http://*)
+              echo "::error::NEXT_PUBLIC_APP_URL uses http:// — Vercel 308s every http request. Set it to https://."
+              exit 1 ;;
+            https://*) ;;
+            *)
+              echo "::error::NEXT_PUBLIC_APP_URL must be a full https:// URL with no trailing slash."
+              exit 1 ;;
+          esac
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$URL/login")
           echo "Vercel /login → $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Vercel returned $STATUS — expected 200"
-            exit 1
-          fi
+          case "$STATUS" in
+            200) ;;
+            301|302|307|308)
+              # Deliberately NOT followed with -L. A redirect here means the
+              # secret is not the canonical origin, and following it would keep
+              # the check green while pointing at the wrong host.
+              echo "::error::Vercel redirected ($STATUS) instead of serving /login — the URL in the secret is not the canonical origin. Check for a trailing slash, a www/apex mismatch, or a stale deployment alias."
+              exit 1 ;;
+            *)
+              echo "::error::Vercel returned $STATUS — expected 200"
+              exit 1 ;;
+          esac
 
       # Named for the job it does, not the vendor doing it (L7.1). The previous
       # name was RAILWAY_WORKER_URL, which would have gone on reporting green
