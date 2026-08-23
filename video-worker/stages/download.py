@@ -45,7 +45,15 @@ YTDLP_BASE_OPTIONS = {
     # confirm you're not a bot". The client list is still worth keeping — it
     # costs nothing and helps on some sources — but it is NOT a substitute for
     # WORKER_YOUTUBE_COOKIES, and believing it was is why cookies were never set.
-    'extractor_args': {'youtube': {'player_client': ['ios', 'web']}},
+    'extractor_args': {
+        'youtube': {'player_client': ['ios', 'web']},
+        # Script-mode PO-token provider (see Dockerfile). Without a token,
+        # requests from this flagged datacenter IP get bot-checked regardless
+        # of cookies or the solved JS challenge; with one, guest access is
+        # usually restored. Harmless when the script is absent - the plugin
+        # logs and falls through.
+        'youtubepot-bgutilscript': {'script_path': ['/opt/bgutil/server/build/generate_once.js']},
+    },
 }
 
 
@@ -125,10 +133,19 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
         # client (ios, web, android) got "Sign in to confirm you're not a bot",
         # while the job record said the format was wrong.
         if 'not a bot' in error_str or 'sign in to confirm' in error_str or 'confirm you' in error_str:
+            # Measured 2026-08-23 on this IP: with PO tokens + the EJS solver,
+            # SOME videos extract as a guest, but most still demand a login.
+            # Cookies exported from a browser session that stays open get
+            # ROTATED by YouTube within hours and die silently — which is what
+            # happened to the first cookie export this worker was given. The
+            # message must teach the correct procedure, not just name the var.
             raise DownloadError(
-                "YouTube blocked this download as automated traffic. The worker runs on a "
-                "datacenter IP, which YouTube challenges by default. Set WORKER_YOUTUBE_COOKIES "
-                "to a valid cookie export to authenticate these requests.",
+                "YouTube asked this worker to sign in. Set or REFRESH "
+                "WORKER_YOUTUBE_COOKIES: export cookies from a logged-in "
+                "private/incognito window and close that window immediately "
+                "afterwards — cookies from a browser session that stays open "
+                "are rotated by YouTube within hours and stop working. "
+                "Alternatively, upload the video file directly.",
                 job_id,
             )
 

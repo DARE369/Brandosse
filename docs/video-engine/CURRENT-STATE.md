@@ -1,0 +1,84 @@
+# Video Engine — Current State
+
+**Written 2026-08-23, from a full audit of the original clipping spec ("Packs
+6–15") against the code, with every claim behaviourally tested against the
+deployed worker.** Everything else in this folder is the historical build
+journal — where it disagrees with this file or the code, it is wrong.
+
+## Feature audit: original spec vs. what exists and works
+
+| Spec (pack) | Status | Evidence |
+|---|---|---|
+| Backend bug fixes — caption path escaping, natural clip length/count (6) | ✅ implemented | `video-worker/stages/analyze.py:79` dynamic count/duration prompts |
+| Gallery — split panel / list / table + persistence (7, 15) | ✅ implemented | `src/components/video-engine/ClipsGallery.jsx:227` `useLocalStorage("video-lab-layout-mode")` |
+| Job settings columns + worker reads them (8) | ✅ implemented | `video_jobs` has all six columns; `video-worker/stages/render.py:340` reads them |
+| Submission form pickers (9) | ✅ implemented | `AspectRatioPicker`, `CaptionStylePicker`, `ClipSettingsPanel` render via `SubmitForm.jsx` |
+| **API route passes settings through (8)** | ❌→✅ **fixed 2026-08-23** | zod stripped all six fields silently; every job ran with defaults. Now validated + inserted (`app/api/video/submit/route.ts:31`), guarded by `scripts/check-video-prefs-contract.cjs` in CI |
+| MediaPipe face tracker (10) | ✅ implemented | `video-worker/utils/face_tracker.py` |
+| Scene classifier (11) | ✅ implemented + working | `video-worker/utils/scene_classifier.py`; test job classified SCREEN_ONLY correctly |
+| Split layout compositor + aspect ratios (12) | ✅ implemented | `video-worker/stages/render.py:50` `calculate_output_dimensions` |
+| Cursor tracker (13) | ✅ implemented + **verified visually** | `video-worker/utils/cursor_tracker.py:59`; extracted frames show the crop following the cursor |
+| Hook text overlay (13) | ❌→✅ **fixed 2026-08-23** | overflowed narrow frames (drawtext cannot wrap); now 7-word cap + width-scaled font |
+| Thumbnails (13) | ✅ implemented + working | `thumbnail_url` populated on real clips |
+| Caption style presets ×6 (14) | ✅ implemented | `video-worker/utils/caption_generator.py:35` `STYLE_CONFIGS` |
+| **Karaoke captions actually burn in (3/14)** | ❌→✅ **fixed 2026-08-23** | every transcript save failed on NOT NULL `raw_transcript` (schema drift) and was swallowed as a warning → 100% of clips shipped captionless. Save fixed, read-back verified, failure now fails the job (`video-worker/stages/transcribe.py:210`). Verified visually: karaoke sweep present in extracted frames |
+| Progress display (15) | ✅ variant | `download_progress` column + per-clip realtime, instead of the spec's `progress_pct` |
+| Stitched output (extra) | ✅ implemented | `stitched_output_url` on `video_jobs` |
+
+**End-to-end proof (2026-08-23):** upload → transcribe → analyze
+(`clip_count_target=1` honored) → render → captions visible, hook fits,
+cursor-tracked crop correct → thumbnail → stitch → storage. Job
+`46c02358` in `video_jobs`.
+
+## YouTube ingestion — status and plan
+
+### The stack, all deployed and proven
+
+YouTube withholds format URLs behind three independent gates. All three are now
+handled in the worker image:
+
+1. **JS signature / n-challenge** — needs a JS runtime yt-dlp ≥ 2026 will
+   accept: Node ≥ 22 installed from official tarball, explicitly enabled at
+   `video-worker/stages/download.py:41` — *and* the challenge-solver scripts,
+   which yt-dlp is not allowed to fetch remotely by default. Bundled locally
+   via `yt-dlp-ejs` (`video-worker/requirements.txt:21`). Without it the
+   failure masquerades as "Requested format is not available".
+2. **PO tokens (BotGuard attestation)** — minted per-request in script mode by
+   `bgutil-ytdlp-pot-provider`; Node half built in the image
+   (`video-worker/Dockerfile:43`), plugin wired at
+   `video-worker/stages/download.py:55`.
+3. **IP reputation** — the residual gate. Measured 2026-08-23 from the
+   worker's Fly IP: with the full stack, a real video **downloaded
+   successfully as a guest** (11.8MB, full speed, valid MP4) — but most tested
+   videos still answer "Sign in to confirm you're not a bot", across every
+   player client (web, tv, mweb, web_embedded, android). Per-video enforcement
+   varies.
+
+### The one action outstanding (user)
+
+`WORKER_YOUTUBE_COOKIES` currently holds cookies that YouTube has **rotated
+dead** ("The provided YouTube account cookies are no longer valid"). They were
+exported from a browser session that stayed open — YouTube rotates such
+cookies within hours, by design.
+
+**Correct procedure:** log into a **burner** Google account in a
+private/incognito window → export cookies (Get cookies.txt extension) →
+**close the window immediately** and never reuse that session → set the export
+as the `WORKER_YOUTUBE_COOKIES` secret on Fly. Valid cookies + PO tokens + the
+EJS solver is the standard working combination on datacenter IPs.
+
+### Escalation tiers if cookies prove insufficient
+
+| tier | cost | note |
+|---|---|---|
+| Valid burner cookies (above) | free | expected to unblock most videos |
+| Rotate Fly machine → new IP | free | new IP starts unflagged; degrades with use |
+| Residential/mobile proxy | ~$1–8/GB | conflicts with the $5/mo ceiling — **founder decision** |
+| Transcript-first architecture | rebuild | different product shape; horizon item |
+
+Rate discipline regardless: guest sessions tolerate roughly 300 videos/hour
+before throttling; we are nowhere near it, but bulk features should never
+assume unlimited pulls.
+
+**The upload path is the permanent fallback** and is fully working —
+browser → HMAC ticket → Fly volume → pipeline (`video-worker/uploads.py`).
