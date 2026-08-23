@@ -26,9 +26,16 @@ YTDLP_BASE_OPTIONS = {
     # selector works across both iOS and web player clients.
     'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
     'no_playlist': True,
-    'socket_timeout': 30,
-    'retries': 3,
-    'fragment_retries': 3,
+    # Resilience for large sources. A 20-minute video failed mid-transfer with
+    # "The read operation timed out. Giving up after 3 retries" (2026-08-23),
+    # while the same video downloaded in 15s on retest — so this was a
+    # transient stall, NOT a systematic limit. That is exactly what retries and
+    # a patient socket exist for: a 30-second read timeout treats a normal
+    # network hiccup on an 80MB transfer as a fatal error, burns the user's
+    # job, and makes them resubmit.
+    'socket_timeout': 120,
+    'retries': 10,
+    'fragment_retries': 10,
     'quiet': True,
     'no_warnings': False,
     'extract_flat': False,
