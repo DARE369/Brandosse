@@ -70,12 +70,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // The browser POSTs to this URL from an HTTPS page. If WORKER_WEBHOOK_URL is
+  // http://, the browser blocks it as mixed content before a request is ever
+  // made, and the only symptom is "Failed to fetch" — no status, no CORS error,
+  // nothing that names the cause.
+  //
+  // This bites ONLY the browser. Server-side callers (notifyJobSubmitted) follow
+  // the worker's 301 http->https quietly, so an http:// value looks completely
+  // healthy from the backend while every upload fails. Upgrade it here rather
+  // than depending on an environment variable being written correctly.
+  const secureWorkerUrl = workerUrl.replace(/^http:\/\//i, 'https://');
+  if (secureWorkerUrl !== workerUrl) {
+    console.warn(
+      '[upload-ticket] WORKER_WEBHOOK_URL is http:// — upgraded to https:// for the browser. '
+        + 'Fix the environment variable: an http value blocks every upload as mixed content.',
+    );
+  }
+
   const uploadId = randomUUID().replace(/-/g, '');
   const expiresAt = Math.floor(Date.now() / 1000) + TICKET_TTL_SECONDS;
   const signature = signTicket(user.id, uploadId, expiresAt, secret);
 
   return successResponse({
-    upload_url: `${workerUrl.replace(/\/$/, '')}/upload`,
+    upload_url: `${secureWorkerUrl.replace(/\/$/, '')}/upload`,
     upload_id: uploadId,
     user_id: user.id,
     expires_at: expiresAt,

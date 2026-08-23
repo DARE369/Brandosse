@@ -1,5 +1,7 @@
 # Video Engine Documentation
 > **Historical — the video-engine build journal, 2026-02 to 2026-05. Not current.**
+> **The maintained current-state document is [CURRENT-STATE.md](CURRENT-STATE.md)**
+> (feature audit vs the original spec, YouTube ingestion status, and the plan).
 > Written while the app was still Vite-based and the pipeline was mock-first.
 > The implementation went a different way. What the worker ACTUALLY does today:
 >

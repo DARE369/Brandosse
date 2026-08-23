@@ -8,6 +8,7 @@ WORKDIR /app
 
 # ffmpeg  - rendering and audio extraction (stages/render.py, ffmpeg_utils.py)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     ffmpeg \
     curl \
     xz-utils \
@@ -31,6 +32,19 @@ RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-l
         --exclude=CHANGELOG.md --exclude=LICENSE --exclude=README.md \
     && rm /tmp/node.tar.xz \
     && node --version
+
+# -- PO-token generator (BotGuard) -------------------------------------------
+# YouTube flags datacenter IPs after a handful of requests and then withholds
+# formats even from a client that solves the JS challenge. PO tokens are the
+# attestation YouTube's own web client presents; minting them restores guest
+# access from flagged IPs in most cases. This clones and builds the Node half
+# of bgutil-ytdlp-pot-provider; the pip plugin in requirements.txt invokes
+# build/generate_once.js per download ("script mode" - no extra daemon).
+RUN git clone --depth 1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/bgutil \
+    && cd /opt/bgutil/server \
+    && npm install --no-audit --no-fund \
+    && npx tsc \
+    && test -f build/generate_once.js
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

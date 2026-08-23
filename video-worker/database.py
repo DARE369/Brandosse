@@ -141,18 +141,47 @@ def fail_job(job_id: str, user_id: str, error_message: str, error_stage: str, sh
     """
     # Step 1: Mark job as failed
     update_job_status(job_id, "failed", error_message, error_stage)
-    
-    # Step 2: Refund credits if applicable
-    if should_refund and credits_to_refund > 0:
+
+    # Step 2: Refund whatever this job ACTUALLY still owes, per the ledger.
+    #
+    # The caller passes credits_to_refund from in-memory state of the current
+    # run, which is blind to earlier runs. Observed 2026-08-23: an upload job
+    # was charged 5 credits, then retried; the retry failed early (its source
+    # file had already been cleaned up) so this run had charged nothing, passed
+    # 0, and the original 5 credits were never returned. The user paid for a
+    # job that produced nothing and can never succeed.
+    #
+    # The invariant worth enforcing is simple and independent of run count:
+    # A FAILED JOB COSTS NOTHING. Consumption is negative and refunds positive,
+    # so any net below zero is money still owed back — regardless of which run
+    # took it.
+    outstanding = 0
+    try:
+        prior = supabase.table("credit_transactions")\
+            .select("amount").eq("job_id", job_id).execute()
+        net = sum(t.get("amount", 0) for t in (prior.data or []))
+        outstanding = -net if net < 0 else 0
+    except Exception as e:
+        # Fall back to the caller's figure rather than refunding nothing.
+        outstanding = credits_to_refund if should_refund else 0
+        log.warning("refund_ledger_check_failed", job_id=job_id, error=str(e)[:120])
+
+    if should_refund and outstanding > 0:
         try:
-            refund_credits(user_id, job_id, credits_to_refund, f"Refund for failed job: {error_stage}")
-            log.info("job_credits_refunded", job_id=job_id, user_id=user_id, amount=credits_to_refund)
+            refund_credits(user_id, job_id, outstanding, f"Refund for failed job: {error_stage}")
+            log.info(
+                "job_credits_refunded",
+                job_id=job_id,
+                user_id=user_id,
+                amount=outstanding,
+                caller_said=credits_to_refund,
+            )
         except Exception as e:
             log.error(
                 "credit_refund_failed_manual_review_required",
                 job_id=job_id,
                 user_id=user_id,
-                amount=credits_to_refund,
+                amount=outstanding,
                 error=str(e)
             )
 
@@ -336,7 +365,45 @@ def deduct_credits(user_id: str, job_id: str, amount: int) -> tuple[bool, int]:
 
     This is called after the pre-flight metadata check, when the worker knows
     the exact duration and therefore the exact credit cost.
+
+    IDEMPOTENT PER JOB. A job can reach this line more than once: the "Try
+    again" button, the stuck-job reaper, and the shutdown requeue all rerun the
+    download stage. Without this check every retry billed the user again —
+    observed 2026-08-23, job 5e77c665 charged 15 credits twice for one video
+    that produced one set of clips. Charging twice for one job is the worst
+    class of bug this product can have, because the user pays for it and the
+    logs look normal.
+
+    The ledger is the source of truth, not a flag: sum every transaction for
+    this job. Consumption is negative, refund positive, so a net below zero
+    means the user has already paid and has not been refunded — skip. A job
+    that failed and WAS refunded nets to zero, so a genuine retry charges
+    correctly.
     """
+    try:
+        prior = supabase.table("credit_transactions")\
+            .select("amount")\
+            .eq("job_id", job_id)\
+            .execute()
+
+        net = sum(t.get("amount", 0) for t in (prior.data or []))
+        if net < 0:
+            balance = supabase.table("user_credits")\
+                .select("balance").eq("user_id", user_id).single().execute()
+            current_balance = (balance.data or {}).get("balance", 0)
+            log.info(
+                "credits_already_charged_for_job",
+                job_id=job_id,
+                net_already_paid=-net,
+                message="Retry of an already-paid job — not billing again.",
+            )
+            return True, current_balance
+    except Exception as e:
+        # Never block a job on the idempotency probe itself. Falling through
+        # risks a double charge in a rare failure; refusing to process risks
+        # every job. The refund path covers the former.
+        log.warning("credit_idempotency_check_failed", job_id=job_id, error=str(e)[:120])
+
     try:
         current = supabase.table("user_credits")\
             .select("balance, lifetime_consumed")\

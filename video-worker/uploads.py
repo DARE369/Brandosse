@@ -48,12 +48,34 @@ UPLOAD_SUBDIR = "uploads"
 # not a standing invitation.
 TICKET_TTL_SECONDS = 60 * 60
 
-# Refuse rather than fill the disk. Two concurrent jobs plus ffmpeg
-# intermediates need real headroom on a 25GB volume, and a full disk fails
-# every in-flight render, not just the upload that caused it.
-MIN_FREE_BYTES_AFTER_UPLOAD = 6 * 1024 * 1024 * 1024  # 6GB
+# Headroom is a PROPORTION of the disk, never a fixed number of bytes.
+#
+# This was 6GB, chosen when the volume was 25GB. The volume later shrank to 3GB
+# to hit a $5/month budget and this constant did not, so every upload was
+# rejected with 507 — the check demanded 6GB free on a 3GB disk, which no file
+# can satisfy, including a 0-byte one. A limit that cannot be met by any input
+# is not a limit, it is an outage.
+#
+# Deriving both numbers from the disk at call time means resizing the volume can
+# never desynchronise them again.
+MIN_FREE_FRACTION = 0.20          # keep a fifth of the disk for ffmpeg's working files
+MIN_FREE_FLOOR_BYTES = 512 * 1024 * 1024
+MAX_UPLOAD_FRACTION = 0.50        # one upload may claim at most half the volume
+MAX_UPLOAD_CEILING_BYTES = 4 * 1024 * 1024 * 1024
 
-MAX_UPLOAD_BYTES = 4 * 1024 * 1024 * 1024  # 4GB
+
+def _disk():
+    return shutil.disk_usage(config.temp_dir)
+
+
+def max_upload_bytes() -> int:
+    """The largest file this worker can accept, given the disk it actually has."""
+    total = _disk().total
+    return int(min(total * MAX_UPLOAD_FRACTION, MAX_UPLOAD_CEILING_BYTES))
+
+
+# Kept as a module attribute for callers that want a static-looking value.
+MAX_UPLOAD_BYTES = MAX_UPLOAD_CEILING_BYTES
 
 _SAFE_ID = re.compile(r'^[A-Za-z0-9_-]{8,64}$')
 _SAFE_EXT = re.compile(r'^[a-z0-9]{2,5}$')
@@ -114,18 +136,26 @@ def assert_disk_headroom(incoming_bytes: int) -> None:
     Check BEFORE writing, not after. A disk that fills mid-write takes down
     every concurrent render on the machine, not just this upload.
     """
-    usage = shutil.disk_usage(config.temp_dir)
+    usage = _disk()
+    required_free = max(int(usage.total * MIN_FREE_FRACTION), MIN_FREE_FLOOR_BYTES)
     projected_free = usage.free - incoming_bytes
-    if projected_free < MIN_FREE_BYTES_AFTER_UPLOAD:
+
+    if projected_free < required_free:
         log.warning(
             "upload_rejected_disk",
-            free_gb=round(usage.free / 1e9, 1),
-            incoming_gb=round(incoming_bytes / 1e9, 2),
+            total_gb=round(usage.total / 1e9, 2),
+            free_gb=round(usage.free / 1e9, 2),
+            incoming_mb=round(incoming_bytes / 1e6, 1),
+            required_free_gb=round(required_free / 1e9, 2),
         )
+        # Say the actual numbers. "No room" with 24GB free and a 8MB file reads
+        # as a lie, and sends the user looking in the wrong place.
         raise HTTPException(
             status_code=507,
             detail=(
-                "The worker does not have room for this file right now. "
+                f"Not enough room on the worker: {usage.free / 1e9:.1f}GB free, and this "
+                f"upload needs {incoming_bytes / 1e6:.0f}MB plus "
+                f"{required_free / 1e9:.1f}GB of working space. "
                 "Wait for current jobs to finish, or upload a smaller file."
             ),
         )

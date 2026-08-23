@@ -157,7 +157,26 @@ def _escape_drawtext_text(text: str) -> str:
     return text
 
 
-def _build_hook_text_filter(ai_title) -> str:
+# Below this, hook text stops being readable on a phone and the words should be
+# dropped instead of shrunk further.
+HOOK_MIN_FONTSIZE = 15
+HOOK_MAX_FONTSIZE = 30
+
+
+def _fitted_fontsize(text: str, frame_w: int) -> int:
+    """
+    Largest readable drawtext size for `text` on a `frame_w`-wide frame.
+
+    drawtext cannot wrap, so the only fit control is size. Assumes ~0.6 x
+    fontsize average glyph width and targets 90% of the frame.
+    """
+    if not text:
+        return HOOK_MAX_FONTSIZE
+    raw = int(0.9 * frame_w / (0.6 * len(text)))
+    return max(HOOK_MIN_FONTSIZE, min(HOOK_MAX_FONTSIZE, raw))
+
+
+def _build_hook_text_filter(ai_title, frame_w: int = 608) -> str:
     """
     Build an FFmpeg drawtext filter string for the hook text overlay.
 
@@ -171,16 +190,40 @@ def _build_hook_text_filter(ai_title) -> str:
     if not ai_title or not str(ai_title).strip():
         return ""
 
-    escaped = _escape_drawtext_text(str(ai_title).strip())
+    # A hook is 5-7 punchy words, not a full sentence. The first real render
+    # burned "...rem Explained in Plain English (No M..." across the top of a
+    # 404px-wide clip — the title was wider than the frame, so the centred
+    # drawtext overflowed BOTH edges and read as garbage. Truncating by words
+    # keeps whatever survives coherent; truncating by pixels would not.
+    # Trim only as far as readability requires, not to a fixed word count.
+    # A hard 7-word cap was sized for a 404px frame and cut "He sent 50
+    # DOPPELGANGERS to trap 100 cops" to "...to trap 100" — losing the noun and
+    # the joke. Sources now arrive at 1080p, so frames are wider and the font
+    # auto-fits: start with the whole title and drop trailing words only while
+    # the fitted size would fall below the readable floor.
+    words = str(ai_title).strip().split()
+    hook_text = " ".join(words[:12])
+    while len(words) > 3 and _fitted_fontsize(hook_text, frame_w) <= HOOK_MIN_FONTSIZE:
+        words = words[:-1]
+        hook_text = " ".join(words)
+
+    escaped = _escape_drawtext_text(hook_text)
     if not escaped:
         return ""
+
+    # Size the text to the frame it will actually be drawn on. drawtext cannot
+    # wrap, so the only way to guarantee fit is to shrink: aim for ~90% of the
+    # frame width at ~0.6 x fontsize average glyph width, clamped to stay
+    # readable (14px floor) and tasteful (30px ceiling). frame_w must be the
+    # OUTPUT width — the filter runs after scaling.
+    fontsize = _fitted_fontsize(escaped, frame_w)
 
     return (
         f"drawtext="
         f"text='{escaped}'"
         f":x=(w-text_w)/2"
         f":y=50"
-        f":fontsize=22"
+        f":fontsize={fontsize}"
         f":fontcolor=white"
         f":box=1"
         f":boxcolor=black@0.55"
@@ -255,7 +298,7 @@ async def _render_split_layout(
         else:
             vf = [f"[0:v]scale={out_w}:{out_h}:flags=lanczos,format=yuv420p[stacked]"]
 
-    hook_filter = _build_hook_text_filter(clip.get("ai_title") if clip else None)
+    hook_filter = _build_hook_text_filter(clip.get("ai_title") if clip else None, frame_w=out_w)
 
     if captions_file:
         captions_escaped = captions_file.replace("\\", "/").replace(":", "\\:")
@@ -394,7 +437,27 @@ async def _render_single_clip(
         split_rendered = False
 
         if not is_vertical:
-            target_w = min(out_w, video_width)
+            # Crop a window that ALREADY has the output aspect ratio, then scale
+            # it. Both numbers must fit inside the source frame.
+            #
+            # This was `target_w = min(out_w, video_width)` with crop_height set
+            # to out_h — i.e. it asked for a 608x1080 crop out of a 1280x720
+            # screencast. 1080 > 720, so ffmpeg's crop filter refused, the video
+            # stream produced no packets, and every clip failed with
+            # "return code -22 (Invalid argument)" and frame=0 while the audio
+            # encoded perfectly. Two mistakes in one: out_h is the OUTPUT height,
+            # not the source's, and cropping 608 wide then scaling to 608x1080
+            # would have stretched the picture vertically even where it fitted.
+            target_h = make_even(video_height)
+            target_w = make_even(int(round(target_h * out_w / out_h)))
+            if target_w > video_width:
+                target_w = make_even(video_width)
+                target_h = make_even(int(round(target_w * out_h / out_w)))
+
+            # Centre the window vertically when it is shorter than the frame.
+            # Zero would crop the top and drop whatever is at the bottom, which
+            # on a screencast is usually the thing being pointed at.
+            crop_y_centred = max(0, (video_height - target_h) // 2)
 
             # ── Scene classification — runs BEFORE face tracker ───────────────
             # classify_clip is synchronous (MediaPipe + NumPy). asyncio.to_thread
@@ -454,9 +517,9 @@ async def _render_single_clip(
                     )
                 crop_coords = {
                     "crop_x": crop_x,
-                    "crop_y": 0,
+                    "crop_y": crop_y_centred,
                     "crop_width": target_w,
-                    "crop_height": out_h,
+                    "crop_height": target_h,
                     "method": "talking_head",
                 }
 
@@ -534,9 +597,9 @@ async def _render_single_clip(
 
                 crop_coords = {
                     "crop_x": crop_x,
-                    "crop_y": 0,
+                    "crop_y": crop_y_centred,
                     "crop_width": target_w,
-                    "crop_height": out_h,
+                    "crop_height": target_h,
                     "method": "screen_only",
                 }
 
@@ -551,9 +614,9 @@ async def _render_single_clip(
                 crop_x = max(0, (video_width - target_w) // 2)
                 crop_coords = {
                     "crop_x": crop_x,
-                    "crop_y": 0,
+                    "crop_y": crop_y_centred,
                     "crop_width": target_w,
-                    "crop_height": out_h,
+                    "crop_height": target_h,
                     "method": scene["dominant"].lower(),
                 }
 
@@ -574,7 +637,11 @@ async def _render_single_clip(
                 height=video_height,
             )
 
-        hook_filter = _build_hook_text_filter(clip_score_data.get("ai_title"))
+        # The output frame is the crop's native width (ffmpeg_utils caps the
+        # render there unless WORKER_ALLOW_UPSCALE). If upscaling is on, the
+        # hook comes out slightly small on the bigger canvas — never oversized.
+        hook_frame_w = crop_coords.get("crop_width") or 608
+        hook_filter = _build_hook_text_filter(clip_score_data.get("ai_title"), frame_w=hook_frame_w)
 
         if not split_rendered:
             render_ok, render_result = await asyncio.to_thread(
@@ -770,7 +837,14 @@ async def run_render(
     # source file from N ffmpeg processes concurrently, causing disk I/O thrash that
     # turns a 5-minute job into hours. 2 at a time keeps I/O sane while still
     # overlapping MediaPipe + encode work across clips.
-    MAX_CONCURRENT_RENDERS = 2
+    # ONE render at a time on this machine size. This was 2, and on the
+    # shared-cpu-1x box two ffmpeg encodes thrash a single vCPU so hard that
+    # neither finishes before Fly's idle-stop kills the machine (observed
+    # 2026-08-23: two 3-minute clips, 15+ minutes, zero completed). Sequential
+    # is the same total CPU but each clip COMMITS as it finishes, so an
+    # interruption loses at most one clip of progress instead of all of them.
+    # Raise this only together with the machine size (L7.5).
+    MAX_CONCURRENT_RENDERS = 1
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_RENDERS)
 
     async def _render_with_semaphore(db_row, clip_score_data):

@@ -13,7 +13,7 @@ from config import config
 from database import reset_stuck_jobs
 from poller import poll_loop, trigger_poll
 from uploads import (
-    MAX_UPLOAD_BYTES, assert_disk_headroom, local_path_for,
+    assert_disk_headroom, local_path_for, max_upload_bytes,
     reap_orphaned_uploads, verify_ticket,
 )
 from logger import log
@@ -87,13 +87,25 @@ app.add_middleware(
     # Was ["http://localhost:5173"] — the Vite dev server, which this app has
     # not used since the Next.js migration. Browsers now upload source video
     # directly to this service, so the real app origins have to be here or every
-    # upload is blocked by CORS before it starts.
+    # upload is blocked by CORS before a byte is sent.
     allow_origins=[
         o.strip() for o in (
             os.environ.get("WORKER_ALLOWED_ORIGINS")
             or "http://localhost:3000,http://localhost:3001"
         ).split(",") if o.strip()
     ],
+    # Vercel mints a NEW hostname for every single deployment
+    # (brandosse-2ge025g4x-dare369s-projects.vercel.app), so an exact-match list
+    # is stale the moment anything is pushed — which is exactly how the first
+    # real upload attempt failed. A regex is the only thing that keeps up.
+    #
+    # Deliberately NOT `.*\.vercel\.app`: that would let any Vercel project on
+    # the internet post files to this worker. Scoped to this account's project
+    # namespace instead.
+    allow_origin_regex=os.environ.get(
+        "WORKER_ALLOWED_ORIGIN_REGEX",
+        r"^https://brandosse[a-z0-9-]*-dare369s-projects\.vercel\.app$",
+    ),
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -170,11 +182,12 @@ async def upload_source(
 
     verify_ticket(x_upload_user, x_upload_id, expires_at, x_upload_signature)
 
+    limit = max_upload_bytes()
     declared = int(request.headers.get("content-length") or 0)
-    if declared > MAX_UPLOAD_BYTES:
+    if declared > limit:
         raise HTTPException(
             status_code=413,
-            detail=f"File is larger than the {MAX_UPLOAD_BYTES // (1024**3)}GB limit.",
+            detail=f"File is larger than the {limit / 1e9:.1f}GB limit for this worker.",
         )
     assert_disk_headroom(declared or 0)
 
@@ -188,7 +201,7 @@ async def upload_source(
                 # Content-Length is a claim by the client. Enforce the real
                 # limit against what actually arrives, or a lying header walks
                 # straight past the check above.
-                if written > MAX_UPLOAD_BYTES:
+                if written > limit:
                     raise HTTPException(status_code=413, detail="Upload exceeded the size limit.")
                 handle.write(chunk)
     except HTTPException:

@@ -3,14 +3,52 @@
 # Runs in a separate asyncio task alongside the FastAPI server.
 
 import asyncio
+import os
+import time
+import urllib.request
+
 from config import config
-from database import claim_next_job
+from database import claim_next_job, update_job_status
 from job_runner import process_job
 from retention import maybe_sweep
 from logger import log
 
 # Tracks how many jobs are currently being processed
 _active_jobs: set[str] = set()
+
+# ── Keep the machine alive while a job is running ───────────────────────────
+# Fly's proxy auto-stops this machine when it sees no edge traffic for a few
+# minutes. A 15-minute render is pure internal work — zero proxied requests —
+# so the proxy concluded the machine was idle and SIGTERMed it MID-JOB
+# (observed 2026-08-23: graceful shutdown at 11:35 with two clips half-done,
+# job stranded in 'rendering'). Pinging our own public URL routes one request
+# through the proxy and resets its idle clock. Only while jobs are active, so
+# scale-to-zero still works the moment we are genuinely idle.
+_KEEPALIVE_INTERVAL_SECS = 60
+_last_keepalive = 0.0
+
+
+def _keepalive_ping() -> None:
+    app_name = os.environ.get("FLY_APP_NAME")
+    if not app_name:
+        return  # not on Fly (local dev) — nothing to keep alive
+    try:
+        urllib.request.urlopen(f"https://{app_name}.fly.dev/health", timeout=10)
+        log.info("keepalive_ping", active_jobs=len(_active_jobs))
+    except Exception as exc:
+        # Best effort. A failed ping must never take down the pipeline the
+        # ping exists to protect.
+        log.warning("keepalive_ping_failed", error=str(exc)[:80])
+
+
+async def _maybe_keepalive() -> None:
+    global _last_keepalive
+    if not _active_jobs:
+        return
+    now = time.monotonic()
+    if now - _last_keepalive >= _KEEPALIVE_INTERVAL_SECS:
+        _last_keepalive = now
+        await asyncio.to_thread(_keepalive_ping)
 
 
 async def poll_loop() -> None:
@@ -27,6 +65,9 @@ async def poll_loop() -> None:
             # and never raises — retention is a cost concern and must not be
             # able to stop the pipeline that earns the money.
             maybe_sweep()
+
+            # While work is in flight, stop Fly's proxy from idle-stopping us.
+            await _maybe_keepalive()
 
             # Only poll if we have capacity for more jobs
             if len(_active_jobs) < config.max_concurrent_jobs:
@@ -56,6 +97,18 @@ async def _run_and_cleanup(job: dict) -> None:
     job_id = job["id"]
     try:
         await process_job(job)
+    except asyncio.CancelledError:
+        # Shutdown interrupted this job (Fly stop, deploy, crash-restart).
+        # Put it BACK IN THE QUEUE rather than stranding it in a non-terminal
+        # state: analyze deletes any existing clips for the job before
+        # inserting, so a rerun is idempotent. Without this, the job sat in
+        # 'rendering' forever waiting for the startup reaper's threshold.
+        try:
+            update_job_status(job_id, "queued")
+            log.warning("job_requeued_on_shutdown", job_id=job_id)
+        except Exception as exc:
+            log.error("job_requeue_failed", job_id=job_id, error=str(exc)[:100])
+        raise
     finally:
         _active_jobs.discard(job_id)
         log.info("poller_job_slot_freed", job_id=job_id, active_count=len(_active_jobs))

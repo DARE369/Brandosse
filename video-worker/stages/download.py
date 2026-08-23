@@ -6,6 +6,8 @@
 import asyncio
 import math
 import os
+import re
+import time
 
 import yt_dlp
 
@@ -23,11 +25,29 @@ MIN_CREDITS_REQUIRED = 5
 YTDLP_BASE_OPTIONS = {
     # iOS player serves combined mp4 streams — don't restrict by ext so the
     # selector works across both iOS and web player clients.
-    'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+    # Degrade, never fail. Each '/' is a fallback tried in order: preferred
+    # 1080p merge, then a combined 1080p stream, then ANY video+audio merge
+    # regardless of height, then any single stream at all. Only a source with
+    # literally no usable format reaches the end — and that is a real failure
+    # worth reporting, unlike "no format matched my height filter", which is
+    # our constraint failing rather than the video being unavailable.
+    'format': (
+        'bestvideo[height<=1080]+bestaudio'
+        '/best[height<=1080]'
+        '/bestvideo*+bestaudio'
+        '/best'
+    ),
     'no_playlist': True,
-    'socket_timeout': 30,
-    'retries': 3,
-    'fragment_retries': 3,
+    # Resilience for large sources. A 20-minute video failed mid-transfer with
+    # "The read operation timed out. Giving up after 3 retries" (2026-08-23),
+    # while the same video downloaded in 15s on retest — so this was a
+    # transient stall, NOT a systematic limit. That is exactly what retries and
+    # a patient socket exist for: a 30-second read timeout treats a normal
+    # network hiccup on an 80MB transfer as a fatal error, burns the user's
+    # job, and makes them resubmit.
+    'socket_timeout': 120,
+    'retries': 10,
+    'fragment_retries': 10,
     'quiet': True,
     'no_warnings': False,
     'extract_flat': False,
@@ -45,8 +65,78 @@ YTDLP_BASE_OPTIONS = {
     # confirm you're not a bot". The client list is still worth keeping — it
     # costs nothing and helps on some sources — but it is NOT a substitute for
     # WORKER_YOUTUBE_COOKIES, and believing it was is why cookies were never set.
-    'extractor_args': {'youtube': {'player_client': ['ios', 'web']}},
+    'extractor_args': {
+        # Client choice decides BOTH reliability and quality, and the previous
+        # list ['tv','ios','web'] was quietly terrible at both. Measured on the
+        # same video, same moment, 2026-08-23:
+        #
+        #   tv+ios+web    5 formats, max height  360p   <- what we were shipping
+        #   mweb        166 formats, max height 2160p
+        #   web_safari  143 formats, max height 1080p
+        #   tv_embedded 119 formats
+        #
+        # Five formats is why an intermittent SABR sweep could wipe out every
+        # option and fail the job, and 360p is why rendered clips looked soft —
+        # the pipeline was never given anything better to work with. The rich
+        # clients pick 1080p and leave ~160 fallbacks if some are poisoned.
+        'youtube': {'player_client': ['mweb', 'web_safari', 'tv_embedded', 'web']},
+        # Script-mode PO-token provider (see Dockerfile). Without a token,
+        # requests from this flagged datacenter IP get bot-checked regardless
+        # of cookies or the solved JS challenge; with one, guest access is
+        # usually restored. Harmless when the script is absent - the plugin
+        # logs and falls through.
+        'youtubepot-bgutilscript': {'script_path': ['/opt/bgutil/server/build/generate_once.js']},
+    },
 }
+
+
+# Pauses before re-walking the whole ladder. YouTube's format poisoning is
+# TRANSIENT and applied per request: the same source failed and then returned
+# 304 usable formats minutes later with unchanged code. When every client is
+# poisoned at once, no client choice helps and only waiting does. Costs at most
+# ~35s on a job that would otherwise fail outright; the first pass has no pause.
+YOUTUBE_RETRY_PAUSES = [0, 12, 25]
+
+
+# Fallback ladder. YouTube's SABR enforcement is applied PER REQUEST, not per
+# video: the same source succeeded at 11:31, failed at 11:52, and succeeded
+# again at 13:10 with identical code. A single client set therefore cannot be
+# "the right one" — resilience comes from having somewhere else to go when the
+# current one comes back empty. Each rung uses a different mix so a sweep that
+# poisons one is unlikely to poison the next.
+CLIENT_LADDER = [
+    ['mweb', 'web_safari', 'tv_embedded', 'web'],   # richest format lists
+    ['web_safari', 'mweb'],
+    ['tv_embedded', 'web'],
+    ['tv', 'ios', 'web'],                            # the old default, last
+]
+
+# Errors that mean "this client came back with nothing usable" rather than
+# "this video cannot be downloaded at all". Only these are worth another rung;
+# a private or deleted video is not.
+_RETRYABLE_MARKERS = (
+    'requested format is not available',
+    'page needs to be reloaded',
+    'no video formats',
+    'unable to extract',
+)
+
+
+def _is_retryable_format_error(err: str) -> bool:
+    low = err.lower()
+    return any(m in low for m in _RETRYABLE_MARKERS)
+
+
+def _opts_with_clients(base: dict, clients: list) -> dict:
+    """Copy opts with the youtube player_client replaced. Deep enough that the
+    module-level YTDLP_BASE_OPTIONS is never mutated by a retry."""
+    opts = dict(base)
+    extractor_args = {k: dict(v) for k, v in (base.get('extractor_args') or {}).items()}
+    yt = dict(extractor_args.get('youtube') or {})
+    yt['player_client'] = clients
+    extractor_args['youtube'] = yt
+    opts['extractor_args'] = extractor_args
+    return opts
 
 
 def calculate_credits(duration_secs: int) -> int:
@@ -58,13 +148,68 @@ def calculate_credits(duration_secs: int) -> int:
     return max(minutes * CREDITS_PER_MINUTE, MIN_CREDITS_REQUIRED)
 
 
+def _repair_cookie_newlines(raw: str) -> str:
+    """
+    Netscape cookie files are newline-delimited, but the Fly secrets dashboard
+    (and many secret UIs) strip newlines out of a pasted multi-line value — the
+    whole file arrives as ONE line with the tabs intact. The Netscape parser
+    then sees a single malformed line and loads zero cookies, and YouTube says
+    "sign in" exactly as if no cookies were set at all. Measured 2026-08-23: a
+    correctly-exported 24-row cookie file pasted into the Fly dashboard arrived
+    as 1 line / 144 tabs, and the pipeline failed with a message telling the
+    user to set the variable they had just set.
+
+    Every data row has the shape:
+        domain \t flag \t path \t flag \t expiry \t name \t value
+    optionally prefixed with '#HttpOnly_' on the domain. Values never contain
+    tabs (the format forbids it), so "domain TAB TRUE|FALSE TAB" is reliably a
+    row start and never occurs inside a value. If the input already has real
+    newlines this is a no-op; otherwise the rows are rebuilt, so a mangled
+    paste self-heals instead of silently downgrading to guest access.
+    """
+    if raw.count("\n") > 3:
+        return raw  # already multi-line, nothing to fix
+
+    # Sometimes newlines survive as the literal two-character sequence \n.
+    unescaped = raw.replace("\\n", "\n").replace("\\t", "\t")
+    if unescaped.count("\n") > 3:
+        return unescaped
+
+    # Newlines were deleted outright: rebuild the rows.
+    body = raw.replace("# Netscape HTTP Cookie File", "")
+    body = re.sub(r"#\s*https?://\S+", "", body)
+    rebuilt = re.sub(
+        r"(#HttpOnly_)?(\.?[A-Za-z0-9.-]+)\t(TRUE|FALSE)\t",
+        lambda m: "\n" + (m.group(1) or "") + m.group(2) + "\t" + m.group(3) + "\t",
+        body,
+    ).strip()
+    rows = [ln for ln in rebuilt.splitlines() if ln.strip() and "\t" in ln]
+    return "# Netscape HTTP Cookie File\n" + "\n".join(rows) + "\n"
+
+
 def _write_cookies_file(temp_dir: str) -> str | None:
-    """Write WORKER_YOUTUBE_COOKIES env var to a temp file for yt-dlp."""
+    """Write WORKER_YOUTUBE_COOKIES to a temp file for yt-dlp, repairing a
+    newline-stripped paste first (see _repair_cookie_newlines)."""
     if not config.youtube_cookies:
         return None
+    content = _repair_cookie_newlines(config.youtube_cookies)
+
+    rows = [ln for ln in content.splitlines() if "\t" in ln and not ln.startswith("#")]
+    if not rows:
+        # Refuse loudly rather than hand yt-dlp a file it will parse to zero
+        # cookies — that failure reads as "sign in required" and points the
+        # user everywhere except at the actual export.
+        log.warning(
+            "youtube_cookies_unparseable",
+            message="WORKER_YOUTUBE_COOKIES contains no valid cookie rows even "
+                    "after repair — the export is malformed. Proceeding as guest.",
+        )
+        return None
+    log.info("youtube_cookies_loaded", rows=len(rows))
+
     cookies_path = os.path.join(temp_dir, "yt_cookies.txt")
     with open(cookies_path, "w") as f:
-        f.write(config.youtube_cookies)
+        f.write(content)
     return cookies_path
 
 
@@ -82,9 +227,97 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
     if cookies_path:
         opts['cookiefile'] = cookies_path
 
+    # ── Never let FORMAT selection decide whether METADATA succeeds ──────────
+    #
+    # This is the structural fix for a failure that recurred all day and
+    # survived four separate patches (PO tokens, cookies, the tv client, a
+    # client fallback ladder). Every one of those changed WHICH CLIENT we
+    # asked; none could help, because the failure was in what we asked FOR.
+    #
+    # This stage needs a title and a duration. Both come from the video page,
+    # and neither depends on a downloadable media format existing. But these
+    # opts inherited the DOWNLOAD selector — bestvideo[height<=1080]+bestaudio
+    # /... — and yt-dlp applies it during extract_info. So any moment YouTube
+    # returned formats that did not match (SABR streams carrying no URL,
+    # formats with no height metadata, an audio-only response), the job died at
+    # PREFLIGHT with "Requested format is not available" — on a video that had
+    # downloaded fine twenty minutes earlier.
+    #
+    # Proven 2026-08-23 by forcing the condition with an unmatchable selector:
+    # metadata failed on ALL FOUR ladder rungs, because every rung carried the
+    # same selector, and succeeded immediately once the selector was dropped.
+    # A fallback that varies the client cannot rescue a constraint that does
+    # not vary. Format availability is now the DOWNLOAD stage's problem alone,
+    # which is the only stage that actually needs a format.
+    opts.pop('format', None)
+    opts['ignore_no_formats_error'] = True
+
+    # Walk the ladder on "came back with nothing usable" errors, then walk it
+    # again after a pause. YouTube's poisoning is TRANSIENT, not per-video:
+    # this exact source failed at 09:10 and returned 304 usable formats a few
+    # minutes later, unchanged code. Switching clients cannot help when every
+    # client is poisoned in the same instant — only waiting can. Two passes
+    # cost at most ~35s on a job that would otherwise have failed outright.
+    last_error = None
+    non_retryable = False
+    for attempt, pause in enumerate(YOUTUBE_RETRY_PAUSES):
+        if pause:
+            log.info("youtube_transient_retry", waiting_secs=pause, attempt=attempt)
+            time.sleep(pause)
+
+        for rung, clients in enumerate(CLIENT_LADDER):
+            try:
+                probe = _opts_with_clients(opts, clients)
+                # process=False skips format selection ENTIRELY. Popping
+                # 'format' is not enough: yt-dlp then applies its OWN default
+                # selector and can still raise "Requested format is not
+                # available". Title and duration come from the page, so this
+                # stage never needs a format to exist at all.
+                with yt_dlp.YoutubeDL(probe) as ydl:
+                    info = ydl.extract_info(url, download=False, process=False)
+
+                if info and info.get('duration') is not None:
+                    log.info(
+                        "preflight_success",
+                        title=info.get('title', 'Untitled Video'),
+                        duration_secs=int(info['duration']),
+                        clients='+'.join(clients),
+                        rung=rung,
+                        attempt=attempt,
+                    )
+                    return {
+                        "title": info.get('title', 'Untitled Video'),
+                        "duration_secs": int(info['duration']),
+                    }
+            except Exception as e:  # noqa: BLE001 - classified by the handler below
+                last_error = e
+                if not _is_retryable_format_error(str(e)):
+                    # Private, deleted, geo-blocked: neither another client nor
+                    # another minute changes the answer. Stop both loops and let
+                    # the classifier below turn it into a real message.
+                    non_retryable = True
+                    break
+                log.warning(
+                    "metadata_client_rung_failed",
+                    rung=rung,
+                    clients='+'.join(clients),
+                    attempt=attempt,
+                    error=str(e)[:100],
+                )
+
+        if non_retryable:
+            break
+
+    # Every rung exhausted (or a non-retryable error): fall through to the
+    # original path so the error classifier produces the right message.
     try:
+        if last_error is not None:
+            # Re-raise into the classifier rather than making another network
+            # call that will fail the same way and cost another round trip.
+            raise last_error
+
         with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            info = ydl.extract_info(url, download=False, process=False)
 
             if info is None:
                 raise DownloadError(
@@ -125,10 +358,19 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
         # client (ios, web, android) got "Sign in to confirm you're not a bot",
         # while the job record said the format was wrong.
         if 'not a bot' in error_str or 'sign in to confirm' in error_str or 'confirm you' in error_str:
+            # Measured 2026-08-23 on this IP: with PO tokens + the EJS solver,
+            # SOME videos extract as a guest, but most still demand a login.
+            # Cookies exported from a browser session that stays open get
+            # ROTATED by YouTube within hours and die silently — which is what
+            # happened to the first cookie export this worker was given. The
+            # message must teach the correct procedure, not just name the var.
             raise DownloadError(
-                "YouTube blocked this download as automated traffic. The worker runs on a "
-                "datacenter IP, which YouTube challenges by default. Set WORKER_YOUTUBE_COOKIES "
-                "to a valid cookie export to authenticate these requests.",
+                "YouTube asked this worker to sign in. Set or REFRESH "
+                "WORKER_YOUTUBE_COOKIES: export cookies from a logged-in "
+                "private/incognito window and close that window immediately "
+                "afterwards — cookies from a browser session that stays open "
+                "are rotated by YouTube within hours and stop working. "
+                "Alternatively, upload the video file directly.",
                 job_id,
             )
 
@@ -179,6 +421,29 @@ def _download_with_ytdlp(url: str, output_path_template: str, job_id: str, cooki
     }
     if cookies_path:
         opts['cookiefile'] = cookies_path
+
+    # Same ladder as the metadata probe. A client set that answered the probe
+    # can still come back empty seconds later, so the download gets its own
+    # walk. Only `opts` is advanced here — the real download happens once,
+    # below, with whichever rung proved it can see usable formats.
+    for rung, clients in enumerate(CLIENT_LADDER[1:], start=1):
+        try:
+            with yt_dlp.YoutubeDL({**opts, 'skip_download': True, 'quiet': True}) as probe:
+                info = probe.extract_info(url, download=False)
+            if info and any(f.get('url') for f in (info.get('formats') or [])):
+                break  # this rung can see real formats; download with it
+            raise RuntimeError('no video formats with URLs')
+        except Exception as e:  # noqa: BLE001 - classified by the handler below
+            if not _is_retryable_format_error(str(e)):
+                break
+            log.warning(
+                "download_client_rung_retry",
+                job_id=job_id,
+                next_rung=rung,
+                clients='+'.join(clients),
+                error=str(e)[:100],
+            )
+            opts = _opts_with_clients(opts, clients)
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:

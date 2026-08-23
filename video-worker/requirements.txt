@@ -7,6 +7,18 @@ structlog>=24.4.0
 pydantic>=2.8.2
 pydantic-settings>=2.4.0
 yt-dlp>=2024.12.13
+# PO-token (BotGuard) provider plugin - the community standard countermeasure
+# for YouTube flagging datacenter IPs. The pip package is the yt-dlp plugin
+# half; the Node half is built into the image from the same project (see
+# Dockerfile). Tokens are minted per-request in "script mode", so no second
+# daemon runs in the container.
+bgutil-ytdlp-pot-provider
+# Bundled JS challenge-solver scripts. Without this, yt-dlp 2026.x must fetch a
+# remote component it is not allowed to fetch by default, signature/n solving
+# fails, and every web format is dropped — the failure that read as
+# 'Requested format is not available'. With it, [jsc:node] solves challenges
+# locally using the Node runtime already in the image.
+yt-dlp-ejs
 replicate>=0.34.1
 anthropic>=0.40.0
 opencv-python-headless>=4.10.0
