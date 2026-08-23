@@ -87,13 +87,25 @@ app.add_middleware(
     # Was ["http://localhost:5173"] — the Vite dev server, which this app has
     # not used since the Next.js migration. Browsers now upload source video
     # directly to this service, so the real app origins have to be here or every
-    # upload is blocked by CORS before it starts.
+    # upload is blocked by CORS before a byte is sent.
     allow_origins=[
         o.strip() for o in (
             os.environ.get("WORKER_ALLOWED_ORIGINS")
             or "http://localhost:3000,http://localhost:3001"
         ).split(",") if o.strip()
     ],
+    # Vercel mints a NEW hostname for every single deployment
+    # (brandosse-2ge025g4x-dare369s-projects.vercel.app), so an exact-match list
+    # is stale the moment anything is pushed — which is exactly how the first
+    # real upload attempt failed. A regex is the only thing that keeps up.
+    #
+    # Deliberately NOT `.*\.vercel\.app`: that would let any Vercel project on
+    # the internet post files to this worker. Scoped to this account's project
+    # namespace instead.
+    allow_origin_regex=os.environ.get(
+        "WORKER_ALLOWED_ORIGIN_REGEX",
+        r"^https://brandosse[a-z0-9-]*-dare369s-projects\.vercel\.app$",
+    ),
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
