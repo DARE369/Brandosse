@@ -394,7 +394,27 @@ async def _render_single_clip(
         split_rendered = False
 
         if not is_vertical:
-            target_w = min(out_w, video_width)
+            # Crop a window that ALREADY has the output aspect ratio, then scale
+            # it. Both numbers must fit inside the source frame.
+            #
+            # This was `target_w = min(out_w, video_width)` with crop_height set
+            # to out_h — i.e. it asked for a 608x1080 crop out of a 1280x720
+            # screencast. 1080 > 720, so ffmpeg's crop filter refused, the video
+            # stream produced no packets, and every clip failed with
+            # "return code -22 (Invalid argument)" and frame=0 while the audio
+            # encoded perfectly. Two mistakes in one: out_h is the OUTPUT height,
+            # not the source's, and cropping 608 wide then scaling to 608x1080
+            # would have stretched the picture vertically even where it fitted.
+            target_h = make_even(video_height)
+            target_w = make_even(int(round(target_h * out_w / out_h)))
+            if target_w > video_width:
+                target_w = make_even(video_width)
+                target_h = make_even(int(round(target_w * out_h / out_w)))
+
+            # Centre the window vertically when it is shorter than the frame.
+            # Zero would crop the top and drop whatever is at the bottom, which
+            # on a screencast is usually the thing being pointed at.
+            crop_y_centred = max(0, (video_height - target_h) // 2)
 
             # ── Scene classification — runs BEFORE face tracker ───────────────
             # classify_clip is synchronous (MediaPipe + NumPy). asyncio.to_thread
@@ -454,9 +474,9 @@ async def _render_single_clip(
                     )
                 crop_coords = {
                     "crop_x": crop_x,
-                    "crop_y": 0,
+                    "crop_y": crop_y_centred,
                     "crop_width": target_w,
-                    "crop_height": out_h,
+                    "crop_height": target_h,
                     "method": "talking_head",
                 }
 
@@ -534,9 +554,9 @@ async def _render_single_clip(
 
                 crop_coords = {
                     "crop_x": crop_x,
-                    "crop_y": 0,
+                    "crop_y": crop_y_centred,
                     "crop_width": target_w,
-                    "crop_height": out_h,
+                    "crop_height": target_h,
                     "method": "screen_only",
                 }
 
@@ -551,9 +571,9 @@ async def _render_single_clip(
                 crop_x = max(0, (video_width - target_w) // 2)
                 crop_coords = {
                     "crop_x": crop_x,
-                    "crop_y": 0,
+                    "crop_y": crop_y_centred,
                     "crop_width": target_w,
-                    "crop_height": out_h,
+                    "crop_height": target_h,
                     "method": scene["dominant"].lower(),
                 }
 
