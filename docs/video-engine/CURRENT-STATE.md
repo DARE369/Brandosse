@@ -95,6 +95,24 @@ assume unlimited pulls.
 **The upload path is the permanent fallback** and is fully working —
 browser → HMAC ticket → Fly volume → pipeline (`video-worker/uploads.py`).
 
+## End-to-end YouTube proof (2026-08-23, job `5e77c665`)
+
+A 14-minute TED talk, submitted as a plain YouTube URL, ran the whole pipeline
+in **under 4 minutes**: download ~45s (tv client) → transcribe → analyze
+(`clip_count_target=2` honored, real hook titles) → two clips of 235s and 174s
+rendered sequentially with thumbnails → storage. Frame inspection confirmed
+face-tracked crop and burned-in captions on the YouTube-sourced output.
+
+Also learned: YouTube's SABR-only streaming is **intermittent per request** —
+the same video downloaded at 11:31 and failed at 11:52 with "Requested format
+is not available". The `tv` player client is outside the SABR experiment and
+fixed it (`video-worker/stages/download.py`).
+
+Known quality note (horizon, not a blocker): the tv client's combined formats
+top out low for some videos — this clip rendered from a 360p source. If clip
+sharpness matters commercially, prefer bestvideo+bestaudio merges from the tv
+formats or fall back across clients by resolution.
+
 ## Long renders vs. scale-to-zero (fixed 2026-08-23)
 
 Fly's proxy stops this machine after a few minutes without edge traffic. A
