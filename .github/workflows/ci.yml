@@ -92,6 +92,8 @@ jobs:
         run: node scripts/check-empty-states.cjs
       - name: check-credit-grant
         run: node scripts/check-credit-grant.cjs
+      - name: check-video-prefs-contract
+        run: node scripts/check-video-prefs-contract.cjs
 
       # LOCK L-1.6 — "documentation is a claim" was the only law in CLAUDE.md
       # with no detector behind it. This checks the one claim docs make

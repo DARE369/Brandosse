@@ -19,8 +19,36 @@ const submitSchema = z
   .object({
     url: z.string().trim().min(3, 'URL is too short').max(500, 'URL is too long'),
     platform: z.enum(['youtube', 'twitter', 'upload']),
+    // ── Clip preferences ────────────────────────────────────────────────────
+    // The form collected these, the database had columns for them, and the
+    // worker read them — but this schema silently STRIPPED them (zod drops
+    // unknown keys), so every job ran with defaults no matter what the user
+    // picked. Backend capability, frontend control, no connection between:
+    // the exact defect class this codebase keeps re-growing.
+    //
+    // All optional. Absent fields are omitted from the insert below so the
+    // database defaults ('9:16', 'karaoke', NULL = Auto) apply.
+    aspect_ratio: z.enum(['9:16', '4:5', '1:1', '16:9', '3:4']).optional(),
+    caption_style: z
+      .enum(['karaoke', 'bold_drop', 'box_pop', 'classic', 'color_pop', 'focus_word'])
+      .optional(),
+    clip_count_target: z.number().int().min(1).max(15).optional(),
+    min_duration_secs: z.number().int().min(10).max(600).optional(),
+    max_duration_secs: z.number().int().min(10).max(600).optional(),
+    specific_moments: z.string().trim().max(500).optional(),
   })
   .superRefine((value, ctx) => {
+    if (
+      value.min_duration_secs !== undefined &&
+      value.max_duration_secs !== undefined &&
+      value.min_duration_secs >= value.max_duration_secs
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['min_duration_secs'],
+        message: 'Minimum clip duration must be less than the maximum',
+      });
+    }
     if (
       value.platform !== 'upload' &&
       !value.url.startsWith('http://') &&
@@ -145,6 +173,16 @@ export async function POST(request: NextRequest) {
       source_url: url,
       source_platform: platform,
       status: 'queued',
+      // Spread-if-present: an absent key lets the column DEFAULT apply, while
+      // an explicit null would override it. This is the difference between
+      // "user chose nothing" and "user chose nothing, stored as a choice".
+      ...(body.aspect_ratio !== undefined && { aspect_ratio: body.aspect_ratio }),
+      ...(body.caption_style !== undefined && { caption_style: body.caption_style }),
+      ...(body.clip_count_target !== undefined && { clip_count_target: body.clip_count_target }),
+      ...(body.min_duration_secs !== undefined && { min_duration_secs: body.min_duration_secs }),
+      ...(body.max_duration_secs !== undefined && { max_duration_secs: body.max_duration_secs }),
+      ...(body.specific_moments !== undefined &&
+        body.specific_moments !== '' && { specific_moments: body.specific_moments }),
     })
     .select('id, status, created_at')
     .single();

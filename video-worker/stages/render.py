@@ -157,7 +157,7 @@ def _escape_drawtext_text(text: str) -> str:
     return text
 
 
-def _build_hook_text_filter(ai_title) -> str:
+def _build_hook_text_filter(ai_title, frame_w: int = 608) -> str:
     """
     Build an FFmpeg drawtext filter string for the hook text overlay.
 
@@ -171,16 +171,31 @@ def _build_hook_text_filter(ai_title) -> str:
     if not ai_title or not str(ai_title).strip():
         return ""
 
-    escaped = _escape_drawtext_text(str(ai_title).strip())
+    # A hook is 5-7 punchy words, not a full sentence. The first real render
+    # burned "...rem Explained in Plain English (No M..." across the top of a
+    # 404px-wide clip — the title was wider than the frame, so the centred
+    # drawtext overflowed BOTH edges and read as garbage. Truncating by words
+    # keeps whatever survives coherent; truncating by pixels would not.
+    words = str(ai_title).strip().split()
+    hook_text = " ".join(words[:7])
+
+    escaped = _escape_drawtext_text(hook_text)
     if not escaped:
         return ""
+
+    # Size the text to the frame it will actually be drawn on. drawtext cannot
+    # wrap, so the only way to guarantee fit is to shrink: aim for ~90% of the
+    # frame width at ~0.6 x fontsize average glyph width, clamped to stay
+    # readable (14px floor) and tasteful (30px ceiling). frame_w must be the
+    # OUTPUT width — the filter runs after scaling.
+    fontsize = max(14, min(30, int(0.9 * frame_w / (0.6 * max(1, len(escaped))))))
 
     return (
         f"drawtext="
         f"text='{escaped}'"
         f":x=(w-text_w)/2"
         f":y=50"
-        f":fontsize=22"
+        f":fontsize={fontsize}"
         f":fontcolor=white"
         f":box=1"
         f":boxcolor=black@0.55"
@@ -255,7 +270,7 @@ async def _render_split_layout(
         else:
             vf = [f"[0:v]scale={out_w}:{out_h}:flags=lanczos,format=yuv420p[stacked]"]
 
-    hook_filter = _build_hook_text_filter(clip.get("ai_title") if clip else None)
+    hook_filter = _build_hook_text_filter(clip.get("ai_title") if clip else None, frame_w=out_w)
 
     if captions_file:
         captions_escaped = captions_file.replace("\\", "/").replace(":", "\\:")
@@ -594,7 +609,11 @@ async def _render_single_clip(
                 height=video_height,
             )
 
-        hook_filter = _build_hook_text_filter(clip_score_data.get("ai_title"))
+        # The output frame is the crop's native width (ffmpeg_utils caps the
+        # render there unless WORKER_ALLOW_UPSCALE). If upscaling is on, the
+        # hook comes out slightly small on the bigger canvas — never oversized.
+        hook_frame_w = crop_coords.get("crop_width") or 608
+        hook_filter = _build_hook_text_filter(clip_score_data.get("ai_title"), frame_w=hook_frame_w)
 
         if not split_rendered:
             render_ok, render_result = await asyncio.to_thread(

@@ -208,17 +208,49 @@ def _approximate_word_timing(full_text: str, duration: float) -> list:
 
 
 def _save_transcript_db(job_id: str, user_id: str, transcript: dict) -> None:
-    """Save transcript to database."""
+    """
+    Save the transcript, and PROVE it saved.
+
+    This used to catch every exception and log a warning. The live table has a
+    NOT NULL raw_transcript column this payload did not include, so every save
+    failed with 23502 — and because the failure was swallowed, every render then
+    loaded zero word segments and burned zero captions into every clip, with
+    nothing louder than a warning in a log nobody was reading. Karaoke captions
+    are the product's promised visual, and they were silently absent from 100%
+    of output.
+
+    Now: the payload satisfies the live schema, a failed save raises so the job
+    fails AT the transcribe stage with a real error, and a read-back confirms
+    the row is actually there — so schema drift can never silently eat captions
+    again. A visible failure is repairable; a silent one already shipped.
+    """
     from database import supabase
-    try:
-        supabase.table("video_transcripts").upsert({
-            "job_id": job_id,
-            "user_id": user_id,
-            "full_text": transcript["full_text"],
-            "word_segments": transcript["word_segments"],
+    supabase.table("video_transcripts").upsert({
+        "job_id": job_id,
+        "user_id": user_id,
+        "full_text": transcript["full_text"],
+        "word_segments": transcript["word_segments"],
+        "language": transcript["language"],
+        "duration": transcript["duration"],
+        # NOT NULL in the live table. Nothing reads it back — word_segments is
+        # the working copy — so store provenance rather than a second copy of
+        # the words.
+        "raw_transcript": {
+            "source": "groq-whisper",
             "language": transcript["language"],
             "duration": transcript["duration"],
-        }, on_conflict="job_id").execute()
-        log.info("transcript_saved_to_db", job_id=job_id)
-    except Exception as e:
-        log.warning("transcript_db_save_failed", job_id=job_id, error=str(e))
+            "word_count": len(transcript["word_segments"]),
+        },
+    }, on_conflict="job_id").execute()
+
+    # Read back. An upsert that "succeeded" against the wrong schema, an RLS
+    # surprise, or a pooler hiccup all look identical from the write side.
+    check = supabase.table("video_transcripts")        .select("word_segments").eq("job_id", job_id).single().execute()
+    saved = (check.data or {}).get("word_segments") or []
+    if len(saved) != len(transcript["word_segments"]):
+        raise RuntimeError(
+            f"Transcript save verification failed: wrote "
+            f"{len(transcript['word_segments'])} words, read back {len(saved)}. "
+            f"Captions would be silently empty — failing the job instead."
+        )
+    log.info("transcript_saved_to_db", job_id=job_id, words=len(saved))
