@@ -116,9 +116,31 @@ async def _run_pipeline_stages(job: dict, temp_dir: str) -> tuple[int, int]:
         update_job_status(job_id, "stitching")
         log.info("stage_start", job_id=job_id, stage="stitch")
 
-        stitched_url = await run_stitch(job, rendered_clips, temp_dir)
-
-        log.info("stage_complete", job_id=job_id, stage="stitch", url=stitched_url)
+        # Stitching is a CONVENIENCE, not the deliverable. The clips are the
+        # product, they are already rendered, uploaded and marked complete by
+        # this point, and the user can see them.
+        #
+        # Observed 2026-08-24: a job produced 5 of 5 clips with thumbnails in
+        # 5.2 minutes and then reported FAILED, because concatenating those
+        # clips into one reel exceeded Supabase's 50MB free-plan object limit
+        # (HTTP 413). Five good clips sat in storage behind a page that said
+        # the job had failed — the worst kind of wrong, because the work was
+        # done and only the reporting lied.
+        #
+        # A failure here is now recorded and moved past. Anything that can
+        # actually break the deliverable still fails the job loudly.
+        try:
+            stitched_url = await run_stitch(job, rendered_clips, temp_dir)
+            log.info("stage_complete", job_id=job_id, stage="stitch", url=stitched_url)
+        except Exception as stitch_error:
+            stitched_url = None
+            log.warning(
+                "stitch_failed_clips_unaffected",
+                job_id=job_id,
+                clips_delivered=len(rendered_clips),
+                error=str(stitch_error)[:200],
+                message="Combined reel unavailable; individual clips are complete.",
+            )
 
         # ── Complete ──────────────────────────────────────────────
         update_job_status(job_id, "complete")
