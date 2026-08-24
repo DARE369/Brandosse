@@ -76,6 +76,14 @@ def build_analyze_prompt(title: str, full_text: str, word_segments: list, total_
     max_duration_secs = _get_job_field(job, 'max_duration_secs')
     specific_moments  = _get_job_field(job, 'specific_moments')
 
+    # Auto mode used to allow 15 clips. A 20-minute source produced NINE, each
+    # up to 2 minutes — 11.4 minutes of output video to encode on one shared
+    # vCPU, which took over an hour and kept being interrupted. Nobody posts
+    # nine clips from one video anyway; the tail is filler by definition.
+    # Scale to the source and cap hard: ~1 clip per 4 minutes, at most 6.
+    _src_minutes = (total_duration or 0) / 60.0
+    auto_clip_cap = max(2, min(6, int(_src_minutes // 4) or 2))
+
     if clip_count_target and isinstance(clip_count_target, int) and clip_count_target > 0:
         clip_count_instruction = (
             f"Identify exactly {clip_count_target} clip"
@@ -86,10 +94,10 @@ def build_analyze_prompt(title: str, full_text: str, word_segments: list, total_
     else:
         clip_count_instruction = (
             "Identify every genuinely compelling moment this video contains, "
-            "up to 15 clips maximum. "
+            f"up to {auto_clip_cap} clips maximum. "
             "Quality determines quantity — if only 2 moments are truly strong "
-            "as standalone short-form content, return 2. "
-            "If 11 moments are excellent, return 11. "
+            "as standalone short-form content, return 2. Prefer FEWER, stronger "
+            "clips over more, weaker ones. "
             "Do not pad the list with weak clips to reach a minimum."
         )
 
@@ -118,7 +126,10 @@ def build_analyze_prompt(title: str, full_text: str, word_segments: list, total_
             "Each clip must be as long as the natural thought or story arc requires. "
             "A punchy point might be 20 seconds. A complete how-to explanation might "
             "be 2 minutes. Start at the beginning of a complete thought and end at "
-            "its natural conclusion. Minimum 15 seconds. Maximum 4 minutes."
+            "its natural conclusion. Minimum 15 seconds. Maximum 90 seconds — "
+            "retention on short-form collapses past about 90s, and a 2-minute "
+            "clip costs proportionally more to render for content nobody "
+            "finishes watching."
         )
 
     if specific_moments and str(specific_moments).strip():

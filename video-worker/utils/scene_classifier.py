@@ -82,7 +82,10 @@ ANALYSIS_WIDTH = 640
 # Every 15 frames at 30 FPS = 2 samples/second.
 # Coarser than Pack 5's face tracker (every 10 frames) because we only need
 # the dominant type, not a movement trajectory.
-DEFAULT_SAMPLE_INTERVAL = 15
+# Every 30th frame is one sample per second. The classifier only needs the
+# DOMINANT scene type for the clip, decided by majority vote — a vote does
+# not get more decisive by counting twice as many near-identical frames.
+DEFAULT_SAMPLE_INTERVAL = 30
 
 # Fall back to TALKING_HEAD if fewer than this fraction of frames agree.
 # A low confidence score indicates an ambiguous clip (mixed content, transitions).

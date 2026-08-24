@@ -139,6 +139,36 @@ def _opts_with_clients(base: dict, clients: list) -> dict:
     return opts
 
 
+def _find_existing_source(temp_dir: str):
+    """
+    Return (video_path, audio_path) if a previous attempt already fetched both,
+    else None.
+
+    Only counts files with real content — a zero-byte leftover from a transfer
+    that died mid-write must NOT be mistaken for finished work, or the resume
+    hands the pipeline a corrupt input and the job fails somewhere far less
+    obvious than the download stage.
+    """
+    if not os.path.isdir(temp_dir):
+        return None
+
+    def _usable(path, min_bytes):
+        return os.path.isfile(path) and os.path.getsize(path) >= min_bytes
+
+    audio = os.path.join(temp_dir, 'source.wav')
+    if not _usable(audio, 1000):
+        return None
+
+    for name in sorted(os.listdir(temp_dir)):
+        if not name.startswith('source') or name.endswith('.wav'):
+            continue
+        candidate = os.path.join(temp_dir, name)
+        # 100KB floor: any real source video clears it, any stub does not.
+        if _usable(candidate, 100_000):
+            return candidate, audio
+    return None
+
+
 def calculate_credits(duration_secs: int) -> int:
     """
     Calculate credit cost from video duration.
@@ -568,6 +598,41 @@ async def run_download(job: dict, temp_dir: str) -> dict:
     user_id = job["user_id"]
     source_url = job["source_url"]
     platform = job["source_platform"]
+
+    # ── RESUME: reuse a source file that is already on disk ─────────────────
+    #
+    # Transcribe and analyze already skip finished work, but download did not,
+    # and download is the least reliable step in the whole pipeline. So an
+    # interrupted job — which by definition has ALREADY downloaded successfully
+    # — went straight back to YouTube on every retry and could fail there.
+    # Observed 2026-08-23: a job with a saved transcript and 9 scored clips
+    # spent 85 minutes and died re-fetching a file it still had.
+    #
+    # If the video and its extracted audio are both present and non-empty, this
+    # stage is finished. Reported duration comes from the job row (written on
+    # the first successful pass), so no network call is needed to resume.
+    existing = _find_existing_source(temp_dir)
+    if existing:
+        video_path, audio_path = existing
+        known_duration = job.get("source_duration_secs")
+        if known_duration:
+            log.info(
+                "stage_resumed",
+                job_id=job_id,
+                stage="download",
+                video_mb=round(os.path.getsize(video_path) / 1e6, 1),
+                message="source already on disk — skipping fetch",
+            )
+            return {
+                "video_path": video_path,
+                "audio_path": audio_path,
+                "title": job.get("source_title") or "Untitled Video",
+                "duration_secs": int(known_duration),
+                # deduct_credits is idempotent per job, so a resumed run does
+                # not double-charge; passing the real figure keeps the refund
+                # arithmetic correct if a later stage fails.
+                "credits_to_consume": calculate_credits(int(known_duration)),
+            }
     credits_to_consume = 0
     credits_deducted = False
 

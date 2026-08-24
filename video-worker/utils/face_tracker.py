@@ -46,7 +46,11 @@ DEFAULT_EMA_ALPHA = 0.12
 # Process one frame every N frames.
 # At 30 FPS, N=10 → ~3 samples/s. Good balance: captures sub-second movement,
 # completes ~10× faster than per-frame detection.
-DEFAULT_SAMPLE_INTERVAL = 10
+# Every 20th frame is ~1.5 samples/second at 30fps. Halving the sample rate
+# halves the MediaPipe inference cost, which is the dominant per-clip cost
+# on a shared vCPU. Faces do not move meaningfully in a third of a second,
+# and the EMA smoothing downstream was already averaging that detail away.
+DEFAULT_SAMPLE_INTERVAL = 20
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
