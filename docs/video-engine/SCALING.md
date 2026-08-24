@@ -5,6 +5,43 @@ pipeline is currently sized for one user and a $5/month ceiling, deliberately
 (`video-worker/fly.toml:61`). This document exists so the decisions are already
 mapped when volume arrives, rather than discovered under load.
 
+## The render bottleneck is CPU steal, not code (measured 2026-08-24)
+
+Rendering was tuned hard — `veryfast` encoding (7x faster than `fast`), half
+the MediaPipe sampling, fewer and shorter clips — and a 20-minute source still
+took 36.8 minutes and lost 2 of 5 clips to a 10-minute-per-clip render timeout.
+
+The cause is the machine, and `/proc/stat` on the running worker names it:
+
+    user 1056 | system 176 | idle 5246 | steal 10824
+
+**Steal time is ~9x the time we actually get to compute.** The hypervisor is
+handing the physical core to other tenants; `shared-cpu-1x` is burstable, and
+sustained video encoding is exactly the workload that exhausts a burst
+allowance and then runs at a fraction of a core.
+
+It shows up as wild variance rather than consistent slowness. The identical
+crop+scale+encode measured:
+
+    45s of video in 24s   (0.5x realtime — when CPU was available)
+    20s of video in 98s   (4.9x realtime — while being starved)
+
+Same code, same machine, same day. That variance is why clips time out
+unpredictably rather than all failing or all passing, and it is why no further
+code tuning will fix it — the work is already about as small as it can be
+without cutting quality.
+
+**What actually changes it:** a `performance` (dedicated-core) machine. Under
+scale-to-zero the cost shape is favourable — billing is per second, so a
+machine that is several times faster runs for proportionally fewer seconds and
+the cost PER JOB stays close, while wall-clock drops sharply. It does raise the
+floor if the machine ever idles, so it should be paired with keeping
+scale-to-zero on.
+
+**Founder decision, not an engineering one.** Verify current per-second pricing
+on Fly before committing; the principle is that burst workloads on a
+dedicated core cost roughly the same per job and finish far sooner.
+
 ## Today's actual ceiling
 
 One machine, one job at a time, roughly four minutes per job:
