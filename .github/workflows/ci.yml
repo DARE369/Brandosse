@@ -102,6 +102,12 @@ jobs:
       # plus loud failure, so it cannot silently disconnect again.
       - name: check-brand-logo-chain
         run: node scripts/check-brand-logo-chain.cjs
+      # A real generation failed and told the user nothing: a 20-word caption
+      # floor was applied to an X post, and the collected failure reasons were
+      # discarded. Keeps both fixed and keeps the misleading "CORS" symptom
+      # from becoming a real CORS bug.
+      - name: check-generation-diagnosability
+        run: node scripts/check-generation-diagnosability.cjs
 
       # LOCK L-1.6 — "documentation is a claim" was the only law in CLAUDE.md
       # with no detector behind it. This checks the one claim docs make

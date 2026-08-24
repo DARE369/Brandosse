@@ -1895,7 +1895,19 @@ const useSessionStore = create((set, get) => ({
           },
         });
         if (succeededCount === 0) {
-          throw new Error('All variants failed to generate.');
+          // The reasons are sitting in `outcomes` and were being discarded,
+          // so a user whose generation died to a provider timeout or a
+          // guardrail block saw only "All variants failed" and had nothing to
+          // act on — observed 2026-08-24, where the real causes were an edge
+          // function 504 and a caption-length guardrail. Surface them.
+          const reasons = [...new Set(
+            outcomes.filter((o) => !o.ok && !o.cancelled).map((o) => o.error).filter(Boolean),
+          )];
+          throw new Error(
+            reasons.length
+              ? `All variants failed to generate. ${reasons.join(' | ')}`
+              : 'All variants failed to generate.',
+          );
         }
       }
 

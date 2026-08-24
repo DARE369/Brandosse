@@ -104,3 +104,73 @@ These are the real work items — without them the controls exist but don't chan
 6. **Long video** (gap 7).
 
 Steps 1–4 make the *existing* image/carousel/video modes produce genuinely controllable results; 5–6 add the new capabilities.
+
+---
+
+## 7. Failure modes seen in production (2026-08-24)
+
+Recorded from one real failed generation — the prompt asked for a *short,
+conversational X post* about jollof vs fried rice. Three separate things went
+wrong; only one was a bug in the thing that appeared to fail.
+
+### 7.1 The "CORS error" is never CORS
+
+The console showed:
+
+    Access to fetch at '.../generate-content-plan' has been blocked by CORS
+    policy: No 'Access-Control-Allow-Origin' header is present
+
+`supabase/functions/_shared/http.ts:2` sends
+`Access-Control-Allow-Origin: "*"`. Nothing is being blocked by policy.
+**This message means the function returned no response at all** — it timed
+out or crashed, so no headers came back, and the browser reports the absence
+as a CORS failure. The preceding `504` on the same function is the real
+event.
+
+Do not "fix CORS" when this appears. Look at why the function died.
+
+### 7.2 Why generate-content-plan can exceed the gateway limit
+
+`_shared/llm.ts` tries the preferred provider, then falls back to the other,
+**sequentially**, each with its own `AbortSignal.timeout(60_000)`
+(`llm.ts:127`, `llm.ts:167`). A hung first provider therefore costs 60s
+before the fallback even starts, and the invocation can pass 120s against a
+`maxTokens: 6000` JSON generation. That is what produced the 504.
+
+The timeouts are correct in isolation; it is their *sum* that exceeds the
+request budget. Anything that shortens the first leg — a lower per-leg
+timeout, or racing the providers instead of chaining them — attacks the real
+constraint. **Not yet done; recorded so it is not rediscovered.**
+
+### 7.3 The caption floor was platform-blind (FIXED)
+
+`min_caption_words` defaults to **20** (`BrandKitForm.jsx:92`) and is set to
+20 on every kit in the database. `qualityGate.js` applied it identically to
+every platform.
+
+X caps a post at 280 characters, so a 20-word floor is most of the post. The
+user asked for short; the model produced 7 words, then 13; the gate called
+both violations, requested a revision, could not reach the function (7.1),
+and **hard-blocked the generation**. The output was right and the rule was
+wrong.
+
+Fixed: the brand minimum is now capped per platform
+(`PLATFORM_MIN_WORD_CEILING` in `src/services/qualityGate.js`) — X/Twitter 5,
+Threads/TikTok 8, Instagram/Facebook/Pinterest 12, LinkedIn/YouTube 20. It
+uses `Math.min`, so it can only ever **lower** a floor, never raise one; the
+brand's *maximum* is untouched; unknown or missing platforms keep the brand
+rule exactly.
+
+The fail-closed behaviour on an uncleared violation was **not** weakened —
+that is deliberate (`qualityGate.js` header). The rule was corrected instead,
+so a legitimate short post is no longer a violation to begin with.
+
+### 7.4 The failure reasons were collected and thrown away (FIXED)
+
+`SessionStore.js` gathers a per-variant reason into `outcomes`, then, when
+every variant failed, threw a bare `All variants failed to generate.` — so a
+user whose generation died to a provider timeout or a guardrail block had
+nothing to act on. The distinct reasons are now appended to that message.
+
+Guarded by `scripts/check-generation-diagnosability.cjs`, which also asserts
+CORS stays open so the 7.1 symptom cannot become a real 7.1 bug.

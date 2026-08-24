@@ -1,6 +1,37 @@
 // src/services/qualityGate.js
 import { callGroqRevision } from './groqClient';
 
+// A brand-wide word MINIMUM cannot mean the same thing on every platform.
+// `min_caption_words` defaults to 20 (BrandKitForm.jsx) and applies to every
+// kit; X caps a post at 280 characters, so a 20-word floor is most of the
+// post. Observed 2026-08-24: a user asked for a short, conversational X post,
+// the model correctly produced 7 and 13 words, and the gate rejected BOTH —
+// then hard-blocked the generation when the revision call could not be
+// reached. The output was right and the rule was wrong.
+//
+// The brand's minimum still applies; it is only CAPPED per platform. This can
+// lower a floor, never raise one, and it does not touch the maximum — a brand
+// that wants short captions everywhere still gets them.
+const PLATFORM_MIN_WORD_CEILING = {
+  x: 5,
+  twitter: 5,
+  threads: 8,
+  tiktok: 8,
+  instagram: 12,
+  facebook: 12,
+  pinterest: 12,
+  linkedin: 20,
+  youtube: 20,
+};
+
+function effectiveMinWords(brandMin, plan) {
+  const platform = String(
+    plan?.primary_platform || (Array.isArray(plan?.platforms) ? plan.platforms[0] : '') || '',
+  ).trim().toLowerCase();
+  const ceiling = PLATFORM_MIN_WORD_CEILING[platform];
+  return ceiling === undefined ? brandMin : Math.min(brandMin, ceiling);
+}
+
 const GUARDRAIL_CHECKS = [
   // 1. Forbidden phrases in caption
   (plan, kit) => {
@@ -17,7 +48,7 @@ const GUARDRAIL_CHECKS = [
   (plan, kit) => {
     const text = plan.caption?.primary ?? '';
     const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-    const min = kit.raw?.min_caption_words ?? 0;
+    const min = effectiveMinWords(kit.raw?.min_caption_words ?? 0, plan);
     const max = kit.raw?.max_caption_words ?? 9999;
     if (wordCount < min) return `Caption too short: ${wordCount} words (min ${min})`;
     if (wordCount > max) return `Caption too long: ${wordCount} words (max ${max})`;
