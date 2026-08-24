@@ -184,6 +184,32 @@ four rungs recovered on retry; a private video stopped after one call.
 **Guarded:** `scripts/check-metadata-format-decoupling.cjs`, in CI, verified by
 deliberately restoring the coupling and by removing the `/best` fallback.
 
+## What YouTube actually does, and what it costs us
+
+Four separate failures on 2026-08-23, each looking like a different bug, all
+one behaviour: **YouTube intermittently withholds something, and our code kept
+treating a temporary refusal as a permanent verdict.**
+
+| withheld | symptom | why it fooled us | fix |
+|---|---|---|---|
+| formats | "Requested format is not available" | preflight applied the DOWNLOAD selector, and every ladder rung carried it | metadata extracts with `process=False`; selector degrades to bare `best` |
+| duration | "Could not determine video duration. Live streams are not supported." | extraction *succeeded* with a correct title and simply omitted the field | download first, measure with ffprobe — the upload path always did this |
+| access | "Sign in to confirm you're not a bot" | reads like a verdict about the worker, so it was not retried | retryable; measured 6/6 success seconds after a bot-check failure |
+| nothing (transient) | any of the above, then fine minutes later | same code succeeded and failed within minutes | ladder walked up to 3× with pauses |
+
+The rule that would have prevented all four: **do not let an adversarial API be
+the authority on anything you can measure or retry yourself.**
+
+Errors that will never change — private, deleted, geo-blocked — still fail on
+the FIRST attempt with the correct message. Retrying only costs time on
+failures that retrying can actually fix.
+
+**What is still not promised:** 100% reliability from a datacenter IP. A
+sustained challenge period still fails a job. The permanent floor is the upload
+path, which has no cookies, no IP reputation and no bot checks — a strong
+argument for treating upload as the primary route commercially and YouTube
+links as a convenience.
+
 ## Long renders vs. scale-to-zero (fixed 2026-08-23)
 
 Fly's proxy stops this machine after a few minutes without edge traffic. A
