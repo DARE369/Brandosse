@@ -12,9 +12,8 @@
 # right target for production and the wrong one for a product with no revenue
 # and a $5 monthly allowance to stay inside.
 #
-#   cpu/mem   shared-cpu-1x, 1GB. Enough for ffmpeg on short sources with one
-#             job at a time. It will NOT render a 60-minute video — that is the
-#             trade, and it is deliberate.
+#   cpu/mem   performance-1x, 2GB (was shared-cpu-1x/1GB — see the [[vm]] block
+#             below for the steal-time measurement that forced the change).
 #   volume    3GB. Holds one source plus its intermediates. Volumes GROW but
 #             never shrink, so starting small is the only reversible direction.
 #   jobs      MAX_CONCURRENT_JOBS=1. Two renders in 1GB is an OOM, and the OOM
@@ -85,9 +84,33 @@ primary_region = "lhr"
   method = "GET"
   path = "/health"
 
+# ── Sizing: a DEDICATED core, because the shared one was being taken away ──
+#
+# This was shared-cpu-1x/1GB to sit inside a $5/month allowance. It worked for
+# short sources and failed for real ones: a 20-minute video took 36.8 minutes
+# and lost 2 of 5 clips to render timeouts.
+#
+# The cause was not the code. /proc/stat on the running worker, 2026-08-24:
+#
+#     user 1056 | system 176 | idle 5246 | steal 10824
+#
+# Steal time ~9x the time we actually got to compute — the hypervisor handing
+# our core to other tenants. shared-cpu-* is burstable, and sustained video
+# encoding is exactly the workload that exhausts a burst allowance and then
+# crawls. The same crop+scale+encode measured 0.5x realtime with CPU available
+# and 4.9x while starved, same code and same day, which is why clips timed out
+# unpredictably rather than consistently.
+#
+# performance-1x is a dedicated core: no steal, and 2GB instead of 1GB, which
+# also removes the OOM risk that forced MAX_CONCURRENT_JOBS=1.
+#
+# On cost: billing is per SECOND and this app still scales to zero. A machine
+# that renders several times faster runs proportionally fewer seconds, so the
+# cost per job stays close while wall-clock drops sharply. The exposure is idle
+# time, and there is none while min_machines_running = 0.
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "1gb"
+  size = "performance-1x"
+  memory = "2gb"
 
 # Scratch space for downloads, extracted audio and rendered clips. Nothing here
 # is durable state — the job record lives in Postgres and finished clips go to
