@@ -325,18 +325,23 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
                                 error=str(exc)[:80],
                             )
 
-                if info and info.get('duration') is not None:
+                # A title with no duration is still a usable answer — the
+                # caller measures duration from the file when it has to. Only
+                # a response with NEITHER is worth another rung.
+                if info and (info.get('duration') is not None or info.get('title')):
                     log.info(
                         "preflight_success",
                         title=info.get('title', 'Untitled Video'),
-                        duration_secs=int(info['duration']),
+                        duration_secs=(int(info['duration'])
+                                       if info.get('duration') is not None else None),
                         clients='+'.join(clients),
                         rung=rung,
                         attempt=attempt,
                     )
+                    _dur = info.get('duration')
                     return {
                         "title": info.get('title', 'Untitled Video'),
-                        "duration_secs": int(info['duration']),
+                        "duration_secs": int(_dur) if _dur is not None else None,
                     }
             except Exception as e:  # noqa: BLE001 - classified by the handler below
                 last_error = e
@@ -377,19 +382,14 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
             title = info.get('title', 'Untitled Video')
             duration = info.get('duration')
 
-            if duration is None:
-                raise DownloadError(
-                    "Could not determine video duration. Live streams are not supported.",
-                    job_id,
-                )
-
-            duration = int(duration)
+            # None is allowed here too: run_download measures from the file.
+            duration = int(duration) if duration is not None else None
 
             log.info(
                 "preflight_success",
                 title=title,
                 duration_secs=duration,
-                duration_minutes=round(duration / 60, 1),
+                duration_minutes=round(duration / 60, 1) if duration is not None else None,
             )
 
             return {
@@ -670,6 +670,44 @@ async def run_download(job: dict, temp_dir: str) -> dict:
             duration_secs = metadata["duration_secs"]
             video_path = None
 
+            # ── Duration: measure it ourselves when YouTube withholds it ────
+            #
+            # Observed 2026-08-23: extraction succeeded and returned a correct
+            # title while omitting 'duration' from every client across all
+            # retry passes — a sustained gap, not a blip. The job then failed
+            # with "Could not determine video duration. Live streams are not
+            # supported." on a 20-minute video that is plainly not live.
+            #
+            # Duration is only needed to enforce the length limit and to price
+            # the job, and ffprobe answers both from the file itself. The
+            # upload path has always worked this way. So rather than refuse a
+            # job because an adversarial API declined to answer a question we
+            # can answer ourselves, fetch first and measure.
+            #
+            # The cost of being wrong is bounded: the length limit is checked
+            # immediately after, before any credits are taken, so an
+            # over-long source is still refused — it just costs us the
+            # bandwidth to find out.
+            if duration_secs is None:
+                log.warning(
+                    "duration_absent_from_metadata_downloading_to_measure",
+                    job_id=job_id,
+                    title=title,
+                )
+                output_template = os.path.join(temp_dir, 'source.%(ext)s')
+                video_path = await asyncio.to_thread(
+                    _download_with_ytdlp, source_url, output_template, job_id, cookies_path,
+                )
+                measured = await asyncio.to_thread(get_video_duration, video_path)
+                if measured is None:
+                    raise DownloadError(
+                        "Could not determine this video's duration, even after downloading it. "
+                        "It may be a live stream or a broken source. Try uploading the file directly.",
+                        job_id,
+                    )
+                duration_secs = int(measured)
+                log.info("duration_measured_from_file", job_id=job_id, duration_secs=duration_secs)
+
         elif platform == 'upload':
             if str(source_url).startswith('worker://'):
                 # Already on this machine's volume — no fetch, no egress, no
@@ -729,7 +767,7 @@ async def run_download(job: dict, temp_dir: str) -> dict:
 
         update_job_source_info(job_id, title, duration_secs, credits_to_consume)
 
-        if platform in ['youtube', 'twitter']:
+        if platform in ['youtube', 'twitter'] and video_path is None:
             output_template = os.path.join(temp_dir, 'source.%(ext)s')
             log.info("full_download_start", job_id=job_id, platform=platform)
 
