@@ -119,6 +119,20 @@ _RETRYABLE_MARKERS = (
     'page needs to be reloaded',
     'no video formats',
     'unable to extract',
+    # Bot detection belongs here, and leaving it out was a real defect.
+    #
+    # It reads like a permanent verdict about this worker, so it was treated as
+    # one: on "Sign in to confirm you're not a bot" the ladder stopped
+    # immediately and the job failed in under 80 seconds. But measured
+    # 2026-08-23 seconds after exactly that failure, the same URL with the same
+    # cookies extracted 6 times out of 6. YouTube challenges a datacenter IP
+    # intermittently, not permanently — which is precisely the case the pauses
+    # exist for.
+    #
+    # If the cookies really are dead, all rungs and all passes still fail and
+    # the user gets the same clear message, roughly 40 seconds later.
+    "not a bot",
+    'sign in to confirm',
 )
 
 
