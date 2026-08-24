@@ -100,7 +100,9 @@ async function resolveBrandLogo(
     .eq("brand_kit_id", kit.id)
     .eq("asset_type", "logo")
     .eq("status", "ready")
-    .order("created_at", { ascending: false })
+    // updated_at, not created_at: marking an older file as the logo is how a
+    // user CHOOSES between several, and that choice must win over upload order.
+    .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!asset?.storage_path) return null;

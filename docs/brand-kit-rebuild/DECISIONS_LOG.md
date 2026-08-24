@@ -409,19 +409,49 @@ ACTIVE kit has no logo returned `logo_applied: false` with
 works, not just the happy one.
 
 **Guarded**: `scripts/check-brand-logo-chain.cjs`, wired into CI. Verified by
-deliberately breaking 20 links; every break was caught. Four early checks
+deliberately breaking 24 links; every break was caught. Four early checks
 passed against things that were not live code — two against the file's own
 explanatory comments, one against a partially-removed set of call sites, one
 against a renamed-but-still-mentioned constant. The guard now strips
 comments, requires call-site PARITY rather than mere presence, and requires
 the UI options to be rendered rather than merely declared.
 
+**A fifth break, found 2026-08-24 after the first fix shipped** — reported by
+the founder, who knew the product state better than the data did. The first
+pass concluded "the active kit has no logo". It was wrong. The active kit
+(`Chowdeck`) had **two** logos; both were JPEGs, and `asset_type` is derived
+from MIME type alone (`AssetUploader.jsx`): `image/png` and `image/svg+xml`
+become `'logo'`, `image/jpeg` becomes `'image'`. So both logos were silently
+filed as generic images, `resolveBrandLogo` (which filters
+`asset_type = 'logo'`) could never see them, and **nothing in the UI could
+correct the classification** — `asset_type` was written once at upload and
+never editable.
+
+Format does not determine role. A logo saved as JPEG is still a logo.
+
+- The asset list now offers **"Use as logo"** on any visual asset, writing
+  `asset_type` through the `updateAsset` store action that already existed.
+- A kit may hold several logos, so the list marks which one is actually
+  **"on images"**, and `resolveBrandLogo` now orders by `updated_at` (not
+  `created_at`) so re-designating a logo takes effect. The badge and the
+  renderer use the same rule, or the badge would lie.
+- The MIME map is left as a first guess, with a comment saying so. Making it
+  "smarter" would be guessing harder at something the user can simply state.
+
+Verified live against the deployed function with a real JPEG logo promoted
+this way: `logo_applied: true`, composited top-left at 22%, position and
+scale both honoured.
+
 **Known, not fixed** (data/state, not code):
 
-- The kit holding the logo and the palette (`Oríkì Soda Co.`) is
-  `is_active = false`. The active kit (`Chowdeck`) has no logo, so the
-  feature will report "no logo uploaded to the active brand kit" until the
-  intended kit is activated or a logo is added to the active one.
+- `Chowdeck` (active) has **zero colours configured**, so the palette fix
+  produces nothing for it until colours are added. `Oríkì Soda Co.` has all
+  eight but is `is_active = false`. The colour wiring is correct; the active
+  kit simply has no colours to send.
+- Both Chowdeck logos are JPEGs, which have no alpha channel, so they
+  composite as an opaque rectangle. A transparent PNG or SVG is needed for a
+  logo that floats over the image. This is a property of the file, not of
+  the compositor.
 - That logo's SVG paints its own opaque cream background, so it composites
   as a cream rectangle rather than a floating mark. A transparent-background
   variant is a brand-asset task, not a code one.

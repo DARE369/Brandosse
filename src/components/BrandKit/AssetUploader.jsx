@@ -1,10 +1,14 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Upload, FileImage, FileText, FileType, Film, File as FileIcon } from 'lucide-react';
 import useBrandKitStore from '../../stores/BrandKitStore';
 import { ASSET_STATUS } from '../../constants/statusEnums';
 import { Button } from '../../ui-v2';
 import styles from './BrandKit.module.css';
 
+// First guess at an asset's ROLE, from its file format alone. It is only a
+// guess and it is often wrong: a logo saved as JPEG lands here as 'image',
+// which is why the asset list lets the user say "Use as logo" instead. Do not
+// try to make this map smarter — format does not determine role.
 const ASSET_TYPE_MAP = {
   'image/png': 'logo',
   'image/jpeg': 'image',
@@ -23,6 +27,9 @@ const ASSET_TYPE_MAP = {
   'video/webm': 'video',
 };
 
+// Anything visual can BE a logo; documents, fonts and video cannot.
+const PROMOTABLE_TO_LOGO = new Set(['image', 'other']);
+
 const ICON_BY_ASSET_TYPE = {
   logo: FileImage,
   font: FileType,
@@ -37,6 +44,19 @@ export default function AssetUploader({ userId, brandKitId }) {
   const assets = useBrandKitStore((state) => state.assets);
   const updateAsset = useBrandKitStore((state) => state.updateAsset);
   const deleteAsset = useBrandKitStore((state) => state.deleteAsset);
+
+  // Which logo the renderer will ACTUALLY pick. Mirrors resolveBrandLogo in
+  // supabase/functions/generateImage/index.ts: newest ready 'logo' by
+  // updated_at. Shown explicitly because a kit can hold several logos and
+  // "which one am I getting?" should not be a guess.
+  const activeLogoId = useMemo(() => {
+    const logos = assets.filter(
+      (a) => a.asset_type === 'logo' && a.status === ASSET_STATUS.READY,
+    );
+    if (!logos.length) return null;
+    const stamp = (a) => new Date(a.updated_at || a.created_at || 0).getTime();
+    return logos.reduce((best, a) => (stamp(a) > stamp(best) ? a : best)).id;
+  }, [assets]);
 
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -193,6 +213,31 @@ export default function AssetUploader({ userId, brandKitId }) {
                     ].filter(Boolean).join(' ')}
                     title={asset.status}
                   />
+                  {asset.id === activeLogoId && (
+                    <span className={styles.assetTypeBadge} title="This is the logo stamped onto generated images">
+                      on images
+                    </span>
+                  )}
+                  {PROMOTABLE_TO_LOGO.has(asset.asset_type) && asset.status === ASSET_STATUS.READY && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateAsset(asset.id, { asset_type: 'logo' })}
+                      title="Mark this file as your logo so it can be stamped onto generated images"
+                    >
+                      Use as logo
+                    </Button>
+                  )}
+                  {asset.asset_type === 'logo' && asset.id !== activeLogoId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateAsset(asset.id, { asset_type: 'logo' })}
+                      title="Use this logo instead of the current one"
+                    >
+                      Use this one
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" onClick={() => startEdit(asset)}>Edit</Button>
                   <Button variant="danger" size="sm" onClick={() => deleteAsset(asset.id)}>Delete</Button>
                 </div>

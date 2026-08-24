@@ -42,6 +42,7 @@ const tab        = read('src/pages/Settings/ContentDefaultsTab.jsx');
 const studio     = read('src/pages/Studio/StudioPage.jsx');
 const edge       = read('supabase/functions/generateImage/index.ts');
 const composite  = read('supabase/functions/_shared/composite.ts');
+const uploader   = read('src/components/BrandKit/AssetUploader.jsx');
 
 const failures = [];
 const need = (cond, msg) => { if (!cond) failures.push(msg); };
@@ -109,6 +110,26 @@ need(/logo_position/.test(media) && /logo_scale/.test(media),
   'media.service.js: logo_position/logo_scale are not sent to the edge function');
 need(/logo_position\?:\s*LogoPosition/.test(edge),
   'generateImage: logo_position is not part of the request contract');
+
+// ── 3c. The user must be able to SAY what their logo is ───────────────────
+// Found 2026-08-24: asset_type was derived from MIME alone — image/png and
+// image/svg+xml became 'logo', image/jpeg became 'image'. A brand whose logo
+// was a JPEG had it silently filed as a generic image, so resolveBrandLogo
+// (which filters asset_type='logo') could never find it, and NOTHING in the
+// UI could correct the classification. Format does not determine role.
+need(/PROMOTABLE_TO_LOGO/.test(uploader),
+  "AssetUploader.jsx: no way to mark a non-logo asset as the logo — a JPEG logo stays unreachable forever");
+need(/updateAsset\(\s*asset\.id\s*,\s*\{\s*asset_type:\s*'logo'/.test(uploader),
+  'AssetUploader.jsx: the logo control does not actually write asset_type');
+need(/activeLogoId/.test(uploader),
+  'AssetUploader.jsx: does not show WHICH logo will be used — ambiguous when a kit holds several');
+
+// The UI's "which logo wins" rule and the resolver's must agree, or the badge
+// lies. Both order by updated_at.
+need(/order\("updated_at"/.test(edge),
+  'generateImage: resolveBrandLogo does not order by updated_at, so re-designating a logo would not take effect');
+need(/updated_at/.test(uploader),
+  'AssetUploader.jsx: active-logo indicator does not use updated_at, so it can disagree with the renderer');
 
 // ── 4. The edge function must resolve the file ITSELF (private bucket) ─────
 need(/async function resolveBrandLogo/.test(edge),
