@@ -27,7 +27,7 @@ export async function loadBrandKit(userId) {
   // leak into generations steered by the active "Client A" kit.
   const { data: assets } = await supabase
     .from('brand_assets')
-    .select('name, asset_type, description, tags, usage_hints, alt_text, extracted_text, visual_summary, font_family')
+    .select('name, asset_type, description, tags, usage_hints, alt_text, extracted_text, visual_summary, font_family, storage_path, mime_type')
     .eq('brand_kit_id', kit.id)
     .eq('status', 'ready')
     .limit(20);
@@ -36,7 +36,7 @@ export async function loadBrandKit(userId) {
 }
 
 function condenseBrandKit(kit, assets) {
-  if (!kit) return { configured: false, summary: '', asset_context: '', raw: null };
+  if (!kit) return { configured: false, summary: '', asset_context: '', raw: null, logo: null, hasLogo: false };
 
   const summary = [
     kit.brand_name           && `Brand: ${kit.brand_name}`,
@@ -49,6 +49,10 @@ function condenseBrandKit(kit, assets) {
     kit.signature_phrases?.length && `Signature phrases: ${kit.signature_phrases.join('; ')}`,
     kit.forbidden_phrases?.length && `NEVER USE: ${kit.forbidden_phrases.join(', ')}`,
     kit.visual_style_keywords?.length && `Visual style: ${kit.visual_style_keywords.join(', ')}`,
+    // Brand colours were captured in full (hex + name + usage rule) and then
+    // dropped on the floor — nothing read `color_palette`, so "on brand"
+    // imagery only ever meant style adjectives, never the actual palette.
+    formatPalette(kit.color_palette),
     kit.photo_style_notes    && `Photo style: ${kit.photo_style_notes}`,
     kit.avoid_visual_elements?.length && `Avoid visually: ${kit.avoid_visual_elements.join(', ')}`,
     kit.font_display?.family && `Display font: ${kit.font_display.family}${kit.font_display.style ? ` (${kit.font_display.style})` : ''}`,
@@ -70,10 +74,48 @@ function condenseBrandKit(kit, assets) {
     return parts.join(' | ');
   }).join('\n');
 
+  // The logo the compositor will actually stamp: newest ready 'logo' asset.
+  // `storage_path` (not `public_url`) is the useful handle — the bucket is
+  // private, so only a service-role download can read it, which is why the
+  // generateImage edge function resolves the bytes itself and this only
+  // reports whether a logo EXISTS.
+  const logoAsset = assets.find((a) => a.asset_type === 'logo' && a.storage_path) ?? null;
+
   return {
     configured: kit.setup_completed === true,
     raw: kit,
     summary,
     asset_context,
+    logo: logoAsset
+      ? { name: logoAsset.name, storage_path: logoAsset.storage_path, mime_type: logoAsset.mime_type }
+      : null,
+    hasLogo: Boolean(logoAsset),
   };
+}
+
+/**
+ * Render the brand palette for a prompt: hex first (the part a model can act
+ * on), then the human name, then the usage rule that says how much of it to
+ * use. Usage notes are trimmed — the full text is guidance for humans and
+ * would crowd the prompt.
+ */
+function formatPalette(palette) {
+  if (!Array.isArray(palette) || palette.length === 0) return '';
+  const entries = palette
+    .filter((c) => c && c.hex)
+    .slice(0, 8)
+    .map((c) => {
+      const label = [c.hex, c.name].filter(Boolean).join(' ');
+      const usage = typeof c.usage === 'string' && c.usage
+        ? ` (${splitFirstClause(c.usage)})`
+        : '';
+      return `${label}${usage}`;
+    });
+  return entries.length ? `Brand colours: ${entries.join('; ')}` : '';
+}
+
+/** First clause of a usage note, trimmed for prompt use. */
+function splitFirstClause(text) {
+  const cut = text.split(';')[0].split(String.fromCharCode(10))[0];
+  return cut.trim().slice(0, 80);
 }

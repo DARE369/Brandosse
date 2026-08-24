@@ -14,6 +14,7 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
+import type { DatabaseClient } from "../_shared/supabase.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { generateImageByModel, aspectToFalImageSize, type FalImageModel } from "../_shared/fal.service.ts";
 import { compositeLogo, type LogoPosition } from "../_shared/composite.ts";
@@ -54,6 +55,11 @@ type GenerateImageBody = {
   rendering_speed?: "TURBO" | "BALANCED" | "QUALITY";
   negative_prompt?: string;
   recraft_style?: string;
+  /** Stamp the user's ACTIVE brand-kit logo onto the result. The logo file is
+   * resolved server-side from `brand_assets` (see resolveBrandLogo) because the
+   * bucket is private — a client-built public URL 400s. `logo_url` remains
+   * supported for callers supplying their own already-reachable image. */
+  apply_logo?: boolean;
   logo_url?: string;
   logo_position?: LogoPosition;
   logo_scale?: number;
@@ -63,6 +69,57 @@ type GenerateImageBody = {
    * passes "carousel" since each slide goes through this same function. */
   category?: "image" | "carousel";
 };
+
+/**
+ * Fetch the active brand kit's logo bytes for `userId`.
+ *
+ * Why server-side: `brand_assets` is a PRIVATE bucket. The `public_url` column
+ * stored on each row is a public-style URL that returns HTTP 400 — verified
+ * 2026-08-24 against the live row for Oriki_Soda_Co_Logo.svg. Only a
+ * service-role download can read the file, so the client cannot supply it and
+ * must not try.
+ *
+ * Returns null when the user simply has no logo (not an error). Throws when a
+ * logo exists but cannot be read — the caller reports that, never hides it.
+ */
+async function resolveBrandLogo(
+  adminClient: DatabaseClient,
+  userId: string,
+): Promise<{ bytes: Uint8Array; mimeType: string; name: string } | null> {
+  const { data: kit } = await adminClient
+    .from("brand_kit")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (!kit?.id) return null;
+
+  const { data: asset } = await adminClient
+    .from("brand_assets")
+    .select("name, storage_path, mime_type")
+    .eq("brand_kit_id", kit.id)
+    .eq("asset_type", "logo")
+    .eq("status", "ready")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!asset?.storage_path) return null;
+
+  const { data: blob, error } = await adminClient
+    .storage.from("brand_assets")
+    .download(asset.storage_path);
+  if (error || !blob) {
+    throw new Error(
+      `brand logo "${asset.name}" could not be downloaded: ${error?.message ?? "empty body"}`,
+    );
+  }
+
+  return {
+    bytes: new Uint8Array(await blob.arrayBuffer()),
+    mimeType: asset.mime_type ?? "",
+    name: asset.name ?? "logo",
+  };
+}
 
 function buildBrandContext(brandKit: Record<string, unknown> | undefined): string {
   if (!brandKit) return "";
@@ -275,22 +332,56 @@ serve(async (req) => {
     let imgBytes = new Uint8Array(await imgRes.arrayBuffer());
     let ext = body.output_format ?? "jpeg";
 
-    if (body.logo_url) {
+    // ── Brand logo ────────────────────────────────────────────────────────────
+    // Two sources: an explicit `logo_url` (caller-supplied, must be reachable)
+    // or `apply_logo`, which resolves the active brand kit's logo server-side.
+    //
+    // A requested-but-missing logo is REPORTED, never swallowed. The previous
+    // console.warn returned an unbranded image that looked completely
+    // successful — the exact silent no-op the third law forbids. The image is
+    // still delivered (the user paid for it) but `logo_applied: false` plus
+    // `logo_error` ride along on the response so the client can say so.
+    let logoApplied = false;
+    let logoError: string | null = null;
+    const logoRequested = Boolean(body.apply_logo || body.logo_url);
+
+    if (logoRequested) {
       try {
-        const logoRes = await fetch(body.logo_url, {
-          // LOCK L5.9 — download generated image / logo; bounded so a hung transfer fails cleanly.
-          signal: AbortSignal.timeout(120_000),
-        });
-        if (logoRes.ok) {
-          const logoBytes = new Uint8Array(await logoRes.arrayBuffer());
-          imgBytes = await compositeLogo(imgBytes, logoBytes, {
-            position: body.logo_position,
-            scalePct: body.logo_scale,
+        let logoBytes: Uint8Array | null = null;
+        let logoMimeType = "";
+
+        if (body.logo_url) {
+          const logoRes = await fetch(body.logo_url, {
+            // LOCK L5.9 — download generated image / logo; bounded so a hung transfer fails cleanly.
+            signal: AbortSignal.timeout(120_000),
           });
-          ext = "jpeg"; // compositeLogo always returns JPEG
+          if (!logoRes.ok) {
+            throw new Error(`logo_url fetch returned HTTP ${logoRes.status}`);
+          }
+          logoBytes = new Uint8Array(await logoRes.arrayBuffer());
+          logoMimeType = logoRes.headers.get("content-type") ?? "";
+        } else {
+          const resolved = await resolveBrandLogo(adminClient, user.id);
+          if (!resolved) {
+            throw new Error("no logo uploaded to the active brand kit");
+          }
+          logoBytes = resolved.bytes;
+          logoMimeType = resolved.mimeType;
         }
+
+        imgBytes = await compositeLogo(imgBytes, logoBytes, {
+          position: body.logo_position,
+          scalePct: body.logo_scale,
+          logoMimeType,
+        });
+        ext = "jpeg"; // compositeLogo always returns JPEG
+        logoApplied = true;
       } catch (compositeErr) {
-        console.warn("[generateImage] logo composite failed; using base image:", compositeErr);
+        logoError = compositeErr instanceof Error ? compositeErr.message : String(compositeErr);
+        console.error("[generateImage] logo_composite_failed", {
+          user_id: user.id,
+          error: logoError,
+        });
       }
     }
 
@@ -338,6 +429,12 @@ serve(async (req) => {
         // 4.1: record that/how many references guided this render (for
         // reproducibility receipts; not the URLs themselves to keep the row lean).
         reference_count: referenceUrls.length || undefined,
+        // Provenance: whether this image actually carries the brand logo.
+        // Recorded even on failure so a run of un-branded output is findable
+        // in the data rather than only in a log line that scrolls away.
+        logo_requested: logoRequested || undefined,
+        logo_applied:   logoRequested ? logoApplied : undefined,
+        logo_error:     logoError ?? undefined,
       },
     });
 
@@ -347,6 +444,10 @@ serve(async (req) => {
       public_url:        publicUrl,
       storagePath:       fileName,
       storage_path:      fileName,
+      // Client surfaces these — a silently un-branded image is a defect.
+      logo_requested:    logoRequested,
+      logo_applied:      logoApplied,
+      logo_error:        logoError,
       generation_id:     generationId,
       prompt_used:       finalPrompt,
       provider:          provider,

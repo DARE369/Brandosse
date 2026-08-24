@@ -20,6 +20,7 @@
     "check:env-security": "node scripts/check-env-security.cjs",
     "check:e2e-env": "node scripts/check-e2e-env.cjs",
     "check:edge-functions": "node scripts/check-edge-functions.cjs",
+    "check:brand-logo-chain": "node scripts/check-brand-logo-chain.cjs",
     "check:production-ready": "node scripts/check-production-ready.cjs",
     "check:status-literals": "node scripts/check-status-literals.cjs",
     "check:ui-consistency": "node scripts/check-ui-consistency.cjs",

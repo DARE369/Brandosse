@@ -116,6 +116,7 @@ function StudioBody({ brandKit }) {
             aspectRatio: gen.aspect_ratio || settings.aspectRatio,
             videoQuality: gen.video_quality || settings.videoQuality,
             matchBrandKit: gen.match_brand_kit !== false,
+            applyLogo: gen.apply_logo === true,
             imageModel: gen.image_model || settings.imageModel,
             // 4.2: restore a persisted style-lock reference set across sessions.
             styleLock: Boolean(gen.style_lock),

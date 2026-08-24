@@ -165,6 +165,12 @@ export async function generateImages({
   // edge fn routes to FLUX.2's multi-reference endpoint for brand/subject
   // consistency, regardless of imageModel.
   referenceImageUrls = null,
+  // Stamp the active brand kit's real logo onto each image. The edge function
+  // resolves the file itself (the brand_assets bucket is private, so a
+  // client-built URL cannot work) — this only carries the INTENT.
+  applyLogo = false,
+  logoPosition = undefined,
+  logoScale = undefined,
   signal,
   onProgress,
 }) {
@@ -192,6 +198,13 @@ export async function generateImages({
       request_id: requestId,
       request_slot: slotOffset + index,
       generation_id: count === 1 ? generationId : null,
+      ...(applyLogo
+        ? {
+            apply_logo: true,
+            ...(logoPosition ? { logo_position: logoPosition } : {}),
+            ...(Number.isFinite(logoScale) ? { logo_scale: logoScale } : {}),
+          }
+        : {}),
       image_model: imageModel || undefined,
       rendering_speed: providerOptions.renderingSpeed || providerOptions.rendering_speed,
       negative_prompt: providerOptions.negativePrompt || providerOptions.negative_prompt,
@@ -204,8 +217,20 @@ export async function generateImages({
       throw new Error('Image renderer returned no image URL');
     }
 
+    // A requested logo that did not land is a real defect, not a detail. The
+    // image is still returned (it was paid for) but the caller is told.
+    if (applyLogo && data.logo_applied === false) {
+      console.error(
+        '[media.service] brand logo was requested but NOT applied:',
+        data.logo_error || 'unknown reason',
+      );
+    }
+
     images.push({
       url: publicUrl,
+      logoRequested: Boolean(data.logo_requested),
+      logoApplied: Boolean(data.logo_applied),
+      logoError: data.logo_error || null,
       width: dimensions.width,
       height: dimensions.height,
       storagePath: data.storagePath || data.storage_path || null,

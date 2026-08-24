@@ -1744,6 +1744,9 @@ const useSessionStore = create((set, get) => ({
           // override, 1.1/1.2); settings fallback preserves old behavior when
           // a caller doesn't thread it.
           imageModel: opts.imageModel || settings.imageModel || 'ideogram',
+          // Stamp the real brand logo when the user has opted in (Settings >
+          // Content defaults). The edge fn resolves the file; this is intent only.
+          applyLogo: settings?.applyLogo === true,
           referenceImageUrls: opts.referenceImages || undefined,
           category: 'image',
           requestId: opts.requestId,
@@ -1971,6 +1974,9 @@ const useSessionStore = create((set, get) => ({
           brandKit,
           sessionId,
           imageModel: opts.imageModel || settingsSnapshot.imageModel || 'ideogram',
+          // Stamp the real brand logo when the user has opted in (Settings >
+          // Content defaults). The edge fn resolves the file; this is intent only.
+          applyLogo: settingsSnapshot?.applyLogo === true,
           referenceImageUrls: opts.referenceImages || undefined,
           category: 'image',
           requestId: opts.requestId,
@@ -2083,6 +2089,9 @@ const useSessionStore = create((set, get) => ({
         brandKit,
         sessionId: session.id,
         imageModel: opts.imageModel || settings.imageModel || 'ideogram',
+        // Stamp the real brand logo when the user has opted in (Settings >
+        // Content defaults). The edge fn resolves the file; this is intent only.
+        applyLogo: settings?.applyLogo === true,
         referenceImageUrls: opts.referenceImages || undefined,
         category: 'image',
         requestId: opts.requestId,
@@ -2170,6 +2179,9 @@ const useSessionStore = create((set, get) => ({
         // row's metadata, 0.2) so a re-roll stays visually consistent; fall
         // back to the user's setting, then the safe default.
         imageModel: generation.metadata?.image_model || settings.imageModel || 'ideogram',
+        // Stamp the real brand logo when the user has opted in (Settings >
+        // Content defaults). The edge fn resolves the file; this is intent only.
+        applyLogo: settings?.applyLogo === true,
         category,
         requestId: crypto.randomUUID(),
         slotOffset: 0,
@@ -2268,6 +2280,9 @@ const useSessionStore = create((set, get) => ({
           brandKit,
           sessionId: session.id,
           imageModel: opts.imageModel || settings.imageModel || 'ideogram',
+          // Stamp the real brand logo when the user has opted in (Settings >
+          // Content defaults). The edge fn resolves the file; this is intent only.
+          applyLogo: settings?.applyLogo === true,
           referenceImageUrls: opts.referenceImages || undefined,
           category: 'carousel',
           requestId: opts.requestId,

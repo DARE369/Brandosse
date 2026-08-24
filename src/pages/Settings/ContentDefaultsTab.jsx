@@ -24,6 +24,7 @@ export default function ContentDefaultsTab({ userId, onToast }) {
     aspect_ratio: "1:1",
     video_quality: "standard",
     match_brand_kit: true,
+    apply_logo: false,
     default_platforms: [],
   });
 
@@ -126,6 +127,25 @@ export default function ContentDefaultsTab({ userId, onToast }) {
             onClick={() => setForm((c) => ({ ...c, match_brand_kit: !c.match_brand_kit }))}
           >
             <span className={styles.switchKnob} style={{ left: form.match_brand_kit ? "18px" : "2px" }} />
+          </button>
+        </div>
+      </Card>
+
+      <Card>
+        <div className={styles.toggleRow}>
+          <div>
+            <div className={styles.sectionTitle}>Stamp my logo on images</div>
+            <div className={styles.sectionSub}>Overlays your Brand Kit logo onto every generated image, bottom-right. Needs a logo uploaded in your Brand Kit — AI cannot draw your real logo, so this composites the actual file.</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.apply_logo}
+            className={styles.switch}
+            style={{ background: form.apply_logo ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong, var(--uiv2-border))" }}
+            onClick={() => setForm((c) => ({ ...c, apply_logo: !c.apply_logo }))}
+          >
+            <span className={styles.switchKnob} style={{ left: form.apply_logo ? "18px" : "2px" }} />
           </button>
         </div>
       </Card>

@@ -24,6 +24,9 @@ const DEFAULT_GENERATION_DEFAULTS = {
   aspect_ratio: '1:1',
   video_quality: 'standard',
   match_brand_kit: true,
+  // Opt-in: stamping a logo onto every generated image is a strong visual
+  // change, so it stays off until the user asks for it. See ContentDefaultsTab.
+  apply_logo: false,
   image_model: 'auto',
   style_lock: false,
   reference_images: [],
@@ -116,6 +119,7 @@ function normalizeGenerationDefaults(value) {
     aspect_ratio: String(source.aspect_ratio || DEFAULT_GENERATION_DEFAULTS.aspect_ratio),
     video_quality: String(source.video_quality || DEFAULT_GENERATION_DEFAULTS.video_quality),
     match_brand_kit: normalizeBoolean(source.match_brand_kit, DEFAULT_GENERATION_DEFAULTS.match_brand_kit),
+    apply_logo: normalizeBoolean(source.apply_logo, DEFAULT_GENERATION_DEFAULTS.apply_logo),
     image_model: String(source.image_model || DEFAULT_GENERATION_DEFAULTS.image_model),
     style_lock: normalizeBoolean(source.style_lock, DEFAULT_GENERATION_DEFAULTS.style_lock),
     reference_images: Array.isArray(source.reference_images)
