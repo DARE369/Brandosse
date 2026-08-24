@@ -184,6 +184,31 @@ four rungs recovered on retry; a private video stopped after one call.
 **Guarded:** `scripts/check-metadata-format-decoupling.cjs`, in CI, verified by
 deliberately restoring the coupling and by removing the `/best` fallback.
 
+## Verified working end to end (2026-08-24)
+
+YouTube URL in, postable clips out, on `performance-1x`:
+
+    [1s]    downloading
+    [48s]   transcribing
+    [63s]   analyzing
+    [94s]   rendering
+    [312s]  complete      5/5 clips, 5 thumbnails, 5.2 min total
+
+A 20-minute source. Clip lengths 72s, 84s, 66s, 90s, 90s — the 90s cap holding.
+Frame inspection confirms 608x1080, hook text fitting the frame, and karaoke
+captions tracking the speech.
+
+Against the same video earlier the same day on `shared-cpu-1x`: 3/5 clips in
+36.8 minutes, with two clips lost to render timeouts. The difference is the
+dedicated core (see [SCALING.md](SCALING.md) for the steal-time measurement).
+
+**A testing note worth keeping:** two apparent failures during this work were
+deploy races — a job claimed by the old process seconds before the rollover
+finished, running code that no longer existed. Confirmed by timestamps (job
+created 10:48:14Z, machine deployed 10:48:15Z) and by the error string existing
+nowhere in the codebase. Wait for the machine to settle before submitting a
+verification job, or you will debug a fix that already worked.
+
 ## What YouTube actually does, and what it costs us
 
 Four separate failures on 2026-08-23, each looking like a different bug, all
