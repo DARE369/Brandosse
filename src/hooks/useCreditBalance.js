@@ -1,64 +1,134 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { supabase } from "../services/supabaseClient";
 
 /**
  * Real-time credit balance for the current user, backed by `user_credits`
- * (balance, lifetime_purchased, lifetime_consumed) — same table/columns
- * UserNavbar subscribes to. Extracted so pages outside the navbar (e.g. the
- * personal dashboard) can show balance without importing navbar UI.
+ * (balance, lifetime_purchased, lifetime_consumed).
+ *
+ * ── Why this is a shared store and not a plain hook ─────────────────────────
+ * It used to open its own query AND its own realtime channel per call site.
+ * That was fine while exactly one component per page called it. It stops being
+ * fine the moment the app chrome (ui-v2/shell/AppShell) renders the credit
+ * pill, because the pages that also show credits in their BODY — the
+ * dashboard's balance card (via useDashboardData) and Studio's affordability
+ * check — then call it a second time on the same screen.
+ *
+ * Two calls meant two `user_credits` reads and, worse, two channels with the
+ * identical topic `credit-balance-${userId}`. Supabase keys channels by topic,
+ * so the second subscribe on the same topic is not a clean second
+ * subscription — and whichever component unmounted first would `removeChannel`
+ * the topic both were relying on, silently killing live balance updates for
+ * the one still mounted.
+ *
+ * So: one fetch and one channel per userId, shared by every caller, torn down
+ * when the last caller unmounts. Callers see no API change.
  */
-export function useCreditBalance(userId) {
-  const [credits, setCredits] = useState({
-    balance: 0,
-    lifetimePurchased: 0,
-    lifetimeConsumed: 0,
-    ready: false,
+
+const EMPTY = Object.freeze({
+  balance: 0,
+  lifetimePurchased: 0,
+  lifetimeConsumed: 0,
+  ready: false,
+});
+
+/** userId -> { refs, state, listeners, channel, active } */
+const stores = new Map();
+
+function readRow(row) {
+  return Object.freeze({
+    balance: row?.balance ?? 0,
+    lifetimePurchased: row?.lifetime_purchased ?? 0,
+    lifetimeConsumed: row?.lifetime_consumed ?? 0,
+    ready: true,
   });
+}
 
-  useEffect(() => {
-    if (!userId) return undefined;
+function emit(entry, next) {
+  entry.state = next;
+  for (const listener of entry.listeners) listener();
+}
 
-    let active = true;
-    supabase
-      .from("user_credits")
-      .select("balance, lifetime_purchased, lifetime_consumed")
-      .eq("user_id", userId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active || error) return;
-        setCredits({
-          balance: data?.balance ?? 0,
-          lifetimePurchased: data?.lifetime_purchased ?? 0,
-          lifetimeConsumed: data?.lifetime_consumed ?? 0,
-          ready: true,
-        });
-      });
+function acquire(userId) {
+  const existing = stores.get(userId);
+  if (existing) {
+    existing.refs += 1;
+    return existing;
+  }
 
-    const channel = supabase
-      .channel(`credit-balance-${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "user_credits", filter: `user_id=eq.${userId}` },
-        (payload) => {
-          setCredits({
-            balance: payload.new?.balance ?? 0,
-            lifetimePurchased: payload.new?.lifetime_purchased ?? 0,
-            lifetimeConsumed: payload.new?.lifetime_consumed ?? 0,
-            ready: true,
-          });
-        }
-      )
-      .subscribe();
+  const entry = { refs: 1, state: EMPTY, listeners: new Set(), channel: null, active: true };
+  stores.set(userId, entry);
 
-    return () => {
-      active = false;
-      supabase.removeChannel(channel);
-    };
-  }, [userId]);
+  supabase
+    .from("user_credits")
+    .select("balance, lifetime_purchased, lifetime_consumed")
+    .eq("user_id", userId)
+    .maybeSingle()
+    .then(({ data, error }) => {
+      // A failed read must not latch `ready: true`. A pill rendering "0 cr"
+      // over a balance we never loaded is the same class of lie as the
+      // account badges fixed under L2.1 — staying unready keeps the skeleton
+      // up instead of inventing a number.
+      if (!entry.active || error) return;
+      emit(entry, readRow(data));
+    });
 
-  return credits;
+  entry.channel = supabase
+    .channel(`credit-balance-${userId}`)
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "user_credits", filter: `user_id=eq.${userId}` },
+      (payload) => {
+        if (!entry.active) return;
+        emit(entry, readRow(payload.new));
+      }
+    )
+    .subscribe();
+
+  return entry;
+}
+
+function release(userId) {
+  const entry = stores.get(userId);
+  if (!entry) return;
+  entry.refs -= 1;
+  if (entry.refs > 0) return;
+  entry.active = false;
+  if (entry.channel) supabase.removeChannel(entry.channel);
+  stores.delete(userId);
+}
+
+export function useCreditBalance(userId) {
+  // `subscribe` MUST be referentially stable per userId. useSyncExternalStore
+  // re-subscribes whenever this identity changes, so an inline closure would
+  // acquire/release the shared store on every single render — churning the
+  // realtime channel instead of sharing it, which is the bug this store exists
+  // to fix.
+  const subscribe = useCallback(
+    (onChange) => {
+      if (!userId) return () => {};
+      const entry = acquire(userId);
+      entry.listeners.add(onChange);
+      return () => {
+        entry.listeners.delete(onChange);
+        release(userId);
+      };
+    },
+    [userId]
+  );
+
+  const getSnapshot = useCallback(
+    () => (userId ? stores.get(userId)?.state ?? EMPTY : EMPTY),
+    [userId]
+  );
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+/** Server render has no session and no subscription — always the empty state. */
+function getServerSnapshot() {
+  return EMPTY;
 }
 
 const CATEGORY_LABELS = {

@@ -252,9 +252,13 @@ The mechanism that keeps locks locked. **One row per lock, permanently.**
 | L1.3 No fabrication | Constant-write assertion | CI | Build fails |
 | L1.4 Fail-closed | Startup validation | Deploy | Worker refuses to boot |
 | L2.1 Truthful badges | Badge↔state test | CI | Build fails |
+| L2.5 Every post counted | `check-post-status-accounting.cjs` — reads POST_STATUS, asserts each value is counted AND rendered | CI | Build fails |
 | L2.3 No frozen rows | Non-terminal >15 min | Runtime alert | Pages you |
 | L2.4 No no-ops | offered == handled | CI | Build fails |
 | L4.x Connected | Live-path assertions | CI | Build fails |
+| L5.6 One app chrome | `check-app-shell.cjs` — no page may render `AppHeader`/`MobileNavDrawer`/`NotificationBell`/`AvatarMenu`/`CreditPill` or define `ThemeToggleButton`; every personal route must reach `AppShell` | CI | Build fails |
+| L5.6 ui-v2 stays v2 | `check-ui-v2-isolation.cjs` — no old presentation into `src/ui-v2/**`; business logic allowlisted by exact path | CI | Build fails |
+| L5.7 One nav | `check-app-shell.cjs` — only `ui-v2/shell/navItems.js` may declare `NAV_ITEMS` | CI | Build fails |
 | L5.9 Timeouts | Lint: no `fetch` without signal | CI | Build fails |
 | — Provider health | Fallback-activation alert | Runtime | Pages you |
 | — Cost | Per-user deviation alert | Runtime | Pages you |
@@ -282,12 +286,38 @@ landed after it was written. That is Law 2 happening to this very document.
 | −1 Standards + `CLAUDE.md` | ✅ complete |
 | 0 Lock mechanism | ✅ complete — L0.3 verified at `20260821180000_unblind_cron_monitoring.sql:43`, L0.4 shipped. **One half outstanding:** the Python worker is still uninstrumented |
 | 1 Stop the bleeding | ✅ complete, all verified live |
-| 2 UI stops lying | ✅ complete |
+| 2 UI stops lying | ✅ complete — **L2.5 added 2026-08-24** (P9-005): the Content Flow panel counted 4 of 6 statuses, showing 107 posts to a user who had 110 |
 | 3 Delete dead code | 🔴 **Gate 3 is NOT passed** — see below |
 | 4 Connect what exists | ✅ complete |
-| 5 Complete the inadequate | 🟡 **11 of 15 done.** Outstanding: L5.3a, L5.14. Rescoped: L5.1, L5.8 |
+| 5 Complete the inadequate | 🟡 **11 of 15 done.** Outstanding: L5.3a, L5.14. Rescoped: L5.1, L5.8. **L5.6/L5.7 genuinely closed 2026-08-24** — see below |
 | 6 Audit gaps | ✅ complete |
 | 7 Fly migration | ✅ complete — end-to-end proof, job `5e77c665`: YouTube URL → captioned clips in under 4 minutes |
+
+### L5.6 was declared passed and was half-done (closed 2026-08-24)
+
+L5.6 migrated the four legacy pages and introduced `ui-v2/shell/AppShell`
+*because* ten pages hand-wrote the header block — then applied `AppShell` to
+only those four, leaving the ten originals exactly as they were. The lock read
+✅ while the duplication it named was untouched, and neither L5.6 nor L5.7 had
+a row in this register, so nothing said otherwise.
+
+Measured before the fix (2026-08-24): 11 `ThemeToggleButton` definitions,
+10 pages composing `AppHeader` by hand, and `check-ui-v2-isolation.cjs` failing
+on 6 imports — red since `AppShell` was written, in CI nowhere.
+
+The drift had already started, exactly as it had with `NAV_ITEMS`:
+
+| Page | Divergence |
+|---|---|
+| Calendar | rendered nothing while credits loaded; every other page rendered a skeleton |
+| Billing | credit meter hardcoded to `pct="100%"` — a full bar over any balance |
+| Brand Kit | bare `Avatar` linking to `/app/profile` where every other page had the full `AvatarMenu` |
+| Dashboard | only page whose `<main>` lacked `id="main-content"` |
+
+Now: all 10 on `AppShell`, one `ThemeToggleButton`, one `NAV_ITEMS`, the dead
+`UserNavbar`/`UserSidebar` (1,023 lines, the source of the P9-008 blocker)
+deleted, the skip link the migration had silently dropped restored, and three
+guards in CI — each proven against a planted regression.
 
 ### Gate 3 was declared passed and is not
 

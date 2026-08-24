@@ -249,8 +249,8 @@ Important styling detail:
 Files:
 
 - `src/pages/Dashboard/PersonalDashboardPage.jsx`
-- `src/components/User/UserNavbar.jsx`
-- `src/components/User/UserSidebar.jsx`
+- `src/ui-v2/shell/AppShell.jsx` (replaced `UserNavbar.jsx`/`UserSidebar.jsx`, deleted 2026-08-24)
+- `src/ui-v2/shell/AppHeader.module.css`
 - `src/pages/Dashboard/PersonalDashboardPage.module.css`
 
 Visual structure:

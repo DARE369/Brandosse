@@ -15,10 +15,7 @@ import { AlertCircle, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '../../Context/AuthContext';
 import { useAppNavigation } from '../../Context/AppNavigationContext';
 import useBrandKitStore from '../../stores/BrandKitStore';
-import {
-  UiV2ThemeProvider, useUiV2Theme, AppHeader, MobileNavDrawer, CreditPill, Avatar,
-  IconButton, Button, Skeleton, NAV_ITEMS,} from '../../ui-v2';
-import { useCreditBalance } from '../../hooks/useCreditBalance';
+import { AppShell, Button, Skeleton } from '../../ui-v2';
 import BrandKitSetupChoice from '../../components/BrandKit/BrandKitSetupChoice';
 import BrandKitExtractLoader from '../../components/BrandKit/BrandKitExtractLoader';
 import BrandKitConversation from '../../components/BrandKit/BrandKitConversation';
@@ -33,28 +30,10 @@ import styles from '../../components/BrandKit/BrandKit.module.css';
 // support flow later.
 const SUPPORT_EMAIL = 'support@brandosse.com';
 
-function ThemeToggleButton() {
-  const { isDark, toggleTheme } = useUiV2Theme();
-  return (
-    <IconButton title={isDark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={toggleTheme}>
-      {isDark ? (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" strokeLinecap="round" />
-          <circle cx="12" cy="12" r="4.5" />
-        </svg>
-      ) : (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
-        </svg>
-      )}
-    </IconButton>
-  );
-}
 
 function BrandKitBody() {
   const { user, profile, loading: authLoading } = useAuth();
   const { navigate } = useAppNavigation();
-  const credits = useCreditBalance(user?.id ?? null);
 
   const {
     kits, brandKit, assets, isLoading, error,
@@ -63,7 +42,6 @@ function BrandKitBody() {
   } = useBrandKitStore();
 
   const [screen, setScreen] = useState('choice');
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [importUrl, setImportUrl] = useState('');
   const [extractMode, setExtractMode] = useState('setup');
@@ -91,21 +69,6 @@ function BrandKitBody() {
     if (!brandKit.setup_completed && screen === 'dashboard') setScreen('choice');
   }, [brandKit, screen]);
 
-  const userInitials = ((profile?.full_name ? profile.full_name[0] : 'U') + (profile?.full_name?.split(' ')[1]?.[0] ?? '')).toUpperCase();
-  const creditPct = credits.lifetimePurchased > 0 ? Math.max(0, Math.min(100, Math.round((credits.balance / credits.lifetimePurchased) * 100))) : 100;
-
-  const headerRight = (
-    <>
-      {credits.ready ? (
-        <CreditPill pct={`${creditPct}%`} label={`${credits.balance.toLocaleString()} cr`} />
-      ) : (
-        <Skeleton width="76px" height="26px" radius="999px" />
-      )}
-      <ThemeToggleButton />
-      <Avatar initials={userInitials || 'U'} onClick={() => navigate('/app/profile')} />
-    </>
-  );
-
   // ---- Auth resolving / signed-out guard ----
   // While AuthContext is still resolving, show a lightweight loading shell
   // rather than assuming `user` is present (every screen below reads
@@ -114,33 +77,27 @@ function BrandKitBody() {
   // auto-redirect-to-/login behavior) instead of being bounced off-page.
   if (authLoading) {
     return (
-      <>
-        <AppHeader navItems={[]} right={null} />
-        <main className={styles.main}>
-          <div className={styles.loadingWrap}>
-            <Skeleton height="120px" radius="12px" />
-            <Skeleton height="220px" radius="12px" />
-          </div>
-        </main>
-      </>
+      <AppShell minimal className={styles.shell} mainClassName={styles.main}>
+        <div className={styles.loadingWrap}>
+          <Skeleton height="120px" radius="12px" />
+          <Skeleton height="220px" radius="12px" />
+        </div>
+      </AppShell>
     );
   }
 
   if (!user) {
     return (
-      <>
-        <AppHeader navItems={[]} right={null} />
-        <main className={styles.main}>
-          <div className={styles.guardWrap}>
-            <span className={styles.guardIcon} aria-hidden="true"><Lock size={22} /></span>
-            <h1 className={styles.guardTitle}>Sign in to view your brand kit</h1>
-            <p className={styles.guardDesc}>Your brand identity is tied to your account.</p>
-            <div className={styles.guardActions}>
-              <Button onClick={() => navigate('/login')}>Sign in</Button>
-            </div>
+      <AppShell minimal className={styles.shell} mainClassName={styles.main}>
+        <div className={styles.guardWrap}>
+          <span className={styles.guardIcon} aria-hidden="true"><Lock size={22} /></span>
+          <h1 className={styles.guardTitle}>Sign in to view your brand kit</h1>
+          <p className={styles.guardDesc}>Your brand identity is tied to your account.</p>
+          <div className={styles.guardActions}>
+            <Button onClick={() => navigate('/login')}>Sign in</Button>
           </div>
-        </main>
-      </>
+        </div>
+      </AppShell>
     );
   }
 
@@ -351,49 +308,35 @@ function BrandKitBody() {
   const isWideScreen = screen === 'dashboard' && kits.length > 0 && !isFullLoadFailure && !isLoading;
 
   return (
-    <>
-      <Toaster position="top-center" />
-      <AppHeader
-        navItems={NAV_ITEMS}
-        activeKey="brand-kit"
-        onNavClick={(item) => navigate(item.href)}
-        onBurgerClick={() => setMobileNavOpen(true)}
-        right={headerRight}
-      />
-      <MobileNavDrawer
-        open={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-        navItems={NAV_ITEMS}
-        activeKey="brand-kit"
-        onNavClick={(item) => navigate(item.href)}
-      />
-
-      <main className={styles.main}>
-        <div className={isWideScreen ? styles.canvasWide : styles.canvas}>
-          {error && kits.length > 0 && (
-            <div className={styles.errorBanner} role="alert">{error}</div>
+    <AppShell
+      activeKey="brand-kit"
+      className={styles.shell}
+      mainClassName={styles.main}
+      overlays={(
+        <>
+          <Toaster position="top-center" />
+          {isDiffModalOpen && diffData && (
+            <BrandKitDiffModal
+              existingKit={diffData.existingKit}
+              newKit={diffData.newKit}
+              newConfidenceMap={diffData.newConfidenceMap}
+              onApply={async (merged) => { await applyDiff(merged, user.id); }}
+              onCancel={closeDiffModal}
+            />
           )}
-          {renderScreen()}
-        </div>
-      </main>
-
-      {isDiffModalOpen && diffData && (
-        <BrandKitDiffModal
-          existingKit={diffData.existingKit}
-          newKit={diffData.newKit}
-          newConfidenceMap={diffData.newConfidenceMap}
-          onApply={async (merged) => { await applyDiff(merged, user.id); }}
-          onCancel={closeDiffModal}
-        />
+        </>
       )}
-    </>
+    >
+      <div className={isWideScreen ? styles.canvasWide : styles.canvas}>
+        {error && kits.length > 0 && (
+          <div className={styles.errorBanner} role="alert">{error}</div>
+        )}
+        {renderScreen()}
+      </div>
+    </AppShell>
   );
 }
 
 export default function BrandKitPage() {
-  return (
-    <UiV2ThemeProvider className={styles.shell}>
-      <BrandKitBody />
-    </UiV2ThemeProvider>
-  );
+  return <BrandKitBody />;
 }

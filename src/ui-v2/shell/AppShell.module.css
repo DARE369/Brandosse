@@ -1,0 +1,36 @@
+/*
+ * The skip link the ui-v2 migration dropped.
+ *
+ * The legacy shell had one — `.navbar-skip-link` in the since-deleted
+ * src/components/User/UserNavbar.jsx. When those pages moved to ui-v2 the link
+ * did not come with them, and AppShell was left rendering `id="main-content"`
+ * as an anchor with nothing in the app pointing at it. Restored here so it
+ * exists once, for every screen, rather than ten times or not at all.
+ *
+ * Visually hidden until focused — the standard pattern; a keyboard user Tabs
+ * once from page load and it appears.
+ */
+.skipLink {
+  /* fixed, not absolute: the link must land at the top of the VIEWPORT even if
+     focus reaches it on an already-scrolled page. z-index clears the sticky
+     header, which sits at 30. */
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: 0 0 var(--uiv2-radius-md, 8px) 0;
+  background: var(--uiv2-accent-solid);
+  color: var(--uiv2-accent-on-solid, #fff);
+  font-family: var(--uiv2-font-display), system-ui, sans-serif;
+  font-size: var(--uiv2-text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skipLink:focus,
+.skipLink:focus-visible {
+  left: 0;
+  outline: 2px solid var(--uiv2-text-primary);
+  outline-offset: 2px;
+}

@@ -39,7 +39,6 @@ import { fetchUserSettings } from '../../services/userSettingsService';
 import useBrandKitStore from '../../stores/BrandKitStore';
 import { useAuth } from '../../Context/AuthContext';
 import { useAppNavigation } from '../../Context/AppNavigationContext';
-import { useCreditBalance } from '../../hooks/useCreditBalance';
 
 import {
   DEFAULT_TIMEZONE,
@@ -72,37 +71,16 @@ import CellCommandPalette from '../../calendar/components/CellCommandPalette';
 import IntelligenceStrip from '../../calendar/components/IntelligenceStrip';
 import ToastStack, { TOAST_ICONS, useToastStack } from '../../calendar/components/ToastStack';
 
-import {
-  UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton, MobileNavDrawer,
-  NotificationBell, AvatarMenu, NAV_ITEMS,} from '../../ui-v2';
+import { AppShell } from '../../ui-v2';
 import '../../calendar/calendar-engine-v2.css';
 import styles from './CalendarPage.module.css';
 
 const MOBILE_VIEW_BREAKPOINT = 600;
 
-function ThemeToggleButton() {
-  const { isDark, toggleTheme } = useUiV2Theme();
-  return (
-    <IconButton title={isDark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={toggleTheme}>
-      {isDark ? (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" strokeLinecap="round" />
-          <circle cx="12" cy="12" r="4.5" />
-        </svg>
-      ) : (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
-        </svg>
-      )}
-    </IconButton>
-  );
-}
 
 function CalendarBody({ brandKit }) {
   const { navigate } = useAppNavigation();
   const { user, profile } = useAuth();
-  const credits = useCreditBalance(user?.id ?? null);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [userId, setUserId] = useState(null);
   const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
@@ -828,240 +806,212 @@ function CalendarBody({ brandKit }) {
   const monthLabel = formatDateKey(effectiveMonthStartKey, { month: 'long', year: 'numeric' });
   const isEmpty = !isLoading && posts.length === 0 && drafts.length === 0;
 
-  const userInitials = ((profile?.full_name ? profile.full_name[0] : 'U') + (profile?.full_name?.split(' ')[1]?.[0] ?? '')).toUpperCase();
-  const creditPct = credits.lifetimePurchased > 0 ? Math.max(0, Math.min(100, Math.round((credits.balance / credits.lifetimePurchased) * 100))) : 100;
 
   return (
-    <>
-      <Toaster position="bottom-right" toastOptions={{ style: { fontSize: 13, background: 'var(--uiv2-bg-elevated)', color: 'var(--uiv2-text-primary)', border: '1px solid var(--uiv2-border)' } }} />
-
-      <AppHeader
-        navItems={NAV_ITEMS}
-        activeKey="calendar"
-        onNavClick={(item) => navigate(item.href)}
-        onBurgerClick={() => setMobileNavOpen(true)}
-        right={
-          <>
-            {credits.ready ? (
-              <CreditPill pct={`${creditPct}%`} label={`${credits.balance.toLocaleString()} cr`} />
-            ) : null}
-            <ThemeToggleButton />
-            <NotificationBell userId={user?.id} onNavigate={navigate} />
-            <AvatarMenu initials={userInitials || 'U'} name={profile?.full_name} email={user?.email} onNavigate={navigate} />
-          </>
-        }
-      />
-
-      <MobileNavDrawer
-        open={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-        navItems={NAV_ITEMS}
-        activeKey="calendar"
-        onNavClick={(item) => navigate(item.href)}
-      />
-
-      <main className={styles.main}>
-        <div className={styles.canvas}>
-          <div className="cal3-shell">
-            <header className="cal3-header">
-              <div className="cal3-header__nav">
-                <button type="button" className="cal3-icon-btn" onClick={goPrev} aria-label="Previous month">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+    <AppShell
+      activeKey="calendar"
+      className={styles.shell}
+      mainClassName={styles.main}
+      overlays={(
+        <Toaster position="bottom-right" toastOptions={{ style: { fontSize: 13, background: 'var(--uiv2-bg-elevated)', color: 'var(--uiv2-text-primary)', border: '1px solid var(--uiv2-border)' } }} />
+      )}
+    >
+      <div className={styles.canvas}>
+        <div className="cal3-shell">
+          <header className="cal3-header">
+            <div className="cal3-header__nav">
+              <button type="button" className="cal3-icon-btn" onClick={goPrev} aria-label="Previous month">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+              </button>
+              <button type="button" className="cal3-icon-btn" onClick={goNext} aria-label="Next month">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            </div>
+            <div className="cal3-header__title">
+              <span className="cal3-header__month-label">{monthLabel}</span>
+              <span className="cal3-header__today-badge">Today: {formatDateKey(todayKey, { month: 'short', day: 'numeric' })}</span>
+            </div>
+            <div className="cal3-header__actions">
+              <div className="cal3-view-switcher">
+                <button type="button" className={`cal3-view-switcher__btn${viewMode === 'month' ? ' is-active' : ''}`} onClick={() => handleViewSwitch('month')}>
+                  <LayoutGrid size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />Month
                 </button>
-                <button type="button" className="cal3-icon-btn" onClick={goNext} aria-label="Next month">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+                <button type="button" className={`cal3-view-switcher__btn${viewMode === 'list' ? ' is-active' : ''}`} onClick={() => handleViewSwitch('list')}>
+                  <ListTodo size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />List
                 </button>
               </div>
-              <div className="cal3-header__title">
-                <span className="cal3-header__month-label">{monthLabel}</span>
-                <span className="cal3-header__today-badge">Today: {formatDateKey(todayKey, { month: 'short', day: 'numeric' })}</span>
+              <button type="button" className="cal3-btn-ghost" onClick={() => { setCmdBarPreset(''); setCmdBarOpen(true); }}>
+                <Sparkles size={13} aria-hidden="true" /> Ask AI <span className="cal3-kbd">⌘K</span>
+              </button>
+              <button type="button" className="ui-button ui-button-accent ui-button-md" onClick={() => setQuickPostOpen(true)}>+ Quick Post</button>
+            </div>
+          </header>
+
+          <IntelligenceStrip posts={posts} weekStart={`${effectiveMonthStartKey}T00:00:00.000Z`} />
+
+          <CalendarCommandBarInline
+            onOpen={() => { setCmdBarPreset(''); setCmdBarOpen(true); }}
+            onOpenWithPreset={(text) => { setCmdBarPreset(text); setCmdBarOpen(true); }}
+          />
+
+          <div className="cal3-body">
+            {moveMode.active && (
+              <div className="move-mode-banner">
+                <span className="move-mode-banner__icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 9l-3 3 3 3" /><path d="M9 5l3-3 3 3" /><path d="M15 19l3 3 3-3" /><path d="M19 9l3 3-3 3" /><line x1="2" y1="12" x2="22" y2="12" /><line x1="12" y1="2" x2="12" y2="22" /></svg>
+                </span>
+                <span className="move-mode-banner__text">
+                  Moving <strong>{(findGroupByKey(moveMode.postId)?.posts[0]?.title) || 'this post'}</strong> — tap a highlighted day to schedule it there.
+                </span>
+                <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={exitMoveMode}>Cancel</button>
               </div>
-              <div className="cal3-header__actions">
-                <div className="cal3-view-switcher">
-                  <button type="button" className={`cal3-view-switcher__btn${viewMode === 'month' ? ' is-active' : ''}`} onClick={() => handleViewSwitch('month')}>
-                    <LayoutGrid size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />Month
-                  </button>
-                  <button type="button" className={`cal3-view-switcher__btn${viewMode === 'list' ? ' is-active' : ''}`} onClick={() => handleViewSwitch('list')}>
-                    <ListTodo size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />List
-                  </button>
-                </div>
-                <button type="button" className="cal3-btn-ghost" onClick={() => { setCmdBarPreset(''); setCmdBarOpen(true); }}>
-                  <Sparkles size={13} aria-hidden="true" /> Ask AI <span className="cal3-kbd">⌘K</span>
-                </button>
-                <button type="button" className="ui-button ui-button-accent ui-button-md" onClick={() => setQuickPostOpen(true)}>+ Quick Post</button>
-              </div>
-            </header>
+            )}
 
-            <IntelligenceStrip posts={posts} weekStart={`${effectiveMonthStartKey}T00:00:00.000Z`} />
-
-            <CalendarCommandBarInline
-              onOpen={() => { setCmdBarPreset(''); setCmdBarOpen(true); }}
-              onOpenWithPreset={(text) => { setCmdBarPreset(text); setCmdBarOpen(true); }}
-            />
-
-            <div className="cal3-body">
-              {moveMode.active && (
-                <div className="move-mode-banner">
-                  <span className="move-mode-banner__icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 9l-3 3 3 3" /><path d="M9 5l3-3 3 3" /><path d="M15 19l3 3 3-3" /><path d="M19 9l3 3-3 3" /><line x1="2" y1="12" x2="22" y2="12" /><line x1="12" y1="2" x2="12" y2="22" /></svg>
-                  </span>
-                  <span className="move-mode-banner__text">
-                    Moving <strong>{(findGroupByKey(moveMode.postId)?.posts[0]?.title) || 'this post'}</strong> — tap a highlighted day to schedule it there.
-                  </span>
-                  <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={exitMoveMode}>Cancel</button>
-                </div>
+            <div className="cal3-main-col">
+              {viewMode === 'list' ? (
+                <CalendarListView
+                  groups={allGroups}
+                  isLoading={isLoading}
+                  onBulkReschedule={handleBulkReschedule}
+                  onBulkDelete={handleBulkDelete}
+                  timezone={timezone}
+                  todayKey={todayKey}
+                  tomorrowKey={tomorrowKey}
+                  formatDateKey={formatDateKey}
+                  formatInTimeZone={formatInTimeZone}
+                  onOpenGroup={(group) => setSelectedPostId(group.posts[0].id)}
+                />
+              ) : (
+                <CalendarGrid
+                  monthStartKey={effectiveMonthStartKey}
+                  groups={groups}
+                  isLoading={isLoading}
+                  isEmpty={isEmpty}
+                  timezone={timezone}
+                  todayKey={todayKey}
+                  formatDateKey={formatDateKey}
+                  formatInTimeZone={formatInTimeZone}
+                  moveMode={moveModeWithGroupKey}
+                  isLockedGroup={isLockedGroup}
+                  onOpenGroup={(group) => setSelectedPostId(group.posts[0].id)}
+                  onMoveTrigger={handleMoveTrigger}
+                  onCommitMove={handleMoveCommit}
+                  onCreateDraftForDay={handleCreateDraftForDay}
+                  onCellClick={({ dayKey, label }) => setCellPalette({ dayKey, label })}
+                  onQuickPost={() => setQuickPostOpen(true)}
+                />
               )}
 
-              <div className="cal3-main-col">
-                {viewMode === 'list' ? (
-                  <CalendarListView
-                    groups={allGroups}
-                    isLoading={isLoading}
-                    onBulkReschedule={handleBulkReschedule}
-                    onBulkDelete={handleBulkDelete}
-                    timezone={timezone}
-                    todayKey={todayKey}
-                    tomorrowKey={tomorrowKey}
-                    formatDateKey={formatDateKey}
-                    formatInTimeZone={formatInTimeZone}
-                    onOpenGroup={(group) => setSelectedPostId(group.posts[0].id)}
-                  />
-                ) : (
-                  <CalendarGrid
-                    monthStartKey={effectiveMonthStartKey}
-                    groups={groups}
-                    isLoading={isLoading}
-                    isEmpty={isEmpty}
-                    timezone={timezone}
-                    todayKey={todayKey}
-                    formatDateKey={formatDateKey}
-                    formatInTimeZone={formatInTimeZone}
-                    moveMode={moveModeWithGroupKey}
-                    isLockedGroup={isLockedGroup}
-                    onOpenGroup={(group) => setSelectedPostId(group.posts[0].id)}
-                    onMoveTrigger={handleMoveTrigger}
-                    onCommitMove={handleMoveCommit}
-                    onCreateDraftForDay={handleCreateDraftForDay}
-                    onCellClick={({ dayKey, label }) => setCellPalette({ dayKey, label })}
-                    onQuickPost={() => setQuickPostOpen(true)}
-                  />
-                )}
-
-                {isError && !isLoading && (
-                  <div className="day-error-state" role="alert">
-                    <span className="day-error-state__icon">
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-                    </span>
-                    <p>Couldn&apos;t load posts. Check your connection and try again.</p>
-                    <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={() => refetch()}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
-                      Retry
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <UnscheduledRail
-                workspaceType="personal"
-                drafts={drafts}
-                collapsed={draftsRailCollapsed}
-                onToggle={toggleDraftsRail}
-                onOpenDraft={(draft) => setSelectedPostId(draft.id)}
-                onMoveTrigger={handleMoveTrigger}
-              />
+              {isError && !isLoading && (
+                <div className="day-error-state" role="alert">
+                  <span className="day-error-state__icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                  </span>
+                  <p>Couldn&apos;t load posts. Check your connection and try again.</p>
+                  <button type="button" className="ui-button ui-button-secondary ui-button-sm" onClick={() => refetch()}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
+                    Retry
+                  </button>
+                </div>
+              )}
             </div>
 
-            {cellPalette && (
-              <div style={{ position: 'fixed', inset: 0, zIndex: 29 }} onClick={() => setCellPalette(null)}>
-                <CellCommandPalette
-                  day={cellPalette.dayKey}
-                  style={{ position: 'fixed', top: '40%', left: '50%', transform: 'translate(-50%, -50%)' }}
-                  onAction={handleCellPaletteAction}
-                  onClose={() => setCellPalette(null)}
-                />
-              </div>
-            )}
-
-            {cmdBarOpen && (
-              <CalendarCommandBar
-                context={cmdBarContext}
-                preset={cmdBarPreset}
-                onClose={() => setCmdBarOpen(false)}
-                onApplyAction={handleCommandApply}
-              />
-            )}
-
-            {selectedGroup && (
-              <PostDetailDrawer
-                group={selectedGroup}
-                timezone={timezone}
-                brandKit={brandKit}
-                onClose={() => { setSelectedPostId(null); setDeepLinkedGroup(null); }}
-                onSavePost={handleSavePost}
-                onDeletePost={handleDeletePost}
-                onReschedule={handleOpenScheduleModal}
-                onUnschedule={handleUnschedulePost}
-                onDuplicate={handleDuplicatePost}
-                onPostNow={handlePostNow}
-              />
-            )}
-
-            {scheduleModalPost && (
-              <ScheduleModal
-                open
-                post={scheduleModalPost}
-                timezone={timezone}
-                isSubmitting={isSubmitting}
-                onClose={() => setScheduleModalPost(null)}
-                onConfirm={handleConfirmScheduleModal}
-              />
-            )}
-
-            <ConfirmDialog
-              open={Boolean(deleteConfirmTarget)}
-              title="Delete this post?"
-              description="This can't be undone. The scheduled slot will be freed up."
-              confirmLabel="Delete post"
-              confirmTone="danger"
-              onConfirm={confirmDeletePost}
-              onClose={() => setDeleteConfirmTarget(null)}
+            <UnscheduledRail
+              workspaceType="personal"
+              drafts={drafts}
+              collapsed={draftsRailCollapsed}
+              onToggle={toggleDraftsRail}
+              onOpenDraft={(draft) => setSelectedPostId(draft.id)}
+              onMoveTrigger={handleMoveTrigger}
             />
-
-            <ConfirmDialog
-              open={Boolean(postNowTarget)}
-              title="Publish now?"
-              description="This posts immediately (simulated) instead of waiting for its scheduled time. Unlike a draft, this can't be undone from here."
-              confirmLabel="Post now"
-              confirmTone="primary"
-              busy={postNowBusy}
-              onConfirm={confirmPostNow}
-              onClose={() => setPostNowTarget(null)}
-            />
-
-            {quickPostOpen && (
-              <QuickPostComposer
-                open
-                timezone={timezone}
-                libraryAssets={prefillAsset ? [prefillAsset] : []}
-                prefillAsset={prefillAsset}
-                onClose={() => { setQuickPostOpen(false); setPrefillAsset(null); }}
-                onSubmit={handleQuickPostSubmit}
-              />
-            )}
-
-            <ToastStack toasts={toastStack.toasts} onDismiss={toastStack.dismiss} onScheduleAnyway={handleScheduleAnyway} />
           </div>
+
+          {cellPalette && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 29 }} onClick={() => setCellPalette(null)}>
+              <CellCommandPalette
+                day={cellPalette.dayKey}
+                style={{ position: 'fixed', top: '40%', left: '50%', transform: 'translate(-50%, -50%)' }}
+                onAction={handleCellPaletteAction}
+                onClose={() => setCellPalette(null)}
+              />
+            </div>
+          )}
+
+          {cmdBarOpen && (
+            <CalendarCommandBar
+              context={cmdBarContext}
+              preset={cmdBarPreset}
+              onClose={() => setCmdBarOpen(false)}
+              onApplyAction={handleCommandApply}
+            />
+          )}
+
+          {selectedGroup && (
+            <PostDetailDrawer
+              group={selectedGroup}
+              timezone={timezone}
+              brandKit={brandKit}
+              onClose={() => { setSelectedPostId(null); setDeepLinkedGroup(null); }}
+              onSavePost={handleSavePost}
+              onDeletePost={handleDeletePost}
+              onReschedule={handleOpenScheduleModal}
+              onUnschedule={handleUnschedulePost}
+              onDuplicate={handleDuplicatePost}
+              onPostNow={handlePostNow}
+            />
+          )}
+
+          {scheduleModalPost && (
+            <ScheduleModal
+              open
+              post={scheduleModalPost}
+              timezone={timezone}
+              isSubmitting={isSubmitting}
+              onClose={() => setScheduleModalPost(null)}
+              onConfirm={handleConfirmScheduleModal}
+            />
+          )}
+
+          <ConfirmDialog
+            open={Boolean(deleteConfirmTarget)}
+            title="Delete this post?"
+            description="This can't be undone. The scheduled slot will be freed up."
+            confirmLabel="Delete post"
+            confirmTone="danger"
+            onConfirm={confirmDeletePost}
+            onClose={() => setDeleteConfirmTarget(null)}
+          />
+
+          <ConfirmDialog
+            open={Boolean(postNowTarget)}
+            title="Publish now?"
+            description="This posts immediately (simulated) instead of waiting for its scheduled time. Unlike a draft, this can't be undone from here."
+            confirmLabel="Post now"
+            confirmTone="primary"
+            busy={postNowBusy}
+            onConfirm={confirmPostNow}
+            onClose={() => setPostNowTarget(null)}
+          />
+
+          {quickPostOpen && (
+            <QuickPostComposer
+              open
+              timezone={timezone}
+              libraryAssets={prefillAsset ? [prefillAsset] : []}
+              prefillAsset={prefillAsset}
+              onClose={() => { setQuickPostOpen(false); setPrefillAsset(null); }}
+              onSubmit={handleQuickPostSubmit}
+            />
+          )}
+
+          <ToastStack toasts={toastStack.toasts} onDismiss={toastStack.dismiss} onScheduleAnyway={handleScheduleAnyway} />
         </div>
-      </main>
-    </>
+      </div>
+    </AppShell>
   );
 }
 
 export default function CalendarPage() {
   const brandKit = useBrandKitStore((s) => s.brandKit);
-  return (
-    <UiV2ThemeProvider className={styles.shell}>
-      <CalendarBody brandKit={brandKit} />
-    </UiV2ThemeProvider>
-  );
+  return <CalendarBody brandKit={brandKit} />;
 }

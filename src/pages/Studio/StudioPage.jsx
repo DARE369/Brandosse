@@ -29,32 +29,12 @@ import {
   getVideoDurations,
 } from "../../config/mediaGenerationOptions";
 import { PROMPT_LIMIT } from "../../components/GenerateStudio/shared/constants";
-import {
-  UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton,
-  Card, Badge, Skeleton, EmptyState, Button, Modal, Drawer, Dropdown, MobileNavDrawer,
-  NotificationBell, AvatarMenu, NAV_ITEMS,} from "../../ui-v2";
+import { AppShell, IconButton, Card, Skeleton, EmptyState, Button, Modal, Drawer } from "../../ui-v2";
 import PostProductionPanel from "./PostProductionPanel";
 import SessionHistoryDrawer from "./SessionHistoryDrawer";
 import StudioLightbox from "./StudioLightbox";
 import styles from "./StudioPage.module.css";
 
-function ThemeToggleButton() {
-  const { isDark, toggleTheme } = useUiV2Theme();
-  return (
-    <IconButton title={isDark ? "Switch to light mode" : "Switch to dark mode"} onClick={toggleTheme}>
-      {isDark ? (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" strokeLinecap="round" />
-          <circle cx="12" cy="12" r="4.5" />
-        </svg>
-      ) : (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
-        </svg>
-      )}
-    </IconButton>
-  );
-}
 
 const MODE_ICON = { image: "🖼", carousel: "▦", video: "▶", edit: "✎", "image-to-video": "✦" };
 
@@ -190,7 +170,6 @@ function StudioBody({ brandKit }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [videoJobsOpen, setVideoJobsOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -1134,8 +1113,6 @@ function StudioBody({ brandKit }) {
     }
   }, [scheduleDate, scheduleTime, updatePostProduction, saveDraft]);
 
-  const userInitials = ((profile?.full_name ? profile.full_name[0] : "U") + (profile?.full_name?.split(" ")[1]?.[0] ?? "")).toUpperCase();
-  const creditPct = credits.lifetimePurchased > 0 ? Math.max(0, Math.min(100, Math.round((credits.balance / credits.lifetimePurchased) * 100))) : 100;
   const shimmerCount = isCarousel ? (settings.slideCount === "auto" ? 6 : Number(settings.slideCount || 6)) : selectedMode === "image" ? Number(settings.batchSize || 1) : 1;
   const aspectRatio = settings.aspectRatio || "1:1";
   // Week 3 Fix 3: video submits-and-returns, so isGenerating clears within
@@ -1144,756 +1121,8 @@ function StudioBody({ brandKit }) {
   // the most recently submitted one) keeps this indicator lit.
   const videoJobActive = videoJobs.some((job) => job.status === "queued" || job.status === "running");
 
-  return (
+  const overlays = (
     <>
-      <AppHeader
-        navItems={NAV_ITEMS}
-        activeKey="studio"
-        onNavClick={(item) => navigate(item.href)}
-        onBurgerClick={() => setMobileNavOpen(true)}
-        right={
-          <>
-            {videoJobActive && (
-              <div className={styles.videoIndicator} title="Video renders server-side — safe to navigate away, close this tab, or refresh; it'll still be here in the Video jobs drawer when you come back">
-                <span className={styles.loadingDot} />
-                <span className={styles.videoIndicatorLabel} style={{ fontFamily: "var(--uiv2-font-mono)", fontSize: 11, color: "var(--uiv2-warning)" }}>
-                  Video rendering…
-                </span>
-              </div>
-            )}
-            {credits.ready ? (
-              <CreditPill pct={`${creditPct}%`} label={`${availableCredits.toLocaleString()} cr`} />
-            ) : (
-              <Skeleton width="76px" height="26px" radius="999px" />
-            )}
-            <IconButton title="Video jobs" onClick={() => setVideoJobsOpen(true)}>
-              <VideoIcon size={15} />
-            </IconButton>
-            <ThemeToggleButton />
-            <NotificationBell userId={user?.id} onNavigate={navigate} />
-            <AvatarMenu initials={userInitials || "U"} name={profile?.full_name} email={user?.email} onNavigate={navigate} />
-          </>
-        }
-      />
-
-      <MobileNavDrawer
-        open={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-        navItems={NAV_ITEMS}
-        activeKey="studio"
-        onNavClick={(item) => navigate(item.href)}
-      />
-
-      <main className={styles.main}>
-        <div className={styles.canvas}>
-          <div className={styles.studioGrid}>
-            {/* ============ BRIEF PANEL ============ */}
-            <div className={styles.brief}>
-              <Card>
-                <div className={styles.sectionLabel}>Mode</div>
-                <div className={styles.modeRow}>
-                  {CONTENT_TYPES.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      className={[styles.modeChip, selectedMode === m.id ? styles.modeChipActive : ""].join(" ")}
-                      onClick={() => handleModeChange(m.id)}
-                    >
-                      {MODE_ICON[m.id]} {m.label}
-                    </button>
-                  ))}
-                </div>
-              </Card>
-
-              <Card>
-                <div className={styles.promptHead}>
-                  <span className={styles.sectionLabel} style={{ marginBottom: 0 }}>Prompt</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleEnhance}
-                    disabled={enhancing || !prompt.trim() || isGenerating || getRateLimitRemaining("enhance") > 0}
-                  >
-                    <Sliders size={12} />
-                    {getRateLimitRemaining("enhance") > 0
-                      ? `Retry in ${getRateLimitRemaining("enhance")}s`
-                      : enhancing ? "Enhancing…" : "Enhance prompt"}
-                  </Button>
-                </div>
-
-                {needsSourceImage && (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-                      {sourceImageUrl ? (
-                        <img
-                          src={sourceImageUrl}
-                          alt="Source"
-                          style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover", flexShrink: 0, border: "1px solid var(--uiv2-border)" }}
-                          onError={(e) => { e.currentTarget.style.display = "none"; }}
-                        />
-                      ) : null}
-                      <input
-                        className={styles.fieldInput}
-                        style={{ flex: 1 }}
-                        placeholder="Source image URL, or pick from your Library →"
-                        value={sourceImageUrl}
-                        onChange={(e) => setSourceImageUrl(e.target.value)}
-                      />
-                      <Button variant="subtle" size="sm" onClick={openSourcePicker} style={{ flexShrink: 0 }}>
-                        Pick
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {guided ? (
-                  <div className={styles.guidedGrid}>
-                    {["subject", "setting", "style", "mood"].map((key) => (
-                      <label key={key} className={styles.field}>
-                        <span className={styles.fieldLabel}>{key[0].toUpperCase() + key.slice(1)}</span>
-                        <input
-                          className={styles.fieldInput}
-                          value={guidedFields[key]}
-                          onChange={(e) => setGuidedFields((g) => ({ ...g, [key]: e.target.value }))}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <textarea
-                    ref={promptRef}
-                    className={styles.textarea}
-                    maxLength={PROMPT_LIMIT}
-                    placeholder="Describe the post you want — subject, setting, mood."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value.slice(0, PROMPT_LIMIT))}
-                    onKeyDown={handlePromptKeyDown}
-                  />
-                )}
-                <div className={styles.promptFoot}>
-                  <span className={styles.promptCount}>{prompt.length} / {PROMPT_LIMIT.toLocaleString()}</span>
-                  <button type="button" className={styles.linkBtn} onClick={() => setGuided((g) => !g)}>
-                    {guided ? "Use freeform prompt" : "Use guided fields"}
-                  </button>
-                </div>
-              </Card>
-
-              <Card>
-                <div className={styles.sectionLabel}>Format</div>
-                <div className={styles.formatBlock}>
-                  <span className={styles.formatSubLabel}>Aspect ratio</span>
-                  <div className={styles.formatRow}>
-                    {ASPECT_RATIOS.map((r) => (
-                      <button
-                        key={r.id}
-                        type="button"
-                        className={[styles.formatChip, aspectRatio === r.id ? styles.formatChipActive : ""].join(" ")}
-                        onClick={() => updateSettings({ aspectRatio: r.id })}
-                      >
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {(selectedMode === "image" || isCarousel) && (
-                  <div className={styles.formatBlock}>
-                    <span className={styles.formatSubLabel}>Image style</span>
-                    <div className={styles.formatRow}>
-                      {IMAGE_MODEL_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          title={opt.hint}
-                          className={[styles.formatChip, (settings.imageModel || "auto") === opt.id ? styles.formatChipActive : ""].join(" ")}
-                          onClick={() => updateSettings({ imageModel: opt.id })}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                    <span className={styles.formatSubLabel} style={{ marginTop: 4, opacity: 0.8 }}>
-                      {IMAGE_MODEL_OPTIONS.find((o) => o.id === (settings.imageModel || "auto"))?.hint}
-                    </span>
-                  </div>
-                )}
-
-                {selectedMode === "image" && (
-                  <div className={styles.formatBlock}>
-                    <div className={styles.stepperRow}>
-                      <span className={styles.formatSubLabel}>Batch size</span>
-                      <div className={styles.stepperCtl}>
-                        <button type="button" className={styles.stepperBtn} onClick={() => updateSettings({ batchSize: Math.max(1, (settings.batchSize || 1) - 1) })}>−</button>
-                        <span className={styles.stepperVal}>{settings.batchSize || 1}</span>
-                        <button type="button" className={styles.stepperBtn} onClick={() => updateSettings({ batchSize: Math.min(4, (settings.batchSize || 1) + 1) })}>+</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {isCarousel && (
-                  <div className={styles.formatBlock}>
-                    <div className={styles.stepperRow}>
-                      <span className={styles.formatSubLabel}>Slide count</span>
-                      <div className={styles.stepperCtl}>
-                        <button type="button" className={styles.stepperBtn} onClick={() => updateSettings({ slideCount: Math.max(2, Number(settings.slideCount || 6) - 1) })}>−</button>
-                        <span className={styles.stepperVal}>{settings.slideCount === "auto" ? "auto" : settings.slideCount || 6}</span>
-                        <button type="button" className={styles.stepperBtn} onClick={() => updateSettings({ slideCount: Math.min(10, Number(settings.slideCount || 6) + 1) })}>+</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {isVideoMode && (
-                  <div className={styles.formatBlock}>
-                    <span className={styles.formatSubLabel}>Duration</span>
-                    <div className={styles.formatRow}>
-                      {getVideoDurations().map((d) => (
-                        <button
-                          key={d}
-                          type="button"
-                          className={[styles.formatChip, Number(settings.duration) === d ? styles.formatChipActive : ""].join(" ")}
-                          onClick={() => updateSettings({ duration: d })}
-                        >
-                          {d}s
-                        </button>
-                      ))}
-                    </div>
-                    <span className={styles.formatSubLabel} style={{ marginTop: 4 }}>Quality</span>
-                    <div className={styles.formatRow}>
-                      {VIDEO_QUALITY_TIERS.map((tier) => (
-                        <button
-                          key={tier.id}
-                          type="button"
-                          title={tier.hint}
-                          className={[styles.formatChip, (settings.videoQuality || "standard") === tier.id ? styles.formatChipActive : ""].join(" ")}
-                          onClick={() => updateSettings({ videoQuality: tier.id })}
-                        >
-                          {tier.label}
-                        </button>
-                      ))}
-                    </div>
-                    {(settings.videoQuality || "standard") === "standard" && selectedMode === "video" && !sourceImageUrl && (
-                      <span className={styles.formatSubLabel} style={{ marginTop: 4, opacity: 0.8 }}>
-                        Standard requires a source image — without one this renders at premium quality and is billed accordingly.
-                      </span>
-                    )}
-                  </div>
-                )}
-              </Card>
-
-              <Card>
-                <label className={styles.toggleRow} onClick={() => setApplyBrandKit((v) => !v)}>
-                  <span className={styles.toggleCopy}>
-                    <span className={styles.toggleTitle}>Match my brand kit</span>
-                    <span className={styles.toggleSub}>Applies your saved voice, colors, and tone</span>
-                  </span>
-                  <span
-                    className={styles.toggleTrack}
-                    style={{ background: applyBrandKit ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)" }}
-                  >
-                    <span className={styles.toggleKnob} style={{ left: applyBrandKit ? "18px" : "2px" }} />
-                  </span>
-                </label>
-                {brandKit?.raw?.brand_colors?.length > 0 && (
-                  <div className={styles.swatchRow}>
-                    {brandKit.raw.brand_colors.slice(0, 6).map((c, i) => (
-                      <span key={i} className={styles.swatch} style={{ background: c }} />
-                    ))}
-                  </div>
-                )}
-                {!brandKit?.setup_completed && (
-                  <div style={{ marginTop: 10 }}>
-                    <button type="button" className={styles.linkBtn} onClick={() => navigate("/app/settings/brand-kit")}>
-                      Set up brand kit →
-                    </button>
-                  </div>
-                )}
-              </Card>
-
-              {(selectedMode === "image" || isCarousel) && (
-                <Card>
-                  <div className={styles.sectionLabel}>Reference images</div>
-                  <span style={{ fontSize: 11.5, color: "var(--uiv2-text-secondary)", display: "block", marginBottom: 8 }}>
-                    Match the look of images you pick — keep a product, character, or style consistent. Renders on the photo engine.
-                  </span>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {(settings.referenceImages || []).map((url) => (
-                      <div key={url} style={{ position: "relative", width: 52, height: 52 }}>
-                        <img src={url} alt="Reference" style={{ width: 52, height: 52, borderRadius: 6, objectFit: "cover", border: "1px solid var(--uiv2-border)" }} onError={(e) => { e.currentTarget.style.opacity = "0.3"; }} />
-                        <button
-                          type="button"
-                          onClick={() => removeReferenceImage(url)}
-                          aria-label="Remove reference"
-                          style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: 999, border: "none", cursor: "pointer", background: "var(--uiv2-surface-raised, #1c1c1e)", color: "var(--uiv2-text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)", fontSize: 12, lineHeight: "16px" }}
-                        >×</button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => openSourcePicker("reference")}
-                      style={{ width: 52, height: 52, borderRadius: 6, border: "1px dashed var(--uiv2-border-strong)", background: "transparent", color: "var(--uiv2-text-secondary)", cursor: "pointer", fontSize: 20 }}
-                      title="Add a reference image"
-                    >+</button>
-                  </div>
-                  {(settings.referenceImages || []).length > 0 && (
-                    <label className={styles.toggleRow} style={{ marginTop: 12 }} onClick={() => {
-                      const next = !settings.styleLock;
-                      updateSettings({ styleLock: next });
-                      // 4.2: persist the reference set so it rides along on every
-                      // future generation (style-lock), via Content Defaults.
-                      if (user?.id) {
-                        import("../../services/userSettingsService").then(({ saveUserSettings }) => {
-                          saveUserSettings(user.id, {
-                            generationDefaults: {
-                              style_lock: next,
-                              reference_images: next ? (settings.referenceImages || []) : [],
-                            },
-                          }).catch(() => {});
-                        });
-                      }
-                    }}>
-                      <span className={styles.toggleCopy}>
-                        <span className={styles.toggleTitle}>Keep for every generation</span>
-                        <span className={styles.toggleSub}>Match my feed — reuse these across sessions</span>
-                      </span>
-                      <span className={styles.toggleTrack} style={{ background: settings.styleLock ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)" }}>
-                        <span className={styles.toggleKnob} style={{ left: settings.styleLock ? "18px" : "2px" }} />
-                      </span>
-                    </label>
-                  )}
-                </Card>
-              )}
-
-              <Card>
-                <div className={styles.sectionLabel}>Target platforms</div>
-                {accountsLoading ? (
-                  <Skeleton height="30px" />
-                ) : accounts.length === 0 ? (
-                  <span style={{ fontSize: 12, color: "var(--uiv2-text-secondary)" }}>
-                    No accounts connected —{" "}
-                    <button type="button" className={styles.linkBtn} onClick={() => navigate("/app/settings")}>connect one</button>.
-                  </span>
-                ) : (
-                  <div className={styles.formatRow}>
-                    {accounts.map((a) => {
-                      const on = (postProduction.selectedPlatforms || []).includes(a.id);
-                      return (
-                        <button
-                          key={a.id}
-                          type="button"
-                          className={[styles.formatChip, on ? styles.formatChipActive : ""].join(" ")}
-                          style={{ fontFamily: "var(--uiv2-font-body)" }}
-                          onClick={() => {
-                            const cur = postProduction.selectedPlatforms || [];
-                            updatePostProduction({ selectedPlatforms: cur.includes(a.id) ? cur.filter((x) => x !== a.id) : [...cur, a.id] });
-                          }}
-                        >
-                          {a.display_name || a.account_name || a.platform}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card>
-
-              <Card>
-                <div className={styles.costRow}>
-                  <span className={styles.costLabel}>This generation</span>
-                  <span className={styles.costValue} style={{ color: canAfford ? "var(--uiv2-text-primary)" : "var(--uiv2-danger)" }}>{cost} credits</span>
-                </div>
-                {selectedMode === "image" && (
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "2px 0 10px", cursor: "pointer" }} onClick={() => updateSettings({ previewPrompt: !settings.previewPrompt })}>
-                    <span className={styles.toggleTrack} style={{ transform: "scale(0.85)", background: settings.previewPrompt ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)" }}>
-                      <span className={styles.toggleKnob} style={{ left: settings.previewPrompt ? "18px" : "2px" }} />
-                    </span>
-                    <span style={{ fontSize: 12, color: "var(--uiv2-text-secondary)" }}>Review &amp; edit the prompt before spending</span>
-                  </label>
-                )}
-                {!canAfford && (
-                  <div className={styles.errorBox} style={{ padding: "9px 10px", marginBottom: 10, gap: 8 }}>
-                    <span className={styles.errorText}>Not enough credits — you need {cost} but have {availableCredits}.</span>
-                  </div>
-                )}
-                <Button
-                  onClick={handleGenerate}
-                  disabled={!prompt.trim() || !canAfford || isGenerating || getRateLimitRemaining("generate") > 0}
-                  style={{ width: "100%" }}
-                >
-                  <Sparkles size={14} aria-hidden="true" />
-                  {getRateLimitRemaining("generate") > 0
-                    ? `Retry in ${getRateLimitRemaining("generate")}s`
-                    : isGenerating ? "Generating…" : `Generate${shimmerCount > 1 ? ` ${shimmerCount} variants` : ""}`}
-                </Button>
-                {/* ADDENDUM UPGRADE 4: replaces Week 1 Fix 5's disable-only
-                    fix. When a generation is selected, behaves exactly as
-                    before (saveDraft, a post-level draft). When none is
-                    selected, this now genuinely saves the typed prompt +
-                    current settings onto the session (saveDraftPrompt) —
-                    the promptless "save my brief for later" feature the
-                    button's label always implied but never did. Only
-                    disabled when there is truly nothing to save either
-                    way. */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={!selectedGeneration && !prompt.trim()}
-                  title={selectedGeneration || prompt.trim() ? undefined : "Type a prompt or generate first"}
-                  onClick={async () => {
-                    try {
-                      if (selectedGeneration) {
-                        await saveDraft();
-                        toast.success("Saved as draft");
-                      } else {
-                        const saved = await saveDraftPrompt(prompt);
-                        toast.success(saved?.target === "temp-draft"
-                          ? "Draft saved — it'll be here when you come back"
-                          : "Draft saved to this session");
-                      }
-                    } catch (err) {
-                      toast.error(err?.message || "Could not save draft");
-                    }
-                  }}
-                  style={{ width: "100%", marginTop: 4 }}
-                >
-                  Save as draft without generating
-                </Button>
-              </Card>
-            </div>
-
-            {/* ============ CANVAS PANEL ============ */}
-            <div className={styles.canvasCol}>
-              <div className={styles.canvasHead}>
-                <div style={{ minWidth: 0 }}>
-                  <div className={styles.sessionTitle}>{activeSession?.title || "Untitled session"}</div>
-                  <div className={styles.sessionMeta}>
-                    {CONTENT_TYPES.find((m) => m.id === selectedMode)?.label} · {aspectRatio}
-                  </div>
-                </div>
-                <Button variant="subtle" onClick={() => setHistoryOpen(true)}>
-                  <HistoryIcon size={14} aria-hidden="true" /> Session history
-                </Button>
-              </div>
-
-              {(localError || error) && (
-                <div className={styles.errorBox} role="alert">
-                  <div style={{ flex: 1 }}>
-                    <div className={styles.errorTitle}>Generation failed</div>
-                    <div className={styles.errorText}>{localError || error}</div>
-                  </div>
-                  <Button variant="dangerSolid" size="sm" onClick={handleGenerate}>Retry</Button>
-                </div>
-              )}
-
-              {studioStage === "generating" && (
-                <Card>
-                  <div className={styles.loadingHead}>
-                    <span className={styles.loadingDot} />
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{isVideoMode ? "Queued for processing" : "Generating your variants"}</span>
-                    <span className={styles.loadingSub}>{progressLabel || (isVideoMode ? "Usually 2–4 minutes" : "Usually about 20 seconds")}</span>
-                  </div>
-                  <div className={styles.loadingBar}>
-                    <div className={styles.loadingBarFill} style={{ width: `${Math.round(generationProgress)}%` }} />
-                  </div>
-                  <div className={styles.variantGrid}>
-                    {Array.from({ length: Math.max(2, Math.min(4, shimmerCount)) }, (_, i) => (
-                      <Skeleton key={i} height="168px" radius="8px" style={{ aspectRatio: aspectRatio.replace(":", "/") }} />
-                    ))}
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={handleCancelGenerate} style={{ marginTop: 14 }}>Cancel</Button>
-                </Card>
-              )}
-
-              {/* 6.3: quality-flagged bulk regenerate */}
-              {(studioStage === "brief" || studioStage === "results") && flaggedGenerations.length > 0 && (
-                <Card style={{ borderColor: "var(--uiv2-danger, #c0392b)" }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>
-                    {flaggedGenerations.length} image{flaggedGenerations.length > 1 ? "s" : ""} flagged by the quality check
-                  </div>
-                  <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginTop: 4 }}>
-                    The quality check found likely issues (garbled text, artifacts, wrong crop). Regenerating re-rolls each one — this spends credits.
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="subtle"
-                    style={{ marginTop: 10 }}
-                    onClick={handleRegenerateFlagged}
-                    disabled={flaggedGenerations.some((g) => regeneratingIds.includes(g.id))}
-                  >
-                    Regenerate {flaggedGenerations.length} flagged
-                  </Button>
-                </Card>
-              )}
-
-              {(studioStage === "brief" || studioStage === "results") && lastBatchOutcome && lastBatchOutcome.failedCount > 0 && (
-                <Card style={{ borderColor: "var(--uiv2-warning, #b98900)" }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>
-                    {lastBatchOutcome.succeededCount} of {lastBatchOutcome.totalCount} {lastBatchOutcome.kind === "carousel" ? "slides" : "variants"} completed
-                  </div>
-                  <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginTop: 4 }}>
-                    {lastBatchOutcome.failedCount} failed to render. Retrying only re-runs the failed ones — credits already spent on the successful ones are not charged again.
-                  </div>
-                  {lastBatchOutcome.kind === "image" && lastBatchOutcome.failedSlots?.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="subtle"
-                      style={{ marginTop: 10 }}
-                      onClick={() => retryFailedVariants(prompt.trim())}
-                    >
-                      Retry failed only
-                    </Button>
-                  )}
-                  {lastBatchOutcome.kind === "carousel" && lastBatchOutcome.failedSlots?.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="subtle"
-                      style={{ marginTop: 10 }}
-                      onClick={handleGenerate}
-                    >
-                      Regenerate whole carousel
-                    </Button>
-                  )}
-                </Card>
-              )}
-
-              {studioStage !== "generating" && studioStage !== "published" && completedGenerations.length > 0 && (
-                isCarousel ? (
-                  <Card>
-                    <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginBottom: 12 }}>
-                      Click a slide to preview it full-size. Check the ones you want redone.
-                    </div>
-                    <div className={styles.filmstrip}>
-                      {completedGenerations.map((g, i) => (
-                        <div key={g.id} className={styles.filmSlide}>
-                          <div
-                            className={[styles.filmThumb, selectedGenerationId === g.id ? styles.filmThumbSelected : ""].join(" ")}
-                            onClick={() => openLightbox(g)}
-                          >
-                            {(g.storage_path || g.output_url || g.thumbnail_url) && !failedThumbIds.has(g.id) ? (
-                              <img className={styles.variantImg} src={g.storage_path || g.output_url || g.thumbnail_url} alt="" onError={() => markThumbFailed(g.id)} />
-                            ) : (
-                              <span className={styles.variantLabel}>Slide {i + 1}</span>
-                            )}
-                            <QualityFlag quality={g.metadata?.quality} />
-                            <button
-                              type="button"
-                              className={[styles.filmCheck, slideSelection[g.id] ? styles.filmCheckOn : ""].join(" ")}
-                              onClick={(e) => { e.stopPropagation(); toggleSlideSelected(g.id); }}
-                              aria-label={slideSelection[g.id] ? `Deselect slide ${i + 1}` : `Select slide ${i + 1} for regeneration`}
-                            >
-                              {slideSelection[g.id] && (
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#17181B" strokeWidth="3.4"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                              )}
-                            </button>
-                            {regeneratingIds.includes(g.id) && (
-                              <div className={styles.regeneratingOverlay}><span className={styles.regeneratingDot} /></div>
-                            )}
-                          </div>
-                          <div className={styles.filmCaption}>Slide {i + 1}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className={styles.searchRow}>
-                      <Button
-                        variant="subtle"
-                        onClick={handleRegenerateSelectedSlides}
-                        disabled={selectedSlideIds.length === 0 || isGenerating || selectedSlideIds.some((id) => regeneratingIds.includes(id))}
-                      >
-                        {selectedSlideIds.length > 0 ? `Regenerate ${selectedSlideIds.length} selected slide${selectedSlideIds.length > 1 ? "s" : ""}` : "Regenerate selected slides"}
-                      </Button>
-                      <Button
-                        variant="subtle"
-                        onClick={handleGenerate}
-                        disabled={!prompt.trim() || !canAfford || isGenerating || getRateLimitRemaining("generate") > 0}
-                      >
-                        {getRateLimitRemaining("generate") > 0
-                          ? `Retry in ${getRateLimitRemaining("generate")}s`
-                          : `Regenerate whole carousel · ${cost} credits`}
-                      </Button>
-                      <Button
-                        style={{ marginLeft: "auto" }}
-                        onClick={() => {
-                          selectGeneration(completedGenerations[0]);
-                          postProdRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }}
-                      >
-                        Use this carousel
-                      </Button>
-                    </div>
-                  </Card>
-                ) : (
-                  <div className={styles.variantGrid}>
-                    {completedGenerations.map((g, i) => (
-                      <div
-                        key={g.id}
-                        className={[styles.variantCard, selectedGenerationId === g.id ? styles.variantCardSelected : ""].join(" ")}
-                        style={{ aspectRatio: aspectRatio.replace(":", "/") }}
-                        onClick={() => selectGeneration(g)}
-                      >
-                        {(g.storage_path || g.output_url || g.thumbnail_url) && !failedThumbIds.has(g.id) ? (
-                          g.media_type === "video" ? (
-                            <video className={styles.variantImg} src={g.storage_path || g.output_url} muted onError={() => markThumbFailed(g.id)} />
-                          ) : (
-                            <img className={styles.variantImg} src={g.storage_path || g.output_url || g.thumbnail_url} alt="" onError={() => markThumbFailed(g.id)} />
-                          )
-                        ) : (
-                          <span className={styles.variantLabel}>V{i + 1}</span>
-                        )}
-                        <QualityFlag quality={g.metadata?.quality} />
-                        {selectedGenerationId === g.id && (
-                          <span className={styles.variantBadge}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#17181B" strokeWidth="3"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          </span>
-                        )}
-                        <div className={styles.variantHover}>
-                          <span className={styles.variantChip}>Use this</span>
-                          <span style={{ display: "flex", gap: 5 }}>
-                            <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); openLightbox(g); }} title="View maximized">
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.variantIconBtn}
-                              onClick={(e) => { e.stopPropagation(); handleRegenerateVariant(g); }}
-                              disabled={regeneratingIds.includes(g.id)}
-                              title="Regenerate this variant"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-7 3L3 8" strokeLinecap="round" strokeLinejoin="round" /><path d="M3 3v5h5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            </button>
-                            {g.media_type !== "video" && (
-                              <>
-                                <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); handleUseAsSource(g, "edit"); }} title="Edit this image with a prompt">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" strokeLinecap="round" /><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                </button>
-                                <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); handleUseAsSource(g, "image-to-video"); }} title="Animate this image into a video">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" strokeLinejoin="round" /></svg>
-                                </button>
-                              </>
-                            )}
-                          </span>
-                        </div>
-                        {g.metadata?.quality?.verdict === "fail" && !regeneratingIds.includes(g.id) && (
-                          <button
-                            type="button"
-                            className={styles.qualityRegenBar}
-                            onClick={(e) => { e.stopPropagation(); handleRegenerateVariant(g); }}
-                            title={(g.metadata.quality.flags || []).join(" · ") || "Quality check flagged issues"}
-                            style={{
-                              position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 3,
-                              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                              padding: "7px 10px", border: "none", cursor: "pointer",
-                              fontSize: 11.5, fontWeight: 600, color: "#fff",
-                              background: "linear-gradient(to top, rgba(192,57,43,0.96), rgba(192,57,43,0.82))",
-                            }}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-7 3L3 8" strokeLinecap="round" strokeLinejoin="round" /><path d="M3 3v5h5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            Regenerate ({IMAGE_REGEN_COST} cr)
-                          </button>
-                        )}
-                        {regeneratingIds.includes(g.id) && (
-                          <div className={styles.regeneratingOverlay}><span className={styles.regeneratingDot} /></div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-
-              {completedGenerations.length === 0 && studioStage !== "generating" && (
-                // The prompt box sits beside this on desktop, but stacks above
-                // it (and often off-screen) on mobile — so this needs a real
-                // control, not just a sentence pointing at one.
-                <EmptyState
-                  dashed
-                  title="Nothing generated yet"
-                  description="Describe the post you want — the image and the caption are made together."
-                  actions={(
-                    <Button size="sm" onClick={() => {
-                      promptRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                      promptRef.current?.focus();
-                    }}>
-                      Write a prompt
-                    </Button>
-                  )}
-                />
-              )}
-
-              {/* Post production — inline, directly under the results grid, the
-                  moment results exist (mockup Studio.dc.html: showPostProd =
-                  phase === "results"). Targets the effective generation (the
-                  user's pick, or variant 1 by default). The "published" success
-                  state swaps this panel for the confirmation body. */}
-              {(studioStage === "published" || (completedGenerations.length > 0 && studioStage !== "generating")) && effectiveGeneration && (
-                <div ref={postProdRef}>
-                  <PostProductionPanel
-                    published={studioStage === "published"}
-                    selectedGeneration={effectiveGeneration}
-                    postProduction={postProduction}
-                    updatePostProduction={updatePostProduction}
-                    publishing={publishing}
-                    accounts={accounts}
-                    onSaveDraft={handleSaveDraft}
-                    onOpenSchedule={() => setScheduleOpen(true)}
-                    onOpenPublishConfirm={() => setPublishConfirmOpen(true)}
-                    onClose={() => setStudioStage("results")}
-                    onGenerateAnother={() => setStudioStage("brief")}
-                    onRegenerateMetadata={handleRegenerateMetadata}
-                    onRefineCaption={handleRefineCaption}
-                    onRescore={handleRescore}
-                    metadataRetryAfter={getRateLimitRemaining("regenerateMetadata")}
-                    seoRetryAfter={getRateLimitRemaining("rescore")}
-                  />
-                </div>
-              )}
-
-              {/* Recent in this session (mockup: always present at the bottom
-                  of the canvas column). Shows this session's recent generations
-                  with an actual thumbnail, title, and relative time — clicking
-                  a row opens the same lightbox the main results grid uses, so
-                  "recent" is browsable, not just a text log of activity. */}
-              {recentItems.length > 0 && (
-                <Card>
-                  <div className={styles.sectionLabel}>Recent in this session</div>
-                  <div className={styles.recentList}>
-                    {recentItems.map((it) => (
-                      <div
-                        key={it.id}
-                        className={styles.recentRow}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => openLightbox(it.generation)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            openLightbox(it.generation);
-                          }
-                        }}
-                      >
-                        <span className={styles.recentThumb}>
-                          {it.thumbSrc && !failedThumbIds.has(it.id) ? (
-                            it.isVideo ? (
-                              <video className={styles.recentThumbMedia} src={it.thumbSrc} muted onError={() => markThumbFailed(it.id)} />
-                            ) : (
-                              <img className={styles.recentThumbMedia} src={it.thumbSrc} alt="" onError={() => markThumbFailed(it.id)} />
-                            )
-                          ) : (
-                            <span className={styles.recentThumbFallback}>{it.kind}</span>
-                          )}
-                          {it.thumbSrc && !failedThumbIds.has(it.id) && (
-                            <span className={styles.recentThumbBadge}>{it.kind}</span>
-                          )}
-                        </span>
-                        <span className={styles.recentTitle}>{it.title}</span>
-                        <span className={styles.recentTime}>{it.time}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
 
       {/* Schedule dialog */}
       <Modal
@@ -2322,13 +1551,740 @@ function StudioBody({ brandKit }) {
       )}
     </>
   );
+
+  return (
+    <AppShell
+      activeKey="studio"
+      className={styles.shell}
+      mainClassName={styles.main}
+      overlays={overlays}
+      rightLead={videoJobActive ? (
+        <div className={styles.videoIndicator} title="Video renders server-side — safe to navigate away, close this tab, or refresh; it'll still be here in the Video jobs drawer when you come back">
+          <span className={styles.loadingDot} />
+          <span className={styles.videoIndicatorLabel} style={{ fontFamily: "var(--uiv2-font-mono)", fontSize: 11, color: "var(--uiv2-warning)" }}>
+            Video rendering…
+          </span>
+        </div>
+      ) : null}
+      rightActions={(
+        <IconButton title="Video jobs" onClick={() => setVideoJobsOpen(true)}>
+          <VideoIcon size={15} />
+        </IconButton>
+      )}
+    >
+      <div className={styles.canvas}>
+        <div className={styles.studioGrid}>
+          {/* ============ BRIEF PANEL ============ */}
+          <div className={styles.brief}>
+            <Card>
+              <div className={styles.sectionLabel}>Mode</div>
+              <div className={styles.modeRow}>
+                {CONTENT_TYPES.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={[styles.modeChip, selectedMode === m.id ? styles.modeChipActive : ""].join(" ")}
+                    onClick={() => handleModeChange(m.id)}
+                  >
+                    {MODE_ICON[m.id]} {m.label}
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            <Card>
+              <div className={styles.promptHead}>
+                <span className={styles.sectionLabel} style={{ marginBottom: 0 }}>Prompt</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleEnhance}
+                  disabled={enhancing || !prompt.trim() || isGenerating || getRateLimitRemaining("enhance") > 0}
+                >
+                  <Sliders size={12} />
+                  {getRateLimitRemaining("enhance") > 0
+                    ? `Retry in ${getRateLimitRemaining("enhance")}s`
+                    : enhancing ? "Enhancing…" : "Enhance prompt"}
+                </Button>
+              </div>
+
+              {needsSourceImage && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                    {sourceImageUrl ? (
+                      <img
+                        src={sourceImageUrl}
+                        alt="Source"
+                        style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover", flexShrink: 0, border: "1px solid var(--uiv2-border)" }}
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      />
+                    ) : null}
+                    <input
+                      className={styles.fieldInput}
+                      style={{ flex: 1 }}
+                      placeholder="Source image URL, or pick from your Library →"
+                      value={sourceImageUrl}
+                      onChange={(e) => setSourceImageUrl(e.target.value)}
+                    />
+                    <Button variant="subtle" size="sm" onClick={openSourcePicker} style={{ flexShrink: 0 }}>
+                      Pick
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {guided ? (
+                <div className={styles.guidedGrid}>
+                  {["subject", "setting", "style", "mood"].map((key) => (
+                    <label key={key} className={styles.field}>
+                      <span className={styles.fieldLabel}>{key[0].toUpperCase() + key.slice(1)}</span>
+                      <input
+                        className={styles.fieldInput}
+                        value={guidedFields[key]}
+                        onChange={(e) => setGuidedFields((g) => ({ ...g, [key]: e.target.value }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <textarea
+                  ref={promptRef}
+                  className={styles.textarea}
+                  maxLength={PROMPT_LIMIT}
+                  placeholder="Describe the post you want — subject, setting, mood."
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value.slice(0, PROMPT_LIMIT))}
+                  onKeyDown={handlePromptKeyDown}
+                />
+              )}
+              <div className={styles.promptFoot}>
+                <span className={styles.promptCount}>{prompt.length} / {PROMPT_LIMIT.toLocaleString()}</span>
+                <button type="button" className={styles.linkBtn} onClick={() => setGuided((g) => !g)}>
+                  {guided ? "Use freeform prompt" : "Use guided fields"}
+                </button>
+              </div>
+            </Card>
+
+            <Card>
+              <div className={styles.sectionLabel}>Format</div>
+              <div className={styles.formatBlock}>
+                <span className={styles.formatSubLabel}>Aspect ratio</span>
+                <div className={styles.formatRow}>
+                  {ASPECT_RATIOS.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      className={[styles.formatChip, aspectRatio === r.id ? styles.formatChipActive : ""].join(" ")}
+                      onClick={() => updateSettings({ aspectRatio: r.id })}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {(selectedMode === "image" || isCarousel) && (
+                <div className={styles.formatBlock}>
+                  <span className={styles.formatSubLabel}>Image style</span>
+                  <div className={styles.formatRow}>
+                    {IMAGE_MODEL_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        title={opt.hint}
+                        className={[styles.formatChip, (settings.imageModel || "auto") === opt.id ? styles.formatChipActive : ""].join(" ")}
+                        onClick={() => updateSettings({ imageModel: opt.id })}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className={styles.formatSubLabel} style={{ marginTop: 4, opacity: 0.8 }}>
+                    {IMAGE_MODEL_OPTIONS.find((o) => o.id === (settings.imageModel || "auto"))?.hint}
+                  </span>
+                </div>
+              )}
+
+              {selectedMode === "image" && (
+                <div className={styles.formatBlock}>
+                  <div className={styles.stepperRow}>
+                    <span className={styles.formatSubLabel}>Batch size</span>
+                    <div className={styles.stepperCtl}>
+                      <button type="button" className={styles.stepperBtn} onClick={() => updateSettings({ batchSize: Math.max(1, (settings.batchSize || 1) - 1) })}>−</button>
+                      <span className={styles.stepperVal}>{settings.batchSize || 1}</span>
+                      <button type="button" className={styles.stepperBtn} onClick={() => updateSettings({ batchSize: Math.min(4, (settings.batchSize || 1) + 1) })}>+</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isCarousel && (
+                <div className={styles.formatBlock}>
+                  <div className={styles.stepperRow}>
+                    <span className={styles.formatSubLabel}>Slide count</span>
+                    <div className={styles.stepperCtl}>
+                      <button type="button" className={styles.stepperBtn} onClick={() => updateSettings({ slideCount: Math.max(2, Number(settings.slideCount || 6) - 1) })}>−</button>
+                      <span className={styles.stepperVal}>{settings.slideCount === "auto" ? "auto" : settings.slideCount || 6}</span>
+                      <button type="button" className={styles.stepperBtn} onClick={() => updateSettings({ slideCount: Math.min(10, Number(settings.slideCount || 6) + 1) })}>+</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isVideoMode && (
+                <div className={styles.formatBlock}>
+                  <span className={styles.formatSubLabel}>Duration</span>
+                  <div className={styles.formatRow}>
+                    {getVideoDurations().map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className={[styles.formatChip, Number(settings.duration) === d ? styles.formatChipActive : ""].join(" ")}
+                        onClick={() => updateSettings({ duration: d })}
+                      >
+                        {d}s
+                      </button>
+                    ))}
+                  </div>
+                  <span className={styles.formatSubLabel} style={{ marginTop: 4 }}>Quality</span>
+                  <div className={styles.formatRow}>
+                    {VIDEO_QUALITY_TIERS.map((tier) => (
+                      <button
+                        key={tier.id}
+                        type="button"
+                        title={tier.hint}
+                        className={[styles.formatChip, (settings.videoQuality || "standard") === tier.id ? styles.formatChipActive : ""].join(" ")}
+                        onClick={() => updateSettings({ videoQuality: tier.id })}
+                      >
+                        {tier.label}
+                      </button>
+                    ))}
+                  </div>
+                  {(settings.videoQuality || "standard") === "standard" && selectedMode === "video" && !sourceImageUrl && (
+                    <span className={styles.formatSubLabel} style={{ marginTop: 4, opacity: 0.8 }}>
+                      Standard requires a source image — without one this renders at premium quality and is billed accordingly.
+                    </span>
+                  )}
+                </div>
+              )}
+            </Card>
+
+            <Card>
+              <label className={styles.toggleRow} onClick={() => setApplyBrandKit((v) => !v)}>
+                <span className={styles.toggleCopy}>
+                  <span className={styles.toggleTitle}>Match my brand kit</span>
+                  <span className={styles.toggleSub}>Applies your saved voice, colors, and tone</span>
+                </span>
+                <span
+                  className={styles.toggleTrack}
+                  style={{ background: applyBrandKit ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)" }}
+                >
+                  <span className={styles.toggleKnob} style={{ left: applyBrandKit ? "18px" : "2px" }} />
+                </span>
+              </label>
+              {brandKit?.raw?.brand_colors?.length > 0 && (
+                <div className={styles.swatchRow}>
+                  {brandKit.raw.brand_colors.slice(0, 6).map((c, i) => (
+                    <span key={i} className={styles.swatch} style={{ background: c }} />
+                  ))}
+                </div>
+              )}
+              {!brandKit?.setup_completed && (
+                <div style={{ marginTop: 10 }}>
+                  <button type="button" className={styles.linkBtn} onClick={() => navigate("/app/settings/brand-kit")}>
+                    Set up brand kit →
+                  </button>
+                </div>
+              )}
+            </Card>
+
+            {(selectedMode === "image" || isCarousel) && (
+              <Card>
+                <div className={styles.sectionLabel}>Reference images</div>
+                <span style={{ fontSize: 11.5, color: "var(--uiv2-text-secondary)", display: "block", marginBottom: 8 }}>
+                  Match the look of images you pick — keep a product, character, or style consistent. Renders on the photo engine.
+                </span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {(settings.referenceImages || []).map((url) => (
+                    <div key={url} style={{ position: "relative", width: 52, height: 52 }}>
+                      <img src={url} alt="Reference" style={{ width: 52, height: 52, borderRadius: 6, objectFit: "cover", border: "1px solid var(--uiv2-border)" }} onError={(e) => { e.currentTarget.style.opacity = "0.3"; }} />
+                      <button
+                        type="button"
+                        onClick={() => removeReferenceImage(url)}
+                        aria-label="Remove reference"
+                        style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: 999, border: "none", cursor: "pointer", background: "var(--uiv2-surface-raised, #1c1c1e)", color: "var(--uiv2-text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)", fontSize: 12, lineHeight: "16px" }}
+                      >×</button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => openSourcePicker("reference")}
+                    style={{ width: 52, height: 52, borderRadius: 6, border: "1px dashed var(--uiv2-border-strong)", background: "transparent", color: "var(--uiv2-text-secondary)", cursor: "pointer", fontSize: 20 }}
+                    title="Add a reference image"
+                  >+</button>
+                </div>
+                {(settings.referenceImages || []).length > 0 && (
+                  <label className={styles.toggleRow} style={{ marginTop: 12 }} onClick={() => {
+                    const next = !settings.styleLock;
+                    updateSettings({ styleLock: next });
+                    // 4.2: persist the reference set so it rides along on every
+                    // future generation (style-lock), via Content Defaults.
+                    if (user?.id) {
+                      import("../../services/userSettingsService").then(({ saveUserSettings }) => {
+                        saveUserSettings(user.id, {
+                          generationDefaults: {
+                            style_lock: next,
+                            reference_images: next ? (settings.referenceImages || []) : [],
+                          },
+                        }).catch(() => {});
+                      });
+                    }
+                  }}>
+                    <span className={styles.toggleCopy}>
+                      <span className={styles.toggleTitle}>Keep for every generation</span>
+                      <span className={styles.toggleSub}>Match my feed — reuse these across sessions</span>
+                    </span>
+                    <span className={styles.toggleTrack} style={{ background: settings.styleLock ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)" }}>
+                      <span className={styles.toggleKnob} style={{ left: settings.styleLock ? "18px" : "2px" }} />
+                    </span>
+                  </label>
+                )}
+              </Card>
+            )}
+
+            <Card>
+              <div className={styles.sectionLabel}>Target platforms</div>
+              {accountsLoading ? (
+                <Skeleton height="30px" />
+              ) : accounts.length === 0 ? (
+                <span style={{ fontSize: 12, color: "var(--uiv2-text-secondary)" }}>
+                  No accounts connected —{" "}
+                  <button type="button" className={styles.linkBtn} onClick={() => navigate("/app/settings")}>connect one</button>.
+                </span>
+              ) : (
+                <div className={styles.formatRow}>
+                  {accounts.map((a) => {
+                    const on = (postProduction.selectedPlatforms || []).includes(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        className={[styles.formatChip, on ? styles.formatChipActive : ""].join(" ")}
+                        style={{ fontFamily: "var(--uiv2-font-body)" }}
+                        onClick={() => {
+                          const cur = postProduction.selectedPlatforms || [];
+                          updatePostProduction({ selectedPlatforms: cur.includes(a.id) ? cur.filter((x) => x !== a.id) : [...cur, a.id] });
+                        }}
+                      >
+                        {a.display_name || a.account_name || a.platform}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            <Card>
+              <div className={styles.costRow}>
+                <span className={styles.costLabel}>This generation</span>
+                <span className={styles.costValue} style={{ color: canAfford ? "var(--uiv2-text-primary)" : "var(--uiv2-danger)" }}>{cost} credits</span>
+              </div>
+              {selectedMode === "image" && (
+                <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "2px 0 10px", cursor: "pointer" }} onClick={() => updateSettings({ previewPrompt: !settings.previewPrompt })}>
+                  <span className={styles.toggleTrack} style={{ transform: "scale(0.85)", background: settings.previewPrompt ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong)" }}>
+                    <span className={styles.toggleKnob} style={{ left: settings.previewPrompt ? "18px" : "2px" }} />
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--uiv2-text-secondary)" }}>Review &amp; edit the prompt before spending</span>
+                </label>
+              )}
+              {!canAfford && (
+                <div className={styles.errorBox} style={{ padding: "9px 10px", marginBottom: 10, gap: 8 }}>
+                  <span className={styles.errorText}>Not enough credits — you need {cost} but have {availableCredits}.</span>
+                </div>
+              )}
+              <Button
+                onClick={handleGenerate}
+                disabled={!prompt.trim() || !canAfford || isGenerating || getRateLimitRemaining("generate") > 0}
+                style={{ width: "100%" }}
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                {getRateLimitRemaining("generate") > 0
+                  ? `Retry in ${getRateLimitRemaining("generate")}s`
+                  : isGenerating ? "Generating…" : `Generate${shimmerCount > 1 ? ` ${shimmerCount} variants` : ""}`}
+              </Button>
+              {/* ADDENDUM UPGRADE 4: replaces Week 1 Fix 5's disable-only
+                  fix. When a generation is selected, behaves exactly as
+                  before (saveDraft, a post-level draft). When none is
+                  selected, this now genuinely saves the typed prompt +
+                  current settings onto the session (saveDraftPrompt) —
+                  the promptless "save my brief for later" feature the
+                  button's label always implied but never did. Only
+                  disabled when there is truly nothing to save either
+                  way. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!selectedGeneration && !prompt.trim()}
+                title={selectedGeneration || prompt.trim() ? undefined : "Type a prompt or generate first"}
+                onClick={async () => {
+                  try {
+                    if (selectedGeneration) {
+                      await saveDraft();
+                      toast.success("Saved as draft");
+                    } else {
+                      const saved = await saveDraftPrompt(prompt);
+                      toast.success(saved?.target === "temp-draft"
+                        ? "Draft saved — it'll be here when you come back"
+                        : "Draft saved to this session");
+                    }
+                  } catch (err) {
+                    toast.error(err?.message || "Could not save draft");
+                  }
+                }}
+                style={{ width: "100%", marginTop: 4 }}
+              >
+                Save as draft without generating
+              </Button>
+            </Card>
+          </div>
+
+          {/* ============ CANVAS PANEL ============ */}
+          <div className={styles.canvasCol}>
+            <div className={styles.canvasHead}>
+              <div style={{ minWidth: 0 }}>
+                <div className={styles.sessionTitle}>{activeSession?.title || "Untitled session"}</div>
+                <div className={styles.sessionMeta}>
+                  {CONTENT_TYPES.find((m) => m.id === selectedMode)?.label} · {aspectRatio}
+                </div>
+              </div>
+              <Button variant="subtle" onClick={() => setHistoryOpen(true)}>
+                <HistoryIcon size={14} aria-hidden="true" /> Session history
+              </Button>
+            </div>
+
+            {(localError || error) && (
+              <div className={styles.errorBox} role="alert">
+                <div style={{ flex: 1 }}>
+                  <div className={styles.errorTitle}>Generation failed</div>
+                  <div className={styles.errorText}>{localError || error}</div>
+                </div>
+                <Button variant="dangerSolid" size="sm" onClick={handleGenerate}>Retry</Button>
+              </div>
+            )}
+
+            {studioStage === "generating" && (
+              <Card>
+                <div className={styles.loadingHead}>
+                  <span className={styles.loadingDot} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{isVideoMode ? "Queued for processing" : "Generating your variants"}</span>
+                  <span className={styles.loadingSub}>{progressLabel || (isVideoMode ? "Usually 2–4 minutes" : "Usually about 20 seconds")}</span>
+                </div>
+                <div className={styles.loadingBar}>
+                  <div className={styles.loadingBarFill} style={{ width: `${Math.round(generationProgress)}%` }} />
+                </div>
+                <div className={styles.variantGrid}>
+                  {Array.from({ length: Math.max(2, Math.min(4, shimmerCount)) }, (_, i) => (
+                    <Skeleton key={i} height="168px" radius="8px" style={{ aspectRatio: aspectRatio.replace(":", "/") }} />
+                  ))}
+                </div>
+                <Button variant="ghost" size="sm" onClick={handleCancelGenerate} style={{ marginTop: 14 }}>Cancel</Button>
+              </Card>
+            )}
+
+            {/* 6.3: quality-flagged bulk regenerate */}
+            {(studioStage === "brief" || studioStage === "results") && flaggedGenerations.length > 0 && (
+              <Card style={{ borderColor: "var(--uiv2-danger, #c0392b)" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+                  {flaggedGenerations.length} image{flaggedGenerations.length > 1 ? "s" : ""} flagged by the quality check
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginTop: 4 }}>
+                  The quality check found likely issues (garbled text, artifacts, wrong crop). Regenerating re-rolls each one — this spends credits.
+                </div>
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  style={{ marginTop: 10 }}
+                  onClick={handleRegenerateFlagged}
+                  disabled={flaggedGenerations.some((g) => regeneratingIds.includes(g.id))}
+                >
+                  Regenerate {flaggedGenerations.length} flagged
+                </Button>
+              </Card>
+            )}
+
+            {(studioStage === "brief" || studioStage === "results") && lastBatchOutcome && lastBatchOutcome.failedCount > 0 && (
+              <Card style={{ borderColor: "var(--uiv2-warning, #b98900)" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+                  {lastBatchOutcome.succeededCount} of {lastBatchOutcome.totalCount} {lastBatchOutcome.kind === "carousel" ? "slides" : "variants"} completed
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginTop: 4 }}>
+                  {lastBatchOutcome.failedCount} failed to render. Retrying only re-runs the failed ones — credits already spent on the successful ones are not charged again.
+                </div>
+                {lastBatchOutcome.kind === "image" && lastBatchOutcome.failedSlots?.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    style={{ marginTop: 10 }}
+                    onClick={() => retryFailedVariants(prompt.trim())}
+                  >
+                    Retry failed only
+                  </Button>
+                )}
+                {lastBatchOutcome.kind === "carousel" && lastBatchOutcome.failedSlots?.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    style={{ marginTop: 10 }}
+                    onClick={handleGenerate}
+                  >
+                    Regenerate whole carousel
+                  </Button>
+                )}
+              </Card>
+            )}
+
+            {studioStage !== "generating" && studioStage !== "published" && completedGenerations.length > 0 && (
+              isCarousel ? (
+                <Card>
+                  <div style={{ fontSize: 12.5, color: "var(--uiv2-text-secondary)", marginBottom: 12 }}>
+                    Click a slide to preview it full-size. Check the ones you want redone.
+                  </div>
+                  <div className={styles.filmstrip}>
+                    {completedGenerations.map((g, i) => (
+                      <div key={g.id} className={styles.filmSlide}>
+                        <div
+                          className={[styles.filmThumb, selectedGenerationId === g.id ? styles.filmThumbSelected : ""].join(" ")}
+                          onClick={() => openLightbox(g)}
+                        >
+                          {(g.storage_path || g.output_url || g.thumbnail_url) && !failedThumbIds.has(g.id) ? (
+                            <img className={styles.variantImg} src={g.storage_path || g.output_url || g.thumbnail_url} alt="" onError={() => markThumbFailed(g.id)} />
+                          ) : (
+                            <span className={styles.variantLabel}>Slide {i + 1}</span>
+                          )}
+                          <QualityFlag quality={g.metadata?.quality} />
+                          <button
+                            type="button"
+                            className={[styles.filmCheck, slideSelection[g.id] ? styles.filmCheckOn : ""].join(" ")}
+                            onClick={(e) => { e.stopPropagation(); toggleSlideSelected(g.id); }}
+                            aria-label={slideSelection[g.id] ? `Deselect slide ${i + 1}` : `Select slide ${i + 1} for regeneration`}
+                          >
+                            {slideSelection[g.id] && (
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#17181B" strokeWidth="3.4"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            )}
+                          </button>
+                          {regeneratingIds.includes(g.id) && (
+                            <div className={styles.regeneratingOverlay}><span className={styles.regeneratingDot} /></div>
+                          )}
+                        </div>
+                        <div className={styles.filmCaption}>Slide {i + 1}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.searchRow}>
+                    <Button
+                      variant="subtle"
+                      onClick={handleRegenerateSelectedSlides}
+                      disabled={selectedSlideIds.length === 0 || isGenerating || selectedSlideIds.some((id) => regeneratingIds.includes(id))}
+                    >
+                      {selectedSlideIds.length > 0 ? `Regenerate ${selectedSlideIds.length} selected slide${selectedSlideIds.length > 1 ? "s" : ""}` : "Regenerate selected slides"}
+                    </Button>
+                    <Button
+                      variant="subtle"
+                      onClick={handleGenerate}
+                      disabled={!prompt.trim() || !canAfford || isGenerating || getRateLimitRemaining("generate") > 0}
+                    >
+                      {getRateLimitRemaining("generate") > 0
+                        ? `Retry in ${getRateLimitRemaining("generate")}s`
+                        : `Regenerate whole carousel · ${cost} credits`}
+                    </Button>
+                    <Button
+                      style={{ marginLeft: "auto" }}
+                      onClick={() => {
+                        selectGeneration(completedGenerations[0]);
+                        postProdRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                    >
+                      Use this carousel
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                <div className={styles.variantGrid}>
+                  {completedGenerations.map((g, i) => (
+                    <div
+                      key={g.id}
+                      className={[styles.variantCard, selectedGenerationId === g.id ? styles.variantCardSelected : ""].join(" ")}
+                      style={{ aspectRatio: aspectRatio.replace(":", "/") }}
+                      onClick={() => selectGeneration(g)}
+                    >
+                      {(g.storage_path || g.output_url || g.thumbnail_url) && !failedThumbIds.has(g.id) ? (
+                        g.media_type === "video" ? (
+                          <video className={styles.variantImg} src={g.storage_path || g.output_url} muted onError={() => markThumbFailed(g.id)} />
+                        ) : (
+                          <img className={styles.variantImg} src={g.storage_path || g.output_url || g.thumbnail_url} alt="" onError={() => markThumbFailed(g.id)} />
+                        )
+                      ) : (
+                        <span className={styles.variantLabel}>V{i + 1}</span>
+                      )}
+                      <QualityFlag quality={g.metadata?.quality} />
+                      {selectedGenerationId === g.id && (
+                        <span className={styles.variantBadge}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#17181B" strokeWidth="3"><path d="M5 12l5 5 9-11" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </span>
+                      )}
+                      <div className={styles.variantHover}>
+                        <span className={styles.variantChip}>Use this</span>
+                        <span style={{ display: "flex", gap: 5 }}>
+                          <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); openLightbox(g); }} title="View maximized">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.variantIconBtn}
+                            onClick={(e) => { e.stopPropagation(); handleRegenerateVariant(g); }}
+                            disabled={regeneratingIds.includes(g.id)}
+                            title="Regenerate this variant"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-7 3L3 8" strokeLinecap="round" strokeLinejoin="round" /><path d="M3 3v5h5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
+                          {g.media_type !== "video" && (
+                            <>
+                              <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); handleUseAsSource(g, "edit"); }} title="Edit this image with a prompt">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" strokeLinecap="round" /><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              </button>
+                              <button type="button" className={styles.variantIconBtn} onClick={(e) => { e.stopPropagation(); handleUseAsSource(g, "image-to-video"); }} title="Animate this image into a video">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" strokeLinejoin="round" /></svg>
+                              </button>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      {g.metadata?.quality?.verdict === "fail" && !regeneratingIds.includes(g.id) && (
+                        <button
+                          type="button"
+                          className={styles.qualityRegenBar}
+                          onClick={(e) => { e.stopPropagation(); handleRegenerateVariant(g); }}
+                          title={(g.metadata.quality.flags || []).join(" · ") || "Quality check flagged issues"}
+                          style={{
+                            position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 3,
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                            padding: "7px 10px", border: "none", cursor: "pointer",
+                            fontSize: 11.5, fontWeight: 600, color: "#fff",
+                            background: "linear-gradient(to top, rgba(192,57,43,0.96), rgba(192,57,43,0.82))",
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-7 3L3 8" strokeLinecap="round" strokeLinejoin="round" /><path d="M3 3v5h5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          Regenerate ({IMAGE_REGEN_COST} cr)
+                        </button>
+                      )}
+                      {regeneratingIds.includes(g.id) && (
+                        <div className={styles.regeneratingOverlay}><span className={styles.regeneratingDot} /></div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {completedGenerations.length === 0 && studioStage !== "generating" && (
+              // The prompt box sits beside this on desktop, but stacks above
+              // it (and often off-screen) on mobile — so this needs a real
+              // control, not just a sentence pointing at one.
+              <EmptyState
+                dashed
+                title="Nothing generated yet"
+                description="Describe the post you want — the image and the caption are made together."
+                actions={(
+                  <Button size="sm" onClick={() => {
+                    promptRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    promptRef.current?.focus();
+                  }}>
+                    Write a prompt
+                  </Button>
+                )}
+              />
+            )}
+
+            {/* Post production — inline, directly under the results grid, the
+                moment results exist (mockup Studio.dc.html: showPostProd =
+                phase === "results"). Targets the effective generation (the
+                user's pick, or variant 1 by default). The "published" success
+                state swaps this panel for the confirmation body. */}
+            {(studioStage === "published" || (completedGenerations.length > 0 && studioStage !== "generating")) && effectiveGeneration && (
+              <div ref={postProdRef}>
+                <PostProductionPanel
+                  published={studioStage === "published"}
+                  selectedGeneration={effectiveGeneration}
+                  postProduction={postProduction}
+                  updatePostProduction={updatePostProduction}
+                  publishing={publishing}
+                  accounts={accounts}
+                  onSaveDraft={handleSaveDraft}
+                  onOpenSchedule={() => setScheduleOpen(true)}
+                  onOpenPublishConfirm={() => setPublishConfirmOpen(true)}
+                  onClose={() => setStudioStage("results")}
+                  onGenerateAnother={() => setStudioStage("brief")}
+                  onRegenerateMetadata={handleRegenerateMetadata}
+                  onRefineCaption={handleRefineCaption}
+                  onRescore={handleRescore}
+                  metadataRetryAfter={getRateLimitRemaining("regenerateMetadata")}
+                  seoRetryAfter={getRateLimitRemaining("rescore")}
+                />
+              </div>
+            )}
+
+            {/* Recent in this session (mockup: always present at the bottom
+                of the canvas column). Shows this session's recent generations
+                with an actual thumbnail, title, and relative time — clicking
+                a row opens the same lightbox the main results grid uses, so
+                "recent" is browsable, not just a text log of activity. */}
+            {recentItems.length > 0 && (
+              <Card>
+                <div className={styles.sectionLabel}>Recent in this session</div>
+                <div className={styles.recentList}>
+                  {recentItems.map((it) => (
+                    <div
+                      key={it.id}
+                      className={styles.recentRow}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openLightbox(it.generation)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openLightbox(it.generation);
+                        }
+                      }}
+                    >
+                      <span className={styles.recentThumb}>
+                        {it.thumbSrc && !failedThumbIds.has(it.id) ? (
+                          it.isVideo ? (
+                            <video className={styles.recentThumbMedia} src={it.thumbSrc} muted onError={() => markThumbFailed(it.id)} />
+                          ) : (
+                            <img className={styles.recentThumbMedia} src={it.thumbSrc} alt="" onError={() => markThumbFailed(it.id)} />
+                          )
+                        ) : (
+                          <span className={styles.recentThumbFallback}>{it.kind}</span>
+                        )}
+                        {it.thumbSrc && !failedThumbIds.has(it.id) && (
+                          <span className={styles.recentThumbBadge}>{it.kind}</span>
+                        )}
+                      </span>
+                      <span className={styles.recentTitle}>{it.title}</span>
+                      <span className={styles.recentTime}>{it.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
+    </AppShell>
+  );
 }
 
 export default function StudioPage() {
   const brandKit = useBrandKitStore((s) => s.brandKit);
-  return (
-    <UiV2ThemeProvider className={styles.shell}>
-      <StudioBody brandKit={brandKit} />
-    </UiV2ThemeProvider>
-  );
+  return <StudioBody brandKit={brandKit} />;
 }
