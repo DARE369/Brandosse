@@ -13,7 +13,11 @@ from logger import log
 from anthropic import AsyncAnthropic
 
 MIN_CLIP_SECONDS = 15
-MAX_CLIP_SECONDS = 240
+# The prompt ASKS for 90 seconds; this ENFORCES it. Measured 2026-08-23: asked
+# for a 90s maximum, Claude returned clips of 92s and 111s — a prompt is a
+# request, not a constraint, and the longest clips cost the most to render for
+# the content least likely to be watched through.
+MAX_CLIP_SECONDS = 90
 
 
 def _get_job_field(job, field, fallback=None):

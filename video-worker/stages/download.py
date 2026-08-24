@@ -306,6 +306,25 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
                 with yt_dlp.YoutubeDL(probe) as ydl:
                     info = ydl.extract_info(url, download=False, process=False)
 
+                    # process=False skips format selection, which is the whole
+                    # point — but for some clients it also leaves 'duration'
+                    # unresolved, and a job with no duration cannot be priced or
+                    # bounded. Observed 2026-08-23: a resumed job failed with
+                    # "Could not determine video duration. Live streams are not
+                    # supported." on a 20-minute video that is plainly not live.
+                    # Ask again WITH processing only when the cheap path came
+                    # back short; ignore_no_formats_error keeps that second call
+                    # from reintroducing the format coupling.
+                    if info is not None and info.get('duration') is None:
+                        try:
+                            info = ydl.extract_info(url, download=False, process=True)
+                        except Exception as exc:
+                            log.warning(
+                                "duration_reprobe_failed",
+                                rung=rung,
+                                error=str(exc)[:80],
+                            )
+
                 if info and info.get('duration') is not None:
                     log.info(
                         "preflight_success",
