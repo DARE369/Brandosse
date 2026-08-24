@@ -229,6 +229,12 @@ export function useDashboardData(userId, profile) {
     drafts: 0,
     clipsReady: 0,
     failedPosts: 0,
+    publishingPosts: 0,
+    archivedPosts: 0,
+    totalPosts: 0,
+    // Posts whose status is not one of POST_STATUS. Surfaced rather than
+    // dropped — see LOCK L2.5 below.
+    unaccountedPosts: 0,
   });
   const [trends, setTrends] = useState({
     publishedPosts: { pct: 0, direction: "neutral" },
@@ -256,6 +262,10 @@ export function useDashboardData(userId, profile) {
       // Base count query: `posts` filtered by status, scoped to this user/personal scope.
       const postCount = (status) =>
         supabase.from("posts").select("*", { count: "exact", head: true }).eq("user_id", userId).is("organization_id", null).eq("status", status);
+      // Every post, regardless of status. The buckets are checked against this
+      // rather than trusted to be exhaustive — see LOCK L2.5.
+      const allPostsCount = () =>
+        supabase.from("posts").select("*", { count: "exact", head: true }).eq("user_id", userId).is("organization_id", null);
       // Windowed count against whichever timestamp really reflects the transition
       // (published_at/failed_at for those statuses, created_at otherwise).
       const postCountInWindow = (status, tsColumn, gte, lt) => {
@@ -275,6 +285,9 @@ export function useDashboardData(userId, profile) {
         publishedPostsResult,
         draftsResult,
         failedPostsResult,
+        publishingPostsResult,
+        archivedPostsResult,
+        totalPostsResult,
         recentGenerationsResult,
         generationIndexResult,
         upcomingPostsResult,
@@ -295,6 +308,9 @@ export function useDashboardData(userId, profile) {
         postCount(POST_STATUS.PUBLISHED),
         postCount(POST_STATUS.DRAFT),
         postCount(POST_STATUS.FAILED),
+        postCount(POST_STATUS.PUBLISHING),
+        postCount(POST_STATUS.ARCHIVED),
+        allPostsCount(),
         supabase.from("generations").select("id, session_id, prompt, storage_path, media_type, status, created_at, metadata, sessions(title)").eq("user_id", userId).is("organization_id", null).order("created_at", { ascending: false }).limit(RECENT_GENERATION_LIMIT),
         supabase.from("generations").select("id, session_id, prompt, status, created_at, metadata, sessions(title)").eq("user_id", userId).is("organization_id", null).order("created_at", { ascending: false }).limit(GENERATION_SEARCH_LIMIT),
         supabase.from("posts").select("id, platform, title, caption, scheduled_at, status, generation_id, account_id, generations(storage_path, media_type)").eq("user_id", userId).is("organization_id", null).eq("status", POST_STATUS.SCHEDULED).order("scheduled_at", { ascending: true }).limit(UPCOMING_POST_LIMIT),
@@ -324,13 +340,40 @@ export function useDashboardData(userId, profile) {
       const clipsReady = clipsReadyResult.error ? 0 : clipsReadyResult.count ?? 0;
       const countOf = (r) => (r?.error ? 0 : r?.count ?? 0);
 
+      /**
+       * LOCK L2.5 — the status summary accounts for every post.
+       *
+       * This used to count exactly four statuses: draft, scheduled, published,
+       * failed. `publishing` is a first-class value in the app's own enum
+       * (constants/statuses.js) and publish-post writes it on every attempt,
+       * but nothing counted it — so the Content Flow panel reported 107 posts
+       * for a user who had 110, with three sitting mid-publish. The audit
+       * found them stranded for up to four months (L2.3 now reaps them at 15
+       * minutes, but in-flight posts are still real posts).
+       *
+       * Rather than adding the one missing bucket and hoping the enum never
+       * grows again, the buckets are now reconciled against a total count.
+       * Anything unaccounted for is reported as its own bucket instead of
+       * quietly vanishing — the panel may say "we do not recognise these",
+       * but it will not lie about the total.
+       */
+      const byStatus = {
+        drafts: countOf(draftsResult),
+        scheduledPosts: countOf(scheduledPostsResult),
+        publishingPosts: countOf(publishingPostsResult),
+        publishedPosts: countOf(publishedPostsResult),
+        failedPosts: countOf(failedPostsResult),
+        archivedPosts: countOf(archivedPostsResult),
+      };
+      const totalPosts = countOf(totalPostsResult);
+      const bucketed = Object.values(byStatus).reduce((a, b) => a + b, 0);
+
       setStats({
         totalGenerated: totalGenerations,
-        scheduledPosts: scheduledPostsResult.count ?? 0,
-        publishedPosts: publishedPostsResult.count ?? 0,
-        drafts: draftsResult.count ?? 0,
         clipsReady,
-        failedPosts: failedPostsResult.count ?? 0,
+        ...byStatus,
+        totalPosts,
+        unaccountedPosts: Math.max(0, totalPosts - bucketed),
       });
       setTrends({
         publishedPosts: computeTrend(countOf(publishedThisResult), countOf(publishedPrevResult)),

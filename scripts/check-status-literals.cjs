@@ -17,7 +17,7 @@ const TARGET_FILES = [
   "src/pages/Dashboard/PersonalDashboardPage.jsx",   // was UserDashboard.jsx
   "src/hooks/useDashboardData.js",                   // dashboard data layer
   "src/hooks/useRealtimeKPIs.js",
-  "src/components/User/UserNavbar.jsx",
+  "src/ui-v2/shell/AppShell.jsx",                     // was components/User/UserNavbar.jsx
   "src/calendar/components/ScheduleModal.jsx",       // was CalendarPage/components/
   "src/calendar/services/calendarService.js",        // was CalendarStore.js
   "src/calendar/hooks/useScheduleAction.js",

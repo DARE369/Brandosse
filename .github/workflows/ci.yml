@@ -115,6 +115,27 @@ jobs:
       - name: check-env-contract
         run: node scripts/check-env-contract.cjs
 
+      # LOCK L5.6 / L5.7 — the app chrome has one definition. Ten pages had
+      # each hand-written the header block and nine had each declared the nav;
+      # both sets had already drifted (Analytics missing from five navs,
+      # Billing's credit meter pinned to 100%). Neither lock had a detector,
+      # which is why the duplication survived the lock that "fixed" it.
+      - name: check-app-shell
+        run: node scripts/check-app-shell.cjs
+
+      # LOCK L5.6 — ui-v2 must not inherit v1's look. This guard existed but
+      # ran nowhere and had been failing for six imports; it now enforces the
+      # rule README.md actually states (no old presentation) rather than a
+      # stricter one nothing could satisfy.
+      - name: check-ui-v2-isolation
+        run: node scripts/check-ui-v2-isolation.cjs
+
+      # LOCK L2.5 — the dashboard's status summary must account for every post.
+      # It counted four of six statuses, so a user with 110 posts was shown 107
+      # and never learned three were stuck mid-publish.
+      - name: check-post-status-accounting
+        run: node scripts/check-post-status-accounting.cjs
+
   # ── Build ─────────────────────────────────────────────────────────────────
   build:
     name: Build check

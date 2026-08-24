@@ -24,7 +24,8 @@ export { NAV_ITEMS, activeNavKey } from "./shell/navItems";
 
 // LOCK L5.6 — the single definition of the app chrome. Pages supply activeKey
 // and content; they must NOT hand-write the header/drawer/theme-toggle block.
-export { AppShell } from "./shell/AppShell";
+export { AppShell, creditMeterPct } from "./shell/AppShell";
 export { MobileNavDrawer } from "./shell/MobileNavDrawer";
 export { NotificationBell } from "./shell/NotificationBell";
 export { AvatarMenu } from "./shell/AvatarMenu";
+export { ThemeToggleButton } from "./shell/ThemeToggleButton";

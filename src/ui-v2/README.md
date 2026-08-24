@@ -8,12 +8,17 @@ plan in memory `design-system-v2` (owner-approved full replacement of the old
 ## Rules (non-negotiable — the owner set these explicitly)
 
 1. **No imports from old UI into `src/ui-v2/**`.** Never import from
-   `src/components/**`, `src/styles/**`, `src/legacy/**`, `src/calendar/**` (or
-   any old stylesheet/theme file) into anything under this directory. Business
-   logic (services, hooks, stores, Supabase calls) is NOT off-limits — only
-   old *presentation* code is. Pages under `src/app`/`app/app/**` that use
-   `ui-v2` may still import old services/hooks; they just render with
-   `ui-v2` components instead of old styled ones.
+   `src/components/**`, `src/styles/**`, `src/legacy/**`, `src/calendar/**`,
+   `src/org/**` (or any old stylesheet/theme file) into anything under this
+   directory. Business logic (services, hooks, stores, Supabase calls) is NOT
+   off-limits — only old *presentation* code is. Pages under
+   `src/app`/`app/app/**` that use `ui-v2` may still import old services/hooks;
+   they just render with `ui-v2` components instead of old styled ones.
+
+   The business logic `ui-v2/shell` may reach is **allowlisted by exact path**
+   in `scripts/check-ui-v2-isolation.cjs` (`ALLOWED_INTERNAL`). Adding to that
+   list is a review decision, not a convenience — the friction is deliberate.
+   Stylesheets under `ui-v2` may not import outside `ui-v2` at all.
 2. **Tokens live only in `tokens.css`.** All colors/spacing/radii/fonts consumed
    by components must go through `--uiv2-*` CSS variables. No raw hex in a
    component file except inside `tokens.css` itself.
@@ -22,9 +27,10 @@ plan in memory `design-system-v2` (owner-approved full replacement of the old
    the spec of each state per screen.
 4. **Delete the old page's UI code once a screen migrates** so it can't leak
    back in.
-5. Run `node scripts/check-ui-v2-isolation.js` before committing changes under
-   `src/ui-v2/` — it fails the build if any file here imports a path outside
-   `src/ui-v2/` other than `react`, `react-dom`, or `next/*`.
+5. Run `node scripts/check-ui-v2-isolation.cjs` before committing changes under
+   `src/ui-v2/` — it runs in CI and fails the build on rule 1. Also run
+   `node scripts/check-app-shell.cjs`, which fails if a page hand-composes the
+   chrome instead of using `AppShell`.
 
 ## What's here
 
@@ -37,37 +43,44 @@ plan in memory `design-system-v2` (owner-approved full replacement of the old
 - `primitives/` — `Button`, `IconButton`, `Card`, `Badge`, `Skeleton`,
   `EmptyState`, `StatCard`, `Modal`, `Drawer`, `Dropdown`, `Toast`
   (`UiV2ToastProvider`/`useUiV2Toast`).
-- `shell/AppHeader.jsx` — the sticky top nav shared by all 4 mockups
-  (brand mark, nav links + mobile burger, search/extra slot, right-side slot
-  for credits/theme-toggle/notif/avatar — screens compose the right slot
-  themselves since the exact icon set differs per screen).
+- `shell/AppShell.jsx` — **the** app chrome (LOCK L5.6). Every personal route
+  renders this and nothing else: it owns the theme provider, header, nav,
+  mobile drawer, credit pill, notifications, avatar menu, skip link, and the
+  `<main>` landmark. Pages pass `activeKey` and their content, plus optional
+  `leftExtra` / `rightLead` / `rightActions` / `overlays` slots for the few
+  genuinely page-specific controls. `minimal` renders the bare header for
+  loading and signed-out states.
+- `shell/navItems.js` — **the** nav definition (LOCK L5.7). Never redeclare
+  `NAV_ITEMS` in a page.
+- `shell/ThemeToggleButton.jsx` — the light/dark switch, for focused flows
+  (the connect wizard) that take the toggle without the rest of the chrome.
+- `shell/AppHeader.jsx` — the presentational header `AppShell` composes. Pages
+  do not render it directly; the guard rejects that.
 
 ## Using it in a page
 
 ```jsx
-import { UiV2ThemeProvider, UiV2ToastProvider, AppHeader, CreditPill, IconButton, Avatar } from "@/ui-v2";
+import { AppShell, IconButton } from "@/ui-v2";
 
 export default function DashboardPage() {
   return (
-    <UiV2ThemeProvider>
-      <UiV2ToastProvider>
-        <AppHeader
-          navItems={NAV_ITEMS}
-          activeKey="dashboard"
-          right={
-            <>
-              <CreditPill pct="62%" label="1,240 cr" />
-              <IconButton title="Toggle theme">...</IconButton>
-              <Avatar initials="ME" />
-            </>
-          }
-        />
-        {/* page content */}
-      </UiV2ToastProvider>
-    </UiV2ThemeProvider>
+    <AppShell
+      activeKey="dashboard"
+      className={styles.shell}
+      mainClassName={styles.main}
+      rightActions={<IconButton title="Settings">...</IconButton>}
+    >
+      {/* page content */}
+    </AppShell>
   );
 }
 ```
+
+Credits, theme, notifications, avatar and nav are **not** the page's business —
+`AppShell` resolves all of them. A page that reaches for `AppHeader`,
+`CreditPill`, `NotificationBell`, `AvatarMenu` or `MobileNavDrawer` directly,
+or that declares its own `NAV_ITEMS` or `ThemeToggleButton`, fails
+`scripts/check-app-shell.cjs`.
 
 ## Not built yet (add when the first screen that needs it is migrated)
 

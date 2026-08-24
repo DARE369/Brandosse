@@ -16,12 +16,11 @@ import {
   Calendar, FileImage, Filter, Grid3X3, List, RefreshCw, Search, Upload, X,
 } from "lucide-react";
 import {
-  UiV2ThemeProvider, useUiV2Theme, AppHeader, MobileNavDrawer, CreditPill,
-  IconButton, Button, EmptyState, Skeleton, NotificationBell, AvatarMenu, Modal, NAV_ITEMS,} from "../../ui-v2";
+  AppShell, IconButton, Button, EmptyState, Skeleton, Modal,
+} from "../../ui-v2";
 import { useAuth } from "../../Context/AuthContext";
 import usePersistentState from "../../hooks/usePersistentState";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
-import { useCreditBalance } from "../../hooks/useCreditBalance";
 import useLibraryStore from "../../stores/LibraryStore";
 import { buildScheduleHandoffPath } from "../../services/assetLibraryService";
 import {
@@ -63,23 +62,6 @@ function readStoredLibraryFilterPrefs() {
   }
 }
 
-function ThemeToggleButton() {
-  const { isDark, toggleTheme } = useUiV2Theme();
-  return (
-    <IconButton title={isDark ? "Switch to light mode" : "Switch to dark mode"} onClick={toggleTheme}>
-      {isDark ? (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" strokeLinecap="round" />
-          <circle cx="12" cy="12" r="4.5" />
-        </svg>
-      ) : (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
-        </svg>
-      )}
-    </IconButton>
-  );
-}
 
 function LibraryTableThumb({ asset }) {
   const [failed, setFailed] = useState(false);
@@ -113,7 +95,6 @@ function SkeletonGrid() {
 function LibraryBody() {
   const { navigate } = useAppNavigation();
   const { user, profile } = useAuth();
-  const credits = useCreditBalance(user?.id ?? null);
 
   const {
     assets,
@@ -149,7 +130,6 @@ function LibraryBody() {
   const [tagFilter, setTagFilter] = usePersistentState("library.tagFilter", "all", { userId: user?.id ?? null, enabled: Boolean(user?.id) });
   const [unusedChipActive, setUnusedChipActive] = useState(false);
   const [viewMode, setViewMode] = usePersistentState("library.viewMode", "grid", { userId: user?.id ?? null, enabled: Boolean(user?.id) });
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
 
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -452,249 +432,220 @@ function LibraryBody() {
   );
 
   const isEmptyLibrary = !loading && assets.length === 0;
-  const userInitials = ((profile?.full_name ? profile.full_name[0] : "U") + (profile?.full_name?.split(" ")[1]?.[0] ?? "")).toUpperCase();
-  const creditPct = credits.lifetimePurchased > 0 ? Math.max(0, Math.min(100, Math.round((credits.balance / credits.lifetimePurchased) * 100))) : 100;
 
-  return (
-    <>
-      <Toaster position="top-center" />
-
-      <AppHeader
-        navItems={NAV_ITEMS}
-        activeKey="library"
-        onNavClick={(item) => navigate(item.href)}
-        onBurgerClick={() => setMobileNavOpen(true)}
-        right={(
+  const mainContent = (
+      <div className={styles.canvas}>
+        {showTrash ? (
           <>
-            {credits.ready ? (
-              <CreditPill pct={`${creditPct}%`} label={`${credits.balance.toLocaleString()} cr`} />
-            ) : (
-              <Skeleton width="76px" height="26px" radius="999px" />
-            )}
-            <ThemeToggleButton />
-            <NotificationBell userId={user?.id} onNavigate={navigate} />
-            <AvatarMenu initials={userInitials || "U"} name={profile?.full_name} email={user?.email} onNavigate={navigate} />
+            <div className={styles.pageHeadRow}>
+              <div>
+                <div className={styles.pageTitle}>Trash</div>
+                <div className={styles.pageDesc}>Deleted assets, recoverable for 30 days.</div>
+              </div>
+              <div className={styles.pageActions}>
+                <Button variant="subtle" onClick={closeTrash}>Back to Library</Button>
+              </div>
+            </div>
+            <TrashView trashedAssets={trashedAssets} loading={trashLoading} onRestore={handleRestore} />
+          </>
+        ) : (
+          <>
+            <div className={styles.pageHeadRow}>
+              <div>
+                <div className={styles.pageTitle}>Library</div>
+                <div className={styles.pageDesc}>Every upload, generation, and post-linked asset in one place.</div>
+              </div>
+              <div className={styles.pageActions}>
+                <Button variant="subtle" onClick={toggleBulkMode}>
+                  {bulkMode ? "Done selecting" : "Select"}
+                </Button>
+                <Button variant="subtle" onClick={() => fetchLibraryData({ force: true })} title="Refresh library">
+                  <RefreshCw size={14} aria-hidden="true" />
+                  Refresh
+                </Button>
+                <Button onClick={() => setShowUploadModal(true)}>
+                  <Upload size={14} aria-hidden="true" />
+                  Upload
+                </Button>
+                <div className={styles.viewToggle}>
+                  <IconButton
+                    title="Grid view"
+                    className={viewMode === "grid" ? styles.viewToggleBtnActive : ""}
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <Grid3X3 size={14} />
+                  </IconButton>
+                  <IconButton
+                    title="Table view"
+                    className={viewMode === "list" ? styles.viewToggleBtnActive : ""}
+                    onClick={() => setViewMode("list")}
+                  >
+                    <List size={14} />
+                  </IconButton>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.filterRow}>
+              <button type="button" className={styles.mobileRailToggle} onClick={() => setMobileRailOpen(true)} aria-haspopup="dialog">
+                <Filter size={14} aria-hidden="true" />
+                <span>{activeStatusLabel} <span className={styles.mobileRailToggleCount}>{activeRailCount}</span></span>
+              </button>
+
+              <label className={styles.searchBox}>
+                <Search size={14} aria-hidden="true" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search title, description, tags…"
+                />
+              </label>
+
+              <select className={styles.selectChip} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filter by type">
+                <option value="all">All types</option>
+                <option value="image">Image</option>
+                <option value="video">Video</option>
+                <option value="document">Document</option>
+              </select>
+
+              <button
+                type="button"
+                className={[styles.filterChip, unusedChipActive ? styles.filterChipActive : ""].filter(Boolean).join(" ")}
+                onClick={() => setUnusedChipActive((v) => !v)}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M8 12h8" strokeLinecap="round" /></svg>
+                Unused only
+              </button>
+
+              {availableTags.length > 0 ? (
+                <select className={styles.selectChip} value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} aria-label="Filter by tag">
+                  <option value="all">All tags</option>
+                  {availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+                </select>
+              ) : null}
+
+              <label className={styles.rememberCheck}>
+                <input type="checkbox" checked={rememberFilters} onChange={(event) => setRememberFilters(event.target.checked)} />
+                Keep filters
+              </label>
+
+              <Button variant="ghost" size="sm" onClick={resetFilters}>Reset filters</Button>
+            </div>
+
+            <div className={styles.layoutGrid}>
+              <aside className={styles.leftRail}>{railContent()}</aside>
+
+              <section>
+                {loading ? (
+                  <SkeletonGrid />
+                ) : isEmptyLibrary ? (
+                  <EmptyState
+                    title="Nothing in your Library yet"
+                    description="Upload your first asset — logos, brand photography, anything you'll want to post later."
+                    actions={(
+                      <>
+                        <Button onClick={() => setShowUploadModal(true)}>Upload your first asset</Button>
+                        <Button variant="ghost" onClick={() => navigate("/app/generate")}>or generate something in AI Studio</Button>
+                      </>
+                    )}
+                  />
+                ) : filteredAssets.length === 0 ? (
+                  <EmptyState
+                    dashed
+                    title="No assets found"
+                    description="You have assets, but none match the current filters."
+                    actions={<Button size="sm" variant="subtle" onClick={resetFilters}>Clear filters</Button>}
+                  />
+                ) : viewMode === "grid" ? (
+                  <>
+                    <div className={styles.assetGrid}>
+                      {filteredAssets.map((asset) => (
+                        <AssetCard
+                          key={asset.id}
+                          asset={asset}
+                          selectable={bulkMode}
+                          isSelected={selectedIds.has(asset.id)}
+                          onToggleSelect={toggleItemSelected}
+                          onOpenDrawer={openDrawer}
+                          onSchedule={handleSchedule}
+                          onArchive={handleArchive}
+                          onDelete={(a) => setDeleteTarget(a)}
+                        />
+                      ))}
+                    </div>
+                    <BulkActionBar
+                      count={selectedAssets.length}
+                      busy={bulkBusy}
+                      onArchive={handleBulkArchive}
+                      onDelete={() => setBulkDeleteConfirmOpen(true)}
+                      onClear={clearSelection}
+                    />
+                  </>
+                ) : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th className={styles.checkboxCell}><input type="checkbox" aria-label="Select all" /></th>
+                          <th>Name</th>
+                          <th>Source</th>
+                          <th>Type</th>
+                          <th>Size</th>
+                          <th>Used in</th>
+                          <th>Added</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredAssets.map((asset) => (
+                          <tr key={asset.id}>
+                            <td className={styles.checkboxCell}>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(asset.id)}
+                                onChange={() => toggleItemSelected(asset)}
+                                aria-label={`Select ${getItemTitle(asset)}`}
+                              />
+                            </td>
+                            <td>
+                              <div className={styles.nameCell}>
+                                <LibraryTableThumb asset={asset} />
+                                <span>
+                                  <span className={styles.nameCellTitle}>{getItemTitle(asset)}</span>
+                                  <span className={styles.nameCellSub}>{(asset.tags || []).join(", ") || (asset.ai_tags || []).join(", ")}</span>
+                                </span>
+                              </div>
+                            </td>
+                            <td>{getSourceLabel(asset)}</td>
+                            <td>{getFormatLabel(asset)}</td>
+                            <td>{getMetaLeftLabel(asset).split("·")[1]?.trim() || ""}</td>
+                            <td className={styles.tableSecondary}>{getMetaRightLabel(asset)}</td>
+                            <td className={styles.tableSecondary}>{formatDate(asset.created_at)}</td>
+                            <td>
+                              <div className={styles.tableActions}>
+                                <Button variant="subtle" size="sm" onClick={() => openDrawer(asset)}>View</Button>
+                                <IconButton title="Schedule" onClick={() => handleSchedule(asset)}>
+                                  <Calendar size={14} aria-hidden="true" />
+                                </IconButton>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            </div>
           </>
         )}
-      />
+      </div>
+  );
 
-      <MobileNavDrawer
-        open={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-        navItems={NAV_ITEMS}
-        activeKey="library"
-        onNavClick={(item) => navigate(item.href)}
-      />
-
-      <main className={styles.main}>
-        <div className={styles.canvas}>
-          {showTrash ? (
-            <>
-              <div className={styles.pageHeadRow}>
-                <div>
-                  <div className={styles.pageTitle}>Trash</div>
-                  <div className={styles.pageDesc}>Deleted assets, recoverable for 30 days.</div>
-                </div>
-                <div className={styles.pageActions}>
-                  <Button variant="subtle" onClick={closeTrash}>Back to Library</Button>
-                </div>
-              </div>
-              <TrashView trashedAssets={trashedAssets} loading={trashLoading} onRestore={handleRestore} />
-            </>
-          ) : (
-            <>
-              <div className={styles.pageHeadRow}>
-                <div>
-                  <div className={styles.pageTitle}>Library</div>
-                  <div className={styles.pageDesc}>Every upload, generation, and post-linked asset in one place.</div>
-                </div>
-                <div className={styles.pageActions}>
-                  <Button variant="subtle" onClick={toggleBulkMode}>
-                    {bulkMode ? "Done selecting" : "Select"}
-                  </Button>
-                  <Button variant="subtle" onClick={() => fetchLibraryData({ force: true })} title="Refresh library">
-                    <RefreshCw size={14} aria-hidden="true" />
-                    Refresh
-                  </Button>
-                  <Button onClick={() => setShowUploadModal(true)}>
-                    <Upload size={14} aria-hidden="true" />
-                    Upload
-                  </Button>
-                  <div className={styles.viewToggle}>
-                    <IconButton
-                      title="Grid view"
-                      className={viewMode === "grid" ? styles.viewToggleBtnActive : ""}
-                      onClick={() => setViewMode("grid")}
-                    >
-                      <Grid3X3 size={14} />
-                    </IconButton>
-                    <IconButton
-                      title="Table view"
-                      className={viewMode === "list" ? styles.viewToggleBtnActive : ""}
-                      onClick={() => setViewMode("list")}
-                    >
-                      <List size={14} />
-                    </IconButton>
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.filterRow}>
-                <button type="button" className={styles.mobileRailToggle} onClick={() => setMobileRailOpen(true)} aria-haspopup="dialog">
-                  <Filter size={14} aria-hidden="true" />
-                  <span>{activeStatusLabel} <span className={styles.mobileRailToggleCount}>{activeRailCount}</span></span>
-                </button>
-
-                <label className={styles.searchBox}>
-                  <Search size={14} aria-hidden="true" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search title, description, tags…"
-                  />
-                </label>
-
-                <select className={styles.selectChip} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filter by type">
-                  <option value="all">All types</option>
-                  <option value="image">Image</option>
-                  <option value="video">Video</option>
-                  <option value="document">Document</option>
-                </select>
-
-                <button
-                  type="button"
-                  className={[styles.filterChip, unusedChipActive ? styles.filterChipActive : ""].filter(Boolean).join(" ")}
-                  onClick={() => setUnusedChipActive((v) => !v)}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M8 12h8" strokeLinecap="round" /></svg>
-                  Unused only
-                </button>
-
-                {availableTags.length > 0 ? (
-                  <select className={styles.selectChip} value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} aria-label="Filter by tag">
-                    <option value="all">All tags</option>
-                    {availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-                  </select>
-                ) : null}
-
-                <label className={styles.rememberCheck}>
-                  <input type="checkbox" checked={rememberFilters} onChange={(event) => setRememberFilters(event.target.checked)} />
-                  Keep filters
-                </label>
-
-                <Button variant="ghost" size="sm" onClick={resetFilters}>Reset filters</Button>
-              </div>
-
-              <div className={styles.layoutGrid}>
-                <aside className={styles.leftRail}>{railContent()}</aside>
-
-                <section>
-                  {loading ? (
-                    <SkeletonGrid />
-                  ) : isEmptyLibrary ? (
-                    <EmptyState
-                      title="Nothing in your Library yet"
-                      description="Upload your first asset — logos, brand photography, anything you'll want to post later."
-                      actions={(
-                        <>
-                          <Button onClick={() => setShowUploadModal(true)}>Upload your first asset</Button>
-                          <Button variant="ghost" onClick={() => navigate("/app/generate")}>or generate something in AI Studio</Button>
-                        </>
-                      )}
-                    />
-                  ) : filteredAssets.length === 0 ? (
-                    <EmptyState
-                      dashed
-                      title="No assets found"
-                      description="You have assets, but none match the current filters."
-                      actions={<Button size="sm" variant="subtle" onClick={resetFilters}>Clear filters</Button>}
-                    />
-                  ) : viewMode === "grid" ? (
-                    <>
-                      <div className={styles.assetGrid}>
-                        {filteredAssets.map((asset) => (
-                          <AssetCard
-                            key={asset.id}
-                            asset={asset}
-                            selectable={bulkMode}
-                            isSelected={selectedIds.has(asset.id)}
-                            onToggleSelect={toggleItemSelected}
-                            onOpenDrawer={openDrawer}
-                            onSchedule={handleSchedule}
-                            onArchive={handleArchive}
-                            onDelete={(a) => setDeleteTarget(a)}
-                          />
-                        ))}
-                      </div>
-                      <BulkActionBar
-                        count={selectedAssets.length}
-                        busy={bulkBusy}
-                        onArchive={handleBulkArchive}
-                        onDelete={() => setBulkDeleteConfirmOpen(true)}
-                        onClear={clearSelection}
-                      />
-                    </>
-                  ) : (
-                    <div className={styles.tableWrap}>
-                      <table className={styles.table}>
-                        <thead>
-                          <tr>
-                            <th className={styles.checkboxCell}><input type="checkbox" aria-label="Select all" /></th>
-                            <th>Name</th>
-                            <th>Source</th>
-                            <th>Type</th>
-                            <th>Size</th>
-                            <th>Used in</th>
-                            <th>Added</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredAssets.map((asset) => (
-                            <tr key={asset.id}>
-                              <td className={styles.checkboxCell}>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedIds.has(asset.id)}
-                                  onChange={() => toggleItemSelected(asset)}
-                                  aria-label={`Select ${getItemTitle(asset)}`}
-                                />
-                              </td>
-                              <td>
-                                <div className={styles.nameCell}>
-                                  <LibraryTableThumb asset={asset} />
-                                  <span>
-                                    <span className={styles.nameCellTitle}>{getItemTitle(asset)}</span>
-                                    <span className={styles.nameCellSub}>{(asset.tags || []).join(", ") || (asset.ai_tags || []).join(", ")}</span>
-                                  </span>
-                                </div>
-                              </td>
-                              <td>{getSourceLabel(asset)}</td>
-                              <td>{getFormatLabel(asset)}</td>
-                              <td>{getMetaLeftLabel(asset).split("·")[1]?.trim() || ""}</td>
-                              <td className={styles.tableSecondary}>{getMetaRightLabel(asset)}</td>
-                              <td className={styles.tableSecondary}>{formatDate(asset.created_at)}</td>
-                              <td>
-                                <div className={styles.tableActions}>
-                                  <Button variant="subtle" size="sm" onClick={() => openDrawer(asset)}>View</Button>
-                                  <IconButton title="Schedule" onClick={() => handleSchedule(asset)}>
-                                    <Calendar size={14} aria-hidden="true" />
-                                  </IconButton>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </section>
-              </div>
-            </>
-          )}
-        </div>
-      </main>
+  const overlays = (
+    <>
+      <Toaster position="top-center" />
 
       {/* Mobile filter bottom sheet */}
       <div
@@ -759,12 +710,19 @@ function LibraryBody() {
       />
     </>
   );
+
+  return (
+    <AppShell
+      activeKey="library"
+      className={styles.shell}
+      mainClassName={styles.main}
+      overlays={overlays}
+    >
+      {mainContent}
+    </AppShell>
+  );
 }
 
 export default function LibraryPage() {
-  return (
-    <UiV2ThemeProvider className={styles.shell}>
-      <LibraryBody />
-    </UiV2ThemeProvider>
-  );
+  return <LibraryBody />;
 }

@@ -162,6 +162,21 @@
   text-transform: uppercase;
   color: var(--uiv2-text-secondary);
 }
+/*
+ * Total beside the "Content flow" kicker. It exists so the panel's own numbers
+ * can be checked against it at a glance — the L2.5 defect was a total that
+ * quietly disagreed with the sum of the buckets, and nobody could see it
+ * because no total was shown.
+ */
+.panelKickerCount {
+  margin-left: 8px;
+  font-family: var(--uiv2-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--uiv2-text-tertiary);
+}
+
 .panelLink {
   font-size: 12.5px;
   color: var(--uiv2-accent-text);
@@ -237,12 +252,18 @@
 .funnelRow {
   display: flex;
   align-items: stretch;
-  gap: 20px;
+  gap: 20px 16px;
   flex-wrap: wrap;
 }
+/*
+ * Was `min-width: 90px` against four buckets. L2.5 can show up to seven
+ * (Publishing always, Archived and Unrecognised when non-empty), so the floor
+ * comes down and the basis lets a row of five wrap to two tidy rows rather
+ * than crushing every bucket.
+ */
 .funnelItem {
-  flex: 1;
-  min-width: 90px;
+  flex: 1 1 78px;
+  min-width: 78px;
   display: flex;
   flex-direction: column;
   gap: 8px;

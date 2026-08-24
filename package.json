@@ -22,7 +22,10 @@
     "check:edge-functions": "node scripts/check-edge-functions.cjs",
     "check:production-ready": "node scripts/check-production-ready.cjs",
     "check:status-literals": "node scripts/check-status-literals.cjs",
-    "check:ui-consistency": "node scripts/check-ui-consistency.cjs"
+    "check:ui-consistency": "node scripts/check-ui-consistency.cjs",
+    "check:app-shell": "node scripts/check-app-shell.cjs",
+    "check:ui-v2-isolation": "node scripts/check-ui-v2-isolation.cjs",
+    "check:post-status-accounting": "node scripts/check-post-status-accounting.cjs"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.29.0",

@@ -25,12 +25,8 @@ import {
 import { supabase } from "../../services/supabaseClient";
 import { useAuth } from "../../Context/AuthContext";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
-import { useCreditBalance } from "../../hooks/useCreditBalance";
 import { POST_STATUS } from "../../constants/statuses";
-import {
-  UiV2ThemeProvider, useUiV2Theme, AppHeader, CreditPill, IconButton,
-  Card, Badge, Skeleton, EmptyState, Button, MobileNavDrawer,
-  NotificationBell, AvatarMenu, NAV_ITEMS,} from "../../ui-v2";
+import { AppShell, Card, Badge, Skeleton, EmptyState, Button } from "../../ui-v2";
 import styles from "./PersonalAnalyticsPage.module.css";
 
 const KNOWN_OPTIONAL_ERROR_CODES = new Set(["42P01", "42703", "PGRST200"]);
@@ -243,23 +239,6 @@ async function fetchPersonalAccounts(userId) {
   return fallback.data || [];
 }
 
-function ThemeToggleButton() {
-  const { isDark, toggleTheme } = useUiV2Theme();
-  return (
-    <IconButton title={isDark ? "Switch to light mode" : "Switch to dark mode"} onClick={toggleTheme}>
-      {isDark ? (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" strokeLinecap="round" />
-          <circle cx="12" cy="12" r="4.5" />
-        </svg>
-      ) : (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
-        </svg>
-      )}
-    </IconButton>
-  );
-}
 
 // Single-series line+area trend (dataviz skill: magnitude-over-time, one
 // series needs no legend — the panel title already names it). Thin 2px
@@ -318,13 +297,11 @@ function AnalyticsBody() {
   const { navigate } = useAppNavigation();
   const { user, profile } = useAuth();
   const userId = user?.id ?? null;
-  const credits = useCreditBalance(userId);
 
   const [range, setRange] = useState(30);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [data, setData] = useState({ posts: [], accounts: [] });
 
   const fetchAnalytics = useCallback(async ({ silent = false } = {}) => {
@@ -404,213 +381,186 @@ function AnalyticsBody() {
     URL.revokeObjectURL(url);
   }, [data, range]);
 
-  const creditPct = credits.lifetimePurchased > 0
-    ? Math.max(0, Math.min(100, Math.round((credits.balance / credits.lifetimePurchased) * 100)))
-    : 100;
-  const userInitials = ((profile?.full_name ? profile.full_name[0] : "U") + (profile?.full_name?.split(" ")[1]?.[0] ?? "")).toUpperCase();
 
   return (
-    <>
-      <AppHeader
-        navItems={NAV_ITEMS}
-        activeKey="analytics"
-        onNavClick={(item) => navigate(item.href)}
-        onBurgerClick={() => setMobileNavOpen(true)}
-        right={(
-          <>
-            {credits.ready ? (
-              <CreditPill pct={`${creditPct}%`} label={`${credits.balance.toLocaleString()} cr`} />
-            ) : (
-              <Skeleton width="76px" height="26px" radius="999px" />
-            )}
-            <ThemeToggleButton />
-            <NotificationBell userId={userId} onNavigate={navigate} />
-            <AvatarMenu initials={userInitials || "U"} name={profile?.full_name} email={user?.email} onNavigate={navigate} />
-          </>
-        )}
-      />
-
-      <MobileNavDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} navItems={NAV_ITEMS} activeKey="analytics" onNavClick={(item) => navigate(item.href)} />
-
-      <main className={styles.main}>
-        <div className={styles.canvas}>
-          <div className={styles.headRow}>
-            <div>
-              <div className={styles.title}>Analytics</div>
-              <div className={styles.sub}>Publishing here is simulated, so engagement figures are illustrative — counts and statuses are real.</div>
-            </div>
-            <div className={styles.rangeToggle}>
-              <button type="button" className={[styles.rangeBtn, range === 30 ? styles.rangeBtnActive : ""].join(" ")} onClick={() => setRange(30)}>Last 30 days</button>
-              <button type="button" className={[styles.rangeBtn, range === 90 ? styles.rangeBtnActive : ""].join(" ")} onClick={() => setRange(90)}>Last 90 days</button>
-              {/* LOCK L5.13 — export. Disabled with nothing to export rather
-                  than handing the user an empty file (LOCK L2.5). */}
-              <button
-                type="button"
-                className={styles.rangeBtn}
-                onClick={handleExportCsv}
-                disabled={data.posts.length === 0}
-                title={data.posts.length === 0
-                  ? "Nothing to export in this range"
-                  : `Export ${data.posts.length} posts as CSV`}
-              >
-                Export CSV
-              </button>
-            </div>
+    <AppShell
+      activeKey="analytics"
+      className={styles.shell}
+      mainClassName={styles.main}
+    >
+      <div className={styles.canvas}>
+        <div className={styles.headRow}>
+          <div>
+            <div className={styles.title}>Analytics</div>
+            <div className={styles.sub}>Publishing here is simulated, so engagement figures are illustrative — counts and statuses are real.</div>
           </div>
+          <div className={styles.rangeToggle}>
+            <button type="button" className={[styles.rangeBtn, range === 30 ? styles.rangeBtnActive : ""].join(" ")} onClick={() => setRange(30)}>Last 30 days</button>
+            <button type="button" className={[styles.rangeBtn, range === 90 ? styles.rangeBtnActive : ""].join(" ")} onClick={() => setRange(90)}>Last 90 days</button>
+            {/* LOCK L5.13 — export. Disabled with nothing to export rather
+                than handing the user an empty file (LOCK L2.5). */}
+            <button
+              type="button"
+              className={styles.rangeBtn}
+              onClick={handleExportCsv}
+              disabled={data.posts.length === 0}
+              title={data.posts.length === 0
+                ? "Nothing to export in this range"
+                : `Export ${data.posts.length} posts as CSV`}
+            >
+              Export CSV
+            </button>
+          </div>
+        </div>
 
-          {error && (
-            <div className={styles.errorBox} role="alert">
-              <AlertCircle size={18} aria-hidden="true" />
-              <div style={{ flex: 1 }}>
-                <div className={styles.errorTitle}>Analytics could not be loaded</div>
-                <div className={styles.errorText}>{error}</div>
-              </div>
-              <Button variant="dangerSolid" size="sm" onClick={() => fetchAnalytics()}>Retry</Button>
+        {error && (
+          <div className={styles.errorBox} role="alert">
+            <AlertCircle size={18} aria-hidden="true" />
+            <div style={{ flex: 1 }}>
+              <div className={styles.errorTitle}>Analytics could not be loaded</div>
+              <div className={styles.errorText}>{error}</div>
             </div>
-          )}
+            <Button variant="dangerSolid" size="sm" onClick={() => fetchAnalytics()}>Retry</Button>
+          </div>
+        )}
 
-          {loading ? (
+        {loading ? (
+          <div className={styles.statGrid}>
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} height="86px" radius="var(--uiv2-radius-lg)" />)}
+          </div>
+        ) : (
+          <>
             <div className={styles.statGrid}>
-              {[0, 1, 2, 3].map((i) => <Skeleton key={i} height="86px" radius="var(--uiv2-radius-lg)" />)}
-            </div>
-          ) : (
-            <>
-              <div className={styles.statGrid}>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>Published</div>
-                  <div className={styles.statValue}>{formatNumber(model.published)}</div>
-                  <div className={styles.statSub}>in the last {range} days</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>Scheduled</div>
-                  <div className={styles.statValue}>{formatNumber(model.scheduled)}</div>
-                  <div className={styles.statSub}>waiting on the calendar</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>Failed</div>
-                  <div className={styles.statValue} style={{ color: model.failed > 0 ? "var(--uiv2-danger)" : undefined }}>{formatNumber(model.failed)}</div>
-                  <div className={styles.statSub}>{model.failed > 0 ? "review below" : "none this period"}</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>Avg account health</div>
-                  <div className={styles.statValue}>{model.averageHealth === null ? "—" : `${model.averageHealth}%`}</div>
-                  <div className={styles.statSub}>{model.connectedAccounts} connected account{model.connectedAccounts === 1 ? "" : "s"}</div>
-                </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>Published</div>
+                <div className={styles.statValue}>{formatNumber(model.published)}</div>
+                <div className={styles.statSub}>in the last {range} days</div>
               </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>Scheduled</div>
+                <div className={styles.statValue}>{formatNumber(model.scheduled)}</div>
+                <div className={styles.statSub}>waiting on the calendar</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>Failed</div>
+                <div className={styles.statValue} style={{ color: model.failed > 0 ? "var(--uiv2-danger)" : undefined }}>{formatNumber(model.failed)}</div>
+                <div className={styles.statSub}>{model.failed > 0 ? "review below" : "none this period"}</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>Avg account health</div>
+                <div className={styles.statValue}>{model.averageHealth === null ? "—" : `${model.averageHealth}%`}</div>
+                <div className={styles.statSub}>{model.connectedAccounts} connected account{model.connectedAccounts === 1 ? "" : "s"}</div>
+              </div>
+            </div>
 
+            <Card>
+              <div className={styles.panelHead}>
+                <span className={styles.sectionLabel}>Posts published per week</span>
+                <span className={styles.rangeLabel}>{range === 90 ? "Last 12 weeks" : "Last 4 weeks"}</span>
+              </div>
+              {model.weeklySeries.every((s) => s.count === 0) ? (
+                <EmptyState
+                  dashed
+                  title="Nothing published yet"
+                  description="This chart counts posts that actually went out. Schedule one and it will appear here after it publishes."
+                  actions={<Button size="sm" onClick={() => navigate("/app/calendar")}>Schedule a post</Button>}
+                />
+              ) : (
+                <WeeklyChart series={model.weeklySeries} />
+              )}
+            </Card>
+
+            <div className={styles.twoCol}>
               <Card>
                 <div className={styles.panelHead}>
-                  <span className={styles.sectionLabel}>Posts published per week</span>
-                  <span className={styles.rangeLabel}>{range === 90 ? "Last 12 weeks" : "Last 4 weeks"}</span>
+                  <span className={styles.sectionLabel}>By platform</span>
                 </div>
-                {model.weeklySeries.every((s) => s.count === 0) ? (
+                {model.platformRows.length === 0 ? (
                   <EmptyState
                     dashed
-                    title="Nothing published yet"
-                    description="This chart counts posts that actually went out. Schedule one and it will appear here after it publishes."
-                    actions={<Button size="sm" onClick={() => navigate("/app/calendar")}>Schedule a post</Button>}
+                    title="No platform activity yet"
+                    description="Nothing has been created or scheduled for a platform yet, so there is nothing to break down."
+                    actions={<Button size="sm" onClick={() => navigate("/app/generate")}><Sparkles size={14} aria-hidden="true" /> Create content</Button>}
                   />
                 ) : (
-                  <WeeklyChart series={model.weeklySeries} />
+                  <div className={styles.platformTable}>
+                    <div className={[styles.platformRow, styles.platformHeadRow].join(" ")}>
+                      <div className={styles.platformName}>Platform</div>
+                      <div className={styles.platformStat}>Published</div>
+                      <div className={styles.platformStat}>Scheduled</div>
+                      <div className={styles.platformStat}>Failed</div>
+                      <div className={styles.platformStat}>Health</div>
+                    </div>
+                    {model.platformRows.map((row) => <PlatformRow key={row.platform} row={row} />)}
+                  </div>
                 )}
               </Card>
 
-              <div className={styles.twoCol}>
-                <Card>
-                  <div className={styles.panelHead}>
-                    <span className={styles.sectionLabel}>By platform</span>
-                  </div>
-                  {model.platformRows.length === 0 ? (
-                    <EmptyState
-                      dashed
-                      title="No platform activity yet"
-                      description="Nothing has been created or scheduled for a platform yet, so there is nothing to break down."
-                      actions={<Button size="sm" onClick={() => navigate("/app/generate")}><Sparkles size={14} aria-hidden="true" /> Create content</Button>}
-                    />
-                  ) : (
-                    <div className={styles.platformTable}>
-                      <div className={[styles.platformRow, styles.platformHeadRow].join(" ")}>
-                        <div className={styles.platformName}>Platform</div>
-                        <div className={styles.platformStat}>Published</div>
-                        <div className={styles.platformStat}>Scheduled</div>
-                        <div className={styles.platformStat}>Failed</div>
-                        <div className={styles.platformStat}>Health</div>
-                      </div>
-                      {model.platformRows.map((row) => <PlatformRow key={row.platform} row={row} />)}
-                    </div>
-                  )}
-                </Card>
-
-                <Card>
-                  <div className={styles.panelHead}>
-                    <span className={styles.sectionLabel}>Failed posts in this period</span>
-                  </div>
-                  {model.failedPosts.length === 0 ? (
-                    <EmptyState
-                      title="No failures"
-                      description="Nothing failed to publish in this period."
-                      noAction="this empty state is the good outcome — there is nothing for the user to fix"
-                    />
-                  ) : (
-                    <div className={styles.failedList}>
-                      {model.failedPosts.slice(0, 8).map((post) => (
-                        <button
-                          key={post.id}
-                          type="button"
-                          className={styles.failedRow}
-                          onClick={() => navigate(`/app/calendar?postId=${encodeURIComponent(post.id)}`)}
-                        >
-                          <div className={styles.failedMain}>
-                            <span className={styles.failedTitle}>{getPostTitle(post)}</span>
-                            <span className={styles.failedMeta}>{formatPlatformName(getPostPlatform(post))} · {formatDate(post.updated_at || post.created_at)}</span>
-                          </div>
-                          <span className={styles.failedReason}>{post.failure_reason || "Failed to publish"}</span>
-                          <ArrowUpRight size={14} aria-hidden="true" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              </div>
-
               <Card>
                 <div className={styles.panelHead}>
-                  <span className={styles.sectionLabel}>Recent content</span>
-                  <Button variant="ghost" size="sm" onClick={() => fetchAnalytics({ silent: true })} disabled={refreshing}>
-                    <RefreshCw size={13} aria-hidden="true" /> {refreshing ? "Refreshing…" : "Refresh"}
-                  </Button>
+                  <span className={styles.sectionLabel}>Failed posts in this period</span>
                 </div>
-                {model.recentPosts.length === 0 ? (
-                  <EmptyState dashed title="Nothing tracked yet" description="Generate something in Studio to see it here." actions={<Button onClick={() => navigate("/app/generate")}><Sparkles size={14} aria-hidden="true" /> Create content</Button>} />
+                {model.failedPosts.length === 0 ? (
+                  <EmptyState
+                    title="No failures"
+                    description="Nothing failed to publish in this period."
+                    noAction="this empty state is the good outcome — there is nothing for the user to fix"
+                  />
                 ) : (
-                  <div className={styles.recentList}>
-                    {model.recentPosts.map((post) => (
-                      <div key={post.id} className={styles.recentRow}>
-                        <div className={styles.recentMain}>
-                          <span className={styles.recentTitle}>{getPostTitle(post)}</span>
-                          <span className={styles.recentMeta}>{formatDate(post.created_at)}</span>
+                  <div className={styles.failedList}>
+                    {model.failedPosts.slice(0, 8).map((post) => (
+                      <button
+                        key={post.id}
+                        type="button"
+                        className={styles.failedRow}
+                        onClick={() => navigate(`/app/calendar?postId=${encodeURIComponent(post.id)}`)}
+                      >
+                        <div className={styles.failedMain}>
+                          <span className={styles.failedTitle}>{getPostTitle(post)}</span>
+                          <span className={styles.failedMeta}>{formatPlatformName(getPostPlatform(post))} · {formatDate(post.updated_at || post.created_at)}</span>
                         </div>
-                        <Badge tone="neutral">{formatPlatformName(getPostPlatform(post))}</Badge>
-                        <Badge tone={post.status === "published" ? "success" : post.status === "failed" ? "danger" : post.status === "scheduled" ? "info" : "neutral"}>
-                          {post.status || "draft"}
-                        </Badge>
-                      </div>
+                        <span className={styles.failedReason}>{post.failure_reason || "Failed to publish"}</span>
+                        <ArrowUpRight size={14} aria-hidden="true" />
+                      </button>
                     ))}
                   </div>
                 )}
               </Card>
-            </>
-          )}
-        </div>
-      </main>
-    </>
+            </div>
+
+            <Card>
+              <div className={styles.panelHead}>
+                <span className={styles.sectionLabel}>Recent content</span>
+                <Button variant="ghost" size="sm" onClick={() => fetchAnalytics({ silent: true })} disabled={refreshing}>
+                  <RefreshCw size={13} aria-hidden="true" /> {refreshing ? "Refreshing…" : "Refresh"}
+                </Button>
+              </div>
+              {model.recentPosts.length === 0 ? (
+                <EmptyState dashed title="Nothing tracked yet" description="Generate something in Studio to see it here." actions={<Button onClick={() => navigate("/app/generate")}><Sparkles size={14} aria-hidden="true" /> Create content</Button>} />
+              ) : (
+                <div className={styles.recentList}>
+                  {model.recentPosts.map((post) => (
+                    <div key={post.id} className={styles.recentRow}>
+                      <div className={styles.recentMain}>
+                        <span className={styles.recentTitle}>{getPostTitle(post)}</span>
+                        <span className={styles.recentMeta}>{formatDate(post.created_at)}</span>
+                      </div>
+                      <Badge tone="neutral">{formatPlatformName(getPostPlatform(post))}</Badge>
+                      <Badge tone={post.status === "published" ? "success" : post.status === "failed" ? "danger" : post.status === "scheduled" ? "info" : "neutral"}>
+                        {post.status || "draft"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </>
+        )}
+      </div>
+    </AppShell>
   );
 }
 
 export default function PersonalAnalyticsPage() {
-  return (
-    <UiV2ThemeProvider className={styles.shell}>
-      <AnalyticsBody />
-    </UiV2ThemeProvider>
-  );
+  return <AnalyticsBody />;
 }

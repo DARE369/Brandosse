@@ -24,7 +24,7 @@ import PlatformIcon from "../../components/Shared/PlatformIcon";
 import { getAllPlatforms } from "../../services/platforms/platformRegistry";
 import { getAccountsForUser, connectAccount, initiateOAuthConnection } from "../../services/platforms/connectionService";
 import {
-  UiV2ThemeProvider, useUiV2Theme, IconButton, Button, Badge, Skeleton,
+  UiV2ThemeProvider, ThemeToggleButton, Button, Badge, Skeleton,
 } from "../../ui-v2";
 import styles from "./ConnectAccountFlow.module.css";
 
@@ -42,23 +42,6 @@ function sanitizeHandle(value) {
   return String(value || "").replace(/^@+/, "").replace(/\s+/g, "_");
 }
 
-function ThemeToggleButton() {
-  const { isDark, toggleTheme } = useUiV2Theme();
-  return (
-    <IconButton title={isDark ? "Switch to light mode" : "Switch to dark mode"} onClick={toggleTheme}>
-      {isDark ? (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" strokeLinecap="round" />
-          <circle cx="12" cy="12" r="4.5" />
-        </svg>
-      ) : (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z" />
-        </svg>
-      )}
-    </IconButton>
-  );
-}
 
 const STEP_LABELS = ["Platform", "Heads up", "Sign in", "Permissions", "Profile", "Done"];
 
