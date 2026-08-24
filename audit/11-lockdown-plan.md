@@ -271,26 +271,66 @@ The mechanism that keeps locks locked. **One row per lock, permanently.**
 
 ---
 
-## Status — 2026-08-22
+## Status — 2026-08-23
+
+**Re-verified against code, not against this table.** The 2026-08-22 snapshot
+below it had gone stale by four locks — L5.4, L5.5, L5.10, L5.12 and L5.13 all
+landed after it was written. That is Law 2 happening to this very document.
 
 | Wave | State |
 |---|---|
 | −1 Standards + `CLAUDE.md` | ✅ complete |
-| 0 Lock mechanism | ✅ except **L0.4** (error tracking — needs a Sentry account) |
+| 0 Lock mechanism | ✅ complete — L0.3 verified at `20260821180000_unblind_cron_monitoring.sql:43`, L0.4 shipped. **One half outstanding:** the Python worker is still uninstrumented |
 | 1 Stop the bleeding | ✅ complete, all verified live |
 | 2 UI stops lying | ✅ complete |
-| 3 Delete dead code | ✅ complete — ~1,900 lines |
+| 3 Delete dead code | 🔴 **Gate 3 is NOT passed** — see below |
 | 4 Connect what exists | ✅ complete |
-| 5 Complete the inadequate | 🟡 **L5.9 done**, 14 items remain |
-| 6 Audit gaps · 7 Fly migration | ⬜ not started |
+| 5 Complete the inadequate | 🟡 **11 of 15 done.** Outstanding: L5.3a, L5.14. Rescoped: L5.1, L5.8 |
+| 6 Audit gaps | ✅ complete |
+| 7 Fly migration | ✅ complete — end-to-end proof, job `5e77c665`: YouTube URL → captioned clips in under 4 minutes |
 
-**9 migrations applied and verified. 12 of 14 guards run automatically.**
+### Gate 3 was declared passed and is not
 
-Outstanding, all on the founder side:
-- Deploy the 14 modified edge functions (also the first real Deno type-check)
+Wave 3 promises "a CI check for unreferenced modules, so dead code cannot
+silently re-accumulate." **No such script exists** — nothing under `scripts/`
+matches unreferenced/orphan/dead-module detection. And the proof it would have
+caught is still in the tree: `src/services/OptimalTimesService.js`, 466 lines,
+named in the audit as imported nowhere, survived Wave 3's deletion pass, and is
+referenced today by documentation only.
+
+By this plan's own governing rule — *a lock without a guard is not locked* —
+Wave 3 is fixed but not guarded, so its gate stays shut until the detector
+exists. Recording it rather than quietly re-ticking it, because a gate that can
+be declared passed without demonstration is the exact failure this plan was
+written to prevent.
+
+### The four genuinely outstanding engineering items
+
+| # | Item | Why it is still open |
+|---|---|---|
+| 1 | **L5.3a** — clip analysis truncation | Still `max_tokens=4096` at `video-worker/stages/analyze.py:275`. Long videos silently lose moments — the last functional defect in the strongest pillar |
+| 2 | **L5.14** — cost-per-user tracking + per-user ceiling | Zero code exists. No longer blocked: the Zernio figure is now known to be $0 |
+| 3 | **L0.4b** — Python worker not instrumented | Deferred to Wave 7 "because it cannot boot anyway." It boots now, on Fly, running the pillar with the best margin. The deferral reason has expired |
+| 4 | **Gate 3 detector** — unreferenced-module check | Above |
+
+### Rescoped by the OD-1 decision (2026-08-23)
+
+- **L5.1** — from "publish to ≥4 platforms" to **"the multi-platform path works,
+  proven across 2 real accounts."** Same engineering, no spend. DoC-1's launch
+  floor drops to 2 platforms accordingly.
+- **L5.8** — the silent 3× tier upgrade is **already gone**
+  (`src/config/mediaGenerationOptions.js:71-75` now makes the tier an explicit
+  user choice). Repricing proper is deferred with the video-generation decision.
+
+### Founder-side, still open
+
+- Deploy the modified edge functions (also the first real Deno type-check)
 - 5 GitHub secrets for the daily `live-invariants` job
-- Sentry account for L0.4
-- Zernio dashboard access — L5.1 is the keystone and four pillars sit behind it
+- Run `scripts/data/backfill-hotlinked-assets.mjs --apply` — 36 real user
+  generations still exist only on pollinations' servers. Dry-run by default; it
+  has never been run for real
+- **Merge to `main`.** The branch is 48 commits ahead, 0 behind. Every lock in
+  Waves 5–7 lives only on the branch, so the guards have never gated `main`
 
 ## Progress
 

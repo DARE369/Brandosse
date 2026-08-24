@@ -22,6 +22,10 @@ pnpm-debug.log*
 .DS_Store
 .vscode/
 
+# machine-local tooling state — never app code
+.claude/settings.local.json
+tsconfig.tsbuildinfo
+
 
 
 video-worker/venv/
@@ -35,4 +39,11 @@ next-env.d.ts
 supabase/.temp/
 /qa-shots/
 /qa-shots-overflow/
+scripts/qa-shots/
+scripts/qa-*.cjs
 scripts/*-tmp.cjs
+scripts/*-tmp*.cjs
+
+# personal / presentation material — kept local, not app code
+PROJECT-EXPERIENCE-CV.md
+praise-presentation/
