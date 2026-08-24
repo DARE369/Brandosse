@@ -1747,6 +1747,8 @@ const useSessionStore = create((set, get) => ({
           // Stamp the real brand logo when the user has opted in (Settings >
           // Content defaults). The edge fn resolves the file; this is intent only.
           applyLogo: settings?.applyLogo === true,
+          logoPosition: settings?.logoPosition,
+          logoScale: settings?.logoScale,
           referenceImageUrls: opts.referenceImages || undefined,
           category: 'image',
           requestId: opts.requestId,
@@ -1977,6 +1979,8 @@ const useSessionStore = create((set, get) => ({
           // Stamp the real brand logo when the user has opted in (Settings >
           // Content defaults). The edge fn resolves the file; this is intent only.
           applyLogo: settingsSnapshot?.applyLogo === true,
+          logoPosition: settingsSnapshot?.logoPosition,
+          logoScale: settingsSnapshot?.logoScale,
           referenceImageUrls: opts.referenceImages || undefined,
           category: 'image',
           requestId: opts.requestId,
@@ -2092,6 +2096,8 @@ const useSessionStore = create((set, get) => ({
         // Stamp the real brand logo when the user has opted in (Settings >
         // Content defaults). The edge fn resolves the file; this is intent only.
         applyLogo: settings?.applyLogo === true,
+        logoPosition: settings?.logoPosition,
+        logoScale: settings?.logoScale,
         referenceImageUrls: opts.referenceImages || undefined,
         category: 'image',
         requestId: opts.requestId,
@@ -2182,6 +2188,8 @@ const useSessionStore = create((set, get) => ({
         // Stamp the real brand logo when the user has opted in (Settings >
         // Content defaults). The edge fn resolves the file; this is intent only.
         applyLogo: settings?.applyLogo === true,
+        logoPosition: settings?.logoPosition,
+        logoScale: settings?.logoScale,
         category,
         requestId: crypto.randomUUID(),
         slotOffset: 0,
@@ -2283,6 +2291,8 @@ const useSessionStore = create((set, get) => ({
           // Stamp the real brand logo when the user has opted in (Settings >
           // Content defaults). The edge fn resolves the file; this is intent only.
           applyLogo: settings?.applyLogo === true,
+          logoPosition: settings?.logoPosition,
+          logoScale: settings?.logoScale,
           referenceImageUrls: opts.referenceImages || undefined,
           category: 'carousel',
           requestId: opts.requestId,

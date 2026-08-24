@@ -117,6 +117,8 @@ function StudioBody({ brandKit }) {
             videoQuality: gen.video_quality || settings.videoQuality,
             matchBrandKit: gen.match_brand_kit !== false,
             applyLogo: gen.apply_logo === true,
+            logoPosition: gen.logo_position || 'bottom-right',
+            logoScale: Number(gen.logo_scale) || 0.16,
             imageModel: gen.image_model || settings.imageModel,
             // 4.2: restore a persisted style-lock reference set across sessions.
             styleLock: Boolean(gen.style_lock),

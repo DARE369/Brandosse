@@ -19,6 +19,11 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
   weekly_digest: false,
 };
 
+export const LOGO_POSITIONS = [
+  'bottom-right', 'bottom-left', 'bottom-center',
+  'top-right', 'top-left', 'top-center',
+];
+
 const DEFAULT_GENERATION_DEFAULTS = {
   media_type: 'image',
   aspect_ratio: '1:1',
@@ -27,6 +32,8 @@ const DEFAULT_GENERATION_DEFAULTS = {
   // Opt-in: stamping a logo onto every generated image is a strong visual
   // change, so it stays off until the user asks for it. See ContentDefaultsTab.
   apply_logo: false,
+  logo_position: 'bottom-right',
+  logo_scale: 0.16,
   image_model: 'auto',
   style_lock: false,
   reference_images: [],
@@ -120,6 +127,14 @@ function normalizeGenerationDefaults(value) {
     video_quality: String(source.video_quality || DEFAULT_GENERATION_DEFAULTS.video_quality),
     match_brand_kit: normalizeBoolean(source.match_brand_kit, DEFAULT_GENERATION_DEFAULTS.match_brand_kit),
     apply_logo: normalizeBoolean(source.apply_logo, DEFAULT_GENERATION_DEFAULTS.apply_logo),
+    logo_position: LOGO_POSITIONS.includes(source.logo_position)
+      ? source.logo_position
+      : DEFAULT_GENERATION_DEFAULTS.logo_position,
+    // Clamped to the same range the compositor accepts, so a bad stored value
+    // cannot reach the edge function.
+    logo_scale: Number.isFinite(Number(source.logo_scale))
+      ? Math.min(Math.max(Number(source.logo_scale), 0.04), 0.5)
+      : DEFAULT_GENERATION_DEFAULTS.logo_scale,
     image_model: String(source.image_model || DEFAULT_GENERATION_DEFAULTS.image_model),
     style_lock: normalizeBoolean(source.style_lock, DEFAULT_GENERATION_DEFAULTS.style_lock),
     reference_images: Array.isArray(source.reference_images)

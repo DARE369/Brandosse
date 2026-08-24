@@ -16,6 +16,24 @@ import { fetchUserSettings, saveUserSettings } from "../../services/userSettings
 import { Card, Button } from "../../ui-v2";
 import styles from "./ContentDefaultsTab.module.css";
 
+// Mirrors LogoPosition in supabase/functions/_shared/composite.ts — the
+// compositor accepts exactly these six.
+const LOGO_POSITION_OPTIONS = [
+  { value: "bottom-right", label: "Bottom right" },
+  { value: "bottom-center", label: "Bottom centre" },
+  { value: "bottom-left", label: "Bottom left" },
+  { value: "top-right", label: "Top right" },
+  { value: "top-center", label: "Top centre" },
+  { value: "top-left", label: "Top left" },
+];
+
+// Fraction of image width. The compositor clamps to 0.04-0.5.
+const LOGO_SCALE_OPTIONS = [
+  { value: 0.1, label: "Small" },
+  { value: 0.16, label: "Medium" },
+  { value: 0.24, label: "Large" },
+];
+
 export default function ContentDefaultsTab({ userId, onToast }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,6 +43,8 @@ export default function ContentDefaultsTab({ userId, onToast }) {
     video_quality: "standard",
     match_brand_kit: true,
     apply_logo: false,
+    logo_position: 'bottom-right',
+    logo_scale: 0.16,
     default_platforms: [],
   });
 
@@ -135,7 +155,7 @@ export default function ContentDefaultsTab({ userId, onToast }) {
         <div className={styles.toggleRow}>
           <div>
             <div className={styles.sectionTitle}>Stamp my logo on images</div>
-            <div className={styles.sectionSub}>Overlays your Brand Kit logo onto every generated image, bottom-right. Needs a logo uploaded in your Brand Kit — AI cannot draw your real logo, so this composites the actual file.</div>
+            <div className={styles.sectionSub}>Overlays your Brand Kit logo onto every generated image. Needs a logo uploaded to your ACTIVE Brand Kit — AI cannot draw your real logo, so this composites the actual file.</div>
           </div>
           <button
             type="button"
@@ -148,6 +168,40 @@ export default function ContentDefaultsTab({ userId, onToast }) {
             <span className={styles.switchKnob} style={{ left: form.apply_logo ? "18px" : "2px" }} />
           </button>
         </div>
+
+        {form.apply_logo && (
+          <>
+            <div className={styles.sectionSub} style={{ marginTop: 16 }}>Position</div>
+            <div className={styles.chipRow}>
+              {LOGO_POSITION_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  className={`${styles.chip} ${form.logo_position === o.value ? styles.chipActive : ""}`}
+                  aria-pressed={form.logo_position === o.value}
+                  onClick={() => setForm((c) => ({ ...c, logo_position: o.value }))}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+
+            <div className={styles.sectionSub} style={{ marginTop: 16 }}>Size</div>
+            <div className={styles.chipRow}>
+              {LOGO_SCALE_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  className={`${styles.chip} ${form.logo_scale === o.value ? styles.chipActive : ""}`}
+                  aria-pressed={form.logo_scale === o.value}
+                  onClick={() => setForm((c) => ({ ...c, logo_scale: o.value }))}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </Card>
 
       <Card>

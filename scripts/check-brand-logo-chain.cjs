@@ -74,6 +74,42 @@ const flagged    = (store.match(/applyLogo:/g) || []).length;
 need(flagged >= imageCalls - 1,
   `SessionStore.js: ${flagged} of ${imageCalls} generateImages() call sites pass applyLogo`);
 
+// ── 3b. Position / size must travel too, and stay clamped ─────────────────
+// A control that renders but never reaches the renderer is the same defect
+// class this whole guard exists for.
+// The options must be RENDERED, not just declared — renaming the constant
+// left `form.logo_position` behind and a presence check happily passed.
+need(/LOGO_POSITION_OPTIONS\.map/.test(tab),
+  'ContentDefaultsTab.jsx: position chips are not rendered');
+need(/LOGO_SCALE_OPTIONS\.map/.test(tab),
+  'ContentDefaultsTab.jsx: size chips are not rendered');
+need(/logo_position/.test(tab) && /logo_scale/.test(tab),
+  'ContentDefaultsTab.jsx: position/size are not bound to the form');
+// Must be in the DEFAULTS block, not merely mentioned in the normalizer —
+// a missing default silently becomes undefined for every new account.
+const dStart = settings.indexOf('DEFAULT_GENERATION_DEFAULTS = {');
+const defaultsBlock = dStart === -1 ? '' : settings.slice(dStart, settings.indexOf('};', dStart));
+need(/logo_position/.test(defaultsBlock),
+  'userSettingsService.js: logo_position missing from DEFAULT_GENERATION_DEFAULTS');
+need(/logo_scale/.test(defaultsBlock),
+  'userSettingsService.js: logo_scale missing from DEFAULT_GENERATION_DEFAULTS');
+need(/Math\.min\(Math\.max\(Number\(source\.logo_scale\)/.test(settings),
+  'userSettingsService.js: logo_scale is not clamped — an out-of-range value would reach the compositor');
+need(/logoPosition/.test(studio) && /logoScale/.test(studio),
+  'StudioPage.jsx: persisted logo position/scale never reach live settings');
+// Parity, not presence: every site that opts into the logo must also say
+// WHERE and HOW BIG, or that site silently falls back to the defaults while
+// the user believes their setting applies.
+const nApply = (store.match(/applyLogo:/g) || []).length;
+const nPos   = (store.match(/logoPosition:/g) || []).length;
+const nScale = (store.match(/logoScale:/g) || []).length;
+need(nPos === nApply && nScale === nApply,
+  `SessionStore.js: ${nApply} applyLogo sites but ${nPos} logoPosition / ${nScale} logoScale — every site must pass all three`);
+need(/logo_position/.test(media) && /logo_scale/.test(media),
+  'media.service.js: logo_position/logo_scale are not sent to the edge function');
+need(/logo_position\?:\s*LogoPosition/.test(edge),
+  'generateImage: logo_position is not part of the request contract');
+
 // ── 4. The edge function must resolve the file ITSELF (private bucket) ─────
 need(/async function resolveBrandLogo/.test(edge),
   'generateImage: no server-side logo resolution — a client URL cannot read a private bucket (break #3)');

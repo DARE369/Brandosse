@@ -333,3 +333,99 @@ brief:
 
 **Awaiting human sign-off before any Remove classification is acted on.**
 (No Remove classifications were made in this audit — see AS_IS_AUDIT.md §7.)
+
+---
+
+**2026-08-24 — claude-code** — The Brand Kit logo was reaching zero
+generated images, and brand colours were reaching zero prompts. Both are now
+wired, with a guard. — Reasoning below; this entry records CURRENT STATE, so
+where it and the code disagree, the code wins.
+
+**What was actually true before this change** (verified against live data,
+not inferred):
+
+- `brand_assets` held a real logo — `Oriki_Soda_Co_Logo.svg`,
+  `asset_type='logo'`, `status='ready'`.
+- `_shared/composite.ts` contained a correct, complete logo compositor, and
+  `generateImage/index.ts` called it correctly behind `if (body.logo_url)`.
+- **No caller anywhere set `logo_url`.** `media.service.js` sent `brandKit`,
+  aspect ratio and model, and no logo field of any kind. Four independent
+  breaks, each on its own sufficient:
+  1. the caller never sent it (`media.service.js`);
+  2. `brandKitLoader.js` selected asset *text* (`alt_text`, `description`,
+     …) but neither `storage_path` nor `public_url`, so nothing could name
+     the file;
+  3. the `public_url` column stores a public-style URL for a **private**
+     bucket — it returns HTTP 400, confirmed live;
+  4. the logo is SVG and ImageScript decodes PNG/JPEG only.
+- `brand_kit.color_palette` held eight colours with hex, human name, and a
+  usage rule each. `brandKitLoader.js` never referenced the column, so
+  "match brand kit" meant style adjectives and never the brand's colours.
+
+**Decisions taken**
+
+1. **Resolve the logo server-side**, in `generateImage` via the service-role
+   client (`resolveBrandLogo`), not client-side. — Reasoning: the bucket is
+   private, so no client-built URL can work; and it is one chokepoint
+   instead of the six `generateImages()` call sites. `logo_url` is still
+   honoured for callers with their own reachable image. — If wrong: move
+   resolution back to the client and mint signed URLs per request.
+2. **Rasterise SVG with resvg-wasm**, imported lazily inside the SVG branch.
+   — Reasoning: SVG is the common logo format, so "PNG only" would have left
+   the feature dead for most brands; the lazy import means raster logos and
+   logo-free renders never pay its cold start. — If wrong (edge runtime
+   blocks the WASM fetch): rasterise at upload instead and store a PNG
+   derivative, which needs a migration.
+3. **Off by default**, as `apply_logo` in generation defaults, surfaced in
+   Settings > Content defaults. — Reasoning: stamping a logo onto every
+   image is a strong visual change and the user's call. — If wrong: flip the
+   default in `userSettingsService.js`; nothing else changes.
+4. **The video first-frame call site is exempt** (`SessionStore.js`). —
+   Reasoning: a logo there would appear for one frame and vanish.
+5. **Position and size are user-controlled** — six positions and three sizes
+   in Settings > Content defaults, shown only when the toggle is on.
+   — Reasoning: a fixed bottom-right stamp is not usable for every brand or
+   aspect ratio, and the compositor already accepted both parameters; they
+   simply had no way in. `logo_scale` is clamped to the compositor's own
+   0.04-0.5 range at the settings layer, so a bad stored value cannot reach
+   the edge function. — If wrong: the defaults (bottom-right, 0.16) are what
+   every existing account already gets.
+6. **Failure is loud.** The previous `catch` logged `console.warn` and
+   returned a completely normal-looking unbranded image — the silent no-op
+   the third law forbids. A requested logo that does not land now sets
+   `logo_applied: false` + `logo_error` on the response and in the
+   generation metadata, and `media.service.js` logs it at error level.
+
+**Proven**: the real SVG was downloaded from the private bucket
+(HTTP 200), rasterised, and composited through the same two libraries the
+edge function uses; 100% of the logo box changed against a control and the
+mark rendered correctly.
+
+**Also proven live** (2026-08-24, against the deployed function): a real
+generation with the SVG logo returned `logo_applied: true` and the mark is
+visibly composited; a generation with `apply_logo` for an account whose
+ACTIVE kit has no logo returned `logo_applied: false` with
+`logo_error: "no logo uploaded to the active brand kit"` — the loud path
+works, not just the happy one.
+
+**Guarded**: `scripts/check-brand-logo-chain.cjs`, wired into CI. Verified by
+deliberately breaking 20 links; every break was caught. Four early checks
+passed against things that were not live code — two against the file's own
+explanatory comments, one against a partially-removed set of call sites, one
+against a renamed-but-still-mentioned constant. The guard now strips
+comments, requires call-site PARITY rather than mere presence, and requires
+the UI options to be rendered rather than merely declared.
+
+**Known, not fixed** (data/state, not code):
+
+- The kit holding the logo and the palette (`Oríkì Soda Co.`) is
+  `is_active = false`. The active kit (`Chowdeck`) has no logo, so the
+  feature will report "no logo uploaded to the active brand kit" until the
+  intended kit is activated or a logo is added to the active one.
+- That logo's SVG paints its own opaque cream background, so it composites
+  as a cream rectangle rather than a floating mark. A transparent-background
+  variant is a brand-asset task, not a code one.
+- The idempotent cache-hit response (`generateImage`, first `jsonResponse`)
+  does not carry the logo flags. Harmless today — a replay returns the
+  already-composited image — but it means a cached result reports
+  `logo_applied: undefined` rather than `true`.
