@@ -347,7 +347,11 @@ def render_clip_to_file(
 
     codec_attempts = [
         ("h264_nvenc", ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "23"]),
-        ("libx264", ["-c:v", "libx264", "-preset", "fast", "-crf", "23"]),
+        # veryfast, not fast: roughly 1.5-2x quicker to encode for a file about
+        # 10-15% larger, and at 608x1080 on talking-head and screen content
+        # the difference is not visible. On one shared vCPU, encode time is
+        # the scarce resource and file size is not.
+        ("libx264", ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]),
     ]
 
     last_error = "All codec attempts failed"

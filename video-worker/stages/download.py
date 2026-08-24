@@ -119,6 +119,20 @@ _RETRYABLE_MARKERS = (
     'page needs to be reloaded',
     'no video formats',
     'unable to extract',
+    # Bot detection belongs here, and leaving it out was a real defect.
+    #
+    # It reads like a permanent verdict about this worker, so it was treated as
+    # one: on "Sign in to confirm you're not a bot" the ladder stopped
+    # immediately and the job failed in under 80 seconds. But measured
+    # 2026-08-23 seconds after exactly that failure, the same URL with the same
+    # cookies extracted 6 times out of 6. YouTube challenges a datacenter IP
+    # intermittently, not permanently — which is precisely the case the pauses
+    # exist for.
+    #
+    # If the cookies really are dead, all rungs and all passes still fail and
+    # the user gets the same clear message, roughly 40 seconds later.
+    "not a bot",
+    'sign in to confirm',
 )
 
 
@@ -137,6 +151,36 @@ def _opts_with_clients(base: dict, clients: list) -> dict:
     extractor_args['youtube'] = yt
     opts['extractor_args'] = extractor_args
     return opts
+
+
+def _find_existing_source(temp_dir: str):
+    """
+    Return (video_path, audio_path) if a previous attempt already fetched both,
+    else None.
+
+    Only counts files with real content — a zero-byte leftover from a transfer
+    that died mid-write must NOT be mistaken for finished work, or the resume
+    hands the pipeline a corrupt input and the job fails somewhere far less
+    obvious than the download stage.
+    """
+    if not os.path.isdir(temp_dir):
+        return None
+
+    def _usable(path, min_bytes):
+        return os.path.isfile(path) and os.path.getsize(path) >= min_bytes
+
+    audio = os.path.join(temp_dir, 'source.wav')
+    if not _usable(audio, 1000):
+        return None
+
+    for name in sorted(os.listdir(temp_dir)):
+        if not name.startswith('source') or name.endswith('.wav'):
+            continue
+        candidate = os.path.join(temp_dir, name)
+        # 100KB floor: any real source video clears it, any stub does not.
+        if _usable(candidate, 100_000):
+            return candidate, audio
+    return None
 
 
 def calculate_credits(duration_secs: int) -> int:
@@ -276,18 +320,42 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
                 with yt_dlp.YoutubeDL(probe) as ydl:
                     info = ydl.extract_info(url, download=False, process=False)
 
-                if info and info.get('duration') is not None:
+                    # process=False skips format selection, which is the whole
+                    # point — but for some clients it also leaves 'duration'
+                    # unresolved, and a job with no duration cannot be priced or
+                    # bounded. Observed 2026-08-23: a resumed job failed with
+                    # "Could not determine video duration. Live streams are not
+                    # supported." on a 20-minute video that is plainly not live.
+                    # Ask again WITH processing only when the cheap path came
+                    # back short; ignore_no_formats_error keeps that second call
+                    # from reintroducing the format coupling.
+                    if info is not None and info.get('duration') is None:
+                        try:
+                            info = ydl.extract_info(url, download=False, process=True)
+                        except Exception as exc:
+                            log.warning(
+                                "duration_reprobe_failed",
+                                rung=rung,
+                                error=str(exc)[:80],
+                            )
+
+                # A title with no duration is still a usable answer — the
+                # caller measures duration from the file when it has to. Only
+                # a response with NEITHER is worth another rung.
+                if info and (info.get('duration') is not None or info.get('title')):
                     log.info(
                         "preflight_success",
                         title=info.get('title', 'Untitled Video'),
-                        duration_secs=int(info['duration']),
+                        duration_secs=(int(info['duration'])
+                                       if info.get('duration') is not None else None),
                         clients='+'.join(clients),
                         rung=rung,
                         attempt=attempt,
                     )
+                    _dur = info.get('duration')
                     return {
                         "title": info.get('title', 'Untitled Video'),
-                        "duration_secs": int(info['duration']),
+                        "duration_secs": int(_dur) if _dur is not None else None,
                     }
             except Exception as e:  # noqa: BLE001 - classified by the handler below
                 last_error = e
@@ -328,19 +396,14 @@ def _get_video_metadata(url: str, platform: str, job_id: str, cookies_path: str 
             title = info.get('title', 'Untitled Video')
             duration = info.get('duration')
 
-            if duration is None:
-                raise DownloadError(
-                    "Could not determine video duration. Live streams are not supported.",
-                    job_id,
-                )
-
-            duration = int(duration)
+            # None is allowed here too: run_download measures from the file.
+            duration = int(duration) if duration is not None else None
 
             log.info(
                 "preflight_success",
                 title=title,
                 duration_secs=duration,
-                duration_minutes=round(duration / 60, 1),
+                duration_minutes=round(duration / 60, 1) if duration is not None else None,
             )
 
             return {
@@ -568,6 +631,41 @@ async def run_download(job: dict, temp_dir: str) -> dict:
     user_id = job["user_id"]
     source_url = job["source_url"]
     platform = job["source_platform"]
+
+    # ── RESUME: reuse a source file that is already on disk ─────────────────
+    #
+    # Transcribe and analyze already skip finished work, but download did not,
+    # and download is the least reliable step in the whole pipeline. So an
+    # interrupted job — which by definition has ALREADY downloaded successfully
+    # — went straight back to YouTube on every retry and could fail there.
+    # Observed 2026-08-23: a job with a saved transcript and 9 scored clips
+    # spent 85 minutes and died re-fetching a file it still had.
+    #
+    # If the video and its extracted audio are both present and non-empty, this
+    # stage is finished. Reported duration comes from the job row (written on
+    # the first successful pass), so no network call is needed to resume.
+    existing = _find_existing_source(temp_dir)
+    if existing:
+        video_path, audio_path = existing
+        known_duration = job.get("source_duration_secs")
+        if known_duration:
+            log.info(
+                "stage_resumed",
+                job_id=job_id,
+                stage="download",
+                video_mb=round(os.path.getsize(video_path) / 1e6, 1),
+                message="source already on disk — skipping fetch",
+            )
+            return {
+                "video_path": video_path,
+                "audio_path": audio_path,
+                "title": job.get("source_title") or "Untitled Video",
+                "duration_secs": int(known_duration),
+                # deduct_credits is idempotent per job, so a resumed run does
+                # not double-charge; passing the real figure keeps the refund
+                # arithmetic correct if a later stage fails.
+                "credits_to_consume": calculate_credits(int(known_duration)),
+            }
     credits_to_consume = 0
     credits_deducted = False
 
@@ -585,6 +683,44 @@ async def run_download(job: dict, temp_dir: str) -> dict:
             title = metadata["title"]
             duration_secs = metadata["duration_secs"]
             video_path = None
+
+            # ── Duration: measure it ourselves when YouTube withholds it ────
+            #
+            # Observed 2026-08-23: extraction succeeded and returned a correct
+            # title while omitting 'duration' from every client across all
+            # retry passes — a sustained gap, not a blip. The job then failed
+            # with "Could not determine video duration. Live streams are not
+            # supported." on a 20-minute video that is plainly not live.
+            #
+            # Duration is only needed to enforce the length limit and to price
+            # the job, and ffprobe answers both from the file itself. The
+            # upload path has always worked this way. So rather than refuse a
+            # job because an adversarial API declined to answer a question we
+            # can answer ourselves, fetch first and measure.
+            #
+            # The cost of being wrong is bounded: the length limit is checked
+            # immediately after, before any credits are taken, so an
+            # over-long source is still refused — it just costs us the
+            # bandwidth to find out.
+            if duration_secs is None:
+                log.warning(
+                    "duration_absent_from_metadata_downloading_to_measure",
+                    job_id=job_id,
+                    title=title,
+                )
+                output_template = os.path.join(temp_dir, 'source.%(ext)s')
+                video_path = await asyncio.to_thread(
+                    _download_with_ytdlp, source_url, output_template, job_id, cookies_path,
+                )
+                measured = await asyncio.to_thread(get_video_duration, video_path)
+                if measured is None:
+                    raise DownloadError(
+                        "Could not determine this video's duration, even after downloading it. "
+                        "It may be a live stream or a broken source. Try uploading the file directly.",
+                        job_id,
+                    )
+                duration_secs = int(measured)
+                log.info("duration_measured_from_file", job_id=job_id, duration_secs=duration_secs)
 
         elif platform == 'upload':
             if str(source_url).startswith('worker://'):
@@ -645,7 +781,7 @@ async def run_download(job: dict, temp_dir: str) -> dict:
 
         update_job_source_info(job_id, title, duration_secs, credits_to_consume)
 
-        if platform in ['youtube', 'twitter']:
+        if platform in ['youtube', 'twitter'] and video_path is None:
             output_template = os.path.join(temp_dir, 'source.%(ext)s')
             log.info("full_download_start", job_id=job_id, platform=platform)
 

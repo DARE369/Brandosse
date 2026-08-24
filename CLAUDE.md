@@ -31,10 +31,14 @@ All three were being violated when the audit ran.
 **blocking engineering work**. Read it before proposing a plan — some work is
 blocked on a decision, not on effort, and proposing it anyway wastes a cycle.
 
-Currently open: **OD-1 — Zernio per-account pricing.** It blocks L5.1, and four
-pillars sit behind that (analytics needs published posts; the loop needs
-analytics; reach needs the loop). It is also ~3× the entire rest of the cost
-model, as a *fixed* cost against usage-priced revenue.
+Currently open: **none.** OD-1 closed 2026-08-23 — stay on the Zernio free
+tier, which unblocks L5.1 and the four pillars behind it at zero cost.
+
+**The standing consequence, because it will bite exactly once:** the free tier
+is **2 connected accounts across the whole API key**, not per user. Enough to
+build and prove the loop; not a configuration any real user can be onboarded
+into. The per-account pricing question is deferred to the first real user, not
+answered — do not plan a launch that assumes it is.
 
 ## 🔒 Completion Lockdown is ACTIVE
 

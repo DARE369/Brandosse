@@ -24,7 +24,11 @@ _active_jobs: set[str] = set()
 # job stranded in 'rendering'). Pinging our own public URL routes one request
 # through the proxy and resets its idle clock. Only while jobs are active, so
 # scale-to-zero still works the moment we are genuinely idle.
-_KEEPALIVE_INTERVAL_SECS = 60
+# 20s, not 60. At 60s Fly still autostopped a machine mid-render with "App has
+# excess capacity" — one request a minute reads as an idle machine to the proxy.
+# Three pings a minute is negligible traffic and keeps the machine plainly in
+# use while real work is running.
+_KEEPALIVE_INTERVAL_SECS = 20
 _last_keepalive = 0.0
 
 
