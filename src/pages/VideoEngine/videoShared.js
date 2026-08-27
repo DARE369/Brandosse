@@ -312,3 +312,33 @@ export function aspectRatioCss(ratio, fallback = "9 / 16") {
   if (!match) return fallback;
   return `${match[1]} / ${match[2]}`;
 }
+
+/** The job's shape as a number, for arithmetic rather than CSS. */
+export function aspectRatioValue(ratio, fallback = 9 / 16) {
+  const match = /^(\d+)\s*[:/]\s*(\d+)$/.exec(String(ratio ?? "").trim());
+  if (!match) return fallback;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!width || !height) return fallback;
+  return width / height;
+}
+
+/**
+ * The largest box of this shape that fits the given bounds.
+ *
+ * The list thumbnail cannot be a fixed portrait frame: a 16:9 clip cropped into
+ * a 9:12 box is exactly why those thumbnails looked squashed. Sizing is done
+ * here in numbers rather than as CSS `aspect-ratio` plus a `max-width`, because
+ * that pairing leaves the box non-conforming when the cap bites — the width
+ * clamps, the height does not, and the frame is cropped again.
+ */
+export function fitBox(ratio, maxWidth, maxHeight) {
+  const value = aspectRatioValue(ratio);
+  let width = maxHeight * value;
+  let height = maxHeight;
+  if (width > maxWidth) {
+    width = maxWidth;
+    height = maxWidth / value;
+  }
+  return { width: Math.round(width), height: Math.round(height) };
+}

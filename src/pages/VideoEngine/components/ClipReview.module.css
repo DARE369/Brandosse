@@ -8,7 +8,7 @@
 
 .mono {
   font-family: var(--uiv2-font-mono);
-  font-size: var(--uiv2-text-xs);
+  font-size: var(--uiv2-text-sm);
   color: var(--uiv2-text-secondary);
 }
 
@@ -291,7 +291,7 @@
 .scoreLabel {
   display: block;
   font-family: var(--uiv2-font-mono);
-  font-size: 9.5px;
+  font-size: var(--uiv2-text-2xs);
   letter-spacing: 0.12em;
   color: var(--uiv2-text-secondary);
   margin-bottom: 4px;
@@ -315,7 +315,7 @@
 .sectionLabel {
   display: block;
   font-family: var(--uiv2-font-mono);
-  font-size: 9.5px;
+  font-size: var(--uiv2-text-2xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--uiv2-text-tertiary);
@@ -336,7 +336,7 @@
 
 .transcript {
   margin: 0;
-  font-size: var(--uiv2-text-sm);
+  font-size: var(--uiv2-text-base);
   line-height: 1.6;
   color: var(--uiv2-text-secondary);
   background: var(--uiv2-bg-inset);
@@ -370,7 +370,7 @@
 
 .caption {
   margin: 0;
-  font-size: var(--uiv2-text-sm);
+  font-size: var(--uiv2-text-base);
   line-height: 1.6;
   color: var(--uiv2-text-secondary);
 }

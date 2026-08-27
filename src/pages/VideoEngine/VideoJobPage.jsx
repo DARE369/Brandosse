@@ -844,6 +844,7 @@ function JobView({ initialJob, initialClips, userId, ledger, setLedger, navigate
                   <ClipRow
                     key={clip.id}
                     clip={clip}
+                    aspectRatio={job.aspect_ratio || null}
                     rank={clip.rank}
                     selected={clip.id === selected?.id}
                     checked={checked.has(clip.id)}

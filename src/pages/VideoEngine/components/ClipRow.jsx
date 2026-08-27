@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Download, Loader2, Play } from "lucide-react";
 import { Button } from "../../../ui-v2";
-import { formatDuration, formatTimecode, normaliseScore } from "../videoShared";
+import { fitBox, formatDuration, formatTimecode, normaliseScore } from "../videoShared";
 import styles from "./ClipRow.module.css";
 
 /**
@@ -33,6 +33,7 @@ import styles from "./ClipRow.module.css";
 
 export function ClipRow({
   clip,
+  aspectRatio,
   rank,
   selected,
   checked,
@@ -46,6 +47,11 @@ export function ClipRow({
 }) {
   const failed = clip.render_status === "failed";
   const pending = clip.render_status === "pending" || clip.render_status === "rendering";
+
+  // Sized from the job's shape, not assumed portrait. video_clips stores no
+  // aspect ratio — only video_jobs does — so a fixed 9:12 frame squashed every
+  // landscape job's thumbnails.
+  const thumbBox = fitBox(aspectRatio, 132, 104);
 
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState("");
@@ -79,7 +85,7 @@ export function ClipRow({
     return (
       <div className={`${styles.row} ${styles.rowFailed}`}>
         <span className={styles.checkSlot} aria-hidden="true" />
-        <span className={styles.thumb} aria-hidden="true" />
+        <span className={styles.thumb} style={thumbBox} aria-hidden="true" />
         <div className={styles.body}>
           <div className={styles.titleLine}>
             <span className={styles.rank}>—</span>
@@ -126,7 +132,7 @@ export function ClipRow({
         />
       </span>
 
-      <div className={styles.thumb} onClick={(event) => event.stopPropagation()}>
+      <div className={styles.thumb} style={thumbBox} onClick={(event) => event.stopPropagation()}>
         {playing && clip.public_url ? (
           <video
             ref={videoRef}

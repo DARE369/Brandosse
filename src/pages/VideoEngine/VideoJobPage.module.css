@@ -23,7 +23,7 @@
 
 .mono {
   font-family: var(--uiv2-font-mono);
-  font-size: var(--uiv2-text-2xs);
+  font-size: var(--uiv2-text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--uiv2-text-tertiary);
@@ -57,7 +57,7 @@
 .meta {
   margin: 0;
   font-family: var(--uiv2-font-mono);
-  font-size: var(--uiv2-text-xs);
+  font-size: var(--uiv2-text-sm);
   color: var(--uiv2-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -416,7 +416,7 @@
   border: 1px solid var(--uiv2-border);
   border-radius: var(--uiv2-radius-md);
   background: var(--uiv2-bg-surface);
-  font-size: var(--uiv2-text-sm);
+  font-size: var(--uiv2-text-base);
   color: var(--uiv2-text-secondary);
 }
 
@@ -440,7 +440,7 @@
 .triageDone p {
   flex: 1;
   margin: 0;
-  font-size: var(--uiv2-text-sm);
+  font-size: var(--uiv2-text-base);
   color: var(--uiv2-text-secondary);
 }
 

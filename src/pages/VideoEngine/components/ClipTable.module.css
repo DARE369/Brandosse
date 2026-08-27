@@ -23,7 +23,7 @@
   background: transparent;
   border: none;
   font-family: var(--uiv2-font-mono);
-  font-size: 9.5px;
+  font-size: var(--uiv2-text-2xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--uiv2-text-tertiary);
@@ -82,7 +82,7 @@
 
 .titleText {
   display: block;
-  font-size: var(--uiv2-text-sm);
+  font-size: var(--uiv2-text-base);
   font-weight: var(--uiv2-weight-medium);
   color: var(--uiv2-text-primary);
   white-space: nowrap;
@@ -93,7 +93,7 @@
 .titleSub {
   display: block;
   font-family: var(--uiv2-font-mono);
-  font-size: 10px;
+  font-size: var(--uiv2-text-2xs);
   color: var(--uiv2-text-tertiary);
   margin-top: 2px;
 }
@@ -101,13 +101,13 @@
 .mono,
 .num {
   font-family: var(--uiv2-font-mono);
-  font-size: var(--uiv2-text-xs);
+  font-size: var(--uiv2-text-sm);
   color: var(--uiv2-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .num {
-  font-size: 12.5px;
+  font-size: var(--uiv2-text-base);
 }
 
 .band_strong { color: var(--uiv2-success); }
