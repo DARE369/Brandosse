@@ -13,6 +13,18 @@ export const VIDEO_ENGINE_CONSTANTS = {
   MAX_CLIP_DURATION_SECS: 90,
   TARGET_CLIPS_PER_JOB: 7,
 
+  // Rendered clips are swept 7 days after a job reaches a terminal state
+  // (video-worker/retention.py:53, WORKER_CLIP_RETENTION_DAYS). That policy was
+  // real and completely unsaid in the interface: a person who processed a video,
+  // downloaded nothing, and came back in ten days found their clips gone with no
+  // warning. The number lives here so the web app can count down to it rather
+  // than the worker being the only side of the product that knows.
+  //
+  // If WORKER_CLIP_RETENTION_DAYS is ever changed on the worker, change it here
+  // in the same commit — a countdown that disagrees with the sweep is worse than
+  // no countdown, because people will trust it.
+  CLIP_RETENTION_DAYS: 7,
+
   CLIPS_BUCKET: 'video-clips',
   SOURCE_CACHE_BUCKET: 'video-source-cache',
   SIGNED_URL_EXPIRY_SECONDS: 172800,

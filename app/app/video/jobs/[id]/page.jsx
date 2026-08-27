@@ -1,10 +1,10 @@
-import VideoJobDetailPage from "@/pages/VideoEngine/VideoJobDetailPage";
+import VideoJobPage from "@/pages/VideoEngine/VideoJobPage";
 
 export const metadata = {
-  title: "Video Job | Brandosse Command Center",
+  title: "Video job | Brandosse Command Center",
 };
 
 export default async function VideoJobDetailRoute({ params }) {
   const { id } = await params;
-  return <VideoJobDetailPage jobId={id} />;
+  return <VideoJobPage jobId={id} />;
 }

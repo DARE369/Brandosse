@@ -76,3 +76,41 @@ export async function fetchJobDetail(userId, jobId) {
     clips: clips ?? [],
   };
 }
+
+/**
+ * The credit movements recorded against one job.
+ *
+ * ── Why the UI needs this ──────────────────────────────────────────────────
+ * A failed job is refunded automatically (video-worker/job_runner.py:165,
+ * database.py:refund_credits) and the person was never told. An earlier version
+ * of the failure screen printed "your credits have been refunded" as static
+ * text wired to no refund state at all — it asserted a financial fact it had no
+ * knowledge of, and was correctly deleted for it.
+ *
+ * The fix is not silence, it is evidence: read the actual ledger row and show
+ * the real amount and the real time, or show nothing.
+ */
+export async function fetchJobCreditActivity(userId, jobId) {
+  const { data, error } = await supabase
+    .from("credit_transactions")
+    .select("id, amount, balance_after, transaction_type, description, created_at")
+    .eq("user_id", userId)
+    .eq("job_id", jobId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const refund = rows.find((row) => row.transaction_type === "refund") ?? null;
+  const charge = rows.find((row) => row.transaction_type === "used") ?? null;
+
+  return {
+    rows,
+    // Nulls, not zeros. "Refunded 0 credits" is a claim; "we have no refund row
+    // for this job" is the truth, and the interface should render nothing.
+    refundedAmount: refund ? Math.abs(Number(refund.amount)) : null,
+    refundedAt: refund?.created_at ?? null,
+    balanceAfterRefund: refund?.balance_after ?? null,
+    chargedAmount: charge ? Math.abs(Number(charge.amount)) : null,
+  };
+}

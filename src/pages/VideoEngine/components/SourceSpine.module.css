@@ -1,0 +1,127 @@
+/* SourceSpine — the one visual flourish in the Videos surface.
+   Everything else here is deliberately flat so this is where the eye goes. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uiv2-space-2);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-bg-surface);
+  padding: var(--uiv2-space-4);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--uiv2-space-3);
+}
+
+.label,
+.note {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-tertiary);
+}
+
+.track {
+  position: relative;
+  height: 38px;
+  background: var(--uiv2-bg-canvas);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-xs);
+  overflow: hidden;
+}
+
+.ticks {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--uiv2-bg-elevated) 0 1px,
+    transparent 1px 30px
+  );
+}
+
+.progress {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  background: var(--uiv2-accent-wash);
+  transition: width var(--uiv2-duration-base) var(--uiv2-ease);
+}
+
+.failedRegion {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  background: var(--uiv2-danger-wash);
+}
+
+.failedMark {
+  position: absolute;
+  inset-block: 0;
+  width: 1px;
+  background: var(--uiv2-danger);
+}
+
+.segment {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--uiv2-accent-solid) 55%, transparent);
+  cursor: pointer;
+  transition: background var(--uiv2-duration-fast) var(--uiv2-ease);
+}
+
+.segment:hover {
+  background: var(--uiv2-accent-solid);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: 2px;
+}
+
+.segmentSelected {
+  background: var(--uiv2-accent-solid);
+}
+
+/* Not yet rendered — present in the timeline, not yet a deliverable. */
+.segmentPending {
+  background: color-mix(in srgb, var(--uiv2-accent-solid) 22%, transparent);
+}
+
+.segmentFailed {
+  background: color-mix(in srgb, var(--uiv2-danger) 50%, transparent);
+}
+
+.segmentFailed:hover,
+.segmentFailed.segmentSelected {
+  background: var(--uiv2-danger);
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  color: var(--uiv2-text-tertiary);
+}
+
+.unknown {
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress,
+  .segment {
+    transition: none;
+  }
+}

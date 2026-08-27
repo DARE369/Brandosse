@@ -12,6 +12,7 @@ export function AppHeader({
   brandLabel = "Studio",
   brandMark = "S",
   navItems = [],
+  navBadges = null,
   activeKey,
   onNavClick,
   onBurgerClick,
@@ -28,7 +29,12 @@ export function AppHeader({
 
       <nav className={styles.navLinks}>
         {navItems.map((item) => (
-          <NavLink key={item.key} active={item.key === activeKey} onClick={() => onNavClick?.(item)}>
+          <NavLink
+            key={item.key}
+            active={item.key === activeKey}
+            onClick={() => onNavClick?.(item)}
+            badge={navBadges?.[item.key] || null}
+          >
             {item.label}
           </NavLink>
         ))}
@@ -49,7 +55,13 @@ export function AppHeader({
   );
 }
 
-export function NavLink({ active, onClick, children }) {
+/**
+ * `badge` is for work happening off-screen that the person needs to stay aware
+ * of — currently the count of clipping jobs in flight. It is a live count, not
+ * a notification dot: it goes away on its own when the work finishes, and there
+ * is nothing to dismiss.
+ */
+export function NavLink({ active, onClick, children, badge = null }) {
   return (
     <button
       type="button"
@@ -57,6 +69,12 @@ export function NavLink({ active, onClick, children }) {
       onClick={onClick}
     >
       {children}
+      {badge ? (
+        <span className={styles.navBadge} aria-label={`${badge} in progress`}>
+          <span className={styles.navBadgeDot} aria-hidden="true" />
+          {badge}
+        </span>
+      ) : null}
     </button>
   );
 }

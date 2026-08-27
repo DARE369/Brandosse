@@ -40,6 +40,14 @@ const ALLOWED_INTERNAL = new Set([
   "src/hooks/useCreditBalance",
   "src/hooks/useLogout",
   "src/hooks/useUserNotifications",
+  // Count of clipping jobs in flight, shown as a badge on the Videos nav entry.
+  // Justification, since this list is meant to be argued for: clipping is the
+  // only work in the product that runs for minutes with the user elsewhere, and
+  // without a signal in the chrome the product goes silent about it the moment
+  // they navigate away. It is a head-only count query plus a realtime
+  // subscription — business logic, no presentation, same shape as
+  // useCreditBalance directly above.
+  "src/hooks/video-engine/useActiveJobCount",
 ]);
 
 /** Old presentation. Importing any of these from ui-v2 is the actual defect. */

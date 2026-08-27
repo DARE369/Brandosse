@@ -1,0 +1,602 @@
+/* VideosPage — the job list.
+   Density is deliberately high: these users scan and compare dozens of times a
+   session, so whitespace they do not need is scrolling they do. */
+
+.main {
+  background: var(--uiv2-bg-canvas);
+  min-height: calc(100vh - 52px);
+}
+
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: var(--uiv2-space-6) var(--uiv2-space-6) 64px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--uiv2-space-4);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--uiv2-space-5);
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0 0 var(--uiv2-space-1);
+  font-family: var(--uiv2-font-display);
+  font-size: var(--uiv2-text-3xl);
+  font-weight: var(--uiv2-weight-bold);
+  letter-spacing: -0.03em;
+  color: var(--uiv2-text-primary);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--uiv2-text-base);
+  color: var(--uiv2-text-secondary);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--uiv2-space-3);
+  flex-wrap: wrap;
+}
+
+.sleepChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--uiv2-space-2);
+  padding: 5px var(--uiv2-space-3);
+  border-radius: var(--uiv2-radius-pill);
+  border: 1px solid var(--uiv2-warning-border);
+  background: var(--uiv2-warning-wash);
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--uiv2-warning);
+}
+
+.kbd {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  /* Derived from the text colour it sits on, so it works on the accent button
+     in both themes. A fixed black wash became a blob on light-theme orange. */
+  background: color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: var(--uiv2-radius-xs);
+  padding: 1px 5px;
+  margin-left: var(--uiv2-space-1);
+}
+
+/* ── Capacity strip ──────────────────────────────────────────────────────── */
+
+.capacity {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-bg-surface);
+  overflow: hidden;
+}
+
+.capacityCell {
+  flex: 1 1 190px;
+  padding: var(--uiv2-space-3) var(--uiv2-space-4);
+  border-right: 1px solid var(--uiv2-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--uiv2-space-1);
+  min-width: 0;
+}
+
+.capacityCell:last-child {
+  border-right: none;
+}
+
+.capacityLabel {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-tertiary);
+}
+
+.capacityRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--uiv2-space-2);
+  flex-wrap: wrap;
+}
+
+.capacityRow strong {
+  font-size: var(--uiv2-text-base);
+  color: var(--uiv2-text-primary);
+}
+
+.capacityRow em {
+  font-style: normal;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+}
+
+.warnText {
+  color: var(--uiv2-warning) !important;
+}
+
+.warnStrong {
+  font-family: var(--uiv2-font-mono);
+  color: var(--uiv2-warning);
+}
+
+/* ── Stale banner ────────────────────────────────────────────────────────── */
+
+.staleBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--uiv2-space-3);
+  padding: var(--uiv2-space-3) var(--uiv2-space-4);
+  border: 1px solid var(--uiv2-warning-border);
+  background: var(--uiv2-warning-wash);
+  border-radius: var(--uiv2-radius-md);
+}
+
+.staleBanner p {
+  flex: 1;
+  margin: 0;
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+}
+
+.dotWarning {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--uiv2-warning);
+  flex-shrink: 0;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--uiv2-space-3);
+  flex-wrap: wrap;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--uiv2-space-2);
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm);
+  padding: var(--uiv2-space-2) var(--uiv2-space-3);
+  width: 290px;
+  max-width: 100%;
+  color: var(--uiv2-text-secondary);
+}
+
+.search:focus-within {
+  border-color: var(--uiv2-accent-solid);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-primary);
+}
+
+.segmented {
+  display: inline-flex;
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm);
+  padding: 2px;
+}
+
+.segment,
+.segmentActive {
+  border: none;
+  background: transparent;
+  border-radius: var(--uiv2-radius-xs);
+  padding: var(--uiv2-space-2) var(--uiv2-space-3);
+  font: inherit;
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+  cursor: pointer;
+}
+
+.segmentActive {
+  background: var(--uiv2-bg-elevated);
+  color: var(--uiv2-text-primary);
+  font-weight: var(--uiv2-weight-semibold);
+}
+
+.sort {
+  flex: 0 0 auto;
+  width: 170px;
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm);
+  padding: var(--uiv2-space-2) var(--uiv2-space-3);
+  font: inherit;
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-primary);
+  cursor: pointer;
+}
+
+.resultCount {
+  margin-left: auto;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-tertiary);
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+
+.table {
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-bg-canvas);
+  overflow: hidden;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 88px 68px 104px 60px 44px;
+  gap: var(--uiv2-space-3);
+  align-items: center;
+  padding: var(--uiv2-space-3) var(--uiv2-space-4);
+  border-bottom: 1px solid var(--uiv2-bg-elevated);
+}
+
+.headRow {
+  grid-template-columns: 132px minmax(0, 1fr) 88px 68px 104px 60px;
+  padding-right: 44px;
+  background: var(--uiv2-bg-surface);
+  border-bottom: 1px solid var(--uiv2-border);
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-tertiary);
+  padding-block: var(--uiv2-space-2);
+}
+
+/* A job row is one grid: the open button spans the data columns, the delete
+   control sits outside it. Nesting the control inside the button would be
+   invalid HTML and unreachable by keyboard. */
+.jobRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 0;
+  padding: 0;
+  position: relative;
+}
+
+.jobRow:hover {
+  background: var(--uiv2-bg-surface);
+}
+
+.rowWorking {
+  background: var(--uiv2-accent-wash);
+}
+
+.rowOpen {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 88px 68px 104px 60px;
+  gap: var(--uiv2-space-3);
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: var(--uiv2-space-3) 0 var(--uiv2-space-3) var(--uiv2-space-4);
+}
+
+.rowOpen:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: -2px;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--uiv2-space-2);
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.dotPulse {
+  animation: uiv2-pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes uiv2-pulse-dot {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.tone_accent { color: var(--uiv2-accent-text); }
+.tone_success { color: var(--uiv2-success); }
+.tone_danger { color: var(--uiv2-danger); }
+.tone_warning { color: var(--uiv2-warning); }
+.tone_info { color: var(--uiv2-info); }
+.tone_neutral { color: var(--uiv2-text-secondary); }
+
+.sourceCell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sourceTitle {
+  font-size: var(--uiv2-text-sm);
+  font-weight: var(--uiv2-weight-medium);
+  color: var(--uiv2-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceMeta,
+.mono {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-tertiary);
+}
+
+.mono {
+  color: var(--uiv2-text-secondary);
+}
+
+.colAge {
+  text-align: right;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: var(--uiv2-space-3);
+}
+
+.iconButton {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--uiv2-radius-xs);
+  background: transparent;
+  color: var(--uiv2-text-tertiary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  color: var(--uiv2-danger);
+  border-color: var(--uiv2-danger-border);
+  background: var(--uiv2-danger-wash);
+}
+
+.confirm {
+  position: absolute;
+  right: var(--uiv2-space-3);
+  top: var(--uiv2-space-2);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--uiv2-space-2);
+  padding: var(--uiv2-space-2) var(--uiv2-space-3);
+  border: 1px solid var(--uiv2-danger-border);
+  border-radius: var(--uiv2-radius-sm);
+  background: var(--uiv2-bg-elevated);
+  box-shadow: var(--uiv2-shadow-popover-current);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-danger);
+  white-space: nowrap;
+}
+
+.confirm button {
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-xs);
+  background: transparent;
+  color: var(--uiv2-text-primary);
+  font: inherit;
+  font-size: var(--uiv2-text-xs);
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.rowProgress {
+  grid-column: 1 / -1;
+  padding: 0 var(--uiv2-space-4) var(--uiv2-space-3);
+}
+
+.rowProgressTrack {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--uiv2-bg-elevated);
+  overflow: hidden;
+}
+
+.rowProgressFill {
+  height: 100%;
+  background: var(--uiv2-accent-solid);
+  transition: width var(--uiv2-duration-base) var(--uiv2-ease);
+}
+
+.rowProgressMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  color: var(--uiv2-text-secondary);
+}
+
+.moreRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--uiv2-space-3);
+  padding: var(--uiv2-space-3) var(--uiv2-space-4);
+  background: var(--uiv2-bg-surface);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--uiv2-space-3);
+  flex-wrap: wrap;
+}
+
+.pageNav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pageNum,
+.pageNumActive,
+.pageStep {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--uiv2-space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-xs);
+  background: transparent;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+  cursor: pointer;
+}
+
+.pageNum:hover,
+.pageStep:not(:disabled):hover {
+  border-color: var(--uiv2-border-hover);
+  color: var(--uiv2-text-primary);
+}
+
+.pageNumActive {
+  border-color: var(--uiv2-accent-solid);
+  background: var(--uiv2-accent-wash);
+  color: var(--uiv2-accent-text);
+  font-weight: var(--uiv2-weight-semibold);
+}
+
+.pageStep:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pageNum:focus-visible,
+.pageNumActive:focus-visible,
+.pageStep:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: 2px;
+}
+
+.pageGap {
+  padding: 0 2px;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-tertiary);
+}
+
+.shortcuts {
+  display: flex;
+  gap: var(--uiv2-space-4);
+  margin: 0;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-tertiary);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────────
+   Columns are dropped in order of what a phone user can most afford to lose:
+   the age stamp, then expiry, then clip count and length. State and source
+   always survive — they are the two things the row exists to say. */
+
+@media (max-width: 1080px) {
+  .row,
+  .rowOpen {
+    grid-template-columns: 120px minmax(0, 1fr) 80px 60px;
+  }
+  .colExpiry,
+  .colAge {
+    display: none;
+  }
+  .row.headRow {
+    grid-template-columns: 120px minmax(0, 1fr) 80px 60px;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: var(--uiv2-space-4) var(--uiv2-space-3) 56px;
+  }
+  .row,
+  .rowOpen {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+  .row.headRow {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+  .sort {
+    flex: 1 1 auto;
+    width: auto;
+  }
+  .moreRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .colLength,
+  .colClips {
+    display: none;
+  }
+  .search {
+    width: 100%;
+  }
+  .resultCount {
+    margin-left: 0;
+  }
+  .shortcuts {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dotPulse { animation: none; opacity: 1; }
+  .rowProgressFill { transition: none; }
+}

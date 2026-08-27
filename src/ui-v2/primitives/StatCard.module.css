@@ -34,3 +34,23 @@
   color: var(--uiv2-text-secondary);
   margin-top: 5px;
 }
+
+/* Interactive tiles reset the button chrome and keep the card's own look, so a
+   row of tiles stays visually uniform whether or not each one leads somewhere. */
+.interactive {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+
+.interactive:hover {
+  border-color: var(--uiv2-border-hover);
+}
+
+.interactive:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: 2px;
+}

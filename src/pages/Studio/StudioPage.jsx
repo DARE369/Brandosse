@@ -1188,12 +1188,26 @@ function StudioBody({ brandKit }) {
         }
       />
 
-      {/* Video jobs panel — Week 3 Fix 3: real, persistent, multi-job history
+      {/* Generated video panel — real, persistent, multi-job history
           (background_jobs table, survives refresh/tab-close), not the old
-          single in-memory slot. */}
-      <Drawer open={videoJobsOpen} onClose={() => setVideoJobsOpen(false)} title="Video jobs" width="min(380px, 92vw)">
+          single in-memory slot.
+
+          ── Named "Generated video", not "Video jobs" ──────────────────────
+          Two unrelated systems in this product were both called "video jobs":
+          this one, which GENERATES video from a prompt (background_jobs,
+          job_type='video_generation'), and the clipping pipeline behind the
+          Videos nav entry, which CUTS an existing long video into short ones
+          (video_jobs + video_clips). They share no table, no pipeline, no cost
+          model, and no output format.
+
+          The collision was not only cosmetic: the empty state below used to
+          offer "Start a video" pointing at /app/video/new — so someone who
+          wanted an AI-generated video was handed a form asking them to upload
+          one. Videos means clipping; generation stays here under its own
+          name. */}
+      <Drawer open={videoJobsOpen} onClose={() => setVideoJobsOpen(false)} title="Generated video" width="min(380px, 92vw)">
         <div style={{ fontSize: 11.5, color: "var(--uiv2-text-tertiary)", marginBottom: 8 }}>
-          Video jobs keep processing here even if you leave Studio or close this tab — reopen later and they'll still be here.
+          Generated videos keep rendering here even if you leave Studio or close this tab — reopen later and they'll still be here.
         </div>
         {videoJobs.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1229,9 +1243,12 @@ function StudioBody({ brandKit }) {
         ) : (
           <EmptyState
             dashed
-            title="No video jobs"
-            description="Video renders take a few minutes, so they run in the background and report back here."
-            actions={<Button size="sm" onClick={() => navigate("/app/video/new")}>Start a video</Button>}
+            title="Nothing generating"
+            description={
+              "Generated video renders take a few minutes, so they run in the background and report back here. "
+              + "Choose a video mode in the brief to start one."
+            }
+            noAction
           />
         )}
       </Drawer>

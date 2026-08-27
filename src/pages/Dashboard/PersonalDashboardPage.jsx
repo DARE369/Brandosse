@@ -128,7 +128,18 @@ function DashboardBody() {
   const statCards = [
     { label: "Posts published", value: formatCount(stats.publishedPosts), trend: trendText(trends.publishedPosts), trendTone: trendTone(trends.publishedPosts.direction), sub: stats.totalGenerated > 0 ? `${Math.round((stats.publishedPosts / Math.max(stats.totalGenerated, 1)) * 100)}% publish ratio` : "Publish your first post" },
     { label: "Scheduled", value: formatCount(stats.scheduledPosts), trend: trendText(trends.scheduledPosts), trendTone: trendTone(trends.scheduledPosts.direction), sub: stats.scheduledPosts > 0 ? "In queue" : "Nothing queued" },
-    { label: "Clips ready", value: formatCount(stats.clipsReady), trend: trendText(trends.clipsReady), trendTone: trendTone(trends.clipsReady.direction), sub: stats.clipsReady > 0 ? "Ready to use" : "No clips yet" },
+    // A door, not just a number. This tile counted clips and led nowhere — the
+    // Dashboard told people their clips existed while offering no route to them,
+    // and nothing else on this screen linked to the Videos surface either.
+    {
+      label: "Clips ready",
+      value: formatCount(stats.clipsReady),
+      trend: trendText(trends.clipsReady),
+      trendTone: trendTone(trends.clipsReady.direction),
+      sub: stats.clipsReady > 0 ? "Ready to use" : "No clips yet",
+      onClick: () => navigate("/app/video/jobs"),
+      actionLabel: "Open Videos",
+    },
     { label: "Drafts", value: formatCount(stats.drafts), trend: trendText(trends.drafts), trendTone: trendTone(trends.drafts.direction), sub: stats.drafts > 0 ? "Ready to refine" : "All clear" },
   ];
 
@@ -261,7 +272,18 @@ function DashboardBody() {
         <div className={styles.statGrid}>
           {loading
             ? [0, 1, 2, 3].map((i) => <Skeleton key={i} height="86px" radius="var(--uiv2-radius-lg)" />)
-            : statCards.map((s) => <StatCard key={s.label} label={s.label} value={s.value} trend={s.trend} trendTone={s.trendTone} sub={s.sub} />)}
+            : statCards.map((s) => (
+              <StatCard
+                key={s.label}
+                label={s.label}
+                value={s.value}
+                trend={s.trend}
+                trendTone={s.trendTone}
+                sub={s.sub}
+                onClick={s.onClick}
+                actionLabel={s.actionLabel}
+              />
+            ))}
         </div>
 
         <div className={styles.mainGrid}>

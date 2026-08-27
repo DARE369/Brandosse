@@ -17,3 +17,33 @@
   box-shadow: var(--uiv2-shadow-modal-current);
   animation: uiv2-fade-in 0.16s ease;
 }
+
+.message {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The undo affordance. Accent-coloured because it is the one thing in the
+   toast a person is meant to act on, and paired with a word so colour is never
+   carrying the meaning alone. */
+.action {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  margin: -2px -6px -2px 4px;
+  font: inherit;
+  font-weight: var(--uiv2-weight-semibold);
+  color: var(--uiv2-accent-text);
+  cursor: pointer;
+  border-radius: var(--uiv2-radius-xs);
+}
+
+.action:hover {
+  text-decoration: underline;
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: 2px;
+}

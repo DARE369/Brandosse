@@ -1,0 +1,302 @@
+/* ClipRow — triage is comparison, so everything a person judges on sits on one
+   scan line. Rows are taller than list rows because they carry a thumbnail, a
+   transcript line, and four numbers. */
+
+.row {
+  display: grid;
+  grid-template-columns: 30px 104px minmax(0, 1fr) 150px 190px;
+  gap: var(--uiv2-space-4);
+  align-items: center;
+  padding: var(--uiv2-space-3) var(--uiv2-space-4);
+  border-bottom: 1px solid var(--uiv2-bg-elevated);
+  cursor: pointer;
+  background: transparent;
+}
+
+.row:hover {
+  background: var(--uiv2-bg-surface);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: -2px;
+}
+
+.rowSelected {
+  background: var(--uiv2-accent-wash);
+  box-shadow: inset 2px 0 0 var(--uiv2-accent-solid);
+}
+
+.rowChecked {
+  background: var(--uiv2-accent-wash);
+}
+
+.rowFailed {
+  background: var(--uiv2-danger-wash);
+  cursor: default;
+}
+
+.checkSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkSlot input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--uiv2-accent-solid);
+  cursor: pointer;
+}
+
+/* ── Thumbnail / player ──────────────────────────────────────────────────── */
+
+.thumb {
+  width: 104px;
+  aspect-ratio: 9 / 12;
+  border-radius: var(--uiv2-radius-sm);
+  overflow: hidden;
+  background: var(--uiv2-bg-elevated);
+  border: 1px solid var(--uiv2-border);
+}
+
+.playButton {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: none;
+  background-color: var(--uiv2-bg-elevated);
+  background-size: cover;
+  background-position: center;
+  color: var(--uiv2-text-primary);
+  cursor: pointer;
+}
+
+.playButton:disabled {
+  cursor: default;
+  color: var(--uiv2-text-tertiary);
+}
+
+.thumbDuration {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.65);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+
+.body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--uiv2-space-1);
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--uiv2-space-2);
+  min-width: 0;
+}
+
+.rank,
+.mono {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  color: var(--uiv2-text-tertiary);
+  flex-shrink: 0;
+}
+
+.title {
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--uiv2-text-sm);
+  font-weight: var(--uiv2-weight-semibold);
+  color: var(--uiv2-text-primary);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+  border-bottom: 1px dashed transparent;
+}
+
+.title:hover {
+  border-bottom-color: var(--uiv2-border-hover);
+}
+
+.titleInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-accent-solid);
+  border-radius: var(--uiv2-radius-xs);
+  padding: 2px 6px;
+  font: inherit;
+  font-size: var(--uiv2-text-sm);
+  font-weight: var(--uiv2-weight-semibold);
+  color: var(--uiv2-text-primary);
+  outline: none;
+}
+
+.titleFailed {
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keptTag {
+  flex-shrink: 0;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  letter-spacing: 0.1em;
+  color: var(--uiv2-success);
+  border: 1px solid color-mix(in srgb, var(--uiv2-success) 35%, transparent);
+  border-radius: var(--uiv2-radius-xs);
+  padding: 1px 6px;
+}
+
+.excerpt {
+  margin: 0;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Only on the selected row: the rationale is worth reading for the clip you
+   are actually considering, and noise on the five you are not. */
+.why {
+  margin: var(--uiv2-space-1) 0 0;
+  padding-left: var(--uiv2-space-3);
+  border-left: 2px solid var(--uiv2-accent-solid);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-primary);
+  line-height: var(--uiv2-leading-snug);
+  white-space: normal;
+}
+
+.failNote {
+  margin: 0;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-danger);
+}
+
+/* ── Scores ──────────────────────────────────────────────────────────────── */
+
+.scores {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.scoreHook {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-primary);
+}
+
+.scoreUnknown {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-tertiary);
+}
+
+.platform {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  text-transform: uppercase;
+  color: var(--uiv2-text-secondary);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-xs);
+  padding: 1px 6px;
+  align-self: flex-start;
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--uiv2-space-2);
+  flex-wrap: wrap;
+}
+
+.iconLink {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--uiv2-border-strong);
+  border-radius: var(--uiv2-radius-sm);
+  color: var(--uiv2-text-primary);
+  text-decoration: none;
+}
+
+.iconLink:hover {
+  border-color: var(--uiv2-border-hover);
+}
+
+.spin {
+  animation: uiv2-clip-spin 0.8s linear infinite;
+}
+
+@keyframes uiv2-clip-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1080px) {
+  .row {
+    grid-template-columns: 30px 88px minmax(0, 1fr) 150px;
+  }
+  .actions {
+    grid-column: 3 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: 30px 76px minmax(0, 1fr);
+    gap: var(--uiv2-space-3);
+  }
+  .scores {
+    grid-column: 2 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--uiv2-space-2);
+  }
+  .actions {
+    grid-column: 2 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}

@@ -1,9 +1,9 @@
-import VideoJobsPage from "@/pages/VideoEngine/VideoJobsPage";
+import VideosPage from "@/pages/VideoEngine/VideosPage";
 
 export const metadata = {
-  title: "Video Jobs | Brandosse Command Center",
+  title: "Videos | Brandosse Command Center",
 };
 
 export default function VideoJobsRoute() {
-  return <VideoJobsPage />;
+  return <VideosPage />;
 }

@@ -149,3 +149,32 @@
   cursor: pointer;
   flex-shrink: 0;
 }
+
+/* Live count of off-screen work on a nav entry (clipping jobs in flight).
+   Paired with a number, never colour alone. */
+.navBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  color: var(--uiv2-accent-text);
+}
+
+.navBadgeDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--uiv2-accent-solid);
+  animation: uiv2-nav-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes uiv2-nav-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navBadgeDot { animation: none; opacity: 1; }
+}

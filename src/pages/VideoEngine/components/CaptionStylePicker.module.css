@@ -1,0 +1,144 @@
+/* CaptionStylePicker — six treatments, each showing what it does.
+   The animations are CSS approximations of the encoder's output: enough to
+   choose between six options, not a frame-exact render. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--uiv2-space-2);
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.option {
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm);
+  background: transparent;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color var(--uiv2-duration-fast) var(--uiv2-ease),
+    background var(--uiv2-duration-fast) var(--uiv2-ease);
+}
+
+.option:hover {
+  border-color: var(--uiv2-border-hover);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: 2px;
+}
+
+.selected {
+  border-color: var(--uiv2-accent-solid);
+  background: var(--uiv2-accent-wash);
+}
+
+/* The stage is a stand-in for the video frame, which is why it is the darkest
+   surface available rather than the panel colour. */
+.stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  background: var(--uiv2-bg-canvas);
+  border-bottom: 1px solid var(--uiv2-border);
+  overflow: hidden;
+}
+
+.demo {
+  font-family: var(--uiv2-font-display);
+  font-weight: var(--uiv2-weight-bold);
+  font-size: var(--uiv2-text-md);
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  /* Burned-in captions are drawn over video, so they carry their own contrast
+     rather than borrowing the theme's. This is one of the few places a literal
+     colour is correct: it is depicting output, not styling the app. */
+  text-shadow: 0 1px 0 #000, 0 0 3px rgba(0, 0, 0, 0.9);
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.demoBig {
+  font-size: var(--uiv2-text-xl);
+}
+
+.demoBoxed {
+  background: #ffffff;
+  color: #17181b;
+  text-shadow: none;
+  padding: 3px 7px;
+}
+
+.demoColoured {
+  color: var(--uiv2-accent-solid);
+}
+
+.meta {
+  display: block;
+  padding: var(--uiv2-space-2) var(--uiv2-space-3);
+}
+
+.name {
+  display: block;
+  font-size: var(--uiv2-text-sm);
+  font-weight: var(--uiv2-weight-semibold);
+  color: var(--uiv2-text-primary);
+}
+
+.desc {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+}
+
+/* ── The treatments ──────────────────────────────────────────────────────── */
+
+@keyframes uiv2-caption-karaoke {
+  0%, 100% { color: #8b8d93; }
+  40% { color: #ffffff; }
+}
+
+@keyframes uiv2-caption-drop {
+  0% { transform: translateY(-5px); opacity: 0; }
+  30%, 100% { transform: none; opacity: 1; }
+}
+
+@keyframes uiv2-caption-pop {
+  0% { transform: scale(0.86); opacity: 0; }
+  25%, 100% { transform: none; opacity: 1; }
+}
+
+@keyframes uiv2-caption-colour {
+  0%, 100% { color: #ffffff; }
+  45% { color: var(--uiv2-accent-solid); }
+}
+
+@keyframes uiv2-caption-focus {
+  0%, 45% { opacity: 1; }
+  50%, 95% { opacity: 0.15; }
+  100% { opacity: 1; }
+}
+
+.animKaraoke { animation: uiv2-caption-karaoke 1.6s ease-in-out infinite; }
+.animDrop { animation: uiv2-caption-drop 1.8s ease-out infinite; }
+.animPop { animation: uiv2-caption-pop 1.8s ease-out infinite; }
+.animColour { animation: uiv2-caption-colour 2s ease-in-out infinite; }
+.animFocus { animation: uiv2-caption-focus 1.4s steps(1) infinite; }
+
+/* The previews are the only looping motion in this surface, and they exist to
+   convey movement. With motion reduced they hold their end state, which still
+   shows weight, colour, and emphasis — the things being chosen between. */
+@media (prefers-reduced-motion: reduce) {
+  .demo {
+    animation: none !important;
+  }
+  .animKaraoke { color: #ffffff; }
+  .animColour { color: var(--uiv2-accent-solid); }
+}

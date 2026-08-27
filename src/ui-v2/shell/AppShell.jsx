@@ -44,7 +44,9 @@ import { useState } from "react";
 import { useAuth } from "../../Context/AuthContext";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { useCreditBalance } from "../../hooks/useCreditBalance";
+import { useActiveJobCount } from "../../hooks/video-engine/useActiveJobCount";
 import { UiV2ThemeProvider } from "../ThemeProvider";
+import { UiV2ToastProvider } from "../primitives/Toast";
 import { Skeleton } from "../primitives/Skeleton";
 import { AppHeader, CreditPill } from "./AppHeader";
 import { MobileNavDrawer } from "./MobileNavDrawer";
@@ -77,6 +79,9 @@ function AppShellInner({
   const { navigate } = useAppNavigation();
   const { user, profile } = useAuth();
   const credits = useCreditBalance(user?.id ?? null);
+  // Clipping runs for minutes and is meant to be left alone. Without this the
+  // product went silent about an unattended job the moment you navigated away.
+  const activeVideoJobs = useActiveJobCount(user?.id ?? null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const initials = (
@@ -101,6 +106,7 @@ function AppShellInner({
 
       <AppHeader
         navItems={NAV_ITEMS}
+        navBadges={activeVideoJobs > 0 ? { video: activeVideoJobs } : null}
         activeKey={activeKey}
         onNavClick={(item) => navigate(item.href)}
         onBurgerClick={() => setMobileNavOpen(true)}
@@ -158,7 +164,15 @@ export function AppShell({
   minimal = false,
 }) {
   return (
+    // The toast provider lives here, under the theme provider, for the same
+    // reason the header and the nav do: it is chrome. Toast.jsx existed and was
+    // mounted by nobody, so every screen that wanted an undo affordance had to
+    // grow its own — which is how nine copies of NAV_ITEMS happened. Mounting it
+    // once means `useUiV2Toast` works in any component rendered INSIDE AppShell.
+    // Note the consequence: a page component that renders <AppShell> is above
+    // this provider and cannot call the hook itself; its body must be a child.
     <UiV2ThemeProvider className={className}>
+      <UiV2ToastProvider>
       <AppShellInner
         activeKey={activeKey}
         mainClassName={mainClassName}
@@ -170,6 +184,7 @@ export function AppShell({
       >
         {children}
       </AppShellInner>
+      </UiV2ToastProvider>
     </UiV2ThemeProvider>
   );
 }

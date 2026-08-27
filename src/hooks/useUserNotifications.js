@@ -90,7 +90,7 @@ export function useUserNotifications(userId) {
   const fetchNotifications = useCallback(async (activeUserId) => {
     if (!activeUserId) return;
 
-    const [generationsResult, postsResult, accountsResult, adminNotificationsResult] = await Promise.all([
+    const [generationsResult, postsResult, accountsResult, adminNotificationsResult, videoJobsResult] = await Promise.all([
       supabase
         .from("generations")
         .select("id, session_id, prompt, status, created_at, updated_at, metadata")
@@ -113,6 +113,20 @@ export function useUserNotifications(userId) {
         .eq("user_id", activeUserId)
         .order("created_at", { ascending: false })
         .limit(20),
+      // Clipping jobs. They belong in this feed more than anything else here:
+      // the work takes minutes, it is explicitly designed to be left alone, and
+      // until now nothing anywhere told the person it had finished. They had to
+      // keep coming back to look, which is the product polling the user.
+      //
+      // No new table and no worker change — this hook already merges several
+      // sources client-side, so a terminal video_jobs row is just one more.
+      supabase
+        .from("video_jobs")
+        .select("id, source_title, source_url, status, error_stage, updated_at")
+        .eq("user_id", activeUserId)
+        .in("status", ["complete", "failed"])
+        .order("updated_at", { ascending: false })
+        .limit(10),
     ]);
 
     const accountById = new Map((accountsResult.data ?? []).map((account) => [account.id, account]));
@@ -164,6 +178,25 @@ export function useUserNotifications(userId) {
         };
       });
 
+    const videoJobNotifications = (videoJobsResult.data ?? []).map((job) => {
+      const failed = job.status === "failed";
+      // A link job has no title until the download stage resolves one, so a job
+      // that failed AT download would otherwise announce itself as blank.
+      const title = job.source_title
+        || (String(job.source_url || "").startsWith("worker://")
+          ? "your uploaded video"
+          : String(job.source_url || "").replace(/^https?:\/\/(www\.)?/, "").slice(0, 60))
+        || "your video";
+
+      return {
+        id: `video-${job.id}`,
+        timestamp: job.updated_at,
+        headline: failed ? "Clipping failed" : "Your clips are ready",
+        detail: failed && job.error_stage ? `${title} — stopped while ${job.error_stage}` : title,
+        route: `/app/video/jobs/${job.id}`,
+      };
+    });
+
     const adminNotifications = (adminNotificationsResult.data ?? []).map((notification) => {
       const notificationType = notification.type || USER_NOTIFICATION_TYPE.ADMIN_MESSAGE;
       const complaintId = notification.metadata?.complaint_id;
@@ -184,7 +217,7 @@ export function useUserNotifications(userId) {
       };
     });
 
-    const merged = [...generationNotifications, ...postNotifications, ...adminNotifications]
+    const merged = [...generationNotifications, ...postNotifications, ...videoJobNotifications, ...adminNotifications]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 20);
 
@@ -221,6 +254,7 @@ export function useUserNotifications(userId) {
       .channel(`notif-bell-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "generations", filter: `user_id=eq.${userId}` }, () => fetchNotifications(userId))
       .on("postgres_changes", { event: "*", schema: "public", table: "posts", filter: `user_id=eq.${userId}` }, () => fetchNotifications(userId))
+      .on("postgres_changes", { event: "*", schema: "public", table: "video_jobs", filter: `user_id=eq.${userId}` }, () => fetchNotifications(userId))
       .on("postgres_changes", { event: "*", schema: "public", table: "user_notifications", filter: `user_id=eq.${userId}` }, () => fetchNotifications(userId))
       .subscribe();
     return () => supabase.removeChannel(channel);

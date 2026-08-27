@@ -1,0 +1,138 @@
+/* ClipTriageBar — how far through the set you are, and how you want to see it. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--uiv2-space-4);
+  flex-wrap: wrap;
+  padding: var(--uiv2-space-3) var(--uiv2-space-4);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-bg-surface);
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--uiv2-space-3);
+  min-width: 0;
+}
+
+.progressCount {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-primary);
+  white-space: nowrap;
+}
+
+.track {
+  display: block;
+  width: 96px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--uiv2-bg-elevated);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--uiv2-accent-solid);
+  transition: width var(--uiv2-duration-base) var(--uiv2-ease);
+}
+
+.progressNote {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  color: var(--uiv2-text-secondary);
+  white-space: nowrap;
+}
+
+.views {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 2px;
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm);
+}
+
+.view,
+.viewActive {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--uiv2-space-2);
+  border: none;
+  background: transparent;
+  border-radius: var(--uiv2-radius-xs);
+  padding: var(--uiv2-space-2) var(--uiv2-space-3);
+  font: inherit;
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+  cursor: pointer;
+}
+
+.viewActive {
+  background: var(--uiv2-bg-elevated);
+  color: var(--uiv2-text-primary);
+  font-weight: var(--uiv2-weight-semibold);
+}
+
+.view:hover {
+  color: var(--uiv2-text-primary);
+}
+
+.kbd {
+  font-family: var(--uiv2-font-mono);
+  font-size: 9.5px;
+  color: var(--uiv2-text-tertiary);
+}
+
+.filters {
+  display: flex;
+  gap: var(--uiv2-space-2);
+  flex-wrap: wrap;
+}
+
+.pill,
+.pillActive {
+  border: 1px solid var(--uiv2-border);
+  background: transparent;
+  color: var(--uiv2-text-secondary);
+  border-radius: var(--uiv2-radius-pill);
+  padding: 5px var(--uiv2-space-3);
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pillActive {
+  border-color: var(--uiv2-accent-border);
+  background: var(--uiv2-accent-wash);
+  color: var(--uiv2-accent-text);
+}
+
+.pill:hover {
+  border-color: var(--uiv2-border-hover);
+  color: var(--uiv2-text-primary);
+}
+
+.view:focus-visible,
+.viewActive:focus-visible,
+.pill:focus-visible,
+.pillActive:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: 2px;
+}
+
+@media (max-width: 860px) {
+  .views {
+    margin-left: 0;
+  }
+
+  .kbd {
+    display: none;
+  }
+}

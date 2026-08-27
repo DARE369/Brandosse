@@ -1,0 +1,172 @@
+/* ClipTable — five scores across every clip, comparable at a glance. */
+
+.table {
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-bg-canvas);
+  overflow: hidden;
+}
+
+.row {
+  display: grid;
+  grid-template-columns:
+    34px 42px minmax(0, 1fr) 68px 128px 60px 56px 72px 60px 72px 104px 92px;
+  align-items: center;
+}
+
+.head {
+  background: var(--uiv2-bg-surface);
+  border-bottom: 1px solid var(--uiv2-border);
+}
+
+.headCell {
+  background: transparent;
+  border: none;
+  font-family: var(--uiv2-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-tertiary);
+  padding: var(--uiv2-space-2) 10px;
+  cursor: pointer;
+}
+
+.headCell:hover,
+.headActive {
+  color: var(--uiv2-text-primary);
+}
+
+.bodyRow {
+  border-bottom: 1px solid var(--uiv2-border);
+}
+
+.bodyRow:hover {
+  background: var(--uiv2-bg-surface);
+}
+
+.rowActive {
+  box-shadow: inset 2px 0 0 var(--uiv2-accent-solid);
+  background: var(--uiv2-accent-wash);
+}
+
+.rowChecked {
+  background: var(--uiv2-accent-wash);
+}
+
+.rowSkipped {
+  opacity: 0.6;
+}
+
+.cCheck { padding-left: 14px; }
+.cRank { padding: 10px; font-size: var(--uiv2-text-xs); color: var(--uiv2-text-tertiary); }
+.cTitle { min-width: 0; }
+.cLen,
+.cTc,
+.cScore,
+.cFlow,
+.cContent,
+.cTrend { padding: 10px; text-align: right; }
+.cState { padding: 10px; }
+.cAction { padding: var(--uiv2-space-2) 14px var(--uiv2-space-2) 0; text-align: right; }
+
+.titleCell {
+  display: block;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.titleText {
+  display: block;
+  font-size: var(--uiv2-text-sm);
+  font-weight: var(--uiv2-weight-medium);
+  color: var(--uiv2-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titleSub {
+  display: block;
+  font-family: var(--uiv2-font-mono);
+  font-size: 10px;
+  color: var(--uiv2-text-tertiary);
+  margin-top: 2px;
+}
+
+.mono,
+.num {
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  font-size: 12.5px;
+}
+
+.band_strong { color: var(--uiv2-success); }
+.band_fair { color: var(--uiv2-text-primary); }
+.band_weak { color: var(--uiv2-text-secondary); }
+.band_unknown { color: var(--uiv2-text-tertiary); }
+
+.state_kept { color: var(--uiv2-success); }
+.state_skipped { color: var(--uiv2-text-tertiary); }
+.state_failed { color: var(--uiv2-danger); }
+.state_open { color: var(--uiv2-text-secondary); }
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--uiv2-space-3);
+  padding: 10px 14px;
+  background: var(--uiv2-bg-surface);
+  font-family: var(--uiv2-font-mono);
+  font-size: var(--uiv2-text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-tertiary);
+}
+
+.spin {
+  animation: uiv2-clip-table-spin 0.8s linear infinite;
+}
+
+@keyframes uiv2-clip-table-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Columns drop in a deliberate order: the three secondary scores first, then
+   the timecode and length. Hook and overall never drop — they are why the
+   table exists. */
+@media (max-width: 1200px) {
+  .row {
+    grid-template-columns: 34px 42px minmax(0, 1fr) 68px 128px 60px 72px 104px 92px;
+  }
+
+  .cFlow,
+  .cContent,
+  .cTrend { display: none; }
+}
+
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: 34px 42px minmax(0, 1fr) 60px 72px 92px;
+  }
+
+  .cLen,
+  .cTc,
+  .cState { display: none; }
+}
+
+@media (max-width: 560px) {
+  .foot {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
