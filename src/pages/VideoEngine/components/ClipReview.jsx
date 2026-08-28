@@ -5,6 +5,7 @@ import { Check, ChevronLeft, ChevronRight, Copy, Download, Loader2, Play, SkipFo
 import { Button } from "../../../ui-v2";
 import {
   aspectRatioCss,
+  aspectRatioValue,
   clipDisplayTitle,
   clipScores,
   formatDuration,
@@ -53,6 +54,15 @@ export function ClipReview({
   playToken,
 }) {
   const scores = clipScores(clip);
+
+  // A landscape clip in a 268px rail is a postage stamp, and a portrait clip in
+  // a wide one is a column of empty space either side. The player column is
+  // sized to the shape it has to hold — as a custom property, so the one-column
+  // layout at 820px can still override it.
+  const ratio = aspectRatioValue(aspectRatio);
+  const playerColumn = ratio >= 1.2 ? "480px" : ratio >= 0.9 ? "360px" : "268px";
+  const frameRatio = aspectRatioCss(aspectRatio);
+
   const [playing, setPlaying] = useState(false);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(clipDisplayTitle(clip));
@@ -108,9 +118,9 @@ export function ClipReview({
         <span className={styles.hints}>S keep · X skip · Space play · D download</span>
       </div>
 
-      <div className={styles.grid}>
+      <div className={styles.grid} style={{ "--player-column": playerColumn }}>
         <div className={styles.left}>
-          <div className={styles.player} style={{ aspectRatio: aspectRatioCss(aspectRatio) }}>
+          <div className={styles.player} style={{ aspectRatio: frameRatio }}>
             {playing && clip.public_url ? (
               <video
                 ref={videoRef}
@@ -289,11 +299,11 @@ export function ClipReview({
             key={item.id}
             type="button"
             className={item.active ? styles.stripItemActive : styles.stripItem}
+            style={{ aspectRatio: frameRatio, ...(item.thumbnail ? { backgroundImage: `url(${item.thumbnail})` } : {}) }}
             onClick={item.onSelect}
             aria-label={`Go to ${item.title}`}
             aria-current={item.active ? "true" : undefined}
             title={item.title}
-            style={item.thumbnail ? { backgroundImage: `url(${item.thumbnail})` } : undefined}
           >
             <span className={styles.stripRank}>{item.label}</span>
             <span className={`${styles.stripDot} ${styles[`dot_${item.decision}`]}`} aria-hidden="true" />

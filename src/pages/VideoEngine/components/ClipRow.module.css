@@ -72,12 +72,15 @@
   place-items: center;
   border: none;
   background-color: var(--uiv2-bg-elevated);
-  /* The frame is the VIDEO's shape (measured: clips render 1920x1080 on a 16:9
-     job). The poster is not: the worker writes 360x640 thumbnails whatever the
-     render ratio, so a 9:16 still stands in for a 16:9 clip. `cover` crops that
-     stand-in rather than pillarboxing it — the frame keeps telling the truth
-     about the file you will get, and the picture still fills it. */
-  background-size: cover;
+  /* The poster is drawn STRETCHED, not cropped, and that is not a typo.
+     Measured on a real job: the clip is 1920x1080 and the worker's thumbnail is
+     360x640 — the landscape frame scaled to FILL a portrait canvas, so the file
+     itself is squashed (a 1.65:1 scoreboard arrives as 0.52:1, and 0.1875/0.593
+     = 0.316 is exactly that factor). Painting it back across the clip's own
+     frame reverses the squeeze exactly. Where a job really is 9:16 the poster
+     matches the frame and filling is identical to cover, so this is right in
+     both cases. */
+  background-size: 100% 100%;
   background-position: center;
   color: var(--uiv2-text-primary);
   cursor: pointer;

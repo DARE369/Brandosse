@@ -60,7 +60,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 268px minmax(0, 1fr);
+  grid-template-columns: var(--player-column, 268px) minmax(0, 1fr);
   gap: var(--uiv2-space-5);
   align-items: start;
   padding: var(--uiv2-space-5);
@@ -85,6 +85,14 @@
 }
 
 .video,
+  /* The poster is drawn STRETCHED, not cropped, and that is not a typo.
+     Measured on a real job: the clip is 1920x1080 and the worker's thumbnail is
+     360x640 — the landscape frame scaled to FILL a portrait canvas, so the file
+     itself is squashed (a 1.65:1 scoreboard arrives as 0.52:1, and 0.1875/0.593
+     = 0.316 is exactly that factor). Painting it back across the clip's own
+     frame reverses the squeeze exactly. Where a job really is 9:16 the poster
+     matches the frame and filling is identical to cover, so this is right in
+     both cases. */
 .poster {
   width: 100%;
   height: 100%;
@@ -97,8 +105,7 @@
   padding: 0;
   cursor: pointer;
   background-color: var(--uiv2-bg-canvas);
-  background-size: cover;
-  background-position: center;
+  background-size: 100% 100%;
   color: var(--uiv2-accent-text);
   display: grid;
   place-items: center;
@@ -401,12 +408,13 @@
 .stripItem,
 .stripItemActive {
   position: relative;
-  flex: 0 0 62px;
+  flex: 0 0 auto;
+  width: auto;
   height: 82px;
   border: 1px solid var(--uiv2-border);
   background-color: var(--uiv2-bg-inset);
-  background-size: cover;
-  background-position: center;
+  /* Filled, not cropped — same reason as the player above. */
+  background-size: 100% 100%;
   border-radius: var(--uiv2-radius-sm);
   cursor: pointer;
   display: grid;
@@ -468,7 +476,7 @@
   }
 
   .player {
-    max-width: 268px;
+    max-width: 480px;
   }
 
   .hints {
