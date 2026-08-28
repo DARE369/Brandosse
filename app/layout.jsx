@@ -3,6 +3,20 @@ import "../src/styles/app-entry.css";
 export const metadata = {
   title: "Brandosse Command Center",
   description: "Social media command center and content generation platform.",
+  // The tab icon, the install icon, and the header logo are the same drawing:
+  // all of these files come from scripts/generate-brand-icons.mjs, which reads
+  // the geometry the <StudioMark> component renders. public/favicon.ico is
+  // deliberately not listed — it is a zero-byte placeholder that has been
+  // serving a blank tab icon, and pointing at it would keep doing that.
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  manifest: "/manifest.json",
 };
 
 // Without this, mobile browsers render at ~980px and every responsive
@@ -12,6 +26,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#0E0F11",
 };
 
 export default function RootLayout({ children }) {

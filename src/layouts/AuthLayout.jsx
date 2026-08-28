@@ -2,6 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import ThemeToggle from "../components/Shared/ThemeToggle";
+import { StudioMark } from "../ui-v2/brand/StudioMark";
 export default function AuthLayout({ children, title, subtitle }) {
   return (
     <div className="auth-root">
@@ -14,15 +15,7 @@ export default function AuthLayout({ children, title, subtitle }) {
         <div className="auth-panel-inner">
           <Link href="/" className="auth-panel-logo">
             <span className="auth-panel-logo-mark">
-              <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-                <path d="M11 2L20 7V15L11 20L2 15V7L11 2Z" fill="url(#apg1)"/>
-                <circle cx="11" cy="11" r="3" fill="white" opacity="0.9"/>
-                <defs>
-                  <linearGradient id="apg1" x1="2" y1="2" x2="20" y2="20">
-                    <stop stopColor="var(--public-accent-light)"/><stop offset="1" stopColor="var(--public-accent)"/>
-                  </linearGradient>
-                </defs>
-              </svg>
+<StudioMark size={20} decorative />
             </span>
             SocialAI
           </Link>
@@ -84,15 +77,7 @@ export default function AuthLayout({ children, title, subtitle }) {
         <div className="auth-form-wrap">
           <Link href="/" className="auth-mobile-logo">
             <span className="auth-panel-logo-mark">
-              <svg width="18" height="18" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-                <path d="M11 2L20 7V15L11 20L2 15V7L11 2Z" fill="url(#apg2)"/>
-                <circle cx="11" cy="11" r="3" fill="white" opacity="0.9"/>
-                <defs>
-                  <linearGradient id="apg2" x1="2" y1="2" x2="20" y2="20">
-                    <stop stopColor="var(--public-accent-light)"/><stop offset="1" stopColor="var(--public-accent)"/>
-                  </linearGradient>
-                </defs>
-              </svg>
+<StudioMark size={18} tone="light" decorative />
             </span>
             SocialAI
           </Link>

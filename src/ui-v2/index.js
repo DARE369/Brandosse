@@ -19,6 +19,11 @@ export { useOutsideDismiss } from "./primitives/useOutsideDismiss";
 
 export { AppHeader, NavLink, CreditPill, Avatar } from "./shell/AppHeader";
 
+// The product mark. Every surface that draws the logo renders THIS — app
+// chrome, mobile drawer, landing page, auth pages — and the favicon set is
+// generated from the same geometry by scripts/generate-brand-icons.mjs.
+export { StudioMark } from "./brand/StudioMark";
+
 // LOCK L5.7 — the single nav definition. Never redeclare NAV_ITEMS in a page.
 export { NAV_ITEMS, activeNavKey } from "./shell/navItems";
 

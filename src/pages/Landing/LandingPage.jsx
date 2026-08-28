@@ -36,6 +36,7 @@ import AuthLoadingOverlay from "../../components/Shared/AuthLoadingOverlay";
 import { SIGNUP_CREDIT_GRANT } from "../../constants/credits";
 import { CREDIT_PACKAGES } from "../../lib/video-engine/credit-packages";
 import { VIDEO_ENGINE_CONSTANTS } from "../../lib/video-engine/constants";
+import { StudioMark } from "../../ui-v2/brand/StudioMark";
 // LandingPage.css is loaded globally through src/styles/app-entry.css.
 
 /**
@@ -232,7 +233,7 @@ export default function LandingPage() {
 
       <header className={`lp-header ${scrolled ? "is-raised" : ""}`}>
         <Link href="/" className="lp-brand">
-          <span className="lp-brand-mark">S</span>
+          <StudioMark size={26} tone="light" decorative className="lp-brand-mark" />
           <span className="lp-brand-word">Studio</span>
         </Link>
 
@@ -735,7 +736,7 @@ export default function LandingPage() {
         <div className="lp-wrap lp-foot-grid">
           <div>
             <Link href="/" className="lp-brand">
-              <span className="lp-brand-mark">S</span>
+              <StudioMark size={22} tone="light" decorative className="lp-brand-mark" />
               <span className="lp-brand-word">Studio</span>
             </Link>
             <p className="lp-foot-blurb">

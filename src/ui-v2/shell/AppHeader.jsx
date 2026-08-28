@@ -1,3 +1,4 @@
+import { StudioMark } from "../brand/StudioMark";
 import styles from "./AppHeader.module.css";
 
 /**
@@ -10,7 +11,7 @@ import styles from "./AppHeader.module.css";
  */
 export function AppHeader({
   brandLabel = "Studio",
-  brandMark = "S",
+  brandMark = <StudioMark size={22} decorative />,
   navItems = [],
   navBadges = null,
   activeKey,

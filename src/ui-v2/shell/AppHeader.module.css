@@ -22,18 +22,16 @@
   gap: 9px;
   flex-shrink: 0;
 }
+/* The mark carries its own colour now, so the slot is just a slot — no ember
+   tile behind it, which would have put the logo on top of one of its own
+   colours. */
 .mark {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
-  background: var(--uiv2-accent-solid);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--uiv2-font-display);
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--uiv2-accent-on-solid);
+  flex-shrink: 0;
 }
 .wordmark {
   font-family: var(--uiv2-font-display);

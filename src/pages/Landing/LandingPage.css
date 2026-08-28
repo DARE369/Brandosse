@@ -311,18 +311,11 @@
 }
 .lp-brand:hover { color: var(--lp-ink); }
 
+/* The mark brings its own colours, so it needs a slot rather than an ember
+   tile to sit on. */
 .lp-brand-mark {
-  width: 25px;
-  height: 25px;
-  border-radius: 7px;
-  background: var(--lp-accent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--lp-display);
-  font-weight: 700;
-  font-size: 14px;
-  color: #FFF;
+  display: block;
+  flex-shrink: 0;
 }
 
 .lp-brand-word {
