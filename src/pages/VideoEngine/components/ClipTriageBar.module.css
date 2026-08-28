@@ -85,7 +85,7 @@
 
 .kbd {
   font-family: var(--uiv2-font-mono);
-  font-size: 9.5px;
+  font-size: 11.5px;
   color: var(--uiv2-text-tertiary);
 }
 
@@ -134,5 +134,19 @@
 
   .kbd {
     display: none;
+  }
+}
+
+/* At phone widths "0 kept · 0 skipped" no longer fits beside the count, and
+   holding it on one line pushed the page 5px wider than the screen. It wraps
+   instead — the numbers are what matter, not their arrangement. */
+@media (max-width: 520px) {
+  .progress {
+    flex-wrap: wrap;
+    row-gap: var(--uiv2-space-1);
+  }
+
+  .progressNote {
+    white-space: normal;
   }
 }

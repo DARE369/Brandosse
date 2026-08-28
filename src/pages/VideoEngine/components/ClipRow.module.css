@@ -4,7 +4,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 30px 132px minmax(0, 1fr) 160px 190px;
+  grid-template-columns: 30px 132px minmax(0, 1fr) 196px 204px;
   gap: var(--uiv2-space-4);
   align-items: center;
   padding: var(--uiv2-space-3) var(--uiv2-space-4);
@@ -52,8 +52,10 @@
 /* ── Thumbnail / player ──────────────────────────────────────────────────── */
 
 .thumb {
-  /* Width and height are set by the component from the job's aspect ratio.
-     They are NOT declared here: a fixed frame is what distorted them. */
+  /* Width and aspect-ratio are set by the component from the job's shape. They
+     are NOT declared here: a fixed frame is what distorted them. This cap is
+     what keeps the frame inside its column on a narrow screen. */
+  max-width: 100%;
   justify-self: center;
   flex-shrink: 0;
   border-radius: var(--uiv2-radius-sm);
@@ -280,7 +282,7 @@
 
 @media (max-width: 1080px) {
   .row {
-    grid-template-columns: 30px 116px minmax(0, 1fr) 160px;
+    grid-template-columns: 30px 116px minmax(0, 1fr) 196px;
   }
   .actions {
     grid-column: 3 / -1;

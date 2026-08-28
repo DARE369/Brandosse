@@ -10,7 +10,7 @@
 .row {
   display: grid;
   grid-template-columns:
-    34px 42px minmax(0, 1fr) 68px 128px 60px 56px 72px 60px 72px 104px 92px;
+    34px 46px minmax(0, 1fr) 76px 148px 68px 64px 82px 68px 82px 118px 100px;
   align-items: center;
 }
 
@@ -146,7 +146,7 @@
    table exists. */
 @media (max-width: 1200px) {
   .row {
-    grid-template-columns: 34px 42px minmax(0, 1fr) 68px 128px 60px 72px 104px 92px;
+    grid-template-columns: 34px 46px minmax(0, 1fr) 76px 148px 68px 82px 118px 100px;
   }
 
   .cFlow,
@@ -155,8 +155,25 @@
 }
 
 @media (max-width: 900px) {
+  /* Dropping three more columns is not enough here: what is left still cannot
+     fit a phone, and letting the grid solve it collapses the clip title to
+     about 14px — a column too narrow to read one word of. A table that scrolls
+     sideways inside its own frame is the honest answer; the page itself never
+     scrolls sideways. */
+  .table {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--uiv2-scrollbar-thumb) transparent;
+  }
+
+  .row,
+  .foot {
+    min-width: 620px;
+  }
+
   .row {
-    grid-template-columns: 34px 42px minmax(0, 1fr) 60px 72px 92px;
+    grid-template-columns: 34px 46px minmax(0, 1fr) 68px 82px 100px;
   }
 
   .cLen,

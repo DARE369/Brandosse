@@ -551,3 +551,26 @@
     opacity: 1;
   }
 }
+
+/* ── Type scale, +2px ────────────────────────────────────────────────────────
+   The Videos surface runs two points larger than the rest of the app, by
+   request: it is read for long stretches at a desk, and the design record's
+   density was tuned for a mockup viewport rather than a real monitor.
+
+   Done by restating the scale tokens on the surface root rather than by
+   editing ~40 rules, so it stays ONE number per step and cannot drift apart
+   across the four views. Everything inside inherits it, shared primitives
+   included, and no other page is touched.
+   ============================================================================ */
+.main {
+  --uiv2-text-2xs: 0.78125rem; /* 12.5px */
+  --uiv2-text-xs: 0.84375rem;  /* 13.5px */
+  --uiv2-text-sm: 0.9375rem;   /* 15px */
+  --uiv2-text-base: 1rem;      /* 16px */
+  --uiv2-text-md: 1.0625rem;   /* 17px */
+  --uiv2-text-lg: 1.1875rem;   /* 19px */
+  --uiv2-text-xl: 1.375rem;    /* 22px */
+  --uiv2-text-2xl: 1.5rem;     /* 24px */
+  --uiv2-text-3xl: 2rem;       /* 32px */
+  --uiv2-text-4xl: 2.5rem;     /* 40px */
+}

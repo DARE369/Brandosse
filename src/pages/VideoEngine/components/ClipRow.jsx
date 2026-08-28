@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Download, Loader2, Play } from "lucide-react";
 import { Button } from "../../../ui-v2";
-import { fitBox, formatDuration, formatTimecode, normaliseScore } from "../videoShared";
+import { aspectRatioCss, fitBox, formatDuration, formatTimecode, normaliseScore } from "../videoShared";
 import styles from "./ClipRow.module.css";
 
 /**
@@ -51,7 +51,15 @@ export function ClipRow({
   // Sized from the job's shape, not assumed portrait. video_clips stores no
   // aspect ratio — only video_jobs does — so a fixed 9:12 frame squashed every
   // landscape job's thumbnails.
-  const thumbBox = fitBox(aspectRatio, 132, 104);
+  //
+  // Width and aspect-ratio, never width AND height: a fixed height cannot
+  // shrink, and on a phone the 132px frame simply sat on top of the title. With
+  // `max-width: 100%` in the stylesheet the width falls back to whatever the
+  // column allows and the height follows the ratio down with it.
+  const thumbBox = {
+    width: fitBox(aspectRatio, 132, 104).width,
+    aspectRatio: aspectRatioCss(aspectRatio, "9 / 12"),
+  };
 
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState("");
