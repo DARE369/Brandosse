@@ -155,6 +155,34 @@ jobs:
       - name: check-llm-truncation
         run: node scripts/check-llm-truncation.cjs
 
+  # ── Worker unit tests ─────────────────────────────────────────────────────
+  # The Python worker had no test job at all. `_repair_cookie_newlines` was
+  # described in the lockdown plan as "unit-tested four ways", but no test file
+  # was ever committed — the tests existed only in someone's terminal, which is
+  # the same as not existing. This job is where worker tests run from now on.
+  #
+  # Deliberately stdlib-only: the tests stub `database` and `logger` so no
+  # dependency install, no network and no credentials are needed, which keeps
+  # this job fast enough to run on every PR.
+  worker-tests:
+    name: Worker unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # LOCK — brand screening of hook titles. An LLM writes the hook text and
+      # the worker burns it into H.264; nothing checked it against the user's
+      # own forbidden_phrases until 2026-08-31. Burned-in pixels cannot be
+      # corrected without a paid re-render, so this must not regress.
+      - name: brand screening
+        run: python video-worker/tests/test_brand_screening.py
+
+      - name: worker modules compile
+        run: python -m compileall -q video-worker/stages video-worker/utils video-worker/brand_kit.py
+
   # ── Build ─────────────────────────────────────────────────────────────────
   build:
     name: Build check

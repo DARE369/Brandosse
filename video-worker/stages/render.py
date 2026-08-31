@@ -14,6 +14,7 @@ from database import (
     mark_clip_render_failed,
     update_clip_render_complete,
 )
+from brand_kit import load_brand_kit, screen_hook_title
 from errors import RenderError
 from logger import log
 from utils.caption_generator import generate_karaoke_captions
@@ -830,6 +831,42 @@ async def run_render(
             "word_segments_missing",
             job_id=job_id,
             message="Captions will be skipped for all clips",
+        )
+
+    # ── Brand screening of hook titles ───────────────────────────────────────
+    # The hook title is written by an LLM in the analyze stage and burned into
+    # H.264 further down this file. Until 2026-08-31 nothing checked it against
+    # the user's own `forbidden_phrases`, so a brand could ship a clip whose
+    # overlay violates its own guidelines — and unlike a caption, burned-in
+    # pixels cannot be corrected without paying to re-render.
+    #
+    # Screened once here, at the single point where titles enter the render
+    # path, so every downstream use inherits the result rather than each call
+    # site having to remember. A blocked title is dropped, not rewritten: the
+    # clip still ships with its captions, just without a hook card.
+    # Both title sources must be screened. `db_clips` feeds the split-layout
+    # path and `clips` (the analyze stage's score data) feeds the single-clip
+    # path at the other _build_hook_text_filter call site — screening only one
+    # would leave the other rendering unchecked text into pixels.
+    brand = load_brand_kit(user_id)
+    blocked_titles = 0
+    for record in [*db_clips, *clips]:
+        if not isinstance(record, dict):
+            continue
+        safe_title, violations = screen_hook_title(
+            record.get("ai_title"), brand, job_id=job_id
+        )
+        if violations:
+            blocked_titles += 1
+            record["ai_title"] = None
+    if blocked_titles:
+        log.warning(
+            "hook_titles_blocked",
+            job_id=job_id,
+            blocked=blocked_titles,
+            total=len(db_clips),
+            message="Hook overlays omitted on these clips — the generated title "
+                    "contained a phrase the brand kit forbids.",
         )
 
     # ── Launch clip renders with bounded concurrency ─────────────────────────────
