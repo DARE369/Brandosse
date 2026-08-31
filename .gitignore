@@ -60,3 +60,7 @@ test-results/
 
 # Working reference — kept local by founder decision 2026-08-31
 docs/video-compiler/BACKEND-BREAKDOWN.md
+
+# Python bytecode
+__pycache__/
+*.pyc
