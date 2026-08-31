@@ -139,6 +139,49 @@ check("no palette returns nothing, so existing defaults survive",
 check("unparseable palette entries are skipped, not rendered wrong",
       palette_colours({"color_palette": [{"hex": "bogus", "usage": "primary"}]}), {})
 
+# ── Caption presets overlaid with a brand palette ───────────────────────────
+sys.path.insert(0, os.path.join(WORKER, "utils"))
+from caption_generator import _apply_brand_colors, STYLE_CONFIGS  # noqa: E402
+
+PRESET = STYLE_CONFIGS["karaoke"]
+BRAND = {"primary_color": "&H003357FF", "secondary_color": "&H00563412"}
+
+out = _apply_brand_colors(PRESET, BRAND)
+check("brand primary replaces the preset body colour",
+      out["primary_color"], "&H003357FF")
+check("brand secondary replaces the preset highlight",
+      out["secondary_color"], "&H00563412")
+
+# Legibility infrastructure is not the brand's to override. A pale brand
+# primary over bright footage is unreadable the moment the black outline is
+# replaced, and the person who suffers is the viewer.
+check("outline colour survives branding",
+      out["outline_color"], PRESET["outline_color"])
+check("box background survives branding",
+      out["back_color"], PRESET["back_color"])
+check("outline width survives branding", out["outline"], PRESET["outline"])
+
+# STYLE_CONFIGS is module-level shared state. Mutating it in place would leak
+# one customer's palette into the next job rendered by the same worker
+# process — a cross-tenant defect, not a cosmetic one.
+check("the shared preset is not mutated",
+      STYLE_CONFIGS["karaoke"]["primary_color"], PRESET["primary_color"])
+check("and it is genuinely a different dict", out is PRESET, False)
+
+check("two brand colours replace the hardcoded cycling palette",
+      out.get("box_palette"), ["&H003357FF", "&H00563412"])
+
+one = _apply_brand_colors(PRESET, {"primary_color": "&H003357FF"})
+check("one colour is not enough for a cycle, so the preset palette stays",
+      one.get("box_palette"), None)
+check("but the single colour still applies to body text",
+      one["primary_color"], "&H003357FF")
+
+check("no brand colours returns the preset untouched",
+      _apply_brand_colors(PRESET, {}), PRESET)
+check("None returns the preset untouched",
+      _apply_brand_colors(PRESET, None), PRESET)
+
 print("")
 if failures:
     print(f"FAIL — {len(failures)} of {len(failures) + 0} checks failed:")

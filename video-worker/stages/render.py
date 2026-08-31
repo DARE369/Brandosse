@@ -14,7 +14,7 @@ from database import (
     mark_clip_render_failed,
     update_clip_render_complete,
 )
-from brand_kit import load_brand_kit, screen_hook_title
+from brand_kit import load_brand_kit, palette_colours, screen_hook_title
 from errors import RenderError
 from logger import log
 from utils.caption_generator import generate_karaoke_captions
@@ -362,6 +362,7 @@ async def _render_single_clip(
     job_id: str,
     user_id: str,
     job: dict = None,
+    brand_colors: dict = None,
 ) -> dict:
     """
     Render and upload one clip independently.
@@ -421,6 +422,7 @@ async def _render_single_clip(
             caption_style,
             out_w,
             out_h,
+            brand_colors=brand_colors,
         )
 
         if ass_path:
@@ -849,6 +851,11 @@ async def run_render(
     # path at the other _build_hook_text_filter call site — screening only one
     # would leave the other rendering unchecked text into pixels.
     brand = load_brand_kit(user_id)
+    # Caption colours from the brand palette. Empty when the kit has no
+    # usable palette, in which case the presets render unchanged.
+    brand_colors = palette_colours(brand)
+    if brand_colors:
+        log.info("brand_caption_colors_applied", job_id=job_id, colors=brand_colors)
     blocked_titles = 0
     for record in [*db_clips, *clips]:
         if not isinstance(record, dict):
@@ -895,6 +902,7 @@ async def run_render(
                 job_id=job_id,
                 user_id=user_id,
                 job=job,
+                brand_colors=brand_colors,
             )
 
     render_tasks = []

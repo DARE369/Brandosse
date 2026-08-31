@@ -145,6 +145,51 @@ STYLE_CONFIGS = {
 }
 
 
+def _apply_brand_colors(preset: dict, brand_colors: dict) -> dict:
+    """
+    Overlay a brand's palette onto a caption preset.
+
+    ── What a brand is allowed to change, and what it is not ────────────────
+    Overridden: `primary_color` (the body text) and `secondary_color` (the
+    karaoke sweep and the bold-drop / per-word accent), plus the cycling
+    palettes used by box_pop and color_pop — which until 2026-08-31 were
+    hardcoded viral-TikTok colours burned identically into every customer's
+    clips regardless of what they had entered in `color_palette`.
+
+    NOT overridden: `outline_color`, `back_color`, `outline`, `shadow` and
+    `border_style`. Those are legibility infrastructure, not brand
+    expression. A brand whose primary is pale yellow would become unreadable
+    over bright footage the moment the black outline was replaced by its own
+    palette, and the person who suffers that is the viewer, not the brand
+    manager who chose the colour. Contrast survives the customisation.
+
+    An empty or unusable palette returns the preset untouched, so a partial
+    brand kit renders the existing design rather than something half-branded.
+    """
+    if not brand_colors:
+        return preset
+
+    config = dict(preset)
+
+    primary = brand_colors.get("primary_color")
+    secondary = brand_colors.get("secondary_color")
+
+    if primary:
+        config["primary_color"] = primary
+    if secondary:
+        config["secondary_color"] = secondary
+
+    # The cycling palettes need at least two colours to read as a cycle; with
+    # one, every "cycle" step is the same colour and the effect silently
+    # disappears — better to keep the preset's palette than ship a dead effect.
+    cycle = [c for c in (primary, secondary) if c]
+    if len(cycle) >= 2:
+        config["box_palette"] = cycle
+        config["word_palette"] = cycle
+
+    return config
+
+
 def generate_karaoke_captions(
     word_segments: list,
     clip_start: float,
@@ -153,6 +198,7 @@ def generate_karaoke_captions(
     style: str = "karaoke",
     play_res_x: int = 608,
     play_res_y: int = 1080,
+    brand_colors: dict = None,
 ) -> str:
     """
     Generate an ASS subtitle file for a clip using one of the STYLE_CONFIGS
@@ -171,7 +217,10 @@ def generate_karaoke_captions(
         Path to the generated ASS file, or "" if no words fall within the
         clip's time range.
     """
-    config = STYLE_CONFIGS.get(style, STYLE_CONFIGS["karaoke"])
+    config = _apply_brand_colors(
+        STYLE_CONFIGS.get(style, STYLE_CONFIGS["karaoke"]),
+        brand_colors,
+    )
 
     try:
         events = _build_events(word_segments, clip_start, clip_end, config)
@@ -262,7 +311,8 @@ def _build_event_text(group: list, config: dict, bold_drop_color_index: int) -> 
         parts = []
         for i, w in enumerate(group):
             global_index = bold_drop_color_index * group_size + i
-            color = _to_override_color(COLOR_POP_PALETTE[global_index % len(COLOR_POP_PALETTE)])
+            word_palette = config.get("word_palette") or COLOR_POP_PALETTE
+            color = _to_override_color(word_palette[global_index % len(word_palette)])
             parts.append(f"{{\\1c{color}}}{transform(w['word'])} ")
         return "".join(parts).strip()
 
@@ -273,7 +323,8 @@ def _build_event_text(group: list, config: dict, bold_drop_color_index: int) -> 
         return f"{{\\1c{color}}}{text}"
 
     if box_color_cycle:
-        color = _to_override_color(BOX_POP_PALETTE[bold_drop_color_index % len(BOX_POP_PALETTE)])
+        box_palette = config.get("box_palette") or BOX_POP_PALETTE
+        color = _to_override_color(box_palette[bold_drop_color_index % len(box_palette)])
         return f"{{\\3c{color}}}{text}"
 
     return text
