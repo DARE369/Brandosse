@@ -231,6 +231,56 @@ check("no brand colours returns the preset untouched",
 check("None returns the preset untouched",
       _apply_brand_colors(PRESET, None), PRESET)
 
+# ── Brand font resolution ───────────────────────────────────────────────────
+# fonts.py imports config, which requires real env vars to construct. Stub it:
+# the functions under test never read it.
+_cfg = types.ModuleType("config")
+
+
+class _Cfg:
+    temp_dir = os.path.join(HERE, "_fonttmp")
+    google_fonts_api_key = ""
+
+
+_cfg.config = _Cfg()
+sys.modules.setdefault("config", _cfg)
+
+from fonts import brand_font_family, _pick_variant, _safe_name  # noqa: E402
+
+check("reads font_display.family from the kit",
+      brand_font_family({"font_display": {"family": "Poppins"}}, "display"), "Poppins")
+check("reads font_body.family",
+      brand_font_family({"font_body": {"family": "Inter"}}, "body"), "Inter")
+
+# The live schema has drifted from the migrations, so the column may be a plain
+# string, missing, or null. None of those may raise inside a render.
+check("tolerates a plain string column",
+      brand_font_family({"font_display": "Poppins"}, "display"), "Poppins")
+check("missing column returns None",
+      brand_font_family({}, "display"), None)
+check("null column returns None",
+      brand_font_family({"font_display": None}, "display"), None)
+check("empty family returns None",
+      brand_font_family({"font_display": {"family": "  "}}, "display"), None)
+check("no kit returns None", brand_font_family(None, "display"), None)
+
+# Hook cards and captions are set bold — that is what makes them readable over
+# moving footage — so a display face prefers 700 over regular.
+FILES = {"regular": "r.ttf", "700": "b.ttf", "300": "l.ttf", "italic": "i.ttf"}
+check("display prefers bold", _pick_variant(FILES, prefer_bold=True), "b.ttf")
+check("body prefers regular", _pick_variant(FILES, prefer_bold=False), "r.ttf")
+check("falls back through neighbouring weights when 700 is absent",
+      _pick_variant({"600": "s.ttf", "italic": "i.ttf"}, prefer_bold=True), "s.ttf")
+check("never picks italic when an upright exists",
+      _pick_variant({"italic": "i.ttf", "900": "x.ttf"}, prefer_bold=True), "x.ttf")
+check("empty files map returns None", _pick_variant({}, prefer_bold=True), None)
+check("non-dict returns None", _pick_variant(None, prefer_bold=True), None)
+
+check("family names become safe filenames",
+      _safe_name("Playfair Display SC"), "playfair-display-sc")
+check("punctuation is stripped from filenames",
+      _safe_name("Noto Sans/JP  v2!"), "noto-sans-jp-v2")
+
 print("")
 if failures:
     print(f"FAIL — {len(failures)} of {len(failures) + 0} checks failed:")

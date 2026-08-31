@@ -14,6 +14,7 @@ from database import (
     mark_clip_render_failed,
     update_clip_render_complete,
 )
+from fonts import fonts_dir_if_populated, resolve_brand_font
 from brand_kit import (
     hook_overlay_colors,
     load_brand_kit,
@@ -182,7 +183,9 @@ def _fitted_fontsize(text: str, frame_w: int) -> int:
     return max(HOOK_MIN_FONTSIZE, min(HOOK_MAX_FONTSIZE, raw))
 
 
-def _build_hook_text_filter(ai_title, frame_w: int = 608, colors: dict = None) -> str:
+def _build_hook_text_filter(
+    ai_title, frame_w: int = 608, colors: dict = None, fontfile: str = None
+) -> str:
     """
     Build an FFmpeg drawtext filter string for the hook text overlay.
 
@@ -224,6 +227,15 @@ def _build_hook_text_filter(ai_title, frame_w: int = 608, colors: dict = None) -
     fontcolor = colors.get("fontcolor", "white")
     boxcolor = colors.get("boxcolor", "black@0.55")
 
+    # Without fontfile= drawtext uses FFmpeg's built-in default, so a brand
+    # font can only reach the frame through this option. Colons in the path
+    # are escaped the same way the subtitle path is — an unescaped one splits
+    # the filter option list and FFmpeg reports a baffling "No such filter".
+    font_option = ""
+    if fontfile:
+        escaped_font = str(fontfile).replace("\\", "/").replace(":", "\\:")
+        font_option = f":fontfile={escaped_font}"
+
     # Size the text to the frame it will actually be drawn on. drawtext cannot
     # wrap, so the only way to guarantee fit is to shrink: aim for ~90% of the
     # frame width at ~0.6 x fontsize average glyph width, clamped to stay
@@ -237,6 +249,7 @@ def _build_hook_text_filter(ai_title, frame_w: int = 608, colors: dict = None) -
         f":x=(w-text_w)/2"
         f":y=50"
         f":fontsize={fontsize}"
+        f"{font_option}"
         f":fontcolor={fontcolor}"
         f":box=1"
         f":boxcolor={boxcolor}"
@@ -257,6 +270,7 @@ async def _render_split_layout(
     captions_file,
     output_path: str,
     hook_colors: dict = None,
+    hook_fontfile: str = None,
 ) -> str:
     """
     Render a SPLIT-scene clip as a stacked or side-by-side layout.
@@ -313,16 +327,27 @@ async def _render_split_layout(
             vf = [f"[0:v]scale={out_w}:{out_h}:flags=lanczos,format=yuv420p[stacked]"]
 
     hook_filter = _build_hook_text_filter(
-        clip.get("ai_title") if clip else None, frame_w=out_w, colors=hook_colors
+        clip.get("ai_title") if clip else None,
+        frame_w=out_w,
+        colors=hook_colors,
+        fontfile=hook_fontfile,
     )
 
     if captions_file:
         captions_escaped = captions_file.replace("\\", "/").replace(":", "\\:")
+        # libass resolves the ASS Fontname against system fonts unless told
+        # where else to look. fontsdir points it at the downloaded brand fonts;
+        # without it the style's font name is set and then silently ignored,
+        # which looks identical to it having worked.
+        _fonts_dir = fonts_dir_if_populated()
+        ass_opts = f"ass={captions_escaped}"
+        if _fonts_dir:
+            ass_opts += ":fontsdir=" + _fonts_dir.replace("\\", "/").replace(":", "\\:")
         if hook_filter:
-            vf.append(f"[stacked]ass={captions_escaped}[capped]")
+            vf.append(f"[stacked]{ass_opts}[capped]")
             vf.append(f"[capped]{hook_filter}[out]")
         else:
-            vf.append(f"[stacked]ass={captions_escaped}[out]")
+            vf.append(f"[stacked]{ass_opts}[out]")
         map_label = "[out]"
     elif hook_filter:
         vf.append(f"[stacked]{hook_filter}[out]")
@@ -432,6 +457,18 @@ async def _render_single_clip(
         # drawtext needs 0xRRGGBB, not the ASS &HAABBGGRR the captions use, so
         # the hook colours are derived separately from the same kit.
         hook_colors = hook_overlay_colors(brand_kit_row)
+        # Resolve the brand's display face to a real TTF. Returns (family,
+        # None) when the family is known but unusable — logged deliberately,
+        # because "asked for Poppins and rendered DejaVu" must not look the
+        # same as "no brand font set".
+        hook_family, hook_fontfile = resolve_brand_font(brand_kit_row, role="display")
+        if hook_family and not hook_fontfile:
+            log.warning(
+                "brand_font_unavailable",
+                job_id=job_id,
+                family=hook_family,
+                message="Rendering in the default face.",
+            )
 
         ass_path = await asyncio.to_thread(
             generate_karaoke_captions,
@@ -443,6 +480,9 @@ async def _render_single_clip(
             out_w,
             out_h,
             brand_colors=brand_colors,
+            # Only pass the family when its file actually downloaded —
+            # naming a font libass cannot find is a silent fallback.
+            brand_font_family=(hook_family if hook_fontfile else None),
         )
 
         if ass_path:
@@ -578,6 +618,7 @@ async def _render_single_clip(
                     captions_file=ass_path,
                     output_path=output_path,
                     hook_colors=hook_colors,
+                    hook_fontfile=hook_fontfile,
                 )
                 split_rendered = True
 
@@ -666,7 +707,10 @@ async def _render_single_clip(
         # hook comes out slightly small on the bigger canvas — never oversized.
         hook_frame_w = crop_coords.get("crop_width") or 608
         hook_filter = _build_hook_text_filter(
-            clip_score_data.get("ai_title"), frame_w=hook_frame_w, colors=hook_colors
+            clip_score_data.get("ai_title"),
+            frame_w=hook_frame_w,
+            colors=hook_colors,
+            fontfile=hook_fontfile,
         )
 
         if not split_rendered:

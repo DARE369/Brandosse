@@ -10,11 +10,12 @@
 
 ---
 
-## 🔴 Three open decisions — opened 2026-08-31
+## 🔴 Open decisions
 
-All three were surfaced by the video-compiler pricing analysis. Each blocks a
-different part of that work, and **OD-2 and OD-3 have longer lead times than any
-engineering task in the plan** — they are not "decide later" items.
+Opened 2026-08-31 by the video-compiler pricing analysis. **OD-4 is closed**
+(see below). OD-2 and OD-3 are parked by founder decision rather than resolved —
+both have longer lead times than any engineering task in the plan, so parking
+them is a choice about sequencing, not a removal of the risk.
 
 ### OD-2 — Zernio per-account pricing is now due
 
@@ -50,6 +51,33 @@ case; the real figure follows from this choice.
 **Blocks:** collecting any revenue for this capability.
 **Needs:** a cross-border accountant, engaged now rather than at launch.
 
+### ✅ OD-4 — CLOSED 2026-08-31: customers pay for retries
+
+**Founder decision: retries are charged to the customer's credits.** The
+existing rule at `GRAPHICS_CREDIT_MODEL.md:22` stands; the pricing analysis's
+recommendation to absorb retries as COGS is **overruled**.
+
+**What this means downstream, so it is not rediscovered later:**
+
+- The video-compiler allowance is **not** denominated in finished videos. A
+  retry is a billable event like any other generation.
+- The category's most-cited complaint — *"credits consumed faster than users
+  expect"* — is therefore **not** structurally avoided, and has to be managed
+  in the interface instead: the price of a retry must be shown before it is
+  incurred, and the estimate-versus-actual reconciliation on the delivery
+  screen becomes more important, not less.
+- The incentive noted in the original argument still applies: our revenue rises
+  when generation quality falls. That is now a thing to **watch deliberately**
+  rather than something the pricing structure prevents. The retry multiplier
+  `R` in the cost ledger (L5.14) is the metric that makes it visible, and it
+  should be reviewed rather than left to accumulate.
+
+The original argument for the other choice is preserved below, because it will
+come up again with the first enterprise customer.
+
+<details>
+<summary>Superseded recommendation (kept for the reasoning)</summary>
+
 ### OD-4 — Do customers pay for retries?
 
 `GRAPHICS_CREDIT_MODEL.md:22` locks *"Auto-retry — charged from credits (2 cr).
@@ -77,6 +105,20 @@ not — see the note on L5.14 below.
 **Note:** this decision applies to the video compiler. Whether it also
 supersedes the existing credit model for images and single-clip video is part of
 the same call.
+
+</details>
+
+---
+
+## 🔁 Standing reminders — raise these unprompted
+
+Founder asked to be reminded of these each session. None blocks work today.
+
+| # | Item | Status | Why it will bite |
+|---|---|---|---|
+| **OD-2** | Zernio per-account pricing | **Parked.** Staying on Zernio for now, but the intent is to move to the official platform APIs (worked on outside this repo). | The free tier is 2 connected accounts across the whole API key. Any B2B tier promising multi-brand publishing cannot ship on that, whichever provider it ends on. |
+| **OD-3** | USD payment rail | **Parked.** Stripe is the eventual intent. | Stripe cannot pay out to a Nigerian business (`GRAPHICS_CREDIT_MODEL.md:16`). Selling USD subscriptions needs a merchant of record or a foreign entity — weeks of lead time, longer than any engineering task here. Revenue cannot be collected until it is resolved. |
+| **PDFs** | `legal/*.pdf` untracked | **Dropped for now.** | 8.9MB of near-duplicate binaries; the markdown carries the content. If a *signed* version ever becomes the authoritative copy, it needs tracking somewhere — git history keeps binaries forever, so decide before adding. |
 
 ---
 

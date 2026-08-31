@@ -18,6 +18,10 @@ class WorkerConfig(BaseSettings):
     groq_api_key: str = Field(default="", alias="WORKER_GROQ_API_KEY")
     anthropic_api_key: str = Field(default="", alias="WORKER_ANTHROPIC_API_KEY")
     replicate_api_token: str = Field(default="", alias="WORKER_REPLICATE_API_TOKEN")
+    # Google Fonts Developer API. Optional by design: without it the renderer
+    # falls back to its default face and logs that brand typography was
+    # requested but not applied. It is not required to boot.
+    google_fonts_api_key: str = Field(default="", alias="WORKER_GOOGLE_FONTS_API_KEY")
 
     # Mock switches — MUST default to False (LOCK L1.4).
     # These previously defaulted to True, which meant any environment that

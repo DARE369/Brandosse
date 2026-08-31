@@ -199,6 +199,7 @@ def generate_karaoke_captions(
     play_res_x: int = 608,
     play_res_y: int = 1080,
     brand_colors: dict = None,
+    brand_font_family: str = None,
 ) -> str:
     """
     Generate an ASS subtitle file for a clip using one of the STYLE_CONFIGS
@@ -221,6 +222,12 @@ def generate_karaoke_captions(
         STYLE_CONFIGS.get(style, STYLE_CONFIGS["karaoke"]),
         brand_colors,
     )
+    if brand_font_family:
+        # libass matches this name against the fonts in the fontsdir the
+        # render stage passes. Set without that directory it resolves to a
+        # system font or silently falls back — which is why the caller only
+        # supplies a family it has already downloaded a file for.
+        config = {**config, "fontname": brand_font_family}
 
     try:
         events = _build_events(word_segments, clip_start, clip_end, config)
@@ -350,7 +357,7 @@ YCbCr Matrix: None
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,{config['fontsize']},{config['primary_color']},{config['secondary_color']},{config['outline_color']},{config['back_color']},{config['bold']},0,0,0,100,100,0,0,{config['border_style']},{config['outline']},{config['shadow']},{config['alignment']},20,20,{config['margin_v']},1
+Style: Default,{config.get('fontname', 'Arial')},{config['fontsize']},{config['primary_color']},{config['secondary_color']},{config['outline_color']},{config['back_color']},{config['bold']},0,0,0,100,100,0,0,{config['border_style']},{config['outline']},{config['shadow']},{config['alignment']},20,20,{config['margin_v']},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
