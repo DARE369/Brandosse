@@ -25,6 +25,47 @@ All three were being violated when the audit ran.
 - **Pin model IDs explicitly.** Never `-latest` for production output. A provider fallback firing is an alerting event.
 - **No secrets in git**, including in documentation.
 
+## 👥 The twenty-specialist standard — how output is calibrated
+
+**Founder ruling, 2026-08-30:** one person builds this repo, but **nothing in it
+may be scoped, designed, or shipped as if one person built it.** Calibrate every
+result to what a team of twenty highly skilled specialists — each strong in a
+different discipline — would have produced. Solo capacity is not a constraint
+here and must never be used as a reason for a smaller answer.
+
+**What this forbids, concretely.** These are the tells that a decision was sized
+to one person's effort rather than to the problem:
+
+- Choosing the approach that is less work over the approach that is correct.
+- "Good enough for now", "MVP-quality", "we can improve this later", "acceptable
+  for a solo project" — as *justifications*. Deferring work is fine when the
+  reason is sequencing or evidence; it is not fine when the reason is effort.
+- Capping a feature at what is easy to hand-write (a 7-word text limit because
+  the text engine cannot wrap is a defect, not a spec).
+- Shipping a change reviewed only for "does it work", when a security, data
+  integrity, performance, accessibility, mobile, or cost specialist would each
+  have had a distinct objection.
+- Serialising work that has no dependency between its parts.
+
+**What this requires.**
+
+1. **Every change gets the specialist passes it deserves**, not just the ones
+   that are convenient — the review chain in `engineering/02-code-review.md` is
+   the floor, not the ceiling.
+2. **Parallelise by discipline.** Where a task decomposes into independent
+   specialisms, spawn an agent per specialism rather than doing them in
+   sequence. `.claude/agents/` already holds the roster; treat each as the
+   employee who owns that discipline.
+3. **Depth is judged against the specialist, not the generalist.** The bar for
+   the render layer is what a broadcast engineer would accept; for RLS, what an
+   appsec reviewer would accept; for a screen, what a senior product designer
+   would accept.
+4. **When effort and quality conflict, quality wins, and the cost is stated** —
+   surface the extra work as a plan, never silently absorb it as a smaller
+   deliverable.
+
+This standard governs planning, scoping, code, review, and documentation alike.
+
 ## ⚠️ Open decisions — check before planning work
 
 [`OPEN-DECISIONS.md`](OPEN-DECISIONS.md) holds founder decisions that are
@@ -40,9 +81,15 @@ build and prove the loop; not a configuration any real user can be onboarded
 into. The per-account pricing question is deferred to the first real user, not
 answered — do not plan a launch that assumes it is.
 
-## 🔒 Completion Lockdown is ACTIVE
+## 🔓 Completion Lockdown — LIFTED
 
-Per [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md): **no new capability until everything pending is locked.** Finish, connect, or delete what exists. New ideas go to [`audit/08-horizon-register.md`](audit/08-horizon-register.md) — do not smuggle them in as "completion work." If it needs a new table, a new third-party integration, or a new nav item, it is new.
+**LIFTED 2026-08-31 by founder decision.** The bar on new capability is removed. New work — new tables, new third-party integrations, new surfaces — is now in scope and is planned and built like any other work.
+
+**What the lockdown produced, which survives it.** The three laws above, the non-negotiables, the review chain, and the guard requirement all remain. They were never about *whether* to build; they were about how a change is proven and kept working. A new capability is held to exactly the same `fixed + proven + guarded` bar as a repair.
+
+**What is still genuinely outstanding** (tracked in [`audit/11-lockdown-plan.md`](audit/11-lockdown-plan.md), not blocking): the cost ledger (L5.14), clip analysis truncation (L5.3a), Python worker error instrumentation (L0.4b), and the unreferenced-module detector (Gate 3). These are finished on their merits, not as a gate on other work.
+
+**One rule kept from the lockdown, because it earned its place:** before building something, check whether it already exists unwired. This repo's dominant defect is disconnection, not absence — five separate surfaces were found holding live brand data that no consumer reads. Connecting is usually cheaper than building, and it is the first thing to rule out, not a reason to refuse the build.
 
 ## Review before merge
 

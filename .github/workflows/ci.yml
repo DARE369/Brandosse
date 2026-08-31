@@ -148,6 +148,13 @@ jobs:
       - name: check-post-status-accounting
         run: node scripts/check-post-status-accounting.cjs
 
+      # LOCK L5.3a. Clip analysis ran at max_tokens=4096 and parsed the response
+      # without checking stop_reason, so a long source produced a truncated clip
+      # list that either failed with a misleading "invalid JSON" or — worse —
+      # parsed cleanly and shipped a job that had silently lost real moments.
+      - name: check-llm-truncation
+        run: node scripts/check-llm-truncation.cjs
+
   # ── Build ─────────────────────────────────────────────────────────────────
   build:
     name: Build check

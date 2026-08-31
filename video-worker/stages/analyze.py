@@ -287,10 +287,37 @@ async def run_analyze(job: dict, transcript: dict) -> list[dict]:
 
             message = await client.messages.create(
                 model="claude-sonnet-4-6",
-                max_tokens=4096,
+                # LOCK L5.3a — was 4096, which silently truncated the clip list on
+                # long sources. A 60-minute podcast asked for ~10 clips, each with a
+                # title, caption and four scores; the response ran past 4096 tokens
+                # and the tail was cut. Nothing detected it: the parser below takes
+                # rfind("}") and either raised (→ 3 retries → job failed with a
+                # misleading "invalid JSON") or, worse, parsed a short list and the
+                # job "succeeded" having lost real moments.
+                #
+                # 16000 is the SDK's documented non-streaming default and is ample
+                # for the largest clip list this prompt can request. Above ~64000
+                # the SDK requires streaming to avoid HTTP timeouts, which this call
+                # does not use — so this value must not be raised much further
+                # without switching to client.messages.stream().
+                max_tokens=16000,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt}]
             )
+
+            # Truncation must never be parsed. `stop_reason == "max_tokens"` means
+            # the model was cut off mid-JSON; whatever survives is an incomplete
+            # clip list, and accepting it is exactly the silent data loss this lock
+            # exists to close. Fail loudly instead — law 3.
+            if message.stop_reason == "max_tokens":
+                raise AnalysisError(
+                    "Clip analysis was truncated by the output token limit "
+                    f"(max_tokens=16000, stop_reason=max_tokens). The clip list is "
+                    "incomplete and will not be used. This means the source produced "
+                    "more analysis than the current limit allows — raise max_tokens "
+                    "and switch this call to streaming.",
+                    job_id,
+                )
 
             # Parse response
             response_text = message.content[0].text.strip()
@@ -326,6 +353,13 @@ async def run_analyze(job: dict, transcript: dict) -> list[dict]:
                     job_id
                 )
             await asyncio.sleep(1)
+
+        except AnalysisError:
+            # Truncation (L5.3a) and any other deliberate analysis failure must
+            # propagate immediately. Retrying cannot help — the same prompt at the
+            # same max_tokens truncates identically — and the generic handler below
+            # would rewrite the cause as "Claude API failed", hiding it.
+            raise
 
         except Exception as e:
             log.warning("claude_api_error", job_id=job_id, attempt=attempt + 1, error=str(e)[:100])

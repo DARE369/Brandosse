@@ -47,3 +47,13 @@ scripts/*-tmp*.cjs
 # personal / presentation material — kept local, not app code
 PROJECT-EXPERIENCE-CV.md
 praise-presentation/
+
+# Deletion backups — contain user data, never commit
+deleted-generations-*.json
+
+# Build/verify logs and QA screenshots
+*.log
+*.png
+qa-shots-*/
+qa-tmp/
+test-results/

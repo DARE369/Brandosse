@@ -10,16 +10,82 @@
 
 ---
 
-## ✅ No open decisions
+## 🔴 Three open decisions — opened 2026-08-31
 
-Every item that was blocking engineering has been decided. OD-1 closed
-2026-08-23 — see the decision log below.
+All three were surfaced by the video-compiler pricing analysis. Each blocks a
+different part of that work, and **OD-2 and OD-3 have longer lead times than any
+engineering task in the plan** — they are not "decide later" items.
 
-**What replaces OD-1 as the thing to watch:** the Zernio free tier is **2
-connected accounts across the whole API key**, not per user. That is enough to
-build and prove the loop on real data, and it is *not* a configuration any real
-user can be onboarded into. The pricing question returns the moment a second
-person needs to connect an account — it is deferred, not answered.
+### OD-2 — Zernio per-account pricing is now due
+
+The free tier is **2 connected accounts across the whole API key**, not per
+user. When OD-1 closed on 2026-08-23 the standing note said the pricing question
+*"returns the moment a second person needs to connect an account — deferred, not
+answered."*
+
+**That moment has arrived.** The B2B tier structure sells multi-brand
+publishing, and it cannot sit on 2 shared accounts. Any published price depends
+on a per-connected-account cost we do not have.
+
+**Blocks:** lock L5.1 (publish to ≥4 platforms), and every price in the video
+compiler's Growth and Scale tiers.
+**Needs:** Zernio's per-account rate at our expected volume, then a
+re-derivation of tier margins against it as a fixed cost.
+
+### OD-3 — Payment rail for USD B2B revenue
+
+`GRAPHICS_CREDIT_MODEL.md:16` establishes that **Stripe cannot pay out to a
+Nigerian business in 2026**. The 2026-08-30 decision to sell **USD B2B
+subscriptions** — to US and EU companies — makes the naira/Paystack rail
+insufficient rather than merely suboptimal.
+
+Two routes, both with lead times measured in weeks:
+1. A **merchant of record** that will onboard a Nigerian beneficiary.
+2. A **foreign entity** (US LLC or UK Ltd) with its own banking.
+
+This is a legal, tax and banking structure decision that sits **upstream of all
+engineering**. The pricing model assumes a 5% blended fee as the pessimistic
+case; the real figure follows from this choice.
+
+**Blocks:** collecting any revenue for this capability.
+**Needs:** a cross-border accountant, engaged now rather than at launch.
+
+### OD-4 — Do customers pay for retries?
+
+`GRAPHICS_CREDIT_MODEL.md:22` locks *"Auto-retry — charged from credits (2 cr).
+Founder decision — no free retries."* The pricing analysis recommends
+**overturning this** for the video compiler: the customer's allowance is
+denominated in *finished videos*, retries are absorbed as our COGS, and the
+customer never sees a credit.
+
+The argument for overturning it, which deserves a decision rather than a drift:
+
+- *"Credits consumed faster than users expect"* is the single most common
+  complaint recorded against every competitor surveyed. The abstraction itself
+  is the defect, not its explanation.
+- Under a credit model, **our revenue rises when our generation quality falls.**
+  That incentive points the wrong way. Under a video allowance, every retry
+  costs us money, so improving the QC gate has a direct P&L return.
+- It converts the category's biggest complaint into one sentence of
+  positioning: *"you pay for finished videos, not for attempts."*
+
+**The cost of being wrong is bounded and known:** at the base model price the
+Growth tier tolerates a retry multiplier up to ~4.1× before margin drops under
+60%. But that is only true if the multiplier is *measured*, which today it is
+not — see the note on L5.14 below.
+
+**Note:** this decision applies to the video compiler. Whether it also
+supersedes the existing credit model for images and single-clip video is part of
+the same call.
+
+---
+
+**Related engineering prerequisite, not a founder decision:** none of the eight
+cost-danger metrics behind these tiers is measurable today, because
+`FAL_COST_USD` (`supabase/functions/_shared/fal.service.ts:619`) is explicitly
+labelled *"Cost estimates (informational)"* and no per-job ledger records
+**actual** provider spend. That ledger is lock **L5.14**, already open. Until it
+exists, any pricing here is a spreadsheet rather than a control system.
 
 ---
 
