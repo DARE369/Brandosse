@@ -155,6 +155,30 @@ jobs:
       - name: check-llm-truncation
         run: node scripts/check-llm-truncation.cjs
 
+      # The brand kit must be LOADED by user_id, never accepted from the request
+      # body. Eight edge functions were taking it from the body and using it as
+      # the authenticated user's brand — arbitrary caller-controlled text. Fine
+      # while it only reached prompt strings; client-controlled spend the moment
+      # any kit value influences model routing or credit tier.
+      - name: check-brand-kit-trust
+        run: node scripts/check-brand-kit-trust.cjs
+
+  # ── Edge function type check ──────────────────────────────────────────────
+  # The edge functions are TypeScript that has never been type-checked: the
+  # lockdown plan lists "the first real Deno type-check" as an outstanding
+  # founder-side item. Nothing in CI or on a developer machine compiles them, so
+  # a type error ships and is discovered by a 500 in production.
+  edge-typecheck:
+    name: Edge function type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      - name: deno check
+        run: deno check supabase/functions/**/index.ts supabase/functions/_shared/*.ts
+
   # ── Worker unit tests ─────────────────────────────────────────────────────
   # The Python worker had no test job at all. `_repair_cookie_newlines` was
   # described in the lockdown plan as "unit-tested four ways", but no test file

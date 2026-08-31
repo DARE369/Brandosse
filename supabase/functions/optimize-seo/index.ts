@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
 import { callLlm } from "../_shared/llm.ts";
 import { readEnv } from "../_shared/env.ts";
 import { createHttpError } from "../_shared/org.ts";
@@ -154,7 +155,7 @@ Return ONLY valid JSON:
           content: [
             `Platform: ${platform}`,
             `Media type: ${mediaType}`,
-            `Brand context:\n${buildBrandContext(body.brandKit)}`,
+            `Brand context:\n${buildBrandSummary(await loadBrandKit(authClient, user.id))}`,
             targetKeywords.length > 0 ? `Target keywords: ${targetKeywords.join(", ")}` : "",
             title ? `Current title:\n${title}` : "",
             `Current caption:\n${caption}`,

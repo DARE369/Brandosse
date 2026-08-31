@@ -14,6 +14,7 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { generateImageEdit, FAL_COST_USD, FAL_MODELS } from "../_shared/fal.service.ts";
 import { callPromptEngine } from "../_shared/llm.ts";
@@ -120,7 +121,7 @@ serve(async (req) => {
     let finalPrompt = rawPrompt;
     if (body.enhance_prompt !== false) {
       try {
-        const brandContext = buildBrandContext(body.brandKit);
+        const brandContext = buildBrandSummary(await loadBrandKit(authClient, user.id));
         finalPrompt = await callPromptEngine({
           systemPrompt: `You are an expert AI image-editing prompt engineer for FLUX.1 Kontext Pro.
 Rewrite the user's edit instruction to be precise and unambiguous about what should change in the source image.

@@ -4,6 +4,7 @@ import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorP
 import { createHttpError } from "../_shared/org.ts";
 import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import { createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { loadBrandKit } from "../_shared/brandKit.ts";
 
 type EnhancePromptRequest = {
   prompt: string;
@@ -182,7 +183,7 @@ serve(async (req) => {
     const prompt = String(body.prompt || "").trim();
     const variantCount = clampVariantCount(body.variantCount);
     const previousPrompts = normalizePromptList(body.previousPrompts);
-    const brandContext = normalizeBrandContext(body.brandKit);
+    const brandContext = normalizeBrandContext(await loadBrandKit(authClient, user.id));
     const contentType = typeof body.contentType === "string" ? body.contentType : undefined;
     const mediaType = typeof body.mediaType === "string" ? body.mediaType : undefined;
     const imageModel = typeof body.imageModel === "string" ? body.imageModel : undefined;

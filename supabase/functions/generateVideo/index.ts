@@ -28,6 +28,7 @@ import { createHttpError } from "../_shared/org.ts";
 import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import { reserveCredits } from "../_shared/generationIdempotency.ts";
 import { readEnv } from "../_shared/env.ts";
+import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
 
 const CREDITS_STD_VIDEO = 5;
 const CREDITS_PRO_VIDEO = 15;
@@ -38,6 +39,10 @@ type GenerateVideoBody = {
   image_url?: string;
   duration?: FalVideoDuration;
   aspect_ratio?: FalVideoAspect;
+  /** IGNORED since 2026-08-31. The kit is loaded server-side by user_id.
+   *  Accepting it from the body meant using attacker-chosen text as the
+   *  authenticated user's brand. Still declared so older clients that send
+   *  it are not rejected — the value is simply never read. */
   brandKit?: Record<string, unknown>;
   enhance_prompt?: boolean;
   session_id?: string;
@@ -47,16 +52,10 @@ type GenerateVideoBody = {
   request_id?: string;
 };
 
-function buildBrandContext(brandKit: Record<string, unknown> | undefined): string {
-  if (!brandKit) return "";
-  const raw = (typeof brandKit.raw === "object" && brandKit.raw !== null)
-    ? brandKit.raw as Record<string, unknown> : brandKit;
-  return [
-    raw.brand_name ? `Brand: ${raw.brand_name}` : "",
-    Array.isArray(raw.visual_style_keywords)
-      ? `Visual style: ${(raw.visual_style_keywords as string[]).join(", ")}` : "",
-  ].filter(Boolean).join(". ");
-}
+// buildBrandContext() lived here and read 2 of 17 fields — brand_name and
+// visual_style_keywords — from a kit supplied by the client. Both halves of
+// that were wrong. Replaced by _shared/brandKit.ts: loaded by user_id,
+// summarised across every field that earns its place in a prompt.
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -130,7 +129,14 @@ serve(async (req) => {
     let finalPrompt = rawPrompt;
     if (body.enhance_prompt !== false) {
       try {
-        const brandCtx = buildBrandContext(body.brandKit);
+        // Loaded by user_id, never from body.brandKit. visualOnly drops the
+        // copy-level fields: this prompt is compressed hard downstream, so
+        // writing style and hashtag rules would only crowd out the visual
+        // direction the model can actually act on.
+        const brandCtx = buildBrandSummary(
+          await loadBrandKit(adminClient, user.id),
+          { visualOnly: true },
+        );
         finalPrompt = await callPromptEngine({
           systemPrompt: `You are an expert AI video generation prompt engineer.
 Rewrite the prompt for ${quality === "premium" ? "Kling 2.5 Pro (cinematic quality)" : "Hailuo 2.3 (fluid 1080p)"}.

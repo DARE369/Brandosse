@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
 import { callLlm } from "../_shared/llm.ts";
 import { readEnv } from "../_shared/env.ts";
 import { createHttpError } from "../_shared/org.ts";
@@ -90,7 +91,7 @@ serve(async (req) => {
     }
 
     const platform = String(body.platform || "instagram").trim().toLowerCase();
-    const brandContext = buildBrandContext(body.brandKit);
+    const brandContext = buildBrandSummary(await loadBrandKit(authClient, user.id));
     const previousCaptions = Array.isArray(body.previousCaptions)
       ? body.previousCaptions.map((caption) => String(caption || "").trim()).filter(Boolean).slice(0, 5)
       : [];

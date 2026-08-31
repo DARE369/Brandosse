@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { callLlm } from "../_shared/llm.ts";
 
@@ -97,14 +98,14 @@ serve(async (req) => {
 
   try {
     const authClient = createAuthClient(req.headers.get("Authorization"));
-    await requireUser(authClient);
+    const user = await requireUser(authClient);
 
     const body = await parseJsonBody<SuggestionsRequest>(req);
     const count = normalizeCount(body.count);
     const mode = getMode(body.mode);
     const seed = crypto.randomUUID().slice(0, 8);
 
-    const userPrompt = `Randomization seed: ${seed}\nCurrent date: ${new Date().toISOString()}\n\nBrand context:\n${buildBrandContext(body.brandKit)}\n\nGenerate the suggestions now.`;
+    const userPrompt = `Randomization seed: ${seed}\nCurrent date: ${new Date().toISOString()}\n\nBrand context:\n${buildBrandSummary(await loadBrandKit(authClient, user.id))}\n\nGenerate the suggestions now.`;
 
     let parsed: SuggestionsResponse | null = null;
     try {

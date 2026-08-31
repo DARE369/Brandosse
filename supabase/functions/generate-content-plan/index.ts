@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callLlm } from "../_shared/llm.ts";
 import { createAuthClient, requireUser } from "../_shared/supabase.ts";
+import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
 import { createHttpError } from "../_shared/org.ts";
 import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
@@ -175,7 +176,11 @@ function buildRevisionUserMessage(
   violations: string[],
   brandKit?: Record<string, unknown>,
 ): string {
-  const brandSummary = typeof brandKit?.summary === "string" ? brandKit.summary : "none";
+  // Was `brandKit?.summary` — a field the CLIENT used to assemble and send.
+  // The kit now arrives as its database row (loaded by user_id), which has no
+  // `summary` column, so reading it would silently degrade every revision to
+  // "none" while looking like it still worked.
+  const brandSummary = buildBrandSummary(brandKit ?? null) || "none";
 
   return `
 ContentPlan (JSON):
@@ -272,7 +277,7 @@ serve(async (req) => {
       if (!violations.length) {
         throw createHttpError("Missing violations", 400);
       }
-      return jsonResponse(await revisePlan(body.plan, violations, body.brandKit));
+      return jsonResponse(await revisePlan(body.plan, violations, await loadBrandKit(authClient, user.id)));
     }
 
     if (!body.brief || typeof body.brief !== "object") {

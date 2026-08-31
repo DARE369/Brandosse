@@ -15,6 +15,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import type { DatabaseClient } from "../_shared/supabase.ts";
+import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { generateImageByModel, aspectToFalImageSize, type FalImageModel } from "../_shared/fal.service.ts";
 import { compositeLogo, type LogoPosition } from "../_shared/composite.ts";
@@ -31,6 +32,10 @@ type GenerateImageBody = {
   aspect_ratio?: string;
   output_format?: "jpeg" | "png";
   seed?: number;
+  /** IGNORED since 2026-08-31 — the kit is loaded server-side by user_id.
+   *  Accepting it from the body meant treating attacker-chosen text as the
+   *  authenticated user's brand. Kept in the type so older clients that
+   *  still send it are not rejected; the value is never read. */
   brandKit?: Record<string, unknown>;
   enhance_prompt?: boolean;
   session_id?: string;
@@ -123,21 +128,6 @@ async function resolveBrandLogo(
   };
 }
 
-function buildBrandContext(brandKit: Record<string, unknown> | undefined): string {
-  if (!brandKit) return "";
-  const raw = (typeof brandKit.raw === "object" && brandKit.raw !== null)
-    ? brandKit.raw as Record<string, unknown>
-    : brandKit;
-  return [
-    raw.brand_name ? `Brand: ${raw.brand_name}` : "",
-    raw.target_audience ? `Audience: ${raw.target_audience}` : "",
-    raw.brand_voice ? `Brand voice: ${raw.brand_voice}` : "",
-    Array.isArray(raw.tone_descriptors) ? `Tone: ${(raw.tone_descriptors as string[]).join(", ")}` : "",
-    Array.isArray(raw.visual_style_keywords) ? `Visual style: ${(raw.visual_style_keywords as string[]).join(", ")}` : "",
-    raw.photo_style_notes ? `Photo style: ${raw.photo_style_notes}` : "",
-    Array.isArray(raw.avoid_visual_elements) ? `Avoid: ${(raw.avoid_visual_elements as string[]).join(", ")}` : "",
-  ].filter(Boolean).join(". ");
-}
 
 // Model-aware enhancer instructions (1.3). Each fal image model responds to
 // different prompt vocabulary — using FLUX's photographic language on Ideogram
@@ -284,7 +274,11 @@ serve(async (req) => {
     // it's a single pass whose instructions match the engine being used.
     let finalPrompt        = rawPrompt;
     const shouldEnhance    = body.enhance_prompt !== false;
-    const brandContext     = buildBrandContext(body.brandKit);
+    // Loaded by user_id, never from the request body. The logo already
+    // resolved server-side (resolveBrandLogo above); the text fields were
+    // the half still being trusted from the client.
+    const serverKit        = await loadBrandKit(adminClient, user.id);
+    const brandContext     = buildBrandSummary(serverKit, { visualOnly: true });
 
     if (shouldEnhance) {
       try {
@@ -301,10 +295,7 @@ serve(async (req) => {
     // ── Generate via the chosen fal.ai model ──────────────────────────────────
     const startedAt = Date.now();
     const imageSize = aspectToFalImageSize(body.aspect_ratio ?? "1:1");
-    const rawKit = (body.brandKit && typeof body.brandKit.raw === "object" && body.brandKit.raw !== null)
-      ? body.brandKit.raw as Record<string, unknown>
-      : (body.brandKit ?? {});
-    const brandColors = extractBrandColors(rawKit);
+    const brandColors = extractBrandColors((serverKit ?? {}) as Record<string, unknown>);
 
     const referenceUrls = Array.isArray(body.reference_image_urls)
       ? body.reference_image_urls.filter((u) => typeof u === "string" && u.trim()).slice(0, 9)
