@@ -14,7 +14,12 @@ from database import (
     mark_clip_render_failed,
     update_clip_render_complete,
 )
-from brand_kit import load_brand_kit, palette_colours, screen_hook_title
+from brand_kit import (
+    hook_overlay_colors,
+    load_brand_kit,
+    palette_colours,
+    screen_hook_title,
+)
 from errors import RenderError
 from logger import log
 from utils.caption_generator import generate_karaoke_captions
@@ -177,7 +182,7 @@ def _fitted_fontsize(text: str, frame_w: int) -> int:
     return max(HOOK_MIN_FONTSIZE, min(HOOK_MAX_FONTSIZE, raw))
 
 
-def _build_hook_text_filter(ai_title, frame_w: int = 608) -> str:
+def _build_hook_text_filter(ai_title, frame_w: int = 608, colors: dict = None) -> str:
     """
     Build an FFmpeg drawtext filter string for the hook text overlay.
 
@@ -212,6 +217,13 @@ def _build_hook_text_filter(ai_title, frame_w: int = 608) -> str:
     if not escaped:
         return ""
 
+    # White on a 55%-black box is the default. A brand palette replaces the
+    # box fill, and the text colour is then derived from that fill's
+    # luminance rather than chosen — see brand_kit.hook_overlay_colors.
+    colors = colors or {}
+    fontcolor = colors.get("fontcolor", "white")
+    boxcolor = colors.get("boxcolor", "black@0.55")
+
     # Size the text to the frame it will actually be drawn on. drawtext cannot
     # wrap, so the only way to guarantee fit is to shrink: aim for ~90% of the
     # frame width at ~0.6 x fontsize average glyph width, clamped to stay
@@ -225,9 +237,9 @@ def _build_hook_text_filter(ai_title, frame_w: int = 608) -> str:
         f":x=(w-text_w)/2"
         f":y=50"
         f":fontsize={fontsize}"
-        f":fontcolor=white"
+        f":fontcolor={fontcolor}"
         f":box=1"
-        f":boxcolor=black@0.55"
+        f":boxcolor={boxcolor}"
         f":boxborderw=12"
         f":enable='between(t,0,5)'"
     )
@@ -244,6 +256,7 @@ async def _render_split_layout(
     pip_region,
     captions_file,
     output_path: str,
+    hook_colors: dict = None,
 ) -> str:
     """
     Render a SPLIT-scene clip as a stacked or side-by-side layout.
@@ -299,7 +312,9 @@ async def _render_split_layout(
         else:
             vf = [f"[0:v]scale={out_w}:{out_h}:flags=lanczos,format=yuv420p[stacked]"]
 
-    hook_filter = _build_hook_text_filter(clip.get("ai_title") if clip else None, frame_w=out_w)
+    hook_filter = _build_hook_text_filter(
+        clip.get("ai_title") if clip else None, frame_w=out_w, colors=hook_colors
+    )
 
     if captions_file:
         captions_escaped = captions_file.replace("\\", "/").replace(":", "\\:")
@@ -363,6 +378,7 @@ async def _render_single_clip(
     user_id: str,
     job: dict = None,
     brand_colors: dict = None,
+    brand_kit_row: dict = None,
 ) -> dict:
     """
     Render and upload one clip independently.
@@ -412,6 +428,10 @@ async def _render_single_clip(
         # Pre-allocate temp file paths (cleaned up in finally block)
         output_path = os.path.join(temp_dir, f"clip_{clip_id}_final.mp4")
         thumb_path = os.path.join(temp_dir, f"clip_{clip_id}_thumb.jpg")
+
+        # drawtext needs 0xRRGGBB, not the ASS &HAABBGGRR the captions use, so
+        # the hook colours are derived separately from the same kit.
+        hook_colors = hook_overlay_colors(brand_kit_row)
 
         ass_path = await asyncio.to_thread(
             generate_karaoke_captions,
@@ -557,6 +577,7 @@ async def _render_single_clip(
                     pip_region=pip_region,
                     captions_file=ass_path,
                     output_path=output_path,
+                    hook_colors=hook_colors,
                 )
                 split_rendered = True
 
@@ -644,7 +665,9 @@ async def _render_single_clip(
         # render there unless WORKER_ALLOW_UPSCALE). If upscaling is on, the
         # hook comes out slightly small on the bigger canvas — never oversized.
         hook_frame_w = crop_coords.get("crop_width") or 608
-        hook_filter = _build_hook_text_filter(clip_score_data.get("ai_title"), frame_w=hook_frame_w)
+        hook_filter = _build_hook_text_filter(
+            clip_score_data.get("ai_title"), frame_w=hook_frame_w, colors=hook_colors
+        )
 
         if not split_rendered:
             render_ok, render_result = await asyncio.to_thread(
@@ -903,6 +926,7 @@ async def run_render(
                 user_id=user_id,
                 job=job,
                 brand_colors=brand_colors,
+                brand_kit_row=brand,
             )
 
     render_tasks = []

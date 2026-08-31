@@ -45,7 +45,14 @@ class _Log:
 _log.log = _Log()
 sys.modules.setdefault("logger", _log)
 
-from brand_kit import screen_text, screen_hook_title, palette_colours, _hex_to_ass  # noqa: E402
+from brand_kit import (  # noqa: E402
+    screen_text,
+    screen_hook_title,
+    palette_colours,
+    hook_overlay_colors,
+    _hex_to_ass,
+    _relative_luminance,
+)
 
 failures = []
 
@@ -138,6 +145,48 @@ check("no palette returns nothing, so existing defaults survive",
 
 check("unparseable palette entries are skipped, not rendered wrong",
       palette_colours({"color_palette": [{"hex": "bogus", "usage": "primary"}]}), {})
+
+# ── Hook overlay contrast ───────────────────────────────────────────────────
+# The hook card is a solid fill burned into the frame. The brand picks the box;
+# the text colour is DERIVED from it. Letting a brand choose both independently
+# is how you ship white text on a pale yellow box.
+
+check("pure white has luminance 1.0", round(_relative_luminance("#FFFFFF"), 3), 1.0)
+check("pure black has luminance 0.0", round(_relative_luminance("#000000"), 3), 0.0)
+
+# Gamma matters. Mid-grey #808080 is 50% of the byte range but ~21% of the
+# light. Averaging raw bytes would call this "light" and pick black text for a
+# box most people read as dark.
+check("mid grey is linearised, not byte-averaged",
+      _relative_luminance("#808080") < 0.25, True)
+
+# Green dominates perceived brightness (0.7152 of the weighting); blue barely
+# registers. A naive average would rank these two the same.
+check("pure green reads as light", _relative_luminance("#00FF00") > 0.6, True)
+check("pure blue reads as dark", _relative_luminance("#0000FF") < 0.1, True)
+
+check("garbage luminance returns None", _relative_luminance("nope"), None)
+
+dark = hook_overlay_colors({"color_palette": [{"hex": "#0B1F3A", "usage": "primary"}]})
+check("a dark brand box gets white text", dark.get("fontcolor"), "white")
+check("and the box takes the brand colour", dark.get("boxcolor"), "0x0B1F3A@0.55")
+
+light = hook_overlay_colors({"color_palette": [{"hex": "#FFE45C", "usage": "primary"}]})
+check("a light brand box gets black text", light.get("fontcolor"), "black")
+check("and still takes the brand colour", light.get("boxcolor"), "0xFFE45C@0.55")
+
+check("no palette leaves the white-on-black default in place",
+      hook_overlay_colors({"color_palette": []}), {})
+check("no kit leaves the default in place", hook_overlay_colors(None), {})
+check("an unparseable palette leaves the default in place",
+      hook_overlay_colors({"color_palette": [{"hex": "###", "usage": "primary"}]}), {})
+
+check("a usage label wins over position",
+      hook_overlay_colors({"color_palette": [
+          {"hex": "#FFE45C", "usage": "background"},
+          {"hex": "#0B1F3A", "usage": "primary"},
+      ]}).get("boxcolor"),
+      "0x0B1F3A@0.55")
 
 # ── Caption presets overlaid with a brand palette ───────────────────────────
 sys.path.insert(0, os.path.join(WORKER, "utils"))

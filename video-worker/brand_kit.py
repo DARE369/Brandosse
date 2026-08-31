@@ -147,6 +147,95 @@ def _hex_to_ass(hex_colour: str, alpha: str = "00") -> Optional[str]:
     return f"&H{alpha}{b}{g}{r}".upper()
 
 
+def _relative_luminance(hex_colour: str) -> Optional[float]:
+    """
+    WCAG relative luminance (0.0 black — 1.0 white) for an #RRGGBB colour.
+
+    sRGB channels are gamma-encoded, so they must be linearised before
+    weighting; averaging the raw bytes instead — the common shortcut — puts
+    mid-blues and mid-yellows on the wrong side of any threshold, which is
+    exactly the case that decides whether text is readable.
+    """
+    value = str(hex_colour or "").strip().lstrip("#")
+    if len(value) == 3:
+        value = "".join(ch * 2 for ch in value)
+    if len(value) != 6 or not re.fullmatch(r"[0-9a-fA-F]{6}", value):
+        return None
+
+    def channel(pair: str) -> float:
+        c = int(pair, 16) / 255.0
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = channel(value[0:2]), channel(value[2:4]), channel(value[4:6])
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _first_usable_hex(kit: Optional[dict]) -> Optional[str]:
+    """The brand's primary colour as #RRGGBB, preferring an explicit usage label."""
+    if not kit:
+        return None
+    palette = kit.get("color_palette")
+    if not isinstance(palette, list):
+        return None
+
+    labelled = None
+    positional = None
+    for entry in palette:
+        if not isinstance(entry, dict):
+            continue
+        raw = str(entry.get("hex", "")).strip()
+        if _relative_luminance(raw) is None:
+            continue
+        if positional is None:
+            positional = raw
+        usage = str(entry.get("usage", "")).lower()
+        if labelled is None and ("primary" in usage or "brand" in usage):
+            labelled = raw
+    return labelled or positional
+
+
+def hook_overlay_colors(kit: Optional[dict]) -> dict:
+    """
+    Colours for the burned-in hook card, as FFmpeg drawtext values.
+
+    Returns {} when the kit has no usable palette, so the caller keeps its
+    existing white-on-black default rather than rendering something
+    half-branded.
+
+    The box takes the brand colour; the TEXT colour is then *derived*, not
+    chosen — black on a light box, white on a dark one. This is the whole
+    reason this function exists rather than a straight substitution: the hook
+    card is a solid fill, so letting a brand set both colours independently is
+    how you ship white text on a pale yellow box. The brand picks the box;
+    contrast is not theirs to lose.
+
+    Alpha stays at the preset 0.55 so the underlying footage still reads
+    through, which is what makes the card feel like an overlay rather than a
+    banner.
+    """
+    brand_hex = _first_usable_hex(kit)
+    if not brand_hex:
+        return {}
+
+    luminance = _relative_luminance(brand_hex)
+    if luminance is None:
+        return {}
+
+    normalised = str(brand_hex).strip().lstrip("#")
+    if len(normalised) == 3:
+        normalised = "".join(ch * 2 for ch in normalised)
+
+    # 0.45 rather than 0.5: the box is drawn at 55% opacity over video, which
+    # lightens dark fills more than it darkens light ones, so the crossover
+    # sits slightly below the midpoint.
+    text_colour = "black" if luminance > 0.45 else "white"
+
+    return {
+        "boxcolor": f"0x{normalised.upper()}@0.55",
+        "fontcolor": text_colour,
+    }
+
+
 def palette_colours(kit: Optional[dict]) -> dict:
     """
     Extract usable ASS colours from `color_palette`.
