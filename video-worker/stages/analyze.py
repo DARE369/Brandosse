@@ -11,6 +11,9 @@ from database import supabase, delete_clips_for_job
 from errors import AnalysisError
 from logger import log
 from anthropic import AsyncAnthropic
+from typing import Optional
+
+from brand_kit import _phrases, load_brand_kit, neutral_title, screen_text
 
 MIN_CLIP_SECONDS = 15
 # The prompt ASKS for 90 seconds; this ENFORCES it. Measured 2026-08-23: asked
@@ -219,6 +222,158 @@ def snap_to_word_boundary(target_time: float, word_segments: list, snap_type: st
         return min(word_segments, key=lambda w: abs(w["start"] - target_time))["start"]
 
 
+async def _semantic_violations(
+    titles: list[str], restrictions: list[str], client, job_id: str
+) -> dict:
+    """
+    Ask the model which titles break the brand's prose restrictions.
+
+    Returns {index: reason}. Batched into ONE call for the whole job rather
+    than one per title — the restrictions are identical across clips, so
+    per-title calls would pay N times for the same context.
+
+    Only runs when the brand actually wrote prose restrictions, so the common
+    case costs nothing. Never raises: a failed screen degrades to "no semantic
+    violations found" and logs, because the deterministic phrase screen has
+    already run and a job the user paid for must not die here.
+    """
+    if not titles or not restrictions:
+        return {}
+
+    numbered = "\n".join(f"{i}: {t}" for i, t in enumerate(titles) if t)
+    if not numbered.strip():
+        return {}
+
+    rules = "\n".join(f"- {r}" for r in restrictions)
+    try:
+        message = await client.messages.create(
+            model="claude-sonnet-4-6",
+            # short-output: a compliance verdict, not content — a handful of
+            # {index, reason} pairs. Truncation is detected below.
+            max_tokens=1000,
+            system=(
+                "You check short video hook titles against a brand's content "
+                "restrictions. Return ONLY JSON: "
+                '{"violations": [{"index": <int>, "reason": "<short>"}]}. '
+                "Report a title only when it clearly breaks a stated rule. "
+                "Do not flag a title for being dull, vague or lowercase — you "
+                "are checking compliance, not quality, and a false positive "
+                "silently discards a good title."
+            ),
+            messages=[{
+                "role": "user",
+                "content": f"Restrictions:\n{rules}\n\nTitles:\n{numbered}",
+            }],
+        )
+        if message.stop_reason == "max_tokens":
+            log.warning("title_semantic_screen_truncated", job_id=job_id)
+            return {}
+
+        raw = message.content[0].text.strip()
+        start, end = raw.find("{"), raw.rfind("}") + 1
+        if start == -1 or end <= start:
+            return {}
+        parsed = json.loads(raw[start:end])
+
+        out = {}
+        for entry in parsed.get("violations", []):
+            try:
+                out[int(entry["index"])] = str(entry.get("reason", "restricted content"))[:120]
+            except (KeyError, TypeError, ValueError):
+                continue
+        return out
+    except Exception as e:
+        log.warning("title_semantic_screen_failed", job_id=job_id, error=str(e)[:160])
+        return {}
+
+
+async def _regenerate_title(original: str, problem: str, client, job_id: str) -> Optional[str]:
+    """One replacement attempt for a title that broke a brand rule."""
+    try:
+        message = await client.messages.create(
+            model="claude-sonnet-4-6",
+            # short-output: one 5-10 word title. Truncation is detected below.
+            max_tokens=200,
+            system=(
+                "Rewrite a short video hook title so it no longer breaks a "
+                "brand rule, keeping the same subject and energy. 5-10 words. "
+                "Return ONLY the new title, with no quotes or explanation."
+            ),
+            messages=[{
+                "role": "user",
+                "content": f'Title: "{original}"\nRule it breaks: {problem}',
+            }],
+        )
+        if message.stop_reason == "max_tokens":
+            return None
+        text = message.content[0].text.strip().strip('"').strip()
+        return text or None
+    except Exception as e:
+        log.warning("title_regeneration_failed", job_id=job_id, error=str(e)[:160])
+        return None
+
+
+async def _enforce_title_policy(clips: list, kit, client, job_id: str) -> None:
+    """
+    Bring every hook title into compliance, in place.
+
+    Escalation, cheapest first:
+      1. Deterministic phrase screen — free.
+      2. Semantic screen against prose restrictions — one batched call, and
+         only when the brand wrote any.
+      3. One regeneration per offending title, told what it broke.
+      4. Re-screen the replacement. Still bad -> a neutral placeholder.
+
+    Two attempts is the limit by design: at that point the model has twice
+    produced something the brand forbids, and a third guess is likelier to
+    violate again than to land. Every substitution is logged — a title the
+    brand never approved must not appear silently.
+    """
+    if not clips:
+        return
+
+    restrictions = _phrases(kit, "content_restrictions") if kit else []
+    titles = [str(c.get("title") or "") for c in clips]
+
+    problems: dict = {}
+    for i, title in enumerate(titles):
+        hits = screen_text(title, kit)
+        if hits:
+            problems[i] = f"uses the forbidden phrase(s): {', '.join(hits)}"
+
+    for idx, reason in (await _semantic_violations(titles, restrictions, client, job_id)).items():
+        if 0 <= idx < len(clips):
+            problems.setdefault(idx, reason)
+
+    if not problems:
+        return
+
+    log.warning(
+        "hook_titles_violate_brand_rules",
+        job_id=job_id,
+        count=len(problems),
+        total=len(clips),
+    )
+
+    for idx, reason in problems.items():
+        original = titles[idx]
+        replacement = await _regenerate_title(original, reason, client, job_id)
+
+        if replacement and not screen_text(replacement, kit):
+            clips[idx]["title"] = replacement
+            log.info("hook_title_regenerated", job_id=job_id, clip_index=idx)
+            continue
+
+        clips[idx]["title"] = neutral_title(idx)
+        log.warning(
+            "hook_title_replaced_with_placeholder",
+            job_id=job_id,
+            clip_index=idx,
+            reason=reason,
+            message="Two attempts broke the brand's rules; using a neutral title.",
+        )
+
+
 async def run_analyze(job: dict, transcript: dict) -> list[dict]:
     """
     Analyze transcript and identify viral clip candidates.
@@ -372,6 +527,18 @@ async def run_analyze(job: dict, transcript: dict) -> list[dict]:
 
     if not clips_analysis:
         raise AnalysisError("No clips returned from Claude", job_id)
+
+    # ── Brand policy on hook titles ──────────────────────────────────────────
+    # Titles are written by the model above and burned into H.264 downstream,
+    # where they cannot be corrected without a paid re-render. Enforce the
+    # brand's rules here, while regeneration is still cheap and the client is
+    # already open.
+    await _enforce_title_policy(
+        clips_analysis,
+        load_brand_kit(job.get("user_id") if isinstance(job, dict) else None),
+        client,
+        job_id,
+    )
 
     # Validate and create clip records
     created_clips = []

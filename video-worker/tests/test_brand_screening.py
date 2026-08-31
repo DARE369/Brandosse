@@ -46,6 +46,8 @@ _log.log = _Log()
 sys.modules.setdefault("logger", _log)
 
 from brand_kit import (  # noqa: E402
+    banned_phrases,
+    neutral_title,
     screen_text,
     screen_hook_title,
     palette_colours,
@@ -145,6 +147,32 @@ check("no palette returns nothing, so existing defaults survive",
 
 check("unparseable palette entries are skipped, not rendered wrong",
       palette_colours({"color_palette": [{"hex": "bogus", "usage": "primary"}]}), {})
+
+# ── Derived phrases from prose restrictions ─────────────────────────────────
+# "No alcohol references" cannot be literal-matched; "beer", "wine" can. The
+# prose is reduced ONCE at kit-save time into derived_banned_phrases, so
+# screening costs a string match instead of an LLM call per render.
+
+DERIVED = {"forbidden_phrases": ["cheap"], "derived_banned_phrases": ["beer", "wine"]}
+
+check("derived phrases are screened alongside the user's own",
+      screen_text("Grab a beer with us", DERIVED), ["beer"])
+check("the user's own phrases still screen",
+      screen_text("The cheap option", DERIVED), ["cheap"])
+check("both sources merge",
+      banned_phrases(DERIVED), ["cheap", "beer", "wine"])
+
+# The two columns are stored separately so authorship stays unambiguous, but a
+# duplicate across them must not be reported twice.
+check("a phrase in both columns is not duplicated",
+      banned_phrases({"forbidden_phrases": ["Cheap"], "derived_banned_phrases": ["cheap"]}),
+      ["Cheap"])
+check("a missing derived column is fine",
+      banned_phrases({"forbidden_phrases": ["cheap"]}), ["cheap"])
+check("no kit yields no phrases", banned_phrases(None), [])
+
+check("the neutral fallback is 1-indexed for humans", neutral_title(0), "Clip 1")
+check("and counts up", neutral_title(4), "Clip 5")
 
 # ── Hook overlay contrast ───────────────────────────────────────────────────
 # The hook card is a solid fill burned into the frame. The brand picks the box;

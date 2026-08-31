@@ -55,6 +55,7 @@ Return ONLY valid JSON matching this exact schema:
     "emoji_usage": "",
     "call_to_action_style": "",
     "content_restrictions": [],
+    "derived_banned_phrases": [],
     "competitor_names": [],
     "legal_disclaimers": "",
     "visual_style_keywords": [],
@@ -77,6 +78,13 @@ Field rules:
 - call_to_action_style must be exactly ONE of: question-based, imperative, soft.
 - color_palette entries need real hex codes when visible in the source; omit an entry rather than guessing a hex you cannot support.
 - font_display/font_body: only fill in a family/style if the source text names actual typefaces; otherwise return null for that field.
+- derived_banned_phrases: for EACH entry in content_restrictions, list the literal words a
+  writer would actually use if they broke that rule. "No alcohol references" -> ["beer",
+  "wine", "vodka", "cocktail"]. "Never name competitors" -> the competitor names themselves.
+  These are matched literally and case-insensitively against generated copy, so give single
+  words or short phrases, never sentences. Omit a restriction entirely if it cannot be
+  reduced to literal words ("avoid anything that implies a guarantee") — a bad guess here
+  silently suppresses good copy, which is worse than not catching the rule.
 - content_restrictions is CONTENT-level (topics/claims to avoid saying). avoid_visual_elements is VISUAL-level (imagery/photo styles to avoid, e.g. "stock photography", "drop shadows"). Keep these separate.
 - Confidence values must be 0.0 to 1.0 numbers.
 - Do not include markdown.
@@ -255,6 +263,7 @@ function buildFallbackResult(brandNameHint: string) {
     emoji_usage: "",
     call_to_action_style: "",
     content_restrictions: [],
+    derived_banned_phrases: [],
     competitor_names: [],
     legal_disclaimers: "",
     visual_style_keywords: [],
@@ -298,6 +307,10 @@ function normalizeExtraction(parsed: any, brandNameHint: string) {
     emoji_usage: toEnum(sourceKit.emoji_usage, VALID_EMOJI_USAGE),
     call_to_action_style: toEnum(sourceKit.call_to_action_style, VALID_CTA_STYLES),
     content_restrictions: toArray(sourceKit.content_restrictions),
+    // Machine-derived from content_restrictions, kept in its own column so the
+    // user never opens their kit and finds words they did not write. See
+    // migration 20260831020000 and video-worker/brand_kit.py banned_phrases().
+    derived_banned_phrases: toArray(sourceKit.derived_banned_phrases),
     competitor_names: toArray(sourceKit.competitor_names),
     legal_disclaimers: String(sourceKit.legal_disclaimers || "").trim(),
     visual_style_keywords: toArray(sourceKit.visual_style_keywords),
@@ -475,7 +488,8 @@ serve(async (req: Request) => {
         "How to read it:",
         "- Phrases the owner says they use often -> signature_phrases.",
         "- Phrases they say to avoid -> forbidden_phrases.",
-        "- Topics, claims, or subjects they say never to post about -> content_restrictions.",
+        "- Topics, claims, or subjects they say never to post about -> content_restrictions,",
+        "  and the literal words that would break each one -> derived_banned_phrases.",
         "- Named competitors they mention -> competitor_names.",
         "- Words describing how the brand should sound -> tone_descriptors, with the fuller description in brand_voice.",
         "- Who buys from them -> target_audience, plus audience_age_range and audience_locations when stated.",

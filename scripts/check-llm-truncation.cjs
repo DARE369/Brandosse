@@ -79,19 +79,44 @@ for (const rel of SCAN) {
     const value = Number(m[1]);
     const context = nearby(src, m.index);
 
-    if (value < MIN_TOKENS) {
-      failures.push(
-        `${rel}: max_tokens=${value} is below the ${MIN_TOKENS} floor. ` +
-        `A structured response cut at this limit is silently incomplete. ` +
-        `Raise it, or add this file to SHORT_BY_DESIGN with a reason.`,
-      );
-    }
+    // The property that actually matters is that truncation is DETECTED. A
+    // call that checks stop_reason cannot silently ship a cut-off response
+    // whatever its limit, so it is safe at any size. This is non-negotiable
+    // and has no opt-out.
+    const checksStopReason = /stop_reason/.test(context);
 
-    if (!/stop_reason/.test(context)) {
+    if (!checksStopReason) {
       failures.push(
         `${rel}: an LLM call sets max_tokens=${value} but no stop_reason check ` +
         `appears near it. A truncated response must be detected and refused, ` +
         `never parsed. See the comment at the top of this script.`,
+      );
+    }
+
+    // The floor is a second line of defence for calls that produce a large
+    // structured payload, where hitting the limit means a failed job even when
+    // detected. It does not apply to a call that is deliberately short AND
+    // detects its own truncation — but the intent has to be declared on the
+    // line above, so "this one is meant to be small" is a decision on the
+    // record rather than an unexplained number.
+    // Look a few lines up, not just one: the declaration is usually the first
+    // line of a short comment block explaining it, and requiring it to be the
+    // immediately preceding line would force the reason to be written last,
+    // which reads backwards.
+    const lineStart = src.lastIndexOf('\n', m.index - 1);
+    let windowStart = lineStart;
+    for (let i = 0; i < 4 && windowStart > 0; i += 1) {
+      windowStart = src.lastIndexOf('\n', windowStart - 1);
+    }
+    const preceding = src.slice(Math.max(0, windowStart), lineStart);
+    const declaredShort = /short-output:\s*\S/.test(preceding);
+
+    if (value < MIN_TOKENS && !declaredShort) {
+      failures.push(
+        `${rel}: max_tokens=${value} is below the ${MIN_TOKENS} floor. ` +
+        `A large structured response cut at this limit fails the job even when ` +
+        `detected. Raise it, or declare the intent on the line above with a ` +
+        `comment: "# short-output: <why this response is small>".`,
       );
     }
   }

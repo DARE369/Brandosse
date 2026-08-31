@@ -72,24 +72,64 @@ def _phrases(kit: Optional[dict], field: str) -> list[str]:
     return [str(v).strip() for v in value if str(v).strip()]
 
 
+def banned_phrases(kit: Optional[dict]) -> list[str]:
+    """
+    Every literal phrase this brand forbids.
+
+    Two sources, deliberately kept separate in storage and merged here:
+
+      `forbidden_phrases`        — what the user typed. Theirs, never rewritten.
+      `derived_banned_phrases`   — literal phrases DERIVED once, at kit-save
+                                    time, from the prose in
+                                    `content_restrictions`. "No alcohol
+                                    references" cannot be literal-matched;
+                                    "beer", "wine", "vodka" can.
+
+    Deriving once per kit rather than per title is the whole point: it turns a
+    rule that would otherwise need an LLM call on every render into a free
+    string match. The semantic check still runs as a backstop for what phrases
+    cannot express — see the caller in stages/analyze.py.
+    """
+    merged = _phrases(kit, "forbidden_phrases") + _phrases(kit, "derived_banned_phrases")
+    seen = set()
+    out = []
+    for phrase in merged:
+        key = phrase.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(phrase)
+    return out
+
+
+def neutral_title(clip_index: int = 0) -> str:
+    """
+    The last-resort hook title, used only when generation could not produce a
+    compliant one.
+
+    Deliberately plain rather than clever: at this point two attempts have
+    already violated the brand's own rules, and a third guess is more likely to
+    violate again than to land. It is never used silently — the caller logs.
+    """
+    return f"Clip {int(clip_index) + 1}"
+
+
 def screen_text(text: str, kit: Optional[dict]) -> list[str]:
     """
-    Return the forbidden phrases that appear in `text`. Empty list means clean.
+    Return the banned phrases that appear in `text`. Empty list means clean.
 
     Matching is case-insensitive and word-boundary aware, so "ace" does not
     match "space" — a substring check would produce false positives that
     suppress legitimate titles, and a suppressed title is itself a quality
     regression.
 
-    Only `forbidden_phrases` is screened here. `content_restrictions` holds
-    prose rules ("no alcohol references") that a literal match cannot evaluate;
-    enforcing those needs a semantic check and is deliberately NOT faked here —
-    claiming to enforce a rule this function cannot evaluate would be worse
-    than not claiming it.
+    Covers both literal sources (see `banned_phrases`). Prose rules in
+    `content_restrictions` that could not be reduced to phrases are handled by
+    the semantic screen in the analyze stage, not here — this function never
+    claims to enforce a rule it cannot evaluate.
     """
     if not text:
         return []
-    forbidden = _phrases(kit, "forbidden_phrases")
+    forbidden = banned_phrases(kit)
     if not forbidden:
         return []
 
