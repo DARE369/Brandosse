@@ -14,6 +14,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { upscaleImage, FAL_MODELS, FAL_COST_USD } from "../_shared/fal.service.ts";
+import { recordCost } from "../_shared/costLedger.ts";
 import { createHttpError } from "../_shared/org.ts";
 import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import { findCachedGeneration, reserveCredits } from "../_shared/generationIdempotency.ts";
@@ -81,6 +82,21 @@ serve(async (req) => {
     // Upscale.
     const startedAt = Date.now();
     const result = await upscaleImage({ image_url: imageUrl, scale: body.scale ?? 2 });
+
+    // LOCK L5.14. Before the URL check: fal has billed this call whether or
+    // not it returned a usable image, and a failed upscale we paid for is
+    // exactly the cost that would otherwise never reach COGS.
+    await recordCost(adminClient, {
+      userId: user.id,
+      provider: "fal",
+      modelId: FAL_MODELS.imageUpscale,
+      callClass: "planned",
+      unitType: "images",
+      units: 1,
+      estimatedCostUsd: FAL_COST_USD.imageUpscale,
+      generationId: body.generation_id ?? null,
+    });
+
     const providerUrl = result.images?.[0]?.url;
     if (!providerUrl) throw new Error("Upscaler returned no image URL");
 

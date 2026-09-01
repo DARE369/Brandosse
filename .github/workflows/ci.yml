@@ -163,6 +163,13 @@ jobs:
       - name: check-brand-kit-trust
         run: node scripts/check-brand-kit-trust.cjs
 
+      # LOCK L5.14. A provider call that is not recorded in the cost ledger is
+      # invisible to every cost control in the system — the retry multiplier,
+      # per-user spend ceilings, real COGS per delivered video, price-drift
+      # detection and invoice reconciliation all read that one table.
+      - name: check-cost-ledger
+        run: node scripts/check-cost-ledger.cjs
+
   # ── Edge function type check ──────────────────────────────────────────────
   # The edge functions are TypeScript that has never been type-checked: the
   # lockdown plan lists "the first real Deno type-check" as an outstanding

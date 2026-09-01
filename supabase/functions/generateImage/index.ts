@@ -16,6 +16,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import type { DatabaseClient } from "../_shared/supabase.ts";
 import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
+import { recordCost } from "../_shared/costLedger.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { generateImageByModel, aspectToFalImageSize, type FalImageModel } from "../_shared/fal.service.ts";
 import { compositeLogo, type LogoPosition } from "../_shared/composite.ts";
@@ -311,6 +312,20 @@ serve(async (req) => {
       recraft_style:   body.recraft_style,
       brand_colors:    imageModel === "recraft" ? brandColors : undefined,
       image_urls:      referenceUrls.length ? referenceUrls : undefined,
+    });
+
+    // LOCK L5.14. Recorded before the URL check: the call has completed and
+    // been billed by fal whether or not it returned a usable image, and a
+    // failed generation we paid for is exactly the kind of cost that would
+    // otherwise never appear in COGS.
+    await recordCost(adminClient, {
+      userId: user.id,
+      provider,
+      modelId,
+      callClass: "planned",
+      unitType: "images",
+      units: 1,
+      estimatedCostUsd: costUsd,
     });
 
     const sourceUrl = result.images?.[0]?.url;

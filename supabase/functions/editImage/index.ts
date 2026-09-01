@@ -17,6 +17,7 @@ import { createAdminClient, createAuthClient, requireUser } from "../_shared/sup
 import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { generateImageEdit, FAL_COST_USD, FAL_MODELS } from "../_shared/fal.service.ts";
+import { recordCost } from "../_shared/costLedger.ts";
 import { callPromptEngine } from "../_shared/llm.ts";
 import { createHttpError } from "../_shared/org.ts";
 import { enforceRateLimit } from "../_shared/rateLimit.ts";
@@ -140,10 +141,24 @@ Rules:
 
     // ── Edit via fal.ai FLUX.1 Kontext Pro ─────────────────────────────────────
     const startedAt = Date.now();
+    // LOCK L5.14 — recorded immediately after the call returns; see below.
     const result = await generateImageEdit({
       prompt:        finalPrompt,
       image_url:     sourceImageUrl,
       aspect_ratio:  body.aspectRatio,
+    });
+
+    // LOCK L5.14. Before the URL check: fal has billed this edit whether or not
+    // it returned a usable image, and a failed edit we paid for is exactly the
+    // cost that would otherwise never reach COGS.
+    await recordCost(adminClient, {
+      userId: user.id,
+      provider: "fal",
+      modelId: FAL_MODELS.imageEditKontext,
+      callClass: "planned",
+      unitType: "images",
+      units: 1,
+      estimatedCostUsd: FAL_COST_USD.imageEditKontext,
     });
 
     const providerUrl = result.images?.[0]?.url;

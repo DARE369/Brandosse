@@ -29,6 +29,7 @@ import { enforceRateLimit } from "../_shared/rateLimit.ts";
 import { reserveCredits } from "../_shared/generationIdempotency.ts";
 import { readEnv } from "../_shared/env.ts";
 import { buildBrandSummary, loadBrandKit } from "../_shared/brandKit.ts";
+import { recordCost } from "../_shared/costLedger.ts";
 
 const CREDITS_STD_VIDEO = 5;
 const CREDITS_PRO_VIDEO = 15;
@@ -227,6 +228,28 @@ Rules:
         { prompt: finalPrompt, image_url: body.image_url, duration, aspect_ratio } as never,
         webhookUrl,
       );
+
+      // LOCK L5.14. Recorded here, immediately after fal accepts, because
+      // this is the moment money is committed — not on completion, which
+      // never arrives for a dropped webhook, and not before submit, which
+      // would book spend for a call that never happened.
+      //
+      // actual_cost_usd stays null: fal does not report per-call cost on
+      // submit. Copying the estimate across would make drift invisible,
+      // which is the whole reason both columns exist. It is filled in by
+      // invoice reconciliation, and its absence is the signal to run one.
+      await recordCost(adminClient, {
+        userId: user.id,
+        provider: "fal",
+        modelId,
+        callClass: "planned",
+        jobId: job.id,
+        generationId: generation.id,
+        units: Number(duration) || null,
+        unitType: "seconds",
+        estimatedCostUsd: costUsd,
+        providerJobId: falRequestId,
+      });
 
       // Best-effort — fal has already accepted the job at this point (the
       // webhook will fire and process-jobs' fallback sweep matches on
