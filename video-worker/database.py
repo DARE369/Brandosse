@@ -338,17 +338,28 @@ def save_clips(job_id: str, user_id: str, clips: list[dict]) -> bool:
         return False
 
 
-def update_clip_render_complete(clip_id: str, storage_path: str, public_url: str, thumbnail_path: str, thumbnail_url: str) -> bool:
-    """Update a clip record after rendering completes."""
+def update_clip_render_complete(clip_id: str, storage_path: str, public_url: str, thumbnail_path: str, thumbnail_url: str, file_size_bytes: int = None) -> bool:
+    """
+    Update a clip record after rendering completes.
+
+    file_size_bytes feeds the per-user storage ceiling that replaced the
+    removed 7-day expiry. It is optional so a caller that cannot determine
+    the size still completes the clip — a clip that renders but reports no
+    size is far better than one that fails over an accounting field. The
+    view counts those rows separately rather than treating them as zero.
+    """
     try:
-        supabase.table("video_clips").update({
+        payload = {
             "storage_path": storage_path,
             "public_url": public_url,
             "thumbnail_path": thumbnail_path,
             "thumbnail_url": thumbnail_url,
             "render_status": "complete",
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }).eq("id", clip_id).execute()
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if file_size_bytes is not None:
+            payload["file_size_bytes"] = int(file_size_bytes)
+        supabase.table("video_clips").update(payload).eq("id", clip_id).execute()
         return True
     except Exception as e:
         log.error("update_clip_render_failed", clip_id=clip_id, error=str(e))

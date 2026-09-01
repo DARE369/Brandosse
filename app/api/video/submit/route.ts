@@ -138,6 +138,39 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ── Storage ceiling ───────────────────────────────────────────────────────
+  // The 7-day clip expiry was removed on 2026-09-01, so nothing reclaims
+  // storage any more. A ceiling replaces it: a limit tells someone they need to
+  // clear space, where a deadline destroyed work they had paid to produce.
+  //
+  // Checked BEFORE credits, deliberately. Both refuse the submission, but this
+  // one is the cheaper conversation — "you are full, delete something" is
+  // actionable immediately, where "buy more credits" is not the right thing to
+  // say to someone who is about to hit a wall anyway.
+  //
+  // Read failure does NOT block. A storage ceiling is a cost control, and a
+  // cost control that takes the product down when its own query fails has cost
+  // more than it saved. It logs and lets the submission through.
+  const { data: usage, error: usageError } = await supabaseAdmin
+    .from('user_storage_usage')
+    .select('bytes_used, clips_unmeasured')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (usageError) {
+    console.error('[VideoSubmit] storage usage read failed (allowing submit):', usageError);
+  } else if (usage && Number(usage.bytes_used) >= VIDEO_ENGINE_CONSTANTS.CLIP_STORAGE_CEILING_BYTES) {
+    const usedGb = (Number(usage.bytes_used) / 1_000_000_000).toFixed(1);
+    const capGb = (VIDEO_ENGINE_CONSTANTS.CLIP_STORAGE_CEILING_BYTES / 1_000_000_000).toFixed(0);
+    return errorResponse(
+      `Your clip storage is full — ${usedGb} GB of ${capGb} GB. Delete some clips or ` +
+      `whole jobs to free space, then submit again. Nothing is deleted automatically, ` +
+      `so anything you have is still there.`,
+      'STORAGE_LIMIT_REACHED',
+      507,
+    );
+  }
+
   const { data: creditsData, error: creditsError } = await supabaseAdmin
     .from('user_credits')
     .select('balance')

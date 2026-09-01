@@ -21,6 +21,18 @@ export const VIDEO_ENGINE_CONSTANTS = {
   // CLIP_RETENTION_DAYS any more: clips are kept until the user deletes them.
   TERMINAL_STATUSES: ['complete', 'failed'] as const,
 
+  // Per-user clip storage ceiling, in bytes. This replaced the 7-day expiry
+  // removed on 2026-09-01 — a limit rather than a deadline, because a limit
+  // asks someone to clear space where a deadline destroyed work they had
+  // paid to produce.
+  //
+  // 20 GB is a starting number, not a derived one. It is roughly 700 clips
+  // at observed sizes, which is far more than any current user holds, so it
+  // bounds the runaway case without being reachable in normal use. The cost
+  // ledger (L5.14) is what will make the real distribution visible; revisit
+  // this against actual bytes-per-user rather than against intuition.
+  CLIP_STORAGE_CEILING_BYTES: 20_000_000_000,
+
   CLIPS_BUCKET: 'video-clips',
   SOURCE_CACHE_BUCKET: 'video-source-cache',
   SIGNED_URL_EXPIRY_SECONDS: 172800,

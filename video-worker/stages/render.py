@@ -796,12 +796,24 @@ async def _render_single_clip(
                     error=signed_thumb_url,
                 )
 
+        # Read from the rendered file rather than trusting the uploader's return:
+        # this is the artefact that was actually stored, and the number feeds a
+        # spend control. os.path.getsize can raise if the temp file has already
+        # been cleaned up, and a missing size must not fail a clip that rendered
+        # — the storage view counts unmeasured rows separately for exactly this.
+        try:
+            rendered_bytes = os.path.getsize(output_path)
+        except OSError:
+            rendered_bytes = None
+            log.warning("clip_size_unavailable", job_id=job_id, clip_id=clip_id)
+
         update_clip_render_complete(
             clip_id=clip_id,
             storage_path=clip_storage_path,
             public_url=clip_url,
             thumbnail_path=thumb_storage_path,
             thumbnail_url=thumb_url,
+            file_size_bytes=rendered_bytes,
         )
 
         log.info("clip_render_complete", job_id=job_id, clip_index=clip_index, clip_id=clip_id)

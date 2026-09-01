@@ -42,6 +42,10 @@ def upload_clip_to_storage(
             storage_path=storage_path,
             size_mb=round(file_size_mb, 2),
         )
+        # The size was already computed above and, until 2026-09-01, only
+        # logged. It is returned now so the caller can persist it: the
+        # per-user storage ceiling that replaced the 7-day expiry needs a
+        # number it can sum without listing the whole bucket.
         return True, storage_path
 
     except Exception as e:
