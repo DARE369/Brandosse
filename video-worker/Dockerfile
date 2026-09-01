@@ -51,6 +51,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Which commit is actually running.
+#
+# Before this existed, /health returned a hardcoded "1.0.0" and the only way
+# to answer "is the latest code live?" was to compare Fly's deploy timestamp
+# against a git commit time. That inference is unreliable: on 2026-09-01 it
+# reported daily-analysis as two hours stale when the code was in fact
+# deployed, and a behavioural probe was needed to disprove it. A deployment
+# that cannot state its own version turns every such question into detective
+# work.
+#
+# Passed by .github/workflows/deploy-worker.yml as --build-arg GIT_SHA.
+# Defaults to "unknown" so a local `docker build` still succeeds.
+ARG GIT_SHA=unknown
+ENV WORKER_GIT_SHA=$GIT_SHA
+
 # Create temp directory
 RUN mkdir -p /tmp/video-engine
 

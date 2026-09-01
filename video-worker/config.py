@@ -22,6 +22,9 @@ class WorkerConfig(BaseSettings):
     # falls back to its default face and logs that brand typography was
     # requested but not applied. It is not required to boot.
     google_fonts_api_key: str = Field(default="", alias="WORKER_GOOGLE_FONTS_API_KEY")
+    # Commit this image was built from. Baked in by the Dockerfile at build
+    # time; "unknown" means a local build or a deploy that did not pass it.
+    git_sha: str = Field(default="unknown", alias="WORKER_GIT_SHA")
 
     # Mock switches — MUST default to False (LOCK L1.4).
     # These previously defaulted to True, which meant any environment that

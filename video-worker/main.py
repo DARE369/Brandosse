@@ -134,6 +134,10 @@ async def health_check():
         "status": "healthy",
         "service": "video-engine-worker",
         "version": "1.0.0",
+        # The commit actually running. "1.0.0" above is a static label and
+        # has never changed; this is the field that answers "is the latest
+        # code live?" without inferring it from deploy timestamps.
+        "git_sha": config.git_sha,
         "temp_dir_exists": os.path.exists(config.temp_dir)
     }
 

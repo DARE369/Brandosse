@@ -155,6 +155,13 @@ jobs:
       - name: check-llm-truncation
         run: node scripts/check-llm-truncation.cjs
 
+      # A deployment that cannot state which commit it is running turns every
+      # "is this live?" question into detective work. On 2026-09-01 a timestamp
+      # comparison wrongly reported a security fix as undeployed, and only a
+      # behavioural probe disproved it.
+      - name: check-deploy-version-signal
+        run: node scripts/check-deploy-version-signal.cjs
+
       # The brand kit must be LOADED by user_id, never accepted from the request
       # body. Eight edge functions were taking it from the body and using it as
       # the authenticated user's brand — arbitrary caller-controlled text. Fine
