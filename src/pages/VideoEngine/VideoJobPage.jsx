@@ -15,7 +15,6 @@ import {
   rerunVideoJob,
 } from "../../services/videoEngineApi";
 import { saveClipToLibrary, scheduleHandoffPathForAsset } from "../../components/video-engine/clipLibraryActions";
-import { clipExpiry, formatRemaining } from "../../lib/video-engine/retention";
 import { SourceSpine } from "./components/SourceSpine";
 import { ClipRow } from "./components/ClipRow";
 import { ClipTriageBar } from "./components/ClipTriageBar";
@@ -150,8 +149,6 @@ function JobView({ initialJob, initialClips, userId, ledger, setLedger, navigate
   const state = jobState(job.status);
   const isFailed = job.status === "failed";
   const isWorking = state.working;
-  const expiry = clipExpiry(job);
-  const expiryLabel = formatRemaining(expiry.msRemaining);
 
   const [selectedId, setSelectedId] = useState(null);
   const [checked, setChecked] = useState(() => new Set());
@@ -586,16 +583,6 @@ function JobView({ initialJob, initialClips, userId, ledger, setLedger, navigate
             </span>
           ) : null}
 
-          {job.status === "complete" && expiryLabel ? (
-            <span
-              className={`${styles.statusPill} ${expiry.expiringSoon ? styles.pillWarning : styles.pillNeutral}`}
-              title="Clip files are deleted 7 days after the job finishes. Keeping a clip copies it to your Library, which has no expiry."
-            >
-              <span className={styles.dot} aria-hidden="true" />
-              Clips delete in {expiryLabel}
-            </span>
-          ) : null}
-
           {rendered.length > 0 ? (
             <>
               <Button size="sm" variant="subtle" onClick={() => handleDownloadAll(null)} disabled={busy === "archiving"}>
@@ -762,8 +749,7 @@ function JobView({ initialJob, initialClips, userId, ledger, setLedger, navigate
                 <span className={styles.dotSuccess} aria-hidden="true" />
                 <p>
                   Every clip reviewed — {counts.kept} kept, {counts.skipped} skipped
-                  {counts.failed > 0 ? `, ${counts.failed} failed to render` : ""}. Kept clips are in your Library and
-                  will not expire.
+                  {counts.failed > 0 ? `, ${counts.failed} failed to render` : ""}. Kept clips are in your Library.
                 </p>
                 {counts.kept > 0 ? (
                   <Button size="sm" variant="subtle" onClick={() => navigate("/app/library")}>Open the Library</Button>
@@ -881,10 +867,9 @@ function JobView({ initialJob, initialClips, userId, ledger, setLedger, navigate
 
             <p className={styles.retentionNote}>
               <span>
-                These files are deleted {expiry.expiresAt ? formatRemaining(expiry.msRemaining) : "7 days"} from now — that is
-                how storage stays cheap. <strong>Keeping</strong> a clip copies it into your Library, which never expires.
-                Downloads are yours to keep either way. Skipping only marks a clip reviewed for this pass; it deletes
-                nothing and is not remembered after you leave.
+                Your clips stay here until you delete them. <strong>Keeping</strong> a clip also copies it into
+                your Library. Downloads are yours either way. Skipping only marks a clip reviewed for this pass;
+                it deletes nothing and is not remembered after you leave.
               </span>
               <Button size="sm" variant="ghost" onClick={handleTranscript} disabled={busy === "transcript"}>
                 <FileText size={14} aria-hidden="true" /> Transcript

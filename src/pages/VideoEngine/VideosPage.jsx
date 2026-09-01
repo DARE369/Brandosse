@@ -8,7 +8,6 @@ import { useAuth } from "../../Context/AuthContext";
 import { useJobsFeed } from "../../hooks/video-engine/useJobsFeed";
 import { useWorkerHealth } from "../../hooks/video-engine/useWorkerHealth";
 import { deleteVideoJob } from "../../services/videoEngineApi";
-import { clipExpiry, formatRemaining } from "../../lib/video-engine/retention";
 import { NewJobSheet } from "./components/NewJobSheet";
 import { formatAge, formatClockTime, formatTimecode, jobTitle, resolveJobState, sourceLabel } from "./videoShared";
 import styles from "./VideosPage.module.css";
@@ -268,7 +267,6 @@ function VideosBody() {
             <span>Source</span>
             <span className={styles.colLength}>Length</span>
             <span className={styles.colClips}>Clips</span>
-            <span className={styles.colExpiry}>Clips expire</span>
             <span className={styles.colAge} />
           </div>
 
@@ -279,7 +277,6 @@ function VideosBody() {
                 <Skeleton width={`${45 + ((index * 13) % 40)}%`} height="11px" />
                 <Skeleton width="52px" height="11px" className={styles.colLength} />
                 <Skeleton width="24px" height="11px" className={styles.colClips} />
-                <Skeleton width="48px" height="11px" className={styles.colExpiry} />
                 <span className={styles.colAge} />
               </div>
             ))
@@ -487,8 +484,6 @@ function CapacityStrip({ capacity, loading }) {
 function JobRow({ job, onOpen, onDelete }) {
   const [confirming, setConfirming] = useState(false);
   const state = resolveJobState(job);
-  const expiry = clipExpiry(job);
-  const expiryLabel = formatRemaining(expiry.msRemaining);
 
   const total = job.clip_count ?? 0;
   const rendered = job.clips_rendered ?? 0;
@@ -517,9 +512,6 @@ function JobRow({ job, onOpen, onDelete }) {
           {job.source_duration_secs ? formatTimecode(job.source_duration_secs) : "—"}
         </span>
         <span className={`${styles.mono} ${styles.colClips}`}>{clipsLabel}</span>
-        <span className={`${styles.mono} ${styles.colExpiry} ${expiry.expiringSoon ? styles.warnText : ""}`}>
-          {expiryLabel ?? "—"}
-        </span>
         <span className={`${styles.mono} ${styles.colAge}`}>{formatAge(job.created_at)}</span>
       </button>
 

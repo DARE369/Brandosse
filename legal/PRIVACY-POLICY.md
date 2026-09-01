@@ -216,7 +216,7 @@ appropriate safeguards under contract.
 | Account and profile | While your account is open |
 | Content, brand kit, uploads, generated Output | While your account is open, or until you delete the item |
 | Video source material you supplied | 24 hours after the job reaches a final state |
-| Rendered video clips | 7 days after the job reaches a final state, then permanently deleted |
+| Rendered video clips | While your account is open, or until you delete the clip or its job |
 | Connected account tokens | Until you disconnect or the token is revoked |
 | Credit ledger and transaction records | 7 years, to meet tax and accounting obligations |
 | Security and access logs | 90 days |

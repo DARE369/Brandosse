@@ -327,7 +327,7 @@ Verbatim, so the design is calibrated against real text rather than placeholder 
 | Target clip length | 30–90 seconds | `constants.ts:12-13` |
 | Requestable clip length | 10–600 seconds each bound, min < max | `submit/route.ts:35-36,41-52` |
 | Playback link lifetime | 48 hours, auto-renewed | `constants.ts:23`; `clips/[id]/refresh-url/route.ts` |
-| **Clip file lifetime** | **7 days after the job finishes, then permanently deleted** | `video-worker/retention.py:53` |
+| **Clip file lifetime** | **Kept until the person deletes them** (automatic expiry removed 2026-09-01) | `video-worker/retention.py` |
 | Cancellable | Only while still queued | `jobs/[id]/route.ts:15,99-105` |
 | Deletion | Permanent; removes the job and all its clip files | `jobs/[id]/route.ts:107-127` |
 | Job list depth | 50 most recent, no pagination | `videoEngineData.js:32` |
@@ -357,7 +357,7 @@ These are product decisions, not design ones. They are listed so the design does
 2. Is retry a true one-click resubmit, or a prefilled new submission? (§3.1)
 3. Does the stitched full-length output ship, or should the pipeline stop producing it? (§3.4)
 4. Should a person be able to cancel a job that has started, accepting the wasted work, or is the current queued-only rule correct? (§3.3)
-5. Should clip retention be extended, made a paid feature, or kept at seven days and simply made honest? (§7)
+5. ~~Should clip retention be extended, made a paid feature, or kept at seven days?~~ **Decided 2026-09-01: removed entirely.** Clips are kept until deleted.
 6. Should a video already in the Library be re-submittable to clipping? (§4.2)
 
 ---
@@ -503,7 +503,7 @@ Measured by which token set each screen's own code uses.
 1. **Dashboard counts clips and cannot reach them.** "Clips ready" is one of four headline numbers and is inert; the stat component takes no action, and nothing else on the Dashboard links to Videos (§4.2).
 2. **A running job is invisible outside its own screen.** No Dashboard presence, no shell indicator, no notification on completion — on a feature explicitly built to be left alone.
 3. **The job list does not update.** Submit, return to the list, and it reads "In Queue" until manually reloaded (A.7).
-4. **Nothing warns before clips are deleted.** Seven-day retention, never mentioned (§7).
+4. ~~**Nothing warns before clips are deleted.**~~ **Resolved 2026-09-01** — the automatic expiry was removed rather than surfaced.
 5. **Caption styles are chosen blind.** Six burned-in treatments, no preview, credits spent to find out.
 6. **A large upload gives no progress.** Up to 4 GB behind a single word, no percentage, no cancel.
 7. **A running job cannot be stopped, and says the wrong thing when asked.** (A.8)

@@ -27,7 +27,6 @@ import {
 } from '@/lib/video-engine/auth-helpers';
 import { supabaseAdmin } from '@/lib/video-engine/supabase-admin';
 import { VIDEO_ENGINE_CONSTANTS } from '@/lib/video-engine/constants';
-import { expiringSoonCutoffIso, TERMINAL_STATUSES } from '@/lib/video-engine/retention';
 import { MIN_CREDITS_TO_SUBMIT } from '@/lib/video-engine/credit-packages';
 import type { JobStatus } from '@/lib/video-engine/types';
 
@@ -81,7 +80,7 @@ type ClipProjection = { id: string; render_status: string | null };
 async function readCapacity(userId: string) {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-  const [activeResult, recentResult, creditsResult, expiringResult] = await Promise.all([
+  const [activeResult, recentResult, creditsResult] = await Promise.all([
     supabaseAdmin
       .from('video_jobs')
       .select('id', { count: 'exact', head: true })
@@ -97,13 +96,6 @@ async function readCapacity(userId: string) {
       .gte('created_at', oneHourAgo)
       .order('created_at', { ascending: true }),
     supabaseAdmin.from('user_credits').select('balance').eq('user_id', userId).maybeSingle(),
-    supabaseAdmin
-      .from('video_clips')
-      .select('id, video_jobs!inner(status, updated_at)', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('render_status', 'complete')
-      .in('video_jobs.status', TERMINAL_STATUSES as unknown as string[])
-      .lt('video_jobs.updated_at', expiringSoonCutoffIso(24)),
   ]);
 
   const recentRows = recentResult.data ?? [];
@@ -126,8 +118,6 @@ async function readCapacity(userId: string) {
     balance: creditsResult.error ? null : creditsResult.data?.balance ?? 0,
     min_credits_to_submit: MIN_CREDITS_TO_SUBMIT,
     credits_per_source_minute: VIDEO_ENGINE_CONSTANTS.CREDITS_PER_MINUTE_OF_SOURCE,
-    clips_expiring_soon: expiringResult.error ? null : expiringResult.count ?? 0,
-    retention_days: VIDEO_ENGINE_CONSTANTS.CLIP_RETENTION_DAYS,
   };
 }
 

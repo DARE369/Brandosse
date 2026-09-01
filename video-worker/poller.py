@@ -10,7 +10,6 @@ import urllib.request
 from config import config
 from database import claim_next_job, update_job_status
 from job_runner import process_job
-from retention import maybe_sweep
 from logger import log
 
 # Tracks how many jobs are currently being processed
@@ -65,10 +64,9 @@ async def poll_loop() -> None:
     
     while True:
         try:
-            # Expire old clips (LOCK L7.4). Self-rate-limited to once an hour,
-            # and never raises — retention is a cost concern and must not be
-            # able to stop the pipeline that earns the money.
-            maybe_sweep()
+            # The hourly clip-expiry sweep used to run here. Removed 2026-09-01:
+            # clips are kept until the user deletes them, so there is nothing to
+            # expire. See video-worker/retention.py for what replaced it.
 
             # While work is in flight, stop Fly's proxy from idle-stopping us.
             await _maybe_keepalive()

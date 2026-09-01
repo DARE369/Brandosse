@@ -117,12 +117,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const rendered = (clips ?? []).filter((clip) => clip.storage_path);
 
   if (rendered.length === 0) {
+    // These messages used to explain the absence with the 7-day expiry. That
+    // expiry was removed on 2026-09-01, so the only way a rendered clip has no
+    // file now is that someone deleted it — saying anything about a retention
+    // window would be inventing a cause.
     return errorResponse(
       selection
-        ? 'None of those clips have a file to download any more. Clip files are kept for '
-          + `${VIDEO_ENGINE_CONSTANTS.CLIP_RETENTION_DAYS} days after a job finishes.`
-        : 'This job has no rendered clips to download. They may have been removed — clip files are kept for '
-          + `${VIDEO_ENGINE_CONSTANTS.CLIP_RETENTION_DAYS} days after a job finishes.`,
+        ? 'None of those clips have a file to download any more. They may have been deleted.'
+        : 'This job has no rendered clips to download. They may have been deleted.',
       'NO_CLIPS_TO_ARCHIVE',
       404,
     );
