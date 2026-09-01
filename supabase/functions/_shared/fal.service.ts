@@ -616,9 +616,24 @@ export function aspectToFalImageSize(aspect: string): FalImageSize {
  * Cost estimates (informational — used for credit deduction calculations).
  * fal.ai charges per megapixel for images, per second for video.
  */
+// Estimates. `video_cost_ledger.estimated_cost_usd` is written from these and
+// compared against the actual, so drift here is measurable rather than silent.
+//
+// VERIFIED against the fal billing dashboard 2026-09-01 (period 2026-08-02 to
+// 2026-09-01, $1.23 across 2 endpoints):
+//   fal-ai/flux-2-pro   23.00 processed megapixels  @ $0.03/MP    = $0.69  ✓ matched
+//   fal-ai/ideogram/v3  18.00 images                @ $0.03/image = $0.54  ✗ was 2× out
 export const FAL_COST_USD = {
-  imageFluxPerMP:        0.030, // first MP; $0.015 each additional
-  imageIdeogramBalanced: 0.060, // fal-ai/ideogram/v3 BALANCED (TURBO $0.03 / QUALITY $0.09)
+  imageFluxPerMP:        0.030, // first MP; $0.015 each additional. Confirmed exact.
+  // Was 0.060 on the belief that BALANCED cost twice TURBO. fal bills this
+  // account $0.03/image while fal.service.ts:399 requests BALANCED, so the
+  // BALANCED rate has come down to meet TURBO. The old figure made every
+  // ideogram generation look twice as expensive as it is — a 100% error in the
+  // COGS model, and one that would have quietly biased the "which image model
+  // can we afford" decision against the best text-rendering model we have.
+  // Charged credits were never affected: these constants are informational and
+  // feed the ledger and analytics only, never a debit.
+  imageIdeogramBalanced: 0.030, // fal-ai/ideogram/v3 BALANCED — billed rate, not list
   imageRecraft:          0.040, // fal-ai/recraft/v3 raster ($0.08 vector)
   imageEditKontext:      0.040, // fal-ai/flux-pro/kontext per edit
   imageUpscale:          0.040, // fal-ai/clarity-upscaler per image (5.3)
