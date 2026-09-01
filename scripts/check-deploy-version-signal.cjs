@@ -78,6 +78,36 @@ if (main && !/"git_sha":\s*config\.git_sha/.test(main)) {
   );
 }
 
+// 5. The frontend reports its own version too, so neither surface needs a
+//    credential to answer "what is live?". A Vercel token is not read-only —
+//    it can deploy and delete — so requiring one to answer a read-only
+//    question is the wrong trade.
+const webHealth = read('app/api/health/route.ts');
+if (webHealth) {
+  if (!/VERCEL_GIT_COMMIT_SHA/.test(webHealth)) {
+    failures.push(
+      'app/api/health/route.ts: does not read VERCEL_GIT_COMMIT_SHA, so the ' +
+      'frontend cannot say which commit it is serving.',
+    );
+  }
+  // A cached health check reports the version of whenever it was cached, and
+  // looks authoritative doing it — worse than having no endpoint at all.
+  //
+  // Anchored to the actual export, not the bare words: the first version of
+  // this check matched "force-dynamic" anywhere in the file and so was
+  // satisfied by a COMMENT mentioning it. Deleting the real export left the
+  // guard green. A guard that can be satisfied by prose is not a guard.
+  const declaresDynamic = /export\s+const\s+dynamic\s*=\s*['"]force-dynamic['"]/.test(webHealth);
+  const declaresNoStore = /['"]Cache-Control['"]\s*:\s*['"][^'"]*no-store/.test(webHealth);
+  if (!declaresDynamic || !declaresNoStore) {
+    failures.push(
+      'app/api/health/route.ts: must set both `dynamic = "force-dynamic"` and a ' +
+      'no-store Cache-Control. A cached version endpoint reports a stale commit ' +
+      'with full confidence.',
+    );
+  }
+}
+
 if (failures.length > 0) {
   console.error('  check-deploy-version-signal: FAIL\n');
   for (const f of failures) console.error(`    - ${f}`);

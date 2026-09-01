@@ -126,19 +126,29 @@ do {
     process.exit(3);
   }
   const body = await res.json();
-  const items = body.items ?? body.data ?? [];
-  if (!Array.isArray(items)) {
+
+  // VERIFIED 2026-09-01 against the live API. The response is:
+  //   { next_cursor, has_more, time_series: [ { bucket, results: [...] } ] }
+  // NOT the flat `items` array the documentation summary implied. Records sit
+  // one level down, inside each time bucket's `results`.
+  const series = body.time_series;
+  if (!Array.isArray(series)) {
     console.error(
-      '\nFATAL: unexpected usage response shape. Expected an items array; got:\n  ' +
-      JSON.stringify(body).slice(0, 400) +
-      '\n\n  The API shape has changed. Fix this script rather than guessing at a\n' +
-      '  mapping — a wrong mapping writes wrong money into the ledger.\n',
+      '\nFATAL: unexpected usage response shape. Expected `time_series` to be an ' +
+      'array; got keys: ' + Object.keys(body ?? {}).join(', ') +
+      '\n\n  The API shape has changed again. Fix this script rather than guessing\n' +
+      '  at a mapping — a wrong mapping writes wrong money into the ledger.\n',
     );
     process.exit(3);
   }
-  usage.push(...items);
+  for (const bucket of series) {
+    if (Array.isArray(bucket?.results)) usage.push(...bucket.results);
+  }
+
   cursor = body.next_cursor ?? null;
   pages += 1;
+  // has_more is authoritative — a cursor can still be present on the last page.
+  if (body.has_more === false) break;
 } while (cursor && pages < PAGE_LIMIT);
 
 console.log(`  fal billing records ...... ${usage.length} (${pages} page(s))`);
@@ -147,20 +157,54 @@ console.log(`  fal billing records ...... ${usage.length} (${pages} page(s))`);
 const updates = [];
 let unmatched = 0;
 
+// The per-record field names are NOT yet verified against live data — the
+// account had no fal usage in the 90 days before this was written, so every
+// bucket came back empty. The container shape is confirmed; these field names
+// are not. Rather than silently matching nothing (which would look like a
+// clean run and quietly leave every actual_cost_usd null forever), the loop
+// below counts records it could not read and the script reports it as a
+// failure. Fix the mapping when a real record first appears.
+let unreadable = 0;
+
 for (const item of usage) {
-  const requestId = item.request_id ?? item.requestId ?? null;
-  if (!requestId) continue;
+  const requestId = item.request_id ?? item.requestId ?? item.id ?? null;
+  if (!requestId) { unreadable += 1; continue; }
   const row = byRequestId.get(String(requestId));
   if (!row) {
     unmatched += 1;
     continue;
   }
   const cost = item.cost_total ?? item.costTotal ?? null;
-  if (typeof cost !== 'number') continue;
+  if (typeof cost !== 'number') { unreadable += 1; continue; }
   updates.push({ id: row.id, actual: cost, estimated: row.estimated_cost_usd, model: row.model_id });
 }
 
 console.log(`  matched .................. ${updates.length}`);
+
+if (unreadable > 0) {
+  const sample = usage.find(
+    (u) => !(u.request_id ?? u.requestId ?? u.id)
+        || typeof (u.cost_total ?? u.costTotal) !== 'number',
+  );
+  console.error(
+    [
+      '',
+      `  FATAL: ${unreadable} usage record(s) had no readable request id or cost.`,
+      `  Sample: ${JSON.stringify(sample).slice(0, 300)}`,
+      '',
+      '  The per-record field names here were written from documentation and never',
+      '  validated against a populated response — the account had no fal usage in',
+      '  the 90 days before this was written, so every bucket came back empty.',
+      '  Update the mapping to match the sample above.',
+      '',
+      '  This exits non-zero deliberately: a run that matches nothing looks exactly',
+      '  like a run with nothing to do, and silently leaving every actual_cost_usd',
+      '  null forever is the failure this whole script exists to prevent.',
+      '',
+    ].join('\n'),
+  );
+  process.exit(4);
+}
 console.log(`  fal records with no ledger row ... ${unmatched}` +
   (unmatched > 0 ? '  <- spend we did not record; investigate' : ''));
 
