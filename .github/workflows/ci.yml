@@ -148,6 +148,18 @@ jobs:
       # "a palette was produced".
       - name: check-site-harvest
         run: node scripts/check-site-harvest.cjs
+      # Text measurement is what every wrap, shrink and safe-area guarantee is
+      # computed from. Asserted against real rendered ink, not against itself —
+      # and specifically that predictions never run NARROW, since narrow means
+      # text overflows the canvas.
+      - name: check-font-metrics
+        run: node scripts/check-font-metrics.cjs
+      # The compositor was built, wired inside generateImage, and covered by two
+      # passing guards — and never ran once, because nothing in the client sent
+      # `compose.text`. A guard that proves a module WORKS is not a guard that
+      # proves it is USED. This asserts the whole chain, every registration site.
+      - name: check-compose-wiring
+        run: node scripts/check-compose-wiring.cjs
       # Three components each showed "AI inferred this — please verify" behind
       # `confidence === 'low'`, against a value the extractor has always sent as a
       # NUMBER. The flag had never rendered once. Also asserts the harvester's

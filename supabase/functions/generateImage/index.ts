@@ -296,10 +296,39 @@ serve(async (req) => {
     // ── Compositor path ───────────────────────────────────────────────────────
     // When the caller wants real typography, the model's job changes: it paints
     // a background and nothing else.
-    const composeText: TextContent = (body.compose?.text ?? {}) as TextContent;
+    const composeText: TextContent = { ...((body.compose?.text ?? {}) as TextContent) };
     const wantsComposite =
       Boolean(body.compose) &&
       Object.values(composeText).some((value) => String(value ?? "").trim());
+
+    // ── Required marks come from the KIT, not from the caller ────────────────
+    //
+    // The legal line and the contact block are brand obligations, not creative
+    // choices. Taking them from the request body would mean a client that
+    // forgets to send them produces a graphic with the disclosure silently
+    // missing — and "the client forgot" is not a defence anyone wants to make
+    // about a required legal mark.
+    //
+    // Same reasoning that made the brand kit itself server-loaded: the caller
+    // says WHAT the post is about; the kit says what must appear on it.
+    if (wantsComposite) {
+      const kitDesign = readDesignFromKit(serverKit as Record<string, unknown> | null);
+
+      const legalLine = String(kitDesign.required_marks?.legal_line ?? "").trim();
+      if (legalLine && !String(composeText.legal ?? "").trim()) {
+        composeText.legal = legalLine;
+      }
+
+      // The contact block is opt-in per brand — it only goes on artwork when
+      // the brand said it should.
+      const contact = kitDesign.contact_block;
+      if (contact?.show_on_designs && !String(composeText.contact ?? "").trim()) {
+        const parts = [contact.website, contact.phone, contact.email]
+          .map((part) => String(part ?? "").trim())
+          .filter(Boolean);
+        if (parts.length > 0) composeText.contact = parts.join("  ·  ");
+      }
+    }
 
     let designTemplate: DesignTemplate | null = null;
     if (wantsComposite) {

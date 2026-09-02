@@ -27,6 +27,8 @@
     "check:brand-design-writer": "node scripts/check-brand-design-writer.cjs",
     "check:migrations-apply": "node scripts/check-migrations-apply.cjs",
     "check:site-harvest": "node scripts/check-site-harvest.cjs",
+    "check:font-metrics": "node scripts/check-font-metrics.cjs",
+    "check:compose-wiring": "node scripts/check-compose-wiring.cjs",
     "check:brand-provenance": "node scripts/check-brand-provenance.cjs",
     "check:compositor-fonts": "node scripts/check-compositor-fonts.cjs",
     "check:no-diffusion-text": "node scripts/check-no-diffusion-text.cjs",
