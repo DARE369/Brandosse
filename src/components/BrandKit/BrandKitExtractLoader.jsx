@@ -112,7 +112,13 @@ export default function BrandKitExtractLoader({
         const extracted = data?.brandKit || {};
         const confidence = data?.confidenceMap || {};
         const missingTier1Fields = data?.missingTier1Fields || [];
-        setExtractedDraft(extracted, confidence, missingTier1Fields);
+        // The design layer and its provenance only exist on the website path;
+        // document and conversation imports have no CSS to measure.
+        const design = data?.design || null;
+        if (design?.extraction_evidence) {
+          extracted.extraction_evidence = design.extraction_evidence;
+        }
+        setExtractedDraft(extracted, confidence, missingTier1Fields, design);
 
         await delay(250);
         if (mode === 'setup' && missingTier1Fields.length >= 2) {

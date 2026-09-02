@@ -33,14 +33,16 @@ const toReadableUploadError = (error) => {
   return message;
 };
 
-function computeVersionHash(value) {
-  try {
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(value || {}))));
-    return encoded.slice(0, 16);
-  } catch (_error) {
-    return computeBrandKitHash(value);
-  }
-}
+// `computeVersionHash` used to live here as
+// `btoa(JSON.stringify(kit)).slice(0, 16)`. Sixteen base64 characters is twelve
+// bytes of input, and a brand_kit row always begins `{"id":"<uuid>`, so it was
+// a function of the kit's UUID and nothing else — byte-identical after changing
+// the brand name and the entire palette (verified 2026-09-01). Every generation
+// receipt has therefore been stamped with a brand version that never changed.
+//
+// There is now one hash for both the DB column and the suggestion cache. See
+// src/utils/brandKitHash.js for what it covers and why.
+const computeVersionHash = computeBrandKitHash;
 
 async function uploadWithProgress(bucket, storagePath, file, onProgress) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -372,12 +374,19 @@ const useBrandKitStore = create((set, get) => ({
   },
 
   // Draft flow helpers.
-  setExtractedDraft: (brandKit, confidenceMap = {}, missingTier1Fields = []) => {
+  // `design` is the normalised design layer built by _shared/brandDesign.ts on
+  // the server (colour roles, type scale, contact block, social handles,
+  // provenance). It rides along with the draft so that confirming an import
+  // saves the design layer too — without this the harvester measures a brand's
+  // colour roles and then throws them away at the last step, which is exactly
+  // the disconnection defect this repo keeps finding.
+  setExtractedDraft: (brandKit, confidenceMap = {}, missingTier1Fields = [], design = null) => {
     set({
       extractedDraft: {
         brandKit: brandKit || {},
         confidenceMap: confidenceMap || {},
         missingTier1Fields: missingTier1Fields || [],
+        design: design || null,
       },
     });
   },
@@ -394,9 +403,18 @@ const useBrandKitStore = create((set, get) => ({
     set({ setupPath: 'upload' });
   },
 
-  openDiffModal: (existingKit, newKit, newConfidenceMap = {}) => {
+  openDiffModal: (existingKit, newKit, newConfidenceMap = {}, extra = {}) => {
     set({
-      diffData: { existingKit, newKit, newConfidenceMap },
+      diffData: {
+        existingKit,
+        newKit,
+        newConfidenceMap,
+        // Provenance drives the Measured/Review badges; design is applied
+        // wholesale when the user accepts, since it is derived from the values
+        // they are approving rather than independently editable here.
+        newExtractionEvidence: extra?.extractionEvidence || {},
+        design: extra?.design || null,
+      },
       isDiffModalOpen: true,
     });
   },
@@ -416,7 +434,18 @@ const useBrandKitStore = create((set, get) => ({
 
     if (!userId) throw new Error('Missing user id for Brand Kit update');
 
-    const saved = await get().saveBrandKit(userId, mergedKit, state.currentKitId);
+    // The design layer is derived from the values the user is accepting, so it
+    // is applied with them rather than diffed field-by-field — a user choosing
+    // "keep my current palette" would otherwise end up with colour ROLES from
+    // the new site pointing at hexes from the old one.
+    const anyNewAccepted = Object.keys(mergedKit || {}).some(
+      (key) => JSON.stringify(mergedKit[key]) !== JSON.stringify(state.diffData?.existingKit?.[key]),
+    );
+    const payload = anyNewAccepted && state.diffData?.design
+      ? { ...mergedKit, ...state.diffData.design }
+      : mergedKit;
+
+    const saved = await get().saveBrandKit(userId, payload, state.currentKitId);
     set({ isDiffModalOpen: false, diffData: null });
     return saved;
   },

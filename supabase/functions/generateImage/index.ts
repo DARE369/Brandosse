@@ -20,6 +20,18 @@ import { recordCost } from "../_shared/costLedger.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { generateImageByModel, aspectToFalImageSize, type FalImageModel } from "../_shared/fal.service.ts";
 import { compositeLogo, type LogoPosition } from "../_shared/composite.ts";
+import { safeFetch } from "../_shared/safeFetch.ts";
+import { readDesignFromKit } from "../_shared/brandDesign.ts";
+import {
+  compositeDesign,
+  CompositorUnavailableError,
+  type TextContent,
+} from "../_shared/designCompositor.ts";
+import {
+  backgroundDirectiveFor,
+  pickTemplate,
+  type DesignTemplate,
+} from "../_shared/designTemplates.ts";
 import { callPromptEngine } from "../_shared/llm.ts";
 import { createHttpError } from "../_shared/org.ts";
 import { enforceRateLimit } from "../_shared/rateLimit.ts";
@@ -61,6 +73,21 @@ type GenerateImageBody = {
   rendering_speed?: "TURBO" | "BALANCED" | "QUALITY";
   negative_prompt?: string;
   recraft_style?: string;
+  /**
+   * Draw the text DETERMINISTICALLY instead of asking the image model to.
+   *
+   * When present, the model renders a text-free background with calm space
+   * where the layout reserves it, and the words are composited afterwards in
+   * the brand's real typeface at its exact colours. This is what removes
+   * misspellings, wrong fonts, colour drift and the word-count cap in one move
+   * — see _shared/designCompositor.ts.
+   */
+  compose?: {
+    template_id?: string;
+    /** Layouts this brand used recently, so the same one is not reused. */
+    recent_template_ids?: string[];
+    text?: TextContent;
+  };
   /** Stamp the user's ACTIVE brand-kit logo onto the result. The logo file is
    * resolved server-side from `brand_assets` (see resolveBrandLogo) because the
    * bucket is private — a client-built public URL 400s. `logo_url` remains
@@ -266,7 +293,28 @@ serve(async (req) => {
     // 'ideogram' (which sent every image through the text-rendering engine).
     // In practice the pipeline always passes an explicit body.image_model
     // resolved from render_intent (1.1).
-    const imageModel: FalImageModel = body.image_model ?? "flux";
+    // ── Compositor path ───────────────────────────────────────────────────────
+    // When the caller wants real typography, the model's job changes: it paints
+    // a background and nothing else.
+    const composeText: TextContent = (body.compose?.text ?? {}) as TextContent;
+    const wantsComposite =
+      Boolean(body.compose) &&
+      Object.values(composeText).some((value) => String(value ?? "").trim());
+
+    let designTemplate: DesignTemplate | null = null;
+    if (wantsComposite) {
+      designTemplate = pickTemplate(
+        Array.isArray(body.compose?.recent_template_ids) ? body.compose!.recent_template_ids! : [],
+        body.compose?.template_id,
+      );
+    }
+
+    // Ideogram exists in this stack for one reason: rendering exact text inside
+    // an image. On the compositor path that is precisely what must NOT happen,
+    // so it is never selected here — a stray model-drawn word behind real
+    // typography is the worst of both approaches.
+    let imageModel: FalImageModel = body.image_model ?? "flux";
+    if (wantsComposite && imageModel === "ideogram") imageModel = "flux";
 
     // ── Prompt enhancement — ONE model-aware pass (1.3) ───────────────────────
     // Previously this always assumed FLUX.2 Pro regardless of the model that
@@ -291,6 +339,16 @@ serve(async (req) => {
       } catch (_) {
         finalPrompt = rawPrompt; // non-critical fallback
       }
+    }
+
+    // Appended AFTER the enhancer, never before. The enhancer rewrites its
+    // input freely and would happily paraphrase "render no text" into
+    // something softer; appending afterwards makes the instruction survive
+    // verbatim. It is stated several ways on purpose — image models treat a
+    // single negative as a weak preference, and one stray word in the
+    // background defeats the entire point of compositing.
+    if (wantsComposite && designTemplate) {
+      finalPrompt = `${finalPrompt}\n\n${backgroundDirectiveFor(designTemplate)}`;
     }
 
     // ── Generate via the chosen fal.ai model ──────────────────────────────────
@@ -340,6 +398,71 @@ serve(async (req) => {
     let imgBytes = new Uint8Array(await imgRes.arrayBuffer());
     let ext = body.output_format ?? "jpeg";
 
+    // Resolved before compositing so the compositor can place it with real
+    // clear space rather than having it stamped into a corner afterwards.
+    let logoApplied = false;
+    let brandLogo: { bytes: Uint8Array; mimeType: string } | null = null;
+    if (body.apply_logo && !body.logo_url) {
+      try {
+        const resolved = await resolveBrandLogo(adminClient, user.id);
+        if (resolved) brandLogo = { bytes: resolved.bytes, mimeType: resolved.mimeType };
+      } catch (error) {
+        console.error("[generateImage] logo_resolve_failed", {
+          user_id: user.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // ── Deterministic typography ──────────────────────────────────────────────
+    //
+    // The model has painted a text-free background. Everything the brand
+    // actually promises is drawn here instead: the words, in its real typeface,
+    // at its exact hex, wrapped and shrink-to-fit into a real box.
+    //
+    // Failure is NEVER silent and never fatal. The user has already been billed
+    // for the render, so a compositor that cannot run returns the plain
+    // background with a stated reason rather than an error or — far worse — a
+    // confidently blank graphic. See CompositorUnavailableError.
+    let composeApplied = false;
+    let composeTemplateId: string | null = null;
+    let composeError: string | null = null;
+    let composeNotes: string[] = [];
+    let composeFonts: { display?: string; body?: string } = {};
+
+    if (wantsComposite && designTemplate) {
+      composeTemplateId = designTemplate.id;
+      try {
+        const composed = await compositeDesign({
+          baseImage: imgBytes,
+          template: designTemplate,
+          text: composeText,
+          // readDesignFromKit owns the column names, so this function never has
+          // to. One module knows the schema; everything else asks it.
+          design: readDesignFromKit(serverKit as Record<string, unknown> | null),
+          // The logo goes on inside the compositor so it can honour clear space
+          // against the text it just placed, rather than being stamped blind
+          // into a corner afterwards.
+          logo: brandLogo ? { bytes: brandLogo.bytes, mimeType: brandLogo.mimeType } : null,
+        });
+        // Copied rather than aliased so the buffer type matches `imgBytes`
+        // exactly. The existing logo path assigns across the same mismatch and
+        // passes `deno check`; not repeating it keeps this line clean under a
+        // stricter checker too, at the cost of one buffer copy.
+        imgBytes = new Uint8Array(composed.bytes);
+        ext = "jpeg";
+        composeApplied = true;
+        composeNotes = composed.notes;
+        composeFonts = composed.fontsUsed;
+        if (composed.logoApplied) logoApplied = true;
+      } catch (error) {
+        composeError = error instanceof CompositorUnavailableError
+          ? error.reason
+          : (error instanceof Error ? error.message : String(error));
+        console.error("[generateImage] compose_failed", { user_id: user.id, error: composeError });
+      }
+    }
+
     // ── Brand logo ────────────────────────────────────────────────────────────
     // Two sources: an explicit `logo_url` (caller-supplied, must be reachable)
     // or `apply_logo`, which resolves the active brand kit's logo server-side.
@@ -349,25 +472,30 @@ serve(async (req) => {
     // successful — the exact silent no-op the third law forbids. The image is
     // still delivered (the user paid for it) but `logo_applied: false` plus
     // `logo_error` ride along on the response so the client can say so.
-    let logoApplied = false;
     let logoError: string | null = null;
     const logoRequested = Boolean(body.apply_logo || body.logo_url);
 
-    if (logoRequested) {
+    // Skipped when the compositor already placed the logo with proper clear
+    // space — stamping it twice would put two marks on one graphic.
+    if (logoRequested && !logoApplied) {
       try {
         let logoBytes: Uint8Array | null = null;
         let logoMimeType = "";
 
         if (body.logo_url) {
-          const logoRes = await fetch(body.logo_url, {
-            // LOCK L5.9 — download generated image / logo; bounded so a hung transfer fails cleanly.
-            signal: AbortSignal.timeout(120_000),
+          // Caller-supplied URL, so it goes through safeFetch rather than bare
+          // fetch. Unguarded (as it was until 2026-09-01) this fetched any
+          // address the runtime could reach and composited the bytes into an
+          // image the caller then downloads — an SSRF read primitive with a
+          // delivery mechanism attached. See _shared/safeFetch.ts.
+          const logoResult = await safeFetch(body.logo_url, {
+            maxBytes: 8 * 1024 * 1024,
+            timeoutMs: 20_000,
+            expectContentType: /image\//i,
+            context: "generateImage.logo_url",
           });
-          if (!logoRes.ok) {
-            throw new Error(`logo_url fetch returned HTTP ${logoRes.status}`);
-          }
-          logoBytes = new Uint8Array(await logoRes.arrayBuffer());
-          logoMimeType = logoRes.headers.get("content-type") ?? "";
+          logoBytes = logoResult.bytes;
+          logoMimeType = logoResult.contentType;
         } else {
           const resolved = await resolveBrandLogo(adminClient, user.id);
           if (!resolved) {
@@ -443,6 +571,16 @@ serve(async (req) => {
         logo_requested: logoRequested || undefined,
         logo_applied:   logoRequested ? logoApplied : undefined,
         logo_error:     logoError ?? undefined,
+        // Which layout drew this, so pickTemplate can avoid repeating it and a
+        // run of identical-looking posts is visible in the data. Recorded on
+        // failure too: a compositor that quietly stopped running would
+        // otherwise look exactly like one that was never asked to.
+        compose_requested:  wantsComposite || undefined,
+        compose_applied:    wantsComposite ? composeApplied : undefined,
+        compose_template:   composeTemplateId ?? undefined,
+        compose_error:      composeError ?? undefined,
+        compose_fonts:      composeApplied ? composeFonts : undefined,
+        compose_notes:      composeNotes.length ? composeNotes : undefined,
       },
     });
 
@@ -456,6 +594,13 @@ serve(async (req) => {
       logo_requested:    logoRequested,
       logo_applied:      logoApplied,
       logo_error:        logoError,
+      // The client shows these: text drawn in the wrong face, or not drawn at
+      // all, must be visible to the user rather than only in a log line.
+      compose_applied:   composeApplied,
+      compose_template:  composeTemplateId,
+      compose_error:     composeError,
+      compose_notes:     composeNotes,
+      compose_fonts:     composeFonts,
       generation_id:     generationId,
       prompt_used:       finalPrompt,
       provider:          provider,

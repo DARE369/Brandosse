@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '../../ui-v2';
+import { fieldProvenance, PROVENANCE } from '../../utils/brandProvenance';
 import { useUiV2ThemeOptional } from '../../ui-v2/ThemeProvider';
 import styles from './BrandKit.module.css';
 
@@ -15,6 +16,13 @@ const COMPARABLE_FIELDS = [
   { key: 'forbidden_phrases', label: 'Forbidden Phrases' },
   { key: 'content_restrictions', label: 'Content Restrictions' },
   { key: 'visual_style_keywords', label: 'Visual Style Keywords' },
+  // The harvester measures these off the site's own CSS. Leaving them out of the
+  // diff meant an import could change a brand's colours and typefaces without
+  // the user ever being shown that it had.
+  { key: 'color_palette', label: 'Colour Palette' },
+  { key: 'font_display', label: 'Display Font' },
+  { key: 'font_body', label: 'Body Font' },
+  { key: 'website_url', label: 'Website' },
   { key: 'photo_style_notes', label: 'Photo Style Notes' },
   { key: 'legal_disclaimers', label: 'Legal Disclaimers' },
   { key: 'competitor_names', label: 'Competitor Names' },
@@ -22,6 +30,12 @@ const COMPARABLE_FIELDS = [
 
 function isEmptyValue(value) {
   if (Array.isArray(value)) return value.length === 0;
+  // font_display/font_body are objects; String({}) is "[object Object]", which
+  // is truthy, so an empty font pair read as "filled" and produced a phantom
+  // conflict against every import.
+  if (value && typeof value === 'object') {
+    return !Object.values(value).some((entry) => String(entry ?? '').trim());
+  }
   return !String(value ?? '').trim();
 }
 
@@ -53,8 +67,19 @@ function buildDiff(existing, updated) {
 function formatValue(value) {
   if (isEmptyValue(value)) return '—';
   if (Array.isArray(value)) {
-    const sliced = value.slice(0, 4).join(', ');
+    // A colour palette is an array of objects; joining it produced
+    // "[object Object], [object Object]".
+    const parts = value.slice(0, 4).map((entry) => (
+      entry && typeof entry === 'object'
+        ? String(entry.hex || entry.name || entry.family || '')
+        : String(entry)
+    )).filter(Boolean);
+    const sliced = parts.join(', ');
     return value.length > 4 ? `${sliced} +${value.length - 4}` : sliced;
+  }
+  // Font pairs are { family, style }.
+  if (value && typeof value === 'object') {
+    return [value.family, value.style].filter(Boolean).join(' · ') || '—';
   }
   if (typeof value === 'string') {
     return value.length > 110 ? `${value.slice(0, 110)}…` : value;
@@ -67,8 +92,22 @@ function formatValue(value) {
  * re-import — receives existingKit/newKit/newConfidenceMap generically via
  * BrandKitStore.openDiffModal, same as before.
  */
-export default function BrandKitDiffModal({ existingKit, newKit, newConfidenceMap, onApply, onCancel }) {
+export default function BrandKitDiffModal({
+  existingKit,
+  newKit,
+  newConfidenceMap,
+  newExtractionEvidence,
+  onApply,
+  onCancel,
+}) {
   const themeCtx = useUiV2ThemeOptional();
+  // Replaces `newConfidenceMap[key] === 'low'` against a value the extractor has
+  // always sent as a NUMBER — the badge below had never rendered. A measured
+  // value additionally must not read like a guess: it came off the site.
+  const prov = (field) => fieldProvenance(field, {
+    confidenceMap: newConfidenceMap || {},
+    extractionEvidence: newExtractionEvidence || {},
+  });
   const { conflicts, additions, unchangedCount } = useMemo(
     () => buildDiff(existingKit, newKit),
     [existingKit, newKit],
@@ -141,8 +180,15 @@ export default function BrandKitDiffModal({ existingKit, newKit, newConfidenceMa
                   >
                     <span className={styles.diffVersionTag}>
                       New
-                      {(newConfidenceMap?.[conflict.key] === 'low' || newConfidenceMap?.[conflict.key] === 'inferred') && (
-                        <span className={styles.confidenceBadge}>Review</span>
+                      {prov(conflict.key).source === PROVENANCE.MEASURED && (
+                        <span className={styles.measuredBadge} title={prov(conflict.key).description}>
+                          Measured
+                        </span>
+                      )}
+                      {prov(conflict.key).needsReview && (
+                        <span className={styles.confidenceBadge} title={prov(conflict.key).description}>
+                          Review
+                        </span>
                       )}
                     </span>
                     <span className={styles.diffVersionValue}>{formatValue(conflict.newValue)}</span>
@@ -169,7 +215,19 @@ export default function BrandKitDiffModal({ existingKit, newKit, newConfidenceMa
                       checked={Boolean(additionSelections[addition.key])}
                       onChange={(event) => setAdditionSelections((prev) => ({ ...prev, [addition.key]: event.target.checked }))}
                     />
-                    <span className={styles.diffAdditionLabel}>{addition.label}</span>
+                    <span className={styles.diffAdditionLabel}>
+                      {addition.label}
+                      {prov(addition.key).source === PROVENANCE.MEASURED && (
+                        <span className={styles.measuredBadge} title={prov(addition.key).description}>
+                          Measured
+                        </span>
+                      )}
+                      {prov(addition.key).needsReview && (
+                        <span className={styles.confidenceBadge} title={prov(addition.key).description}>
+                          Review
+                        </span>
+                      )}
+                    </span>
                     <span className={styles.diffAdditionValue}>{formatValue(addition.newValue)}</span>
                   </label>
                 ))}

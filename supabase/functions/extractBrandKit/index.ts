@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import { callLlm, callAnthropicWithDocument } from "../_shared/llm.ts";
+import { harvestSite, type HarvestResult } from "../_shared/siteHarvest.ts";
+import { buildDesignUpdate } from "../_shared/brandDesign.ts";
 import { corsHeaders, handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 
 // Source can be a previously-uploaded brand_assets document, or a live
@@ -215,37 +217,6 @@ function decodeDocumentText(bytes: Uint8Array, mimeType = "", fileName = "") {
   return extractPrintableText(latinText);
 }
 
-// Strip a fetched HTML page down to visible-ish text: drop script/style
-// blocks, decode the most common entities, collapse tags to whitespace.
-// Not a full HTML parser — good enough to feed an LLM extraction prompt,
-// same "best-effort text soup" standard the PDF path already uses.
-function extractTextFromHtml(html: string) {
-  const withoutNoise = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ");
-
-  const titleMatch = withoutNoise.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const descMatch = withoutNoise.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i);
-
-  const bodyText = withoutNoise
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
-
-  const parts = [
-    titleMatch ? `Page title: ${extractPrintableText(titleMatch[1])}` : "",
-    descMatch ? `Meta description: ${extractPrintableText(descMatch[1])}` : "",
-    extractPrintableText(bodyText),
-  ].filter(Boolean);
-
-  return parts.join("\n");
-}
-
 function buildFallbackResult(brandNameHint: string) {
   const brand_name = inferBrandName(brandNameHint);
   const brandKit = {
@@ -343,6 +314,112 @@ function normalizeExtraction(parsed: any, brandNameHint: string) {
     });
 
   return { brandKit, confidenceMap, missingTier1Fields };
+}
+
+/**
+ * Put the MEASURED values back over the model's output.
+ *
+ * ── Why this exists even though the prompt already says not to change them ──
+ * The evidence document instructs the model to reproduce measured values
+ * exactly. Instructions are a request, not a guarantee: a model that has been
+ * shown `#0a2540` and asked for a brand palette will sometimes return
+ * `#0A2540`, sometimes `#0a2541`, and occasionally "navy". Two of those are
+ * harmless and one silently changes the brand's colour.
+ *
+ * So the instruction handles the common case and this handles the guarantee.
+ * Anything the site actually stated wins, and `extraction_evidence` records
+ * which fields were measured so the review UI can show the user the difference
+ * between a fact and a guess.
+ */
+function applyMeasuredEvidence(
+  extracted: ReturnType<typeof normalizeExtraction> & Record<string, unknown>,
+  harvest: HarvestResult,
+) {
+  const brandKit = { ...extracted.brandKit } as Record<string, unknown>;
+  const confidenceMap = { ...(extracted.confidenceMap as Record<string, number>) };
+  const evidence: Record<string, { source: string; url: string; confidence: number }> = {};
+
+  const markMeasured = (field: string, confidence = 0.99) => {
+    evidence[field] = { source: "measured", url: harvest.siteUrl, confidence };
+    confidenceMap[field] = confidence;
+  };
+
+  // -- Palette: the site's own CSS, ordered by how structurally it is used.
+  if (harvest.measuredPalette.length > 0) {
+    brandKit.color_palette = harvest.measuredPalette.slice(0, 6).map((color) => ({
+      hex: color.hex,
+      name: "",
+      usage: color.fromCustomProperty
+        ? `declared as ${color.sources[0] ?? "a CSS variable"}`
+        : `used on ${color.sources.slice(0, 2).join(", ") || "the site"}`,
+    }));
+    markMeasured("color_palette");
+  }
+
+  // -- Typefaces: a name read out of @font-face or a Google Fonts link is not
+  //    a guess, and it is the difference between rendering the brand's actual
+  //    letterforms and rendering a model's idea of them.
+  if (harvest.measuredFonts.display) {
+    brandKit.font_display = { family: harvest.measuredFonts.display.family, style: "" };
+    markMeasured("font_display");
+  }
+  if (harvest.measuredFonts.body) {
+    brandKit.font_body = { family: harvest.measuredFonts.body.family, style: "" };
+    markMeasured("font_body");
+  }
+
+  // -- Identity from JSON-LD. A legal name the site publishes about itself
+  //    beats a name inferred from a hostname or a headline.
+  const orgName = harvest.organization.name || harvest.organization.legalName;
+  if (orgName) {
+    brandKit.brand_name = orgName;
+    markMeasured("brand_name");
+  }
+  if (harvest.organization.slogan && !String(brandKit.tagline || "").trim()) {
+    brandKit.tagline = harvest.organization.slogan;
+    markMeasured("tagline", 0.9);
+  }
+  brandKit.website_url = harvest.siteUrl;
+  markMeasured("website_url");
+
+  // -- Fields the model produced, marked as inference so the review UI can say
+  //    so. Only fields it actually filled: an empty field is not a guess, it is
+  //    a gap, and labelling it "inferred" would overstate what happened.
+  for (const [field, value] of Object.entries(brandKit)) {
+    if (evidence[field]) continue;
+    const isEmpty = Array.isArray(value)
+      ? value.length === 0
+      : !String(value ?? "").trim();
+    if (isEmpty) continue;
+    evidence[field] = {
+      source: "inferred",
+      url: harvest.siteUrl,
+      confidence: confidenceMap[field] ?? 0,
+    };
+  }
+
+  // -- The design layer. Built entirely inside brandDesign.ts: this function
+  //    describes what the harvest FOUND and that module decides which column it
+  //    belongs in, computes the contrast numbers, and normalises the shapes.
+  const design = buildDesignUpdate({
+    colorRoles: harvest.colorRoles,
+    displayFontFamily: harvest.measuredFonts.display?.family,
+    bodyFontFamily: harvest.measuredFonts.body?.family,
+    websiteUrl: harvest.contact.website,
+    email: harvest.contact.email,
+    phone: harvest.contact.phone,
+    address: harvest.contact.address,
+    socialHandles: harvest.socialHandles,
+    evidence,
+  });
+
+  return {
+    ...extracted,
+    brandKit,
+    confidenceMap,
+    design,
+    measuredFields: Object.keys(evidence).filter((f) => evidence[f].source === "measured"),
+  };
 }
 
 async function runExtraction(sourceText: string, brandNameHint: string) {
@@ -508,33 +585,39 @@ serve(async (req: Request) => {
       return jsonResponse({ ...result, source: "conversation" });
     }
 
-    // -- Website-URL source (mockup's "yourbrand.com" import / "Re-import
-    // from site") — fetch the live page, no stored document involved. --
+    // ── Website source — MEASURED, not inferred ───────────────────────────
+    //
+    // This used to fetch one page, strip the tags off with a regex, and ask an
+    // LLM to extract a colour palette from the resulting prose. Having been
+    // shown no colours, the model produced colours anyway — a plausible palette
+    // invented from marketing copy and handed to the user with the authority of
+    // a fact. The site was carrying the real answer the whole time.
+    //
+    // harvestSite reads several pages, parses the site's own CSS for the hexes
+    // and typefaces actually in use, and reads its structured data for identity
+    // and contact details. Everything it measures is labelled as measured, and
+    // applyMeasuredEvidence below puts those values back over whatever the model
+    // said — so the model cannot drift a brand colour by a few percent.
+    //
+    // Every request inside the harvest goes through safeFetch (~a dozen of them,
+    // to addresses taken from attacker-influenceable markup).
     if (websiteUrl) {
-      let parsedUrl: URL;
-      try {
-        parsedUrl = new URL(websiteUrl.startsWith("http") ? websiteUrl : `https://${websiteUrl}`);
-      } catch {
-        throw new Error("Invalid website URL");
-      }
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        throw new Error("Website URL must be http or https");
-      }
+      const harvest = await harvestSite(websiteUrl);
+      const hostname = new URL(harvest.siteUrl).hostname;
 
-      const pageResponse = await fetch(parsedUrl.toString(), {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; BrandKitBot/1.0)" },
-        redirect: "follow",
-        // LOCK L5.9 — brand kit extraction; bounded so a hung provider fails cleanly.
-        signal: AbortSignal.timeout(60_000),
+      const extracted = await runExtraction(harvest.evidenceDocument, hostname);
+      const merged = applyMeasuredEvidence(extracted, harvest);
+
+      return jsonResponse({
+        ...merged,
+        sourceType: "url",
+        sourceUrl: harvest.siteUrl,
+        pagesRead: harvest.pagesHarvested,
+        // Surfaced, never swallowed: if no stylesheet was readable the user is
+        // looking at inference and has a right to know before accepting it.
+        harvestNotes: harvest.notes,
+        logoCandidates: harvest.logoCandidates,
       });
-      if (!pageResponse.ok) {
-        throw new Error(`Could not fetch ${parsedUrl.hostname} (${pageResponse.status})`);
-      }
-      const html = await pageResponse.text();
-      const sourceText = extractTextFromHtml(html).slice(0, 24000);
-
-      const result = await runExtraction(sourceText, parsedUrl.hostname);
-      return jsonResponse({ ...result, sourceType: "url", sourceUrl: parsedUrl.toString() });
     }
 
     // -- Stored-document source (existing upload flow) --

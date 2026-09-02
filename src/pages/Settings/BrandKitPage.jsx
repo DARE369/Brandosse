@@ -320,6 +320,7 @@ function BrandKitBody() {
               existingKit={diffData.existingKit}
               newKit={diffData.newKit}
               newConfidenceMap={diffData.newConfidenceMap}
+              newExtractionEvidence={diffData.newExtractionEvidence}
               onApply={async (merged) => { await applyDiff(merged, user.id); }}
               onCancel={closeDiffModal}
             />

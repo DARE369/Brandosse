@@ -82,7 +82,10 @@ export default function BrandKitDashboard({
         body: { websiteUrl: url.trim() },
       });
       if (error) throw error;
-      openDiffModal(brandKit || {}, data?.brandKit || {}, data?.confidenceMap || {});
+      openDiffModal(brandKit || {}, data?.brandKit || {}, data?.confidenceMap || {}, {
+        extractionEvidence: data?.design?.extraction_evidence || {},
+        design: data?.design || null,
+      });
     } catch (err) {
       toast.error(err?.message || 'Could not re-import from that site.');
     } finally {
