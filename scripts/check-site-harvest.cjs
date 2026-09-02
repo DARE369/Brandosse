@@ -272,6 +272,79 @@ async function main() {
       assert(role.source === 'measured', `Role ${name} came from the CSS and must be labelled measured.`);
     }
 
+    // ── The chowdeck.com case: heavy use is not evidence of being the ground ──
+    //
+    // Reproduced from a real harvest on 2026-09-02. The site declares #000000
+    // as a custom property and paints it on borders, and never declares a page
+    // background in any stylesheet we can attribute. Black therefore carried
+    // more raw weight than anything else and took the background role — on a
+    // light site — and was labelled "measured" while being a guess.
+    // Shaped from the REAL chowdeck.com stylesheets (165KB, measured 2026-09-02):
+    //   #000000  weight 74  backgroundWeight  9   <- mostly borders and shadows
+    //   #ffffff  weight 46  backgroundWeight 18   <- the actual page ground
+    // Both appear on `background-color` somewhere, so a boolean "is it ever a
+    // background?" tiebreak TIES and raw weight decides — which is how black won
+    // the background role on a light site. Only comparing how MUCH of the weight
+    // is background evidence separates them.
+    const CHOWDECK_LIKE = `
+      :root { --color-black: #000000; --color-white: #ffffff; --brand-green: #0c513f; }
+      .divider { border-color: #000000; }
+      .rule { border-color: #000000; }
+      .edge { border-color: #000000; }
+      .hr { border-color: #000000; }
+      .line { border-color: #000000; }
+      .sep { border-color: #000000; }
+      .frame { border-color: #000000; }
+      .outline { border-color: #000000; }
+      .chip { background-color: #000000; }
+      .sheet { background-color: #ffffff; }
+      .modal { background-color: #ffffff; }
+      .label { color: #ffffff; }
+      .panel { background-color: #0c513f; }
+    `;
+    const chow = h.analyseCss([CHOWDECK_LIKE], []);
+    const chowRoles = h.inferColorRoles(chow.palette);
+
+    const black = chow.palette.find((c) => c.hex === '#000000');
+    const chowWhite = chow.palette.find((c) => c.hex === '#ffffff');
+    assert(
+      black && chowWhite && black.weight > chowWhite.weight,
+      `Fixture precondition: black raw weight (${black && black.weight}) must exceed white `
+      + `(${chowWhite && chowWhite.weight}), or this does not reproduce the real case.`,
+    );
+    assert(
+      black && chowWhite && black.backgroundWeight > 0 && chowWhite.backgroundWeight > black.backgroundWeight,
+      'Fixture precondition: both colours must appear on a background (so a boolean tiebreak ties), '
+      + `with white carrying more; got black bgW=${black && black.backgroundWeight}, `
+      + `white bgW=${chowWhite && chowWhite.backgroundWeight}.`,
+    );
+    assert(
+      chowRoles.background?.hex === '#ffffff',
+      `The page ground should be the colour with the most BACKGROUND evidence (#ffffff), not the `
+      + `one with the most raw usage; got ${chowRoles.background?.hex}.`,
+    );
+    // The actual regression: black took the background role on a light site
+    // purely because borders gave it the most raw weight.
+    assert(
+      chowRoles.background?.hex !== '#000000',
+      'The most heavily USED colour took the background role instead of the most heavily used '
+      + 'AS A BACKGROUND. On the real site that put black on a light page.',
+    );
+    assert(
+      chowRoles.background?.source === 'inferred',
+      'When no stylesheet declares a page background, the background role is a GUESS and must be '
+      + `labelled "inferred". Got "${chowRoles.background?.source}" — that puts a fabricated fact `
+      + 'in the brand kit, which is the failure this whole module exists to prevent.',
+    );
+
+    const chowNotes = [];
+    h.inferColorRoles(chow.palette, chowNotes);
+    assert(
+      chowNotes.some((note) => /best guess at the ground/i.test(note)),
+      'Guessing the page background must produce a note. A silent guess is indistinguishable '
+      + 'from a measurement.',
+    );
+
     // ── Structured data ──────────────────────────────────────────────────────
     const byUrl = new Map([['https://orikisoda.test/', FIXTURE_HTML]]);
     const org = h.readJsonLdOrganization(byUrl);

@@ -86,6 +86,15 @@ export interface MeasuredColor {
    * background and then picks a text colour for the wrong ground.
    */
   onGroundSelector: boolean;
+  /**
+   * Portion of `weight` that came from BACKGROUND properties specifically.
+   *
+   * A colour can be heavily used and never once be a background — chowdeck.com
+   * declares #000000 as a custom property and paints it on borders, which gave
+   * it more raw weight than the page's actual ground and won it the background
+   * role on a light site. Raw weight cannot tell those apart; this can.
+   */
+  backgroundWeight: number;
 }
 
 export interface MeasuredFont {
@@ -577,7 +586,7 @@ export async function harvestSite(rawUrl: string): Promise<HarvestResult> {
   }
 
   const { palette, fonts } = analyseCss(cssSources, googleFontFamilies);
-  const colorRoles = inferColorRoles(palette);
+  const colorRoles = inferColorRoles(palette, notes);
 
   // -- Identity, contact, social, logos ---------------------------------------
   const organization = readJsonLdOrganization(htmlByUrl);
@@ -742,6 +751,7 @@ export function analyseCss(
     sources: Map<string, number>;
     custom: boolean;
     ground: boolean;
+    bgWeight: number;
   }>();
   const fontStats = new Map<string, MeasuredFont>();
 
@@ -793,11 +803,16 @@ export function analyseCss(
             sources: new Map<string, number>(),
             custom: false,
             ground: false,
+            bgWeight: 0,
           };
           entry.weight += weight;
           entry.count += 1;
           if (property.startsWith("--")) entry.custom = true;
           if (isGroundSelector && /^background(-color)?$/.test(property)) entry.ground = true;
+          // Background evidence, kept separately from total weight.
+          if (/^background(-color|-image)?$/.test(property) || BG_CUSTOM_PROPERTY.test(property)) {
+            entry.bgWeight += weight;
+          }
           entry.sources.set(property, (entry.sources.get(property) ?? 0) + 1);
           colorStats.set(hex, entry);
         }
@@ -812,6 +827,7 @@ export function analyseCss(
       count: entry.count,
       fromCustomProperty: entry.custom,
       onGroundSelector: entry.ground,
+      backgroundWeight: entry.bgWeight,
       sources: [...entry.sources.entries()]
         .sort((a, b) => b[1] - a[1])
         .slice(0, 4)
@@ -855,6 +871,13 @@ function saturationOf(hex: string): number {
   return l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
 }
 
+/**
+ * A custom property whose NAME declares it is a background — `--bg`,
+ * `--color-background`, `--surface-2`. Anchored on word parts so
+ * `--color-bgblue` (a blue that merely contains "bg") does not qualify.
+ */
+const BG_CUSTOM_PROPERTY = /^--(?:.*[-_])?(?:bg|background|surface|paper|canvas|ground)(?:[-_].*)?$/i;
+
 const BG_PROPERTY = /background|--.*\b(bg|background|surface|paper|canvas)\b|--(bg|background|surface)/i;
 const CTA_PROPERTY = /--.*\b(primary|accent|brand|cta|action|button|link)\b/i;
 
@@ -871,6 +894,8 @@ const CTA_PROPERTY = /--.*\b(primary|accent|brand|cta|action|button|link)\b/i;
  */
 export function inferColorRoles(
   palette: MeasuredColor[],
+  /** Degradations are pushed here so the user is told, never silently guessed at. */
+  notes?: string[],
 ): Partial<Record<ColorRoleName, ColorRole>> {
   const roles: Partial<Record<ColorRoleName, ColorRole>> = {};
   if (palette.length === 0) return roles;
@@ -894,15 +919,56 @@ export function inferColorRoles(
       const aGround = a.c.onGroundSelector ? 1 : 0;
       const bGround = b.c.onGroundSelector ? 1 : 0;
       if (aGround !== bGround) return bGround - aGround;
-      const aBg = a.c.sources.some((s) => BG_PROPERTY.test(s)) ? 1 : 0;
-      const bBg = b.c.sources.some((s) => BG_PROPERTY.test(s)) ? 1 : 0;
-      if (aBg !== bBg) return bBg - aBg;
+
+      // Then by how much of the colour's weight is BACKGROUND evidence, rather
+      // than by a boolean "has any background-ish source" followed by raw
+      // weight. On chowdeck.com both #000000 and #ffffff scored false on that
+      // boolean, so it fell through to raw weight — and black, declared as a
+      // custom property and painted on borders, took the background role on a
+      // light site. Being used a lot is not the same as being the ground.
+      if (a.c.backgroundWeight !== b.c.backgroundWeight) {
+        return b.c.backgroundWeight - a.c.backgroundWeight;
+      }
+      if (a.c.sources.some((s) => BG_PROPERTY.test(s)) !== b.c.sources.some((s) => BG_PROPERTY.test(s))) {
+        return a.c.sources.some((s) => BG_PROPERTY.test(s)) ? -1 : 1;
+      }
       return b.c.weight - a.c.weight;
     });
 
   const background = byExtremity[0]?.c;
   if (!background) return roles;
-  roles.background = measured(background.hex, "Background");
+
+  // Was this actually OBSERVED as a background, or is it the best guess among
+  // extreme-luminance colours?
+  //
+  // Plenty of real sites never declare a page background in any stylesheet we
+  // can attribute — it arrives from a utility class on a wrapper, or from the
+  // browser default. Calling that guess "measured" puts a fabricated fact in
+  // the user's brand kit, which is exactly what this module exists to stop. The
+  // role is still assigned, because the rest of the palette is computed against
+  // it and an empty kit helps nobody — but it is labelled for what it is.
+  // ONLY a background declared on body/html/:root proves the page ground.
+  //
+  // "It is used as a background somewhere" is not the same claim: a hero panel,
+  // a card and a badge are all backgrounds, and on chowdeck.com the most
+  // heavily used of them is a dark green section on a light page. Background
+  // weight is good enough to RANK candidates — it correctly demotes a colour
+  // that only ever paints borders — but it cannot promote a panel to being the
+  // ground, so it does not get to call the result measured.
+  const groundObserved = background.onGroundSelector;
+  roles.background = {
+    hex: background.hex,
+    name: "Background",
+    source: groundObserved ? "measured" : "inferred",
+    contrast_vs_background: 0,
+  };
+  if (!groundObserved) {
+    notes?.push(
+      `The site never declares a page background colour in a stylesheet we can read, so `
+      + `${background.hex} is this importer's best guess at the ground rather than a measured `
+      + `fact. Worth confirming before it is used to tint anything.`,
+    );
+  }
   const bgHex = background.hex;
   const bgLum = relativeLuminance(bgHex);
 

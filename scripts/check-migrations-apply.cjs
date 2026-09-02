@@ -27,7 +27,7 @@
  * failure this repo keeps finding.
  */
 
-const { execFileSync, spawnSync } = require('node:child_process');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -148,13 +148,21 @@ function main() {
       process.exit(1);
     }
 
+    // Readiness is proven with a real QUERY, not with pg_isready.
+    //
+    // The postgres image starts a temporary server to run its init scripts, then
+    // stops it and starts the real one. pg_isready answers "yes" to that
+    // temporary server, so a check that trusts it races the restart: this guard
+    // passed when run alone and failed roughly one run in two inside the full
+    // suite, reporting "Supabase stub schema failed to apply". A flaky guard is
+    // worse than no guard — it teaches people to re-run until green.
     let ready = false;
-    for (let i = 0; i < 60; i += 1) {
-      if (docker(['exec', CONTAINER, 'pg_isready', '-U', 'postgres', '-d', 'testdb']).status === 0) {
+    for (let i = 0; i < 90; i += 1) {
+      const probe = psql('SELECT 1;');
+      if (probe.status === 0) {
         ready = true;
         break;
       }
-      execFileSync(process.execPath, ['-e', 'setTimeout(()=>{},1000)']);
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
     }
     if (!ready) {
