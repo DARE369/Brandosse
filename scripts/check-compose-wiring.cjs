@@ -103,7 +103,15 @@ assert(
 
 // ── 3. Reporting ─────────────────────────────────────────────────────────────
 
-for (const field of ['composeApplied', 'composeError', 'composeNotes', 'composeTemplate']) {
+// composeContrast/composeRendered were computed by the compositor and thrown
+// away at the response boundary. `notes` can say a headline was trimmed; only
+// composeRendered can show WHICH words are missing, which is the difference
+// between a warning a user can act on and one they must squint at the image to
+// understand.
+for (const field of [
+  'composeApplied', 'composeError', 'composeNotes', 'composeTemplate',
+  'composeContrast', 'composeRendered',
+]) {
   assert(
     new RegExp(`${field}\\s*:`).test(media),
     `media.service.js does not return \`${field}\`. The compositor states plainly why it declined `
@@ -115,6 +123,32 @@ assert(
   'media.service.js does not log a requested-but-unapplied composite. The logo path does exactly '
   + 'this, for exactly the same reason.',
 );
+assert(
+  /contrastReport/.test(edge) && /renderedText/.test(edge),
+  'generateImage does not read contrastReport/renderedText off the compositor result. Both are '
+  + 'computed on every render and were being discarded at the response boundary.',
+);
+// Scoped to the RESPONSE body specifically. Searching the whole file also
+// matched the generation-row metadata block, so deleting the field from the
+// response left this passing — the record was written to the database and never
+// reached the UI that needed it.
+const responseBlock = (() => {
+  const start = edge.lastIndexOf('return jsonResponse({');
+  if (start < 0) return '';
+  const end = edge.indexOf('});', start);
+  return end < 0 ? edge.slice(start) : edge.slice(start, end);
+})();
+assert(
+  responseBlock.length > 0,
+  'Could not locate the generateImage response body — this check would silently pass.',
+);
+for (const field of ['compose_rendered', 'compose_contrast', 'compose_notes', 'compose_applied']) {
+  assert(
+    new RegExp(`${field}\s*:`).test(responseBlock),
+    `generateImage computes ${field} but does not RETURN it. Writing it to the generations row `
+    + 'is not the same as giving it to the UI that has to explain the result.',
+  );
+}
 assert(
   /composeTemplate/.test(pipeline),
   'generationPipeline.js does not carry the chosen template back, so a carousel cannot vary its '

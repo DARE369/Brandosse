@@ -66,6 +66,9 @@ function normalizeGeneratedAsset(result) {
       ...(result.composeError ? { compose_error: result.composeError } : {}),
       ...(result.composeNotes?.length ? { compose_notes: result.composeNotes } : {}),
       ...(result.composeFonts ? { compose_fonts: result.composeFonts } : {}),
+      ...(result.composeContrast?.length ? { compose_contrast: result.composeContrast } : {}),
+      ...(result.composeRendered?.length ? { compose_rendered: result.composeRendered } : {}),
+      ...(result.composeRecoloured?.length ? { compose_recoloured: result.composeRecoloured } : {}),
     },
     // Not metadata — the caller uses this to vary the next slide's layout.
     composeTemplate: result.composeTemplate || null,

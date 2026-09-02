@@ -90,6 +90,22 @@ export interface CompositeDesignResult {
    * whole template x palette matrix and a receipt can show its work.
    */
   contrastReport: Array<{ slot: TextSlot; fill: string; ground: string; ratio: number }>;
+  /**
+   * What each slot ACTUALLY says in the finished image, against what was asked
+   * for.
+   *
+   * `notes` can say a headline "was trimmed"; only this can show the four words
+   * that are missing. Without it the UI can report that copy was lost but not
+   * which copy, which is the difference between a warning a user can act on and
+   * one they have to squint at the image to understand.
+   */
+  renderedText: Array<{
+    slot: TextSlot;
+    requested: string;
+    /** The lines as drawn, joined by a space. Empty when the slot was dropped. */
+    drawn: string;
+    truncated: boolean;
+  }>;
 }
 
 const JPEG_QUALITY = 92;
@@ -348,6 +364,7 @@ export async function compositeDesign(
 
   const parts: string[] = [];
   const scrimmedSlots: TextSlot[] = [];
+  const renderedText: CompositeDesignResult["renderedText"] = [];
   const recoloredSlots: TextSlot[] = [];
   const contrastReport: CompositeDesignResult["contrastReport"] = [];
 
@@ -402,6 +419,12 @@ export async function compositeDesign(
     const rendered = spec.transform === "upper" ? content.toUpperCase() : content;
 
     const laid = layOutText(rendered, metrics, spec, boxPx, shorterEdge);
+    renderedText.push({
+      slot: spec.slot,
+      requested: content,
+      drawn: laid.lines.join(" "),
+      truncated: laid.truncated,
+    });
     if (laid.lines.length === 0) continue;
     if (laid.truncated) notes.push(`"${spec.slot}" was too long for its box and was trimmed.`);
     if (!metrics.isReliable(rendered)) {
@@ -693,6 +716,7 @@ export async function compositeDesign(
     logoApplied,
     inkPixels: ink,
     contrastReport,
+    renderedText,
   };
 }
 

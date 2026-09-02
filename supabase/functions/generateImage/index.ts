@@ -458,6 +458,14 @@ serve(async (req) => {
     let composeError: string | null = null;
     let composeNotes: string[] = [];
     let composeFonts: { display?: string; body?: string } = {};
+    // The compositor already computes all of this and it was being thrown away
+    // at the response boundary. `notes` can say a headline was trimmed; only
+    // renderedText can show WHICH words are missing, and only contrastReport can
+    // show what the type actually achieved rather than that it passed.
+    let composeContrast: Array<{ slot: string; fill: string; ground: string; ratio: number }> = [];
+    let composeRendered: Array<{ slot: string; requested: string; drawn: string; truncated: boolean }> = [];
+    let composeScrimmed: string[] = [];
+    let composeRecoloured: string[] = [];
 
     if (wantsComposite && designTemplate) {
       composeTemplateId = designTemplate.id;
@@ -483,6 +491,10 @@ serve(async (req) => {
         composeApplied = true;
         composeNotes = composed.notes;
         composeFonts = composed.fontsUsed;
+        composeContrast = composed.contrastReport;
+        composeRendered = composed.renderedText;
+        composeScrimmed = composed.scrimmedSlots;
+        composeRecoloured = composed.recoloredSlots;
         if (composed.logoApplied) logoApplied = true;
       } catch (error) {
         composeError = error instanceof CompositorUnavailableError
@@ -610,6 +622,10 @@ serve(async (req) => {
         compose_error:      composeError ?? undefined,
         compose_fonts:      composeApplied ? composeFonts : undefined,
         compose_notes:      composeNotes.length ? composeNotes : undefined,
+        // Library reads the record long after the response is gone.
+        compose_contrast:   composeContrast.length ? composeContrast : undefined,
+        compose_rendered:   composeRendered.length ? composeRendered : undefined,
+        compose_recoloured: composeRecoloured.length ? composeRecoloured : undefined,
       },
     });
 
@@ -630,6 +646,10 @@ serve(async (req) => {
       compose_error:     composeError,
       compose_notes:     composeNotes,
       compose_fonts:     composeFonts,
+      compose_contrast:  composeContrast,
+      compose_rendered:  composeRendered,
+      compose_scrimmed:  composeScrimmed,
+      compose_recoloured: composeRecoloured,
       generation_id:     generationId,
       prompt_used:       finalPrompt,
       provider:          provider,

@@ -261,6 +261,14 @@ export async function generateImages({
       // declined to make. Surfaced so a bare graphic is never unexplained.
       composeNotes: Array.isArray(data.compose_notes) ? data.compose_notes : [],
       composeFonts: data.compose_fonts || null,
+      // What the type actually achieved, per slot — the numbers the status
+      // panel shows ("7.1:1", "4.9:1 after recolour").
+      composeContrast: Array.isArray(data.compose_contrast) ? data.compose_contrast : [],
+      // What each slot asked for vs what was drawn. This is what lets the UI
+      // show WHICH words were lost, not merely that some were.
+      composeRendered: Array.isArray(data.compose_rendered) ? data.compose_rendered : [],
+      composeScrimmed: Array.isArray(data.compose_scrimmed) ? data.compose_scrimmed : [],
+      composeRecoloured: Array.isArray(data.compose_recoloured) ? data.compose_recoloured : [],
       width: dimensions.width,
       height: dimensions.height,
       storagePath: data.storagePath || data.storage_path || null,
