@@ -719,3 +719,91 @@
 /* 16px is the minimum comfortable touch target for a checkbox at this density;
    the browser default renders ~13px, which is a miss on a phone. */
 .checkboxRow input[type='checkbox'] { width: 16px; height: 16px; flex: none; accent-color: var(--uiv2-accent-solid); }
+
+
+/* ── Kit deletion ──────────────────────────────────────────────────────────
+   Deleting a brand kit is irreversible and takes its uploaded logos and
+   documents with it, so the trigger is quiet and the confirmation is explicit
+   about what goes. The trigger sits last in the row and stays visually subdued
+   until interacted with, so a thumb reaching for "Make active" never lands on
+   it by accident. */
+.kitSwitcherDelete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px; /* touch target, even though the glyph is 12px */
+  margin-left: auto;
+  border-radius: var(--uiv2-radius-sm);
+  color: var(--uiv2-text-tertiary);
+  cursor: pointer;
+  flex: none;
+}
+.kitSwitcherDelete:hover,
+.kitSwitcherDelete:focus-visible {
+  color: var(--uiv2-danger);
+  background: var(--uiv2-danger-wash);
+  outline: none;
+}
+
+.deleteOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--uiv2-scrim);
+}
+.deleteModal {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-xl);
+  background: var(--uiv2-bg-surface);
+  box-shadow: var(--uiv2-shadow-modal-current);
+}
+.deleteIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-danger-wash);
+  color: var(--uiv2-danger);
+}
+/* Explicit colour: App.css sets h1-h5 from the OLD token system, which is
+   near-black and would vanish on this surface in dark theme. */
+.deleteTitle {
+  margin: 0;
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-display);
+  font-weight: 600;
+  font-size: var(--uiv2-text-lg);
+  letter-spacing: -0.01em;
+}
+.deleteBody { margin: 0; color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-sm); }
+.deleteActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.deleteConfirmBtn {
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid var(--uiv2-danger);
+  border-radius: var(--uiv2-radius-sm);
+  background: var(--uiv2-danger);
+  color: var(--uiv2-bg-surface);
+  font-family: inherit;
+  font-size: var(--uiv2-text-sm);
+  font-weight: var(--uiv2-weight-semibold);
+  cursor: pointer;
+}
+.deleteConfirmBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+@media (max-width: 480px) {
+  .deleteActions { flex-direction: column-reverse; }
+  .deleteActions > * { width: 100%; }
+}

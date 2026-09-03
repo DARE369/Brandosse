@@ -289,17 +289,94 @@ const useBrandKitStore = create((set, get) => ({
     }
   },
 
+  /**
+   * Delete a brand kit, its asset rows and its stored files.
+   *
+   * ── The two things that make this more than a DELETE ────────────────────────
+   *
+   * 1. THE ACTIVE KIT. Studio generates from whichever kit has `is_active`
+   *    (src/services/brandKitLoader.js:18). Deleting the active one without
+   *    promoting a replacement leaves the account with zero active kits, and the
+   *    loader then returns null — every later generation silently runs with no
+   *    brand at all. The user would see nothing wrong until the output was off.
+   *
+   *    So the replacement is promoted BEFORE the delete. If the delete then
+   *    fails, the account still has exactly one active kit; if the promotion
+   *    failed first, nothing is deleted. Doing it the other way round has a
+   *    window with no active kit, and a failure leaves it that way permanently.
+   *
+   *    The order also respects the partial unique index on `is_active`
+   *    (migration 20260708140000): the doomed kit is stood down first, so two
+   *    kits are never active at once.
+   *
+   * 2. STORAGE FILES. `brand_assets` rows cascade on the foreign key, but the
+   *    FILES in the storage bucket do not — nothing in Postgres knows they
+   *    exist. Deleting the row without them leaves logos and documents behind
+   *    forever, invisible to the user and still counting against their storage.
+   *    So the paths are collected and removed FIRST, while the rows can still be
+   *    read.
+   *
+   * Storage cleanup is best-effort: a file that cannot be removed must not block
+   * the user from deleting their own kit. It is logged, not swallowed.
+   */
   deleteKit: async (kitId) => {
-    const { error } = await supabase.from('brand_kit').delete().eq('id', kitId);
-    if (error) throw error;
+    set({ isSaving: true, error: null });
+    try {
+      const state = get();
+      const doomed = state.kits.find((kit) => kit.id === kitId);
+      if (!doomed) throw new Error('That brand kit no longer exists.');
 
-    set((state) => {
       const remaining = state.kits.filter((kit) => kit.id !== kitId);
-      const nextCurrent = state.currentKitId === kitId
-        ? (pickActiveKit(remaining)?.id || null)
+
+      // -- Storage first, while the rows still exist to tell us the paths.
+      const { data: assetRows } = await supabase
+        .from('brand_assets')
+        .select('storage_path')
+        .eq('brand_kit_id', kitId);
+
+      const paths = (assetRows || []).map((row) => row.storage_path).filter(Boolean);
+      if (paths.length > 0) {
+        const { error: storageErr } = await supabase.storage.from('brand_assets').remove(paths);
+        if (storageErr) {
+          console.error('[BrandKitStore] kit deleted but files could not be removed:', storageErr.message, paths);
+        }
+      }
+
+      // -- Hand "active" over before removing anything.
+      let promoted = null;
+      if (doomed.is_active && remaining.length > 0) {
+        promoted = remaining[0];
+        const { error: standDownErr } = await supabase
+          .from('brand_kit').update({ is_active: false }).eq('id', kitId);
+        if (standDownErr) throw standDownErr;
+        const { error: promoteErr } = await supabase
+          .from('brand_kit').update({ is_active: true }).eq('id', promoted.id);
+        if (promoteErr) throw promoteErr;
+      }
+
+      const { error: deleteErr } = await supabase.from('brand_kit').delete().eq('id', kitId);
+      if (deleteErr) throw deleteErr;
+
+      const kits = remaining.map((kit) => (
+        promoted && kit.id === promoted.id ? { ...kit, is_active: true } : kit
+      ));
+      const nextCurrentId = state.currentKitId === kitId
+        ? (pickActiveKit(kits)?.id ?? kits[0]?.id ?? null)
         : state.currentKitId;
-      return { kits: remaining, currentKitId: nextCurrent, ...deriveViewFields(remaining, nextCurrent) };
-    });
+
+      set({
+        kits,
+        currentKitId: nextCurrentId,
+        assets: state.currentKitId === kitId ? [] : state.assets,
+        isSaving: false,
+        ...deriveViewFields(kits, nextCurrentId),
+      });
+
+      return { deletedId: kitId, promotedId: promoted?.id ?? null, remaining: kits.length };
+    } catch (err) {
+      set({ error: err.message, isSaving: false });
+      throw err;
+    }
   },
 
   // Upsert brand kit fields onto a specific kit (defaults to whichever kit
