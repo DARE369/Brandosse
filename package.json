@@ -33,6 +33,7 @@
     "check:website-import-reachable": "node scripts/check-website-import-reachable.cjs",
     "check:kit-deletion": "node scripts/check-kit-deletion.cjs",
     "check:ssr-hydration-safety": "node scripts/check-ssr-hydration-safety.cjs",
+    "check:extract-progress-honesty": "node scripts/check-extract-progress-honesty.cjs",
     "check:brand-provenance": "node scripts/check-brand-provenance.cjs",
     "check:compositor-fonts": "node scripts/check-compositor-fonts.cjs",
     "check:no-diffusion-text": "node scripts/check-no-diffusion-text.cjs",
