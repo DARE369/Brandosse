@@ -166,6 +166,12 @@ jobs:
       # arithmetic, so it gets a guard rather than a reviewer.
       - name: check-token-contrast
         run: node scripts/check-token-contrast.cjs
+      # The URL import — the only path that MEASURES a brand rather than
+      # inferring it — was reachable from the zero-kits landing screen only,
+      # which a user sees once. Everyone with a kit already got a setup screen
+      # that did not offer it.
+      - name: check-website-import-reachable
+        run: node scripts/check-website-import-reachable.cjs
       # Three components each showed "AI inferred this — please verify" behind
       # `confidence === 'low'`, against a value the extractor has always sent as a
       # NUMBER. The flag had never rendered once. Also asserts the harvester's

@@ -30,6 +30,7 @@
     "check:font-metrics": "node scripts/check-font-metrics.cjs",
     "check:compose-wiring": "node scripts/check-compose-wiring.cjs",
     "check:token-contrast": "node scripts/check-token-contrast.cjs",
+    "check:website-import-reachable": "node scripts/check-website-import-reachable.cjs",
     "check:brand-provenance": "node scripts/check-brand-provenance.cjs",
     "check:compositor-fonts": "node scripts/check-compositor-fonts.cjs",
     "check:no-diffusion-text": "node scripts/check-no-diffusion-text.cjs",

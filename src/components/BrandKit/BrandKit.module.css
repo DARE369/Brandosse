@@ -90,11 +90,21 @@
   border: 1px solid var(--uiv2-accent-border);
   color: var(--uiv2-accent-text);
 }
-.emptyTitle { font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-2xl); letter-spacing: -0.01em; }
+/* An explicit colour is required. src/styles/App.css:15 sets
+   `h1,h2,h3,h4,h5 { color: var(--color-text-primary) }` from the OLD token
+   system, which resolves to #141210 here — near-black text on this screen's
+   near-black ground. A class with no colour of its own loses to it, so both
+   titles rendered all but invisible in dark theme. */
+.emptyTitle { color: var(--uiv2-text-primary); font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-2xl); letter-spacing: -0.01em; }
 .emptyDesc { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); max-width: 360px; }
 .emptyForm { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
 .emptyUrlRow { display: flex; gap: 8px; width: 100%; }
-.emptyInput {
+/* Scoped to the parent on purpose. src/styles/global.css styles
+   `input[type="text"]` (specificity 0-1-1), which outranks a bare class
+   (0-1-0) and repainted these inputs with OLD-system tokens: a cream
+   background and near-black text inside the dark theme. Adding the parent
+   takes the class to 0-2-0 so the design system wins its own inputs back. */
+.emptyForm .emptyInput {
   flex: 1;
   min-width: 0;
   background: var(--uiv2-bg-inset);
@@ -106,7 +116,7 @@
   font-family: inherit;
   outline: none;
 }
-.emptyInput:focus { border-color: var(--uiv2-accent-solid); }
+.emptyForm .emptyInput:focus { border-color: var(--uiv2-accent-solid); }
 .emptyDivider {
   display: flex;
   align-items: center;
@@ -133,8 +143,44 @@
   background: var(--uiv2-accent-wash); border: 1px solid var(--uiv2-accent-border); color: var(--uiv2-accent-text);
   margin-bottom: 4px;
 }
-.choiceTitle { font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-2xl); letter-spacing: -0.01em; }
+.choiceTitle { color: var(--uiv2-text-primary); font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-2xl); letter-spacing: -0.01em; }
 .choiceSubtitle { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); max-width: 460px; }
+
+/* Website import — the recommended path, and the only one that MEASURES the
+   brand rather than inferring it. Deliberately mirrors .emptyUrlRow on the
+   zero-kits landing screen: a user who saw that once should recognise this. */
+.choiceUrlBlock { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.choiceUrlRow { display: flex; gap: 8px; width: 100%; }
+.choiceUrlBlock .choiceUrlInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px; /* touch target */
+  padding: 10px 12px;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm);
+  background: var(--uiv2-bg-surface);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+}
+.choiceUrlBlock .choiceUrlInput:focus { border-color: var(--uiv2-accent-solid); outline: none; }
+.choiceUrlNote {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0;
+  color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-xs);
+}
+.choiceUrlError { margin: 0; color: var(--uiv2-danger); font-size: var(--uiv2-text-xs); }
+.choiceDivider {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--uiv2-text-tertiary);
+  font-size: var(--uiv2-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.choiceDivider::before, .choiceDivider::after {
+  content: ""; flex: 1 1 auto; height: 1px; background: var(--uiv2-border);
+}
 
 .choiceGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 720px) { .choiceGrid { grid-template-columns: 1fr; } }
