@@ -22,3 +22,46 @@
   font-size: var(--uiv2-text-sm);
   margin-top: 10px;
 }
+
+/* ── Policies and agreements ───────────────────────────────────────────────
+   The signed-in route to the legal documents. Uses --uiv2-* tokens throughout
+   so it follows the app's theme toggle — unlike the documents themselves,
+   which deliberately commit to one light look. */
+
+.inlineLink { color: var(--uiv2-accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.inlineLink:hover { color: var(--uiv2-accent-solid-hover); }
+
+.legalList {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.legalList li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 9px 10px;
+  margin: 0 -10px;
+  border-radius: var(--uiv2-radius-md);
+}
+
+.legalList li:hover { background: var(--uiv2-bg-canvas); }
+
+.legalList a {
+  color: var(--uiv2-accent-text);
+  font-size: var(--uiv2-text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.legalList a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+.legalList span {
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+}

@@ -1173,9 +1173,13 @@
   background: var(--lp-card);
 }
 
+/* Four columns since the legal documents were published: brand, product,
+   account, legal. Platform review teams look for a legal link in the footer of
+   the site an app is submitted from, and so does anyone deciding whether to
+   trust a signup form. */
 .lp-foot-grid {
   display: grid;
-  grid-template-columns: 1.7fr 1fr 1fr;
+  grid-template-columns: 1.6fr 1fr 1fr 1.05fr;
   gap: clamp(20px, 3vw, 34px);
 }
 

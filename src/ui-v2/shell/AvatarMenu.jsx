@@ -13,6 +13,17 @@ const LINKS = [
 ];
 
 /**
+ * Reference links that leave the app shell. `newTab` is not decoration: /legal
+ * is a public page outside the signed-in product, so navigating to it in place
+ * tears down the shell and drops whatever the user was doing. Someone checking
+ * a clause mid-task should come back to the task.
+ *
+ * One entry, pointing at the hub, rather than six pointing at each document —
+ * a dropdown with six policy links is a dropdown nobody reads.
+ */
+const REFERENCE_LINKS = [{ label: "Legal & policies", href: "/legal", newTab: true }];
+
+/**
  * Real avatar dropdown menu — every mockup's header links Analytics/Settings/
  * Billing/Help + Sign out from here. Previously `AppHeader`'s Avatar just
  * navigated straight to /app/profile with no menu at all.
@@ -49,6 +60,19 @@ export function AvatarMenu({ initials, name, email, onNavigate }) {
         >
           {link.label}
         </button>
+      ))}
+      <div className={styles.separator} />
+      {REFERENCE_LINKS.map((link) => (
+        <a
+          key={link.href}
+          href={link.href}
+          className={styles.item}
+          target={link.newTab ? "_blank" : undefined}
+          rel={link.newTab ? "noopener noreferrer" : undefined}
+          onClick={() => setOpen(false)}
+        >
+          {link.label}
+        </a>
       ))}
       <div className={styles.separator} />
       <button

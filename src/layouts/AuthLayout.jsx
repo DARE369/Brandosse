@@ -88,6 +88,20 @@ export default function AuthLayout({ children, title, subtitle }) {
           </header>
 
           {children}
+
+          {/* Page chrome, not consent. Register.jsx carries the actual
+              agreement sentence inside the form; this is the standing route to
+              the documents from every other auth screen — login, forgot
+              password, reset password — which previously had none at all.
+              Plain <a> rather than <Link>: these are static pages outside the
+              client-routed app, and a full navigation is the cheaper path. */}
+          <nav className="auth-legal" aria-label="Legal">
+            <a href="/terms">Terms</a>
+            <span aria-hidden="true">·</span>
+            <a href="/privacy">Privacy</a>
+            <span aria-hidden="true">·</span>
+            <a href="/legal">All policies</a>
+          </nav>
         </div>
       </main>
     </div>

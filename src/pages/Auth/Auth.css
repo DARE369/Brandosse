@@ -452,6 +452,33 @@
   text-align: center; line-height: 1.55;
 }
 
+/* Standing route to the published policies from every auth screen.
+   Set quieter than .auth-terms: on the register page that sentence is the
+   consent, and this row must not compete with it. */
+.auth-legal {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.18));
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.auth-legal a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.auth-legal a:hover {
+  color: var(--text-primary, currentColor);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ════════════════════════════════════════
    RESPONSIVE
 ════════════════════════════════════════ */

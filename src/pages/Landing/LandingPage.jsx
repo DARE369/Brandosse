@@ -756,6 +756,20 @@ export default function LandingPage() {
             <Link href="/login">Log in</Link>
             <a href="#faq">FAQ</a>
           </div>
+          {/* Complete rather than selective. Meta, TikTok and LinkedIn all check
+              that the policy URLs on an app submission are reachable from the
+              public site, and data deletion is the one they most often look for
+              and most often fail to find. scripts/check-legal-pages.cjs asserts
+              every registered document appears here. */}
+          <div className="lp-foot-col">
+            <span className="lp-mono lp-pane-label">LEGAL</span>
+            <Link href="/terms">Terms of Service</Link>
+            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/acceptable-use">Acceptable Use</Link>
+            <Link href="/refunds">Refunds and Credits</Link>
+            <Link href="/subprocessors">Subprocessors</Link>
+            <Link href="/data-deletion">Data Deletion</Link>
+          </div>
         </div>
         <div className="lp-wrap lp-foot-base">
           <span className="lp-mono">© {new Date().getFullYear()} STUDIO · PUBLISHING IS SIMULATED DURING BETA</span>

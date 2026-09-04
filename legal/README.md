@@ -1,6 +1,45 @@
 # Legal documents
 
-**Status: DRAFTS. Not reviewed by a lawyer. Not publishable.**
+**Status: PUBLISHED (five documents), still not reviewed by a lawyer.**
+
+## ⚠️ These markdown files are no longer the live text
+
+As of 2026-09-04, five of these documents are published on the site and are the
+text users agree to. The live version is the React component, not the markdown:
+
+| Document | Live URL | Component |
+|---|---|---|
+| Terms of Service | `/terms` | [src/pages/Legal/TermsOfService.jsx](../src/pages/Legal/TermsOfService.jsx) |
+| Privacy Policy | `/privacy` | [src/pages/Legal/PrivacyPolicy.jsx](../src/pages/Legal/PrivacyPolicy.jsx) |
+| Acceptable Use Policy | `/acceptable-use` | [src/pages/Legal/AcceptableUsePolicy.jsx](../src/pages/Legal/AcceptableUsePolicy.jsx) |
+| Refund and Credits Policy | `/refunds` | [src/pages/Legal/RefundPolicy.jsx](../src/pages/Legal/RefundPolicy.jsx) |
+| Subprocessors | `/subprocessors` | [src/pages/Legal/SubprocessorsPage.jsx](../src/pages/Legal/SubprocessorsPage.jsx) |
+
+**Editing a markdown file here changes nothing a user sees.** Change the
+component, and move the date in
+[src/pages/Legal/legalDocs.js](../src/pages/Legal/legalDocs.js) in the same
+commit. `node scripts/check-legal-pages.cjs` guards the published set against
+placeholders, dead cross-references, and the signup form losing its links.
+
+Each component's header comment records exactly what was changed in publishing
+it — placeholders resolved, draft banners removed, cross-references linked. The
+markdown files are kept as the drafting record and as the evidence-cited
+internal version of the Subprocessors list; they are not the contract.
+
+## Still outstanding
+
+- **No lawyer has reviewed these.** Publishing them did not change that.
+- **CAC registration number.** Privacy 1.1 was published without it rather than
+  with a visible `[RC NUMBER]` placeholder. Add it to the component when issued.
+- **Payment processor.** Terms 5.2 and the Refund Policy name Paystack; the code
+  implements a Stripe checkout in USD
+  ([app/api/credits/purchase/route.ts:77](../app/api/credits/purchase/route.ts#L77)).
+  Billing is not open, so nobody is affected yet — but the document and the code
+  must agree before the first payment is taken.
+
+---
+
+**Original drafting note, retained:**
 
 I am not a lawyer and these are not legal advice. They are structured, factually
 accurate first drafts written from the actual codebase, intended to cut a

@@ -81,6 +81,11 @@ jobs:
         run: node scripts/check-docs-canonical.cjs
       - name: check-ui-consistency
         run: node scripts/check-ui-consistency.cjs
+      # The six published legal documents: no template placeholder or draft
+      # banner reaches production, every incorporation by reference resolves,
+      # and the signup form links to the contract it makes users accept.
+      - name: check-legal-pages
+        run: node scripts/check-legal-pages.cjs
       - name: check-e2e-env
         run: node scripts/check-e2e-env.cjs
       - name: check-production-ready
@@ -251,6 +256,14 @@ jobs:
           CRON_SECRET: ci-placeholder
           VIDEO_WORKER_WEBHOOK_SECRET: ci-placeholder
           WORKER_WEBHOOK_URL: http://localhost:8001
+
+      # The legal-page checks that can only run against BUILT html. The
+      # hermetic `guards` job reads source, which cannot see a space JSX
+      # dropped between a link and the word after it — that shipped once.
+      # --require-build turns "no build found" from a skip into a failure, so
+      # this step cannot silently pass by finding nothing to check.
+      - name: check-legal-pages (rendered output)
+        run: node scripts/check-legal-pages.cjs --require-build
 
   # ── End-to-end — the suite that had never run in CI at all ─────────────────
   e2e:

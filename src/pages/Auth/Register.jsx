@@ -395,8 +395,19 @@ export default function Register() {
 
       <p className="auth-terms">
         By creating an account you agree to our{" "}
-        <a href="#" className="auth-link">Terms of Service</a> and{" "}
-        <a href="#" className="auth-link">Privacy Policy</a>.
+        {/* These opened nothing until the documents were published. A signup
+            form that makes the user agree to a contract it will not show them
+            is not a formality problem — it is the agreement failing to form.
+            target="_blank" so reading the terms does not discard a half-filled
+            registration form. */}
+        <Link href="/terms" className="auth-link" target="_blank" rel="noopener noreferrer">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="auth-link" target="_blank" rel="noopener noreferrer">
+          Privacy Policy
+        </Link>
+        .
       </p>
 
       <p className="auth-footer">

@@ -34,6 +34,10 @@
   color: var(--uiv2-text-primary);
   font-size: 12.5px;
   font-family: inherit;
+  /* .item is used on both <button> and <a> since the Legal entry was added.
+     Stated rather than inherited so the anchor cannot pick up the global link
+     colour or an underline from app-entry.css. */
+  text-decoration: none;
 }
 .item:hover { background: var(--uiv2-bg-elevated); }
 .danger { color: var(--uiv2-danger); }

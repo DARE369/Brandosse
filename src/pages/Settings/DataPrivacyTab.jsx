@@ -7,7 +7,9 @@
 // buttons record a real row an admin actions manually rather than pretending
 // to run a pipeline that doesn't exist.
 import { useEffect, useState } from "react";
-import { Loader2, Download, Trash2, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Download, Trash2, ShieldAlert, FileText } from "lucide-react";
+import { LEGAL_DOCS } from "../Legal/legalDocs";
 import {
   fetchPendingAccountRequests, submitAccountRequest, cancelAccountRequest,
 } from "../../services/userSettingsService";
@@ -105,7 +107,11 @@ export default function DataPrivacyTab({ userId, onToast }) {
           <Download size={16} aria-hidden="true" />
           <div className={styles.sectionTitle}>Export your data</div>
         </div>
-        <div className={styles.sectionSub}>Request a copy of your content, brand kit, and account activity.</div>
+        <div className={styles.sectionSub}>
+          Request a copy of your content, brand kit, and account activity. Handled the same way as
+          deletion — see <Link href="/data-deletion" className={styles.inlineLink}>the data deletion page</Link> for
+          timings.
+        </div>
         {exportPending ? (
           <div className={styles.pendingRow}>
             <Badge tone="info">Requested {formatDateTime(exportPending.created_at)}</Badge>
@@ -139,6 +145,30 @@ export default function DataPrivacyTab({ userId, onToast }) {
             <Button variant="dangerSolid" onClick={() => setDeleteModalOpen(true)}>Delete account…</Button>
           </div>
         )}
+      </Card>
+
+      {/* Until this shipped, a signed-in user had NO route from the product back
+          to the contract they accepted at signup — the only links were on the
+          public landing page and the signup form itself. Privacy 8.2 sends
+          people to this exact screen, so this is where the documents belong. */}
+      <Card>
+        <div className={styles.sectionHead}>
+          <FileText size={16} aria-hidden="true" />
+          <div className={styles.sectionTitle}>Policies and agreements</div>
+        </div>
+        <div className={styles.sectionSub}>
+          The terms you agreed to when you created this account, and everything that goes with them.
+        </div>
+        <ul className={styles.legalList}>
+          {LEGAL_DOCS.map((doc) => (
+            <li key={doc.slug}>
+              <Link href={`/${doc.slug}`} target="_blank" rel="noopener noreferrer">
+                {doc.title}
+              </Link>
+              <span>{doc.note}</span>
+            </li>
+          ))}
+        </ul>
       </Card>
 
       <Modal
