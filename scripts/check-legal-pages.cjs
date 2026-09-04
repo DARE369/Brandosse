@@ -486,6 +486,77 @@ function checkRenderedPages(requireBuild) {
   return { skipped: false, count: present.length };
 }
 
+/* ── 11. The canonical origin cannot become a hosting subdomain ──────────── */
+
+/**
+ * Measured on the first production deploy: NEXT_PUBLIC_APP_URL was set in
+ * Vercel to https://brandosse1.vercel.app, so every canonical tag, og:url and
+ * sitemap entry on the live site pointed at the vercel.app host. Two live
+ * hosts serving identical pages, each telling crawlers the other is not the
+ * real one — and a reviewer following the canonical from a submitted policy
+ * URL lands somewhere that is not the product.
+ *
+ * The resolution lives in legalMetadata.js and depends on an environment
+ * variable, so it cannot be checked by reading the built HTML on a machine
+ * that does not have production's env. Instead the guard EVALUATES the real
+ * resolution logic out of the source against a table of origins, which is
+ * both hermetic and exact: it tests the shipped code, not a copy of it.
+ */
+function checkCanonicalOrigin() {
+  const file = path.join(LEGAL_SRC, "legalMetadata.js");
+  if (!fs.existsSync(file)) {
+    fail(`Missing file: ${rel(file)}.`);
+    return;
+  }
+
+  const source = read(file);
+  const start = source.indexOf("const RAW_ORIGIN");
+  const end = source.indexOf("/** Build the Next.js");
+
+  if (start === -1 || end === -1 || end <= start) {
+    fail(
+      `${rel(file)}: could not locate the SITE_ORIGIN resolution block. This guard ` +
+        `evaluates it directly; if the file was restructured, update the guard too ` +
+        `rather than leaving the canonical origin unchecked.`,
+    );
+    return;
+  }
+
+  const body = source.slice(start, end).replace(/^export /gm, "");
+  const WWW = "https://www.brandosse.com";
+
+  const cases = [
+    ["production", undefined, WWW, "unset falls back to the production origin"],
+    ["production", "http://localhost:3000", WWW, "a localhost origin is refused"],
+    ["production", "https://brandosse1.vercel.app", WWW, "the vercel.app host is refused"],
+    ["production", "https://brandosse-git-abc.vercel.app", WWW, "any vercel preview host is refused"],
+    ["production", "https://brandosse.com", WWW, "the apex is normalised up to www"],
+    ["production", WWW, WWW, "a correct origin passes through untouched"],
+    ["development", "http://localhost:3000", "http://localhost:3000", "development keeps localhost"],
+  ];
+
+  for (const [nodeEnv, envValue, expected, label] of cases) {
+    let actual;
+    try {
+      // eslint-disable-next-line no-new-func
+      const resolve = new Function("process", `${body}
+return SITE_ORIGIN;`);
+      actual = resolve({ env: { NEXT_PUBLIC_APP_URL: envValue, NODE_ENV: nodeEnv } });
+    } catch (error) {
+      fail(`${rel(file)}: evaluating the origin logic threw — ${error.message}`);
+      return;
+    }
+
+    if (actual !== expected) {
+      fail(
+        `${rel(file)}: canonical origin wrong — ${label}. ` +
+          `NEXT_PUBLIC_APP_URL=${String(envValue)} NODE_ENV=${nodeEnv} ` +
+          `resolved to ${actual}, expected ${expected}.`,
+      );
+    }
+  }
+}
+
 /* ── Run ──────────────────────────────────────────────────────────────────── */
 
 checkRoutesExist();
@@ -497,6 +568,7 @@ checkFooterLinks();
 checkLegalHub();
 checkNotFoundStatus();
 checkInAppReachability();
+checkCanonicalOrigin();
 
 const requireBuild = process.argv.includes("--require-build");
 const rendered = checkRenderedPages(requireBuild);
