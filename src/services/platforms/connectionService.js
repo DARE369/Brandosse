@@ -134,7 +134,15 @@ async function upsertAccountRecord(params) {
     username: providerResult.username,
     avatar_url: providerResult.profilePictureUrl,
     profile_picture_url: providerResult.profilePictureUrl,
-    access_token: providerResult.token,
+    // access_token / mock_token are NOT written here any more.
+    //
+    // Migration 20260904120000 moved real credentials into
+    // connected_account_secrets and revoked client access to these columns, so
+    // writing them from the browser now fails with 403. They are also dead
+    // weight: a grep across src/ and supabase/functions/ shows both columns are
+    // written in several places and READ by nothing — no code path authorises,
+    // publishes, or refreshes based on either. This is a mock connection, so
+    // there is no real credential to store in the first place.
     token_expires_at: providerResult.tokenExpiresAt,
     scopes: providerResult.scopes || [],
     connection_status: 'active',
@@ -142,7 +150,6 @@ async function upsertAccountRecord(params) {
     follower_count: Number(providerResult.followerCount || formData.followerCount || 0),
     account_category: providerResult.accountCategory || formData.accountCategory || null,
     is_mock: true,
-    mock_token: providerResult.token,
     last_token_refresh: new Date().toISOString(),
     last_token_refresh_at: new Date().toISOString(),
     health_score: 100,
@@ -279,12 +286,49 @@ export async function disconnectAccount(accountId, actorId) {
   const account = await fetchAccountRow(accountId);
   if (!account) throw new Error('Connected account not found');
 
+  // ── Direct-OAuth platforms disconnect through the server ──────────────────
+  //
+  // The soft delete below is not sufficient for these. LinkedIn API Terms §4.4
+  // requires that content and tokens collected on a user's behalf be deleted
+  // IMMEDIATELY on request — flipping connection_status to 'revoked' leaves
+  // both in place. The server route also revokes the grant at the platform,
+  // which no client-side update can do: deleting only our row would leave a
+  // live authorization the user believes they cancelled, still sitting in
+  // their LinkedIn settings.
+  if (DIRECT_OAUTH_PLATFORMS.has(account.platform) && !account.is_mock) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Sign in again to disconnect this account.');
+
+    const res = await fetch(`/api/auth/social/${account.platform}/disconnect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ accountId }),
+    });
+
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.detail || payload?.error || 'Could not disconnect this account.');
+    }
+
+    // The row is gone, so there is no updated record to return and no
+    // connection_event to write against it — the event would cascade away with
+    // the account, which is the correct outcome under §4.4.
+    return { id: accountId, platform: account.platform, deleted: true, note: payload?.note || null };
+  }
+
   const { data, error } = await supabase
     .from('connected_accounts')
     .update({
       connection_status: 'revoked',
-      access_token: null,
-      mock_token: null,
+      // Nulling access_token / mock_token here was the cause of a 403 on every
+      // disconnect: those columns are no longer writable by the client
+      // (20260904120000). Clearing them is also unnecessary — real credentials
+      // live in connected_account_secrets and are hard-deleted by the
+      // /api/auth/social/[provider]/disconnect route for direct-OAuth accounts,
+      // which is the path that actually holds anything worth clearing.
       last_failure_reason: null,
     })
     .eq('id', accountId)
@@ -331,8 +375,12 @@ export async function triggerReconnect(accountId, actorId) {
   const { data, error } = await supabase
     .from('connected_accounts')
     .update({
-      access_token: refresh.token,
-      mock_token: refresh.token,
+      // Same reason as connectAccount/disconnectAccount: these columns are
+      // client-unwritable since 20260904120000 and read by nothing. This is
+      // the MOCK reconnect path (provider.refreshToken is mockOAuthProvider),
+      // so the "token" it returns is a simulated string with no consumer.
+      // Real credential refresh belongs server-side, against
+      // connected_account_secrets.
       token_expires_at: refresh.tokenExpiresAt,
       connection_status: 'active',
       last_token_refresh: new Date().toISOString(),
@@ -490,6 +538,18 @@ export async function getAccountHealth(accountId) {
  *
  * The Settings page calls this instead of MockOAuthService.connectMockAccount().
  */
+/**
+ * Platforms migrated to direct per-platform OAuth.
+ *
+ * Zernio is being removed one platform at a time rather than all at once, so
+ * both paths are live during the migration. A platform in this set never
+ * touches Zernio; everything else is unchanged. Add a platform here only once
+ * its adapter exists in publish-post — otherwise the connect flow succeeds and
+ * publishing then fails, which is the "connected but can't publish" defect
+ * this codebase has already shipped once.
+ */
+const DIRECT_OAUTH_PLATFORMS = new Set(['linkedin']);
+
 export async function initiateOAuthConnection({
   platform,
   scope = 'personal',
@@ -497,7 +557,48 @@ export async function initiateOAuthConnection({
   userId,
   formData = {},
   fallbackToMock = true,
+  returnTo = null,
 } = {}) {
+  // ── Direct OAuth (post-Zernio) ────────────────────────────────────────────
+  if (DIRECT_OAUTH_PLATFORMS.has(platform) && scope === 'personal') {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('Sign in again before connecting a real platform account.');
+    }
+
+    const params = new URLSearchParams({ platform, scope, format: 'json' });
+    // Where to land after the round trip. Signed into the state server-side and
+    // validated there — never trusted as given.
+    if (returnTo) params.set('returnTo', returnTo);
+    else if (typeof window !== 'undefined') {
+      params.set('returnTo', window.location.pathname + window.location.search);
+    }
+
+    const provider = platform; // one provider per platform today; Meta will map two
+    const response = await fetch(`/api/auth/social/${provider}/connect?${params.toString()}`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok && payload?.url) {
+      window.location.href = payload.url;
+      return { redirecting: true };
+    }
+
+    // Deliberately does NOT fall through to mock. A mock LinkedIn account
+    // would render as connected and never publish — the exact failure the
+    // capability view (20260821220000) was written to stop the UI reporting
+    // as healthy. Surface the real reason instead.
+    throw new Error(
+      payload?.error === 'app_not_configured'
+        ? 'LinkedIn publishing is not configured in this environment yet.'
+        : payload?.detail || payload?.error || 'Could not start the LinkedIn connect flow.',
+    );
+  }
+
   // Org-scoped accounts aren't wired for Zernio yet (personal-only for this
   // pass), so those go straight to the mock fallback below.
   if (scope === 'personal') {

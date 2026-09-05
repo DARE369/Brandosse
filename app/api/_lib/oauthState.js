@@ -38,6 +38,71 @@ import crypto from 'node:crypto';
 
 const DEFAULT_TTL_SECONDS = 600; // 10 minutes — an OAuth round trip is seconds
 
+/** Where a connect flow lands when it carries no returnTo, or an unsafe one. */
+export const DEFAULT_RETURN_TO = '/app/settings';
+
+/** Long enough for any real in-app path; short enough to bound the state token. */
+const MAX_RETURN_TO_LENGTH = 512;
+
+/**
+ * Reduce a caller-supplied returnTo to a path that can only land inside this
+ * app, or fall back.
+ *
+ * ── Why this is not merely defensive ────────────────────────────────────────
+ * A user can start a connect from Settings, the composer, onboarding, the
+ * calendar, or a failed-post retry, and must come back to the one they left
+ * with their draft intact. That destination has to survive a round trip
+ * through a third-party authorization server, so it rides inside the signed
+ * state.
+ *
+ * The moment a redirect target is attacker-influenceable, it is an open
+ * redirect: a link that begins on our real domain, carries our real branding
+ * through a real login, and deposits the user on a page somebody else
+ * controls. Open redirects are also the standard way OAuth authorization codes
+ * get exfiltrated.
+ *
+ * This file exists because the Zernio callback once trusted a query parameter
+ * to decide WHICH USER an account belonged to (LOCK L1.6). Repeating that
+ * mistake with the redirect target would be the same defect wearing a hat.
+ *
+ * Signing alone is not the answer either: a signed state proves WE minted the
+ * value, not that the value is safe. If a route ever passes an unvalidated
+ * `?next=` straight into createOAuthState, the signature would faithfully
+ * authenticate an attacker's destination. So the value is validated at mint
+ * AND re-validated at verify.
+ *
+ * Rejected, and why each one matters:
+ *   - anything not starting with "/"  → absolute URLs go off-origin
+ *   - "//evil.com"                    → protocol-relative; the browser reads
+ *                                       this as https://evil.com
+ *   - backslashes                     → several browsers normalise "\" to "/",
+ *                                       so "/\evil.com" becomes "//evil.com"
+ *   - control characters              → CR/LF enable Location header splitting
+ *
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string} a safe same-origin path
+ */
+export function sanitizeReturnTo(value, fallback = DEFAULT_RETURN_TO) {
+  if (typeof value !== 'string') return fallback;
+
+  const v = value.trim();
+  if (v === '' || v.length > MAX_RETURN_TO_LENGTH) return fallback;
+
+  if (!v.startsWith('/')) return fallback;   // not a same-origin path at all
+  if (v.startsWith('//')) return fallback;   // protocol-relative -> off-origin
+  if (v.includes('\\')) return fallback;     // normalises to "/" in some browsers
+
+  // Control characters, checked by code point: a CR or LF here would let a
+  // caller split the Location header this value ends up in.
+  for (let i = 0; i < v.length; i += 1) {
+    const code = v.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return fallback;
+  }
+
+  return v;
+}
+
 function getSecret() {
   const secret = process.env.OAUTH_STATE_SECRET || '';
   if (secret.length < 32) {
@@ -58,10 +123,20 @@ function sign(payloadB64) {
 /**
  * Create a signed state for a verified user starting a connect flow.
  *
- * @param {{ userId: string, platform: string, scope?: string, ttlSeconds?: number }} args
+ * `returnTo` is sanitised here rather than trusted. A caller that passes a
+ * raw `?next=` through would otherwise get an attacker's destination faithfully
+ * signed by us — the signature proves we minted it, never that it is safe.
+ *
+ * @param {{ userId: string, platform: string, scope?: string, returnTo?: string, ttlSeconds?: number }} args
  * @returns {string} opaque state token
  */
-export function createOAuthState({ userId, platform, scope = 'personal', ttlSeconds = DEFAULT_TTL_SECONDS }) {
+export function createOAuthState({
+  userId,
+  platform,
+  scope = 'personal',
+  returnTo,
+  ttlSeconds = DEFAULT_TTL_SECONDS,
+}) {
   if (!userId) throw new Error('createOAuthState: userId is required');
   if (!platform) throw new Error('createOAuthState: platform is required');
 
@@ -69,6 +144,10 @@ export function createOAuthState({ userId, platform, scope = 'personal', ttlSeco
     uid: userId,
     platform: String(platform).toLowerCase(),
     scope,
+    // Where to land the user after the round trip. Sanitised at mint AND
+    // re-checked at verify: signing authenticates the value, it does not
+    // validate it.
+    rt: sanitizeReturnTo(returnTo),
     // Nonce makes each state unique even for identical user+platform, so a
     // captured state cannot be silently reused within its TTL window.
     nonce: crypto.randomBytes(12).toString('base64url'),
@@ -122,6 +201,13 @@ export function verifyOAuthState(state, expect = {}) {
   if (expect.platform && payload.platform !== String(expect.platform).toLowerCase()) {
     throw new Error('oauth_state_platform_mismatch');
   }
+
+  // Re-sanitise on the way out. Defence in depth: if a future change ever mints
+  // a state without validating returnTo — or the secret leaks and someone mints
+  // their own — the callback still cannot be steered off-origin. The cost is one
+  // string check; the failure it prevents is an open redirect wearing our
+  // domain and our branding.
+  payload.rt = sanitizeReturnTo(payload.rt);
 
   return payload;
 }

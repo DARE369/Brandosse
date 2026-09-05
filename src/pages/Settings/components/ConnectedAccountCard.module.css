@@ -31,3 +31,13 @@
 
 .actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .dangerBtn { color: var(--uiv2-danger); }
+
+/* The reason an account cannot publish, shown under the account name.
+   A status chip on its own says something is wrong without saying what to do. */
+.statusDetail {
+  margin: 4px 0 0;
+  font-size: var(--uiv2-text-xs);
+  line-height: 1.45;
+  color: var(--uiv2-text-secondary);
+  max-width: 52ch;
+}

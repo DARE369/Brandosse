@@ -89,6 +89,87 @@ test('each state is unique (nonce present)', () => {
   if (a === b) throw new Error('two states were identical — nonce not applied');
 });
 
+// ── returnTo: the redirect target rides inside the state ─────────────────────
+//
+// A user starts a connect from Settings, the composer, onboarding or a failed
+// post, and must land back where they left. That destination survives a round
+// trip through a third-party authorization server, so it travels in the signed
+// state — which makes it a redirect target that a caller can influence.
+//
+// An unvalidated one is an open redirect: a link that starts on our real
+// domain, carries our branding through a real login, and drops the user on a
+// page somebody else controls. It is also the standard route for exfiltrating
+// an OAuth authorization code.
+//
+// Signing does NOT make it safe — a signature proves we minted the value, not
+// that the value is harmless. So these assert VALIDATION, at mint and at verify.
+
+test('a legitimate in-app path survives the round trip', () => {
+  const s = createOAuthState({ userId: 'u', platform: 'tiktok', returnTo: '/app/calendar?draft=abc' });
+  const got = verifyOAuthState(s).rt;
+  if (got !== '/app/calendar?draft=abc') throw new Error(`mangled a valid path: ${got}`);
+});
+
+test('an absolute off-origin URL is refused', () => {
+  const s = createOAuthState({ userId: 'u', platform: 'tiktok', returnTo: 'https://evil.example/steal' });
+  const got = verifyOAuthState(s).rt;
+  if (got.includes('evil.example')) throw new Error(`open redirect: ${got}`);
+});
+
+test('a protocol-relative URL is refused (//evil.example reads as https://evil.example)', () => {
+  const s = createOAuthState({ userId: 'u', platform: 'tiktok', returnTo: '//evil.example/steal' });
+  const got = verifyOAuthState(s).rt;
+  if (got.startsWith('//') || got.includes('evil.example')) throw new Error(`open redirect: ${got}`);
+});
+
+test('a backslash-smuggled URL is refused (browsers normalise \\ to /)', () => {
+  for (const attack of ['/\\evil.example', '\\\\evil.example', '/app\\..\\..\\evil']) {
+    const got = verifyOAuthState(createOAuthState({ userId: 'u', platform: 'tiktok', returnTo: attack })).rt;
+    if (got.includes('\\')) throw new Error(`backslash survived: ${got}`);
+  }
+});
+
+test('CR/LF cannot be smuggled in to split the Location header', () => {
+  const attack = '/app/settings\r\nSet-Cookie: session=attacker';
+  const got = verifyOAuthState(createOAuthState({ userId: 'u', platform: 'tiktok', returnTo: attack })).rt;
+  if (got.includes('\r') || got.includes('\n')) throw new Error('CRLF survived into the redirect target');
+});
+
+test('a javascript: payload is refused', () => {
+  const got = verifyOAuthState(
+    createOAuthState({ userId: 'u', platform: 'tiktok', returnTo: 'javascript:alert(1)' }),
+  ).rt;
+  if (got.toLowerCase().includes('javascript')) throw new Error(`XSS sink: ${got}`);
+});
+
+test('an absent returnTo yields a safe same-origin default', () => {
+  const got = verifyOAuthState(createOAuthState({ userId: 'u', platform: 'tiktok' })).rt;
+  if (typeof got !== 'string' || !got.startsWith('/') || got.startsWith('//')) {
+    throw new Error(`default is not a safe relative path: ${got}`);
+  }
+});
+
+// The one that matters most: verify must not trust the payload just because the
+// signature checks out. Mint a state whose returnTo is hostile by tampering
+// BEFORE signing — i.e. simulate a future caller that skipped sanitising, or a
+// leaked secret. verify() must still refuse to hand back an off-origin target.
+test('verify re-validates returnTo even when the signature is genuine', async () => {
+  const crypto = await import('node:crypto');
+  const payload = {
+    uid: 'u', platform: 'tiktok', scope: 'personal',
+    rt: 'https://evil.example/steal',
+    nonce: 'x', exp: Math.floor(Date.now() / 1000) + 600,
+  };
+  const b64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', process.env.OAUTH_STATE_SECRET)
+    .update(b64).digest('base64url');
+
+  const got = verifyOAuthState(`${b64}.${sig}`).rt;
+  if (got.includes('evil.example')) {
+    throw new Error('verify trusted a hostile returnTo because the signature was valid');
+  }
+});
+
 test('signing fails closed when the secret is absent', () => {
   const saved = process.env.OAUTH_STATE_SECRET;
   process.env.OAUTH_STATE_SECRET = '';

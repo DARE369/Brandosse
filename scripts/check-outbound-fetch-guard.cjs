@@ -54,6 +54,19 @@ const REVIEWED = [
     reason: 'Built from the ZERNIO_BASE constant with every interpolated value passed through encodeURIComponent, so the host cannot be changed by input.',
   },
   {
+    file: '_shared/linkedin.service.ts',
+    match: /^url$/,
+    reason:
+      'fetchWithTimeout() is called with exactly two kinds of URL, neither caller-supplied: '
+      + '(a) template literals rooted in the module-level `API` const (https://api.linkedin.com), '
+      + 'with the only interpolated value passed through encodeURIComponent; and '
+      + '(b) `uploadUrl`, which is read from LinkedIn\'s own initializeUpload RESPONSE — a '
+      + 'single-use URL minted by the API we just authenticated to, not by our caller. '
+      + 'The one genuinely caller-influenced URL in this file is `mediaUrl` '
+      + '(generations.output_url), and that goes through safeFetch() with a content-type '
+      + 'assertion, NOT through fetchWithTimeout.',
+  },
+  {
     file: '_shared/fal.service.ts',
     match: /^(url|statusUrl|responseUrl|cancelUrl)$/,
     reason: 'fal.ai queue URLs are built from FAL_RUN_BASE/FAL_QUEUE_BASE constants and a model id from an internal enum. Not caller-supplied.',
