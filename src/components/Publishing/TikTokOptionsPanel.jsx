@@ -57,6 +57,19 @@ export default function TikTokOptionsPanel({
   mediaDurationSec = null,
   onChange,
   onValidityChange,
+  /**
+   * DESIGN PREVIEW ONLY — never pass this from a real surface.
+   *
+   * Supplies a creator_info payload instead of fetching one, so the panel can
+   * be reviewed before a TikTok sandbox account exists. Every compliance rule
+   * still applies to what renders; only the source of the data changes.
+   *
+   * Passing this in production would defeat the live-fetch requirement that
+   * exists because a creator can go private between sessions. The guard
+   * scripts/check-tiktok-ux-compliance.cjs fails if any file outside
+   * app/app/dev/ passes it.
+   */
+  previewCreatorInfo = null,
 }) {
   const isPhoto = mediaType === 'photo' || mediaType === 'carousel';
 
@@ -82,6 +95,13 @@ export default function TikTokOptionsPanel({
    * stale option list offers a privacy level the account no longer allows.
    */
   const load = useCallback(async () => {
+    // Design-preview short circuit. See the prop's documentation.
+    if (previewCreatorInfo) {
+      setCreator(previewCreatorInfo);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
     if (!accountId) return;
     setLoading(true);
     setLoadError(null);
@@ -102,7 +122,7 @@ export default function TikTokOptionsPanel({
     } finally {
       setLoading(false);
     }
-  }, [accountId]);
+  }, [accountId, previewCreatorInfo]);
 
   useEffect(() => { void load(); }, [load]);
 

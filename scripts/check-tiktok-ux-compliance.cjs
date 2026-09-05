@@ -181,6 +181,46 @@ check(
   'The creator nickname must be shown so the user knows which account receives the post.',
 );
 
+// ── 7. The design-preview seam must not reach production ────────────────────
+//
+// previewCreatorInfo bypasses the live creator_info fetch. That is fine for a
+// dev preview page and fatal anywhere else: the live fetch exists because a
+// creator can go private or disable Duet between sessions, and a stale option
+// list offers a privacy level the account no longer permits.
+
+const ALLOWED_PREVIEW_CALLERS = ['app/app/dev/'];
+
+function walk(dir, out = []) {
+  if (!fs.existsSync(dir)) return out;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, out);
+    else if (/\.(jsx?|tsx?)$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
+
+const leaks = [];
+for (const dir of ['src', 'app']) {
+  for (const file of walk(path.join(ROOT, dir))) {
+    const rel = path.relative(ROOT, file).split(path.sep).join('/');
+    if (rel === REL) continue;                                   // the definition
+    if (ALLOWED_PREVIEW_CALLERS.some((a) => rel.startsWith(a))) continue;
+    const body = fs.readFileSync(file, 'utf8');
+    if (/previewCreatorInfo\s*=/.test(body) || /previewCreatorInfo\s*=\{/.test(body)) {
+      leaks.push(rel);
+    }
+  }
+}
+
+check(
+  'the preview seam is confined to the dev preview page',
+  leaks.length === 0,
+  `previewCreatorInfo is passed from: ${leaks.join(', ')}. Only ${ALLOWED_PREVIEW_CALLERS.join(', ')} `
+  + 'may use it — anywhere else defeats the mandatory live creator_info fetch.',
+);
+
 // ── Report ──────────────────────────────────────────────────────────────────
 
 console.log('TikTok Direct Post UX compliance\n');
