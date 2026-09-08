@@ -33,14 +33,16 @@ const toReadableUploadError = (error) => {
   return message;
 };
 
-function computeVersionHash(value) {
-  try {
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(value || {}))));
-    return encoded.slice(0, 16);
-  } catch (_error) {
-    return computeBrandKitHash(value);
-  }
-}
+// `computeVersionHash` used to live here as
+// `btoa(JSON.stringify(kit)).slice(0, 16)`. Sixteen base64 characters is twelve
+// bytes of input, and a brand_kit row always begins `{"id":"<uuid>`, so it was
+// a function of the kit's UUID and nothing else — byte-identical after changing
+// the brand name and the entire palette (verified 2026-09-01). Every generation
+// receipt has therefore been stamped with a brand version that never changed.
+//
+// There is now one hash for both the DB column and the suggestion cache. See
+// src/utils/brandKitHash.js for what it covers and why.
+const computeVersionHash = computeBrandKitHash;
 
 async function uploadWithProgress(bucket, storagePath, file, onProgress) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -287,17 +289,94 @@ const useBrandKitStore = create((set, get) => ({
     }
   },
 
+  /**
+   * Delete a brand kit, its asset rows and its stored files.
+   *
+   * ── The two things that make this more than a DELETE ────────────────────────
+   *
+   * 1. THE ACTIVE KIT. Studio generates from whichever kit has `is_active`
+   *    (src/services/brandKitLoader.js:18). Deleting the active one without
+   *    promoting a replacement leaves the account with zero active kits, and the
+   *    loader then returns null — every later generation silently runs with no
+   *    brand at all. The user would see nothing wrong until the output was off.
+   *
+   *    So the replacement is promoted BEFORE the delete. If the delete then
+   *    fails, the account still has exactly one active kit; if the promotion
+   *    failed first, nothing is deleted. Doing it the other way round has a
+   *    window with no active kit, and a failure leaves it that way permanently.
+   *
+   *    The order also respects the partial unique index on `is_active`
+   *    (migration 20260708140000): the doomed kit is stood down first, so two
+   *    kits are never active at once.
+   *
+   * 2. STORAGE FILES. `brand_assets` rows cascade on the foreign key, but the
+   *    FILES in the storage bucket do not — nothing in Postgres knows they
+   *    exist. Deleting the row without them leaves logos and documents behind
+   *    forever, invisible to the user and still counting against their storage.
+   *    So the paths are collected and removed FIRST, while the rows can still be
+   *    read.
+   *
+   * Storage cleanup is best-effort: a file that cannot be removed must not block
+   * the user from deleting their own kit. It is logged, not swallowed.
+   */
   deleteKit: async (kitId) => {
-    const { error } = await supabase.from('brand_kit').delete().eq('id', kitId);
-    if (error) throw error;
+    set({ isSaving: true, error: null });
+    try {
+      const state = get();
+      const doomed = state.kits.find((kit) => kit.id === kitId);
+      if (!doomed) throw new Error('That brand kit no longer exists.');
 
-    set((state) => {
       const remaining = state.kits.filter((kit) => kit.id !== kitId);
-      const nextCurrent = state.currentKitId === kitId
-        ? (pickActiveKit(remaining)?.id || null)
+
+      // -- Storage first, while the rows still exist to tell us the paths.
+      const { data: assetRows } = await supabase
+        .from('brand_assets')
+        .select('storage_path')
+        .eq('brand_kit_id', kitId);
+
+      const paths = (assetRows || []).map((row) => row.storage_path).filter(Boolean);
+      if (paths.length > 0) {
+        const { error: storageErr } = await supabase.storage.from('brand_assets').remove(paths);
+        if (storageErr) {
+          console.error('[BrandKitStore] kit deleted but files could not be removed:', storageErr.message, paths);
+        }
+      }
+
+      // -- Hand "active" over before removing anything.
+      let promoted = null;
+      if (doomed.is_active && remaining.length > 0) {
+        promoted = remaining[0];
+        const { error: standDownErr } = await supabase
+          .from('brand_kit').update({ is_active: false }).eq('id', kitId);
+        if (standDownErr) throw standDownErr;
+        const { error: promoteErr } = await supabase
+          .from('brand_kit').update({ is_active: true }).eq('id', promoted.id);
+        if (promoteErr) throw promoteErr;
+      }
+
+      const { error: deleteErr } = await supabase.from('brand_kit').delete().eq('id', kitId);
+      if (deleteErr) throw deleteErr;
+
+      const kits = remaining.map((kit) => (
+        promoted && kit.id === promoted.id ? { ...kit, is_active: true } : kit
+      ));
+      const nextCurrentId = state.currentKitId === kitId
+        ? (pickActiveKit(kits)?.id ?? kits[0]?.id ?? null)
         : state.currentKitId;
-      return { kits: remaining, currentKitId: nextCurrent, ...deriveViewFields(remaining, nextCurrent) };
-    });
+
+      set({
+        kits,
+        currentKitId: nextCurrentId,
+        assets: state.currentKitId === kitId ? [] : state.assets,
+        isSaving: false,
+        ...deriveViewFields(kits, nextCurrentId),
+      });
+
+      return { deletedId: kitId, promotedId: promoted?.id ?? null, remaining: kits.length };
+    } catch (err) {
+      set({ error: err.message, isSaving: false });
+      throw err;
+    }
   },
 
   // Upsert brand kit fields onto a specific kit (defaults to whichever kit
@@ -372,12 +451,19 @@ const useBrandKitStore = create((set, get) => ({
   },
 
   // Draft flow helpers.
-  setExtractedDraft: (brandKit, confidenceMap = {}, missingTier1Fields = []) => {
+  // `design` is the normalised design layer built by _shared/brandDesign.ts on
+  // the server (colour roles, type scale, contact block, social handles,
+  // provenance). It rides along with the draft so that confirming an import
+  // saves the design layer too — without this the harvester measures a brand's
+  // colour roles and then throws them away at the last step, which is exactly
+  // the disconnection defect this repo keeps finding.
+  setExtractedDraft: (brandKit, confidenceMap = {}, missingTier1Fields = [], design = null) => {
     set({
       extractedDraft: {
         brandKit: brandKit || {},
         confidenceMap: confidenceMap || {},
         missingTier1Fields: missingTier1Fields || [],
+        design: design || null,
       },
     });
   },
@@ -394,9 +480,18 @@ const useBrandKitStore = create((set, get) => ({
     set({ setupPath: 'upload' });
   },
 
-  openDiffModal: (existingKit, newKit, newConfidenceMap = {}) => {
+  openDiffModal: (existingKit, newKit, newConfidenceMap = {}, extra = {}) => {
     set({
-      diffData: { existingKit, newKit, newConfidenceMap },
+      diffData: {
+        existingKit,
+        newKit,
+        newConfidenceMap,
+        // Provenance drives the Measured/Review badges; design is applied
+        // wholesale when the user accepts, since it is derived from the values
+        // they are approving rather than independently editable here.
+        newExtractionEvidence: extra?.extractionEvidence || {},
+        design: extra?.design || null,
+      },
       isDiffModalOpen: true,
     });
   },
@@ -416,7 +511,18 @@ const useBrandKitStore = create((set, get) => ({
 
     if (!userId) throw new Error('Missing user id for Brand Kit update');
 
-    const saved = await get().saveBrandKit(userId, mergedKit, state.currentKitId);
+    // The design layer is derived from the values the user is accepting, so it
+    // is applied with them rather than diffed field-by-field — a user choosing
+    // "keep my current palette" would otherwise end up with colour ROLES from
+    // the new site pointing at hexes from the old one.
+    const anyNewAccepted = Object.keys(mergedKit || {}).some(
+      (key) => JSON.stringify(mergedKit[key]) !== JSON.stringify(state.diffData?.existingKit?.[key]),
+    );
+    const payload = anyNewAccepted && state.diffData?.design
+      ? { ...mergedKit, ...state.diffData.design }
+      : mergedKit;
+
+    const saved = await get().saveBrandKit(userId, payload, state.currentKitId);
     set({ isDiffModalOpen: false, diffData: null });
     return saved;
   },

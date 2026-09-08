@@ -22,6 +22,7 @@ import { requireServiceRole } from "../_shared/connectionHelpers.ts";
 import { createHttpError, requireActiveOrgMember } from "../_shared/org.ts";
 import { runMockPublish } from "../_shared/mockPublish.ts";
 import { publishToZernio } from "../_shared/zernio.service.ts";
+import { publishToLinkedIn } from "../_shared/linkedin.service.ts";
 
 type PublishRequest = {
   post_id: string;
@@ -157,20 +158,47 @@ serve(async (req) => {
       });
 
     } else {
-      // Real platform publish — Zernio is the only real-publish provider.
-      // (The earlier direct-per-platform-OAuth path, publisher.service.ts,
-      // was removed: no platform ever had app credentials configured for it,
-      // so it could never actually publish anything.)
-      if (account.provider && account.provider !== "zernio") {
+      // Real platform publish — routed by provider.
+      //
+      // Direct per-platform OAuth is replacing Zernio one platform at a time,
+      // so both paths are live during the migration. LinkedIn is migrated;
+      // everything else still goes through Zernio until its own adapter lands.
+      //
+      // The previous version of this branch refused ANY provider other than
+      // "zernio", which was correct then (the old direct path had no
+      // credentials and could never publish) and is wrong now.
+      const provider = String(account.provider || "").trim().toLowerCase();
+
+      if (provider === "linkedin") {
+        // Secrets live in their own table with no client grant (defect D1,
+        // migration 20260904120000). Only service-role reaches it, which is
+        // exactly the context this function runs in.
+        const { data: secret, error: secretErr } = await adminClient
+          .from("connected_account_secrets")
+          .select("access_token_ciphertext, refresh_token_ciphertext, expires_at, granted_scopes")
+          .eq("connected_account_id", connectedAccountId)
+          .maybeSingle();
+
+        if (secretErr) throw secretErr;
+
+        result = await publishToLinkedIn({ post, account, secret, mediaUrl });
+
+      } else if (provider === "" || provider === "zernio") {
+        result = await publishToZernio({ post, account, mediaUrl });
+
+      } else {
+        // A provider we have no adapter for. Fail loudly and specifically —
+        // never silently, and never as a generic error that reads like the
+        // platform's fault.
         result = {
           success: false,
           platformPostId: null,
           platformPostUrl: null,
-          failureReason: `Unsupported publishing provider "${account.provider}". Reconnect this account through Zernio.`,
+          failureReason:
+            `No publishing adapter for provider "${account.provider}". ` +
+            "Reconnect this account.",
           retriable: false,
         };
-      } else {
-        result = await publishToZernio({ post, account, mediaUrl });
       }
 
       // posts has no consecutive_failure_count/last_failure_at/

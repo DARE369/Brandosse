@@ -1,0 +1,236 @@
+/* TikTokOptionsPanel — see the component header before changing anything.
+   Several rules here exist so audit-relevant elements stay VISIBLE; hiding or
+   collapsing them is a rejection, not a style choice. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uiv2-space-4, 16px);
+  padding: var(--uiv2-space-4, 16px);
+  border: 1px solid var(--uiv2-border, #26282C);
+  border-radius: 10px;
+  background: var(--uiv2-surface, #17181B);
+  color: var(--uiv2-text-primary, #F5F5F4);
+  font-size: 13.5px;
+}
+
+/* ── Creator identity ─────────────────────────────────────────────────────── */
+
+.creator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: var(--uiv2-space-3, 12px);
+  border-bottom: 1px solid var(--uiv2-border-subtle, #1E2023);
+}
+
+.avatar,
+.avatarFallback {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: var(--uiv2-surface-2, #1E2023);
+}
+
+.creatorText { display: flex; flex-direction: column; min-width: 0; }
+.creatorNickname { font-weight: 600; font-size: 13.5px; }
+.creatorHandle { font-size: 12px; color: var(--uiv2-text-secondary, #8B8D93); }
+
+.postingTo {
+  margin-left: auto;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--uiv2-text-tertiary, #5A5C61);
+}
+
+/* ── Fields ───────────────────────────────────────────────────────────────── */
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--uiv2-text-primary, #F5F5F4);
+  padding: 0;
+}
+
+.required { color: var(--uiv2-danger, #E5484D); }
+
+.select {
+  width: 100%;
+  min-height: 44px;              /* touch target */
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--uiv2-border, #26282C);
+  background: var(--uiv2-surface-2, #141518);
+  color: var(--uiv2-text-primary, #F5F5F4);
+  font-size: 13.5px;
+  font-family: inherit;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--uiv2-accent, #FF5C38);
+  outline-offset: 2px;
+}
+
+/* ── Toggles ──────────────────────────────────────────────────────────────── */
+
+.toggleRow,
+.toggleRowDisabled {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Disabled toggles stay legible. A creator whose TikTok settings block Duet
+   must be able to READ why — dimming to invisibility would look like a bug. */
+.toggleRowDisabled { opacity: 0.6; }
+
+.toggleLabel {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 32px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.toggleRowDisabled .toggleLabel { cursor: not-allowed; }
+
+.checkbox {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--uiv2-accent, #FF5C38);
+  cursor: inherit;
+  flex-shrink: 0;
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid var(--uiv2-accent, #FF5C38);
+  outline-offset: 2px;
+}
+
+.toggleHint {
+  font-size: 11.5px;
+  color: var(--uiv2-text-secondary, #8B8D93);
+  padding-left: 26px;
+  line-height: 1.45;
+}
+
+.subGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--uiv2-border, #26282C);
+}
+
+/* ── Messages ─────────────────────────────────────────────────────────────── */
+
+.hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--uiv2-text-secondary, #8B8D93);
+}
+
+/* Paired with role="alert" in the component — never colour alone. */
+.inlineError {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--uiv2-danger, #E5484D);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--uiv2-text-secondary, #8B8D93);
+}
+
+.spin { animation: ttspin 0.8s linear infinite; }
+@keyframes ttspin { to { transform: rotate(360deg); } }
+
+.errorBox {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--uiv2-danger, #E5484D);
+}
+
+.errorTitle {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--uiv2-text-primary, #F5F5F4);
+}
+
+.retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  min-height: 32px;
+  background: transparent;
+  border: 1px solid var(--uiv2-border, #26282C);
+  border-radius: 7px;
+  color: var(--uiv2-text-primary, #F5F5F4);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.retry:hover { border-color: var(--uiv2-border-strong, #3C4046); }
+
+/* ── The declaration ──────────────────────────────────────────────────────── */
+
+/* Deliberately NOT muted into invisibility. This is a mandated disclosure that
+   must be legible without hunting for it, and it is always on screen — the
+   commercial-content toggle changes its wording, never whether it renders. */
+.declaration {
+  margin: 0;
+  padding-top: var(--uiv2-space-3, 12px);
+  border-top: 1px solid var(--uiv2-border-subtle, #1E2023);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--uiv2-text-secondary, #8B8D93);
+}
+
+.declaration a {
+  color: var(--uiv2-accent, #FF5C38);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Screen-reader-only mirror of the exact mandated string. Visually hidden but
+   present in the accessibility tree and in find-in-page. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation-duration: 0.001ms; }
+}

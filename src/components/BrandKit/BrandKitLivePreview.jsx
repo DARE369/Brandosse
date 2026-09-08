@@ -1,10 +1,15 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, BadgeCheck } from 'lucide-react';
+import { fieldProvenance, PROVENANCE } from '../../utils/brandProvenance';
 import styles from './BrandKit.module.css';
 
-function PreviewField({ label, value, confidence }) {
+/**
+ * `provenance` replaces a `confidence === 'low'` string comparison against a
+ * value that has always been a number — so this flag had never rendered. See
+ * src/utils/brandProvenance.js.
+ */
+function PreviewField({ label, value, provenance }) {
   const isEmpty = !value;
-  const isLow = confidence === 'low' || confidence === 'inferred';
 
   return (
     <div className={styles.previewField}>
@@ -15,9 +20,15 @@ function PreviewField({ label, value, confidence }) {
         ) : (
           value
         )}
-        {isLow && !isEmpty && (
-          <span className={styles.confidenceFlag} title="AI inferred this field. Please verify.">
-            <AlertTriangle size={10} />
+        {!isEmpty && provenance?.source === PROVENANCE.MEASURED && (
+          <span className={styles.measuredFlag} title={provenance.description}>
+            <BadgeCheck size={10} aria-hidden="true" />
+            Measured
+          </span>
+        )}
+        {!isEmpty && provenance?.needsReview && (
+          <span className={styles.confidenceFlag} title={provenance.description}>
+            <AlertTriangle size={10} aria-hidden="true" />
             Review
           </span>
         )}
@@ -45,20 +56,22 @@ function buildSampleCaption(data) {
 
 export default function BrandKitLivePreview({ data = {}, confidenceMap = {} }) {
   const sampleCaption = buildSampleCaption(data);
+  const extractionEvidence = data?.extraction_evidence || {};
+  const prov = (field) => fieldProvenance(field, { confidenceMap, extractionEvidence });
 
   return (
     <div className={styles.previewPanel}>
       <div className={styles.previewCard}>
         <h3 className={styles.previewCardTitle}>Your Brand Kit</h3>
         <div className={styles.previewFields}>
-          <PreviewField label="Brand Name" value={data.brand_name} confidence={confidenceMap.brand_name} />
-          <PreviewField label="Industry" value={data.industry} confidence={confidenceMap.industry} />
-          <PreviewField label="Target Audience" value={data.target_audience} confidence={confidenceMap.target_audience} />
-          <PreviewField label="Brand Voice" value={data.brand_voice} confidence={confidenceMap.brand_voice} />
+          <PreviewField label="Brand Name" value={data.brand_name} provenance={prov('brand_name')} />
+          <PreviewField label="Industry" value={data.industry} provenance={prov('industry')} />
+          <PreviewField label="Target Audience" value={data.target_audience} provenance={prov('target_audience')} />
+          <PreviewField label="Brand Voice" value={data.brand_voice} provenance={prov('brand_voice')} />
           <PreviewField
             label="Visual Style"
             value={Array.isArray(data.visual_style_keywords) ? data.visual_style_keywords.join(', ') : ''}
-            confidence={confidenceMap.visual_style_keywords}
+            provenance={prov('visual_style_keywords')}
           />
           {Array.isArray(data.color_palette) && data.color_palette.length > 0 && (
             <div className={styles.previewField}>

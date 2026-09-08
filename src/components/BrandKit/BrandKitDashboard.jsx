@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  ChevronDown, FileText, PenLine, RefreshCw, Check, Plus, Image as ImageIcon,
+  ChevronDown, FileText, PenLine, RefreshCw, Check, Plus, Image as ImageIcon, Trash2, AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useBrandKitStore from '../../stores/BrandKitStore';
@@ -41,11 +41,15 @@ export default function BrandKitDashboard({
   onUploadUpdatedDocument,
   onNewKit,
 }) {
-  const { kits, currentKitId, activeKit, assets, selectKit, setActiveKit } = useBrandKitStore();
+  const { kits, currentKitId, activeKit, assets, selectKit, setActiveKit, deleteKit } = useBrandKitStore();
   const openDiffModal = useBrandKitStore((s) => s.openDiffModal);
 
   const [updateMenuOpen, setUpdateMenuOpen] = useState(false);
   const [kitMenuOpen, setKitMenuOpen] = useState(false);
+  // The kit awaiting confirmation. Deleting a brand kit is irreversible and
+  // takes its uploaded logos and documents with it, so it is never one tap.
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [reimporting, setReimporting] = useState(false);
   const updateInputRef = useRef(null);
 
@@ -82,11 +86,35 @@ export default function BrandKitDashboard({
         body: { websiteUrl: url.trim() },
       });
       if (error) throw error;
-      openDiffModal(brandKit || {}, data?.brandKit || {}, data?.confidenceMap || {});
+      openDiffModal(brandKit || {}, data?.brandKit || {}, data?.confidenceMap || {}, {
+        extractionEvidence: data?.design?.extraction_evidence || {},
+        design: data?.design || null,
+      });
     } catch (err) {
       toast.error(err?.message || 'Could not re-import from that site.');
     } finally {
       setReimporting(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    const name = pendingDelete.kit_name || pendingDelete.brand_name || 'Untitled kit';
+    try {
+      const result = await deleteKit(pendingDelete.id);
+      setPendingDelete(null);
+      // Say what happened to the ACTIVE kit, because that is what Studio
+      // generates from — silently reassigning it would be a surprise later.
+      toast.success(
+        result?.promotedId
+          ? `"${name}" deleted. Studio now generates from your remaining active kit.`
+          : `"${name}" deleted.`,
+      );
+    } catch (err) {
+      toast.error(err?.message || `Could not delete "${name}".`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -122,6 +150,25 @@ export default function BrandKitDashboard({
                   onClick={() => { selectKit(kit.id); setKitMenuOpen(false); }}
                 >
                   <span className={styles.kitSwitcherItemName}>{kit.kit_name || kit.brand_name || 'Untitled kit'}</span>
+                  {/* Delete is deliberately quiet and last in the row: it is
+                      irreversible, and it must never be the thing a thumb hits
+                      while reaching for "Make active". */}
+                  <span
+                    className={styles.kitSwitcherDelete}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Delete ${kit.kit_name || kit.brand_name || 'this kit'}`}
+                    title="Delete this kit"
+                    onClick={(e) => { e.stopPropagation(); setKitMenuOpen(false); setPendingDelete(kit); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault(); e.stopPropagation();
+                        setKitMenuOpen(false); setPendingDelete(kit);
+                      }
+                    }}
+                  >
+                    <Trash2 size={12} aria-hidden="true" />
+                  </span>
                   {kit.is_active ? (
                     <span className={styles.kitSwitcherActiveBadge}><Check size={11} /> active</span>
                   ) : (
@@ -303,6 +350,52 @@ export default function BrandKitDashboard({
           )}
         </Card>
       </div>
+
+      {pendingDelete && (
+        <div
+          className={styles.deleteOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bk-delete-title"
+          onClick={() => { if (!isDeleting) setPendingDelete(null); }}
+        >
+          <div className={styles.deleteModal} onClick={(e) => e.stopPropagation()}>
+            <span className={styles.deleteIcon} aria-hidden="true"><AlertTriangle size={18} /></span>
+            <h2 id="bk-delete-title" className={styles.deleteTitle}>
+              Delete “{pendingDelete.kit_name || pendingDelete.brand_name || 'Untitled kit'}”?
+            </h2>
+            {/* Names what actually goes, rather than a generic "are you sure".
+                The asset count is the part people do not expect to lose. */}
+            <p className={styles.deleteBody}>
+              This removes the kit and everything uploaded to it — logos, documents and
+              references. It cannot be undone.
+            </p>
+            {pendingDelete.is_active && kits.length > 1 && (
+              <p className={styles.deleteBody}>
+                It is your active kit, so Studio will start generating from another one.
+              </p>
+            )}
+            {kits.length === 1 && (
+              <p className={styles.deleteBody}>
+                It is your only kit. Generations will run with no brand until you build another.
+              </p>
+            )}
+            <div className={styles.deleteActions}>
+              <Button variant="ghost" onClick={() => setPendingDelete(null)} disabled={isDeleting}>
+                Keep it
+              </Button>
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={confirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting…' : 'Delete kit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

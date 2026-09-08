@@ -3,7 +3,12 @@
  *
  * Overlays the user's REAL brand logo onto a generated image (AI can't draw a real
  * logo). Pure-WASM ImageScript — Deno/edge-safe, no native deps.
- * Used by generateImage (see resolveBrandLogo there) and by the flyer renderer.
+ *
+ * Consumer: `generateImage` (see resolveBrandLogo there). That is the only one.
+ * This comment previously also claimed "the flyer renderer", which has never
+ * existed in this tree — every other match for "flyer" is prompt text. Corrected
+ * 2026-09-01 under Law 2: a doc that disagrees with the code is a bug, not a
+ * roadmap.
  *
  * SVG note (2026-08-24): ImageScript decodes PNG/JPEG only. Logos are very
  * often SVG — the first real logo in this database is

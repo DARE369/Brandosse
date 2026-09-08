@@ -19,6 +19,7 @@ import {
   ArrowLeft, Check, ChevronRight, Loader2, Lock, ShieldCheck, X,
 } from "lucide-react";
 import { useAuth } from "../../Context/AuthContext";
+import useSocialConnectResult from "../../hooks/useSocialConnectResult";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import PlatformIcon from "../../components/Shared/PlatformIcon";
 import { getAllPlatforms } from "../../services/platforms/platformRegistry";
@@ -81,6 +82,29 @@ function ConnectAccountFlowBody() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [savedAccount, setSavedAccount] = useState(null);
+
+  // Result of a REAL OAuth round trip, as opposed to the mock flow's local
+  // state. Kept separate because the two produce different screens: a real
+  // connection must never inherit the mock flow's "simulated" disclaimer.
+  const [oauthResult, setOauthResult] = useState(null);
+
+  // The OAuth callback redirects back HERE when the flow was started from this
+  // page, appending ?connected= or ?social_error=. Nothing read those, so a
+  // failed connect returned the user to an unchanged-looking page — several
+  // real failures went unnoticed that way. The error banner at the top of this
+  // component already existed; it simply had nothing feeding it.
+  useSocialConnectResult((result) => {
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    // A fresh page load after the redirect has no selectedPlatform and no
+    // savedAccount — the connection happened server-side. Without this the
+    // success step rendered its heading and nothing else.
+    setError("");
+    setOauthResult(result);
+    setStep(6);
+  });
 
   const isMultiProfile = MULTI_PROFILE_PLATFORMS.has(selectedPlatform?.platform_key);
   const totalSteps = 6;
@@ -365,14 +389,30 @@ function ConnectAccountFlowBody() {
           </div>
         ) : null}
 
-        {step === 6 && selectedPlatform ? (
+        {step === 6 && (selectedPlatform || oauthResult) ? (
           <div className={styles.card}>
             <div className={styles.successIcon}><Check size={28} aria-hidden="true" /></div>
-            <div className={styles.cardTitle}>{selectedPlatform.display_name} connected</div>
-            <div className={styles.cardSub}>@{savedAccount?.username || form.username} is now available inside Brandosse.</div>
-            <div className={styles.simDisclaimer}>
-              This is a simulated connection for demonstration — no real {selectedPlatform.display_name} account was accessed, and nothing publishes to the real platform.
+            <div className={styles.cardTitle}>
+              {(selectedPlatform?.display_name
+                || platforms.find((p) => p.platform_key === oauthResult?.platform)?.display_name
+                || oauthResult?.platform)} connected
             </div>
+            <div className={styles.cardSub}>
+              {oauthResult?.account || savedAccount?.username || form.username} is now available inside Brandosse.
+            </div>
+
+            {/*
+              The simulated-connection disclaimer belongs ONLY to the mock flow.
+              Printing it after a real OAuth connection would tell the user their
+              genuine, working LinkedIn account is fake — the exact inversion of
+              the honesty rule this disclaimer exists to serve.
+            */}
+            {oauthResult ? null : (
+              <div className={styles.simDisclaimer}>
+                This is a simulated connection for demonstration — no real {selectedPlatform?.display_name} account was accessed, and nothing publishes to the real platform.
+              </div>
+            )}
+
             <Button onClick={() => navigate("/app/settings?tab=connected")}>Go to Connected Accounts</Button>
           </div>
         ) : null}

@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#0E0F11;}
+
+  /* ── Tokens. Dark is the committed design; light is a full peer, not an afterthought. ── */
+  [data-theme="dark"]{
+    --bg:#0E0F11; --surface:#17181B; --surface-2:#141518; --surface-3:#1B1C20;
+    --sunken:#131417; --line:#26282C; --line-soft:#1E2023; --line-strong:#3C4046;
+    --fg:#F5F5F4; --fg-2:#C4C6CB; --fg-3:#8B8D93; --fg-4:#5A5C61; --fg-dim:#6E7075;
+    --accent:#FF5C38; --accent-hi:#FF7A5C; --accent-press:#C4482C; --on-accent:#17181B;
+    --ok:#5BB98B; --ok-bg:rgba(91,185,139,0.14); --ok-line:rgba(91,185,139,0.40);
+    --warn:#FFB224; --warn-bg:rgba(255,178,36,0.07); --warn-line:rgba(255,178,36,0.30); --warn-fg:#F0D6A0;
+    --bad:#E5484D; --bad-bg:rgba(229,72,77,0.07); --bad-line:rgba(229,72,77,0.32);
+    --focus:#FF5C38; --shadow:0 1px 2px rgba(0,0,0,0.4);
+  }
+  [data-theme="light"]{
+    --bg:#FAF9F7; --surface:#FFFFFF; --surface-2:#F4F2EF; --surface-3:#EFEDE9;
+    --sunken:#F0EEEA; --line:#DFDCD6; --line-soft:#EAE7E2; --line-strong:#B8B4AC;
+    --fg:#1A1917; --fg-2:#3D3B37; --fg-3:#6B6862; --fg-4:#918D85; --fg-dim:#7C7871;
+    --accent:#D93B14; --accent-hi:#F04A20; --accent-press:#A82D0C; --on-accent:#FFFFFF;
+    --ok:#1F7A52; --ok-bg:rgba(31,122,82,0.10); --ok-line:rgba(31,122,82,0.35);
+    --warn:#8A5A00; --warn-bg:rgba(180,120,0,0.09); --warn-line:rgba(180,120,0,0.30); --warn-fg:#6B4700;
+    --bad:#B4232A; --bad-bg:rgba(180,35,42,0.07); --bad-line:rgba(180,35,42,0.28);
+    --focus:#D93B14; --shadow:0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  ::selection{background:rgba(255,92,56,0.35);}
+  a{color:var(--accent);} a:hover{color:var(--accent-hi);}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes sweep{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:560px){.pair{grid-template-columns:1fr;}}
+  @media (max-width:720px){.tiles{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:420px){.tiles{grid-template-columns:1fr;}}
+
+  /* Breadcrumb scrolls rather than clipping on narrow screens. */
+  .crumbs{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
+  .crumbs::-webkit-scrollbar{display:none;}
+
+  /* Every interactive element clears the 44px touch floor. */
+  .tap{min-height:44px;}
+
+  /* One focus treatment, applied everywhere, visible in both themes. */
+  [data-focusable]:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:7px;}
+
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+
+  @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important;}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100vh; width:100%; background:var(--bg); color:var(--fg); font-family:Inter,system-ui,sans-serif; font-size:14px; line-height:1.55; -webkit-font-smoothing:antialiased;">
+
+  <header style="position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 20px; height:52px; background:var(--bg); border-bottom:1px solid var(--line);">
+    <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+      <span style="width:22px; height:22px; border-radius:6px; background:var(--accent); display:inline-flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; color:var(--on-accent); flex-shrink:0;">S</span>
+      <nav class="crumbs" aria-label="Breadcrumb" style="display:flex; align-items:center; gap:7px; font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--fg-4); min-width:0;">
+        <a href="Settings.dc.html" data-focusable="" style="color:var(--fg-3); text-decoration:none; white-space:nowrap;" style-hover="color:var(--fg);">Settings</a>
+        <span aria-hidden="true">/</span>
+        <a href="Settings.dc.html" data-focusable="" style="color:var(--fg-3); text-decoration:none; white-space:nowrap;" style-hover="color:var(--fg);">Accounts</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" style="color:var(--fg); white-space:nowrap;">Connect</span>
+      </nav>
+    </div>
+    <button onClick="{{ cancelAll }}" data-focusable="" class="tap" style="background:transparent; border:1px solid var(--line); color:var(--fg-3); border-radius:7px; padding:6px 12px; font-size:12.5px; font-weight:500; font-family:inherit; cursor:pointer; white-space:nowrap;" style-hover="border-color:var(--line-strong); color:var(--fg);">Cancel</button>
+  </header>
+
+  <main data-screen-label="Connect account" style="width:100%; max-width:760px; margin:0 auto; padding:30px 20px 40px;">
+
+    <!-- Progress rail. Ordered list so assistive tech reports position, with aria-current on the live step. -->
+    <ol aria-label="Progress" style="display:flex; align-items:center; gap:8px; margin:0 0 26px; padding:0; list-style:none;">
+      <sc-for list="{{ rail }}" as="st" hint-placeholder-count="4">
+        <li aria-current="{{ st.current }}" style="display:flex; align-items:center; gap:7px; min-width:0;">
+          <span aria-hidden="true" style="width:6px; height:6px; border-radius:50%; background:{{ st.dot }}; flex-shrink:0;"></span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:{{ st.fg }}; white-space:nowrap;">{{ st.label }}</span>
+          <span class="sr">{{ st.sr }}</span>
+        </li>
+        <sc-if value="{{ st.hasLine }}" hint-placeholder-val="{{ true }}">
+          <li aria-hidden="true" style="flex:1; height:1px; background:{{ st.line }}; min-width:10px;"></li>
+        </sc-if>
+      </sc-for>
+    </ol>
+
+    <!-- returnTo context. Tells the user where they'll land and that their work survives the round trip. -->
+    <sc-if value="{{ showContext }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex; align-items:center; gap:9px; padding:9px 13px; border:1px solid var(--line); border-left:2px solid var(--accent); border-radius:0 8px 8px 0; background:var(--surface-2); margin-bottom:22px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="flex-shrink:0; color:var(--fg-3);"><path d="M9 14l-4-4 4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10h9a5 5 0 015 5v4" stroke-linecap="round"/></svg>
+        <span style="font-size:12.5px; color:var(--fg-2);">{{ contextText }}</span>
+      </div>
+    </sc-if>
+
+    <!-- Politeness channel for step changes and async results. -->
+    <div aria-live="polite" aria-atomic="true" class="sr">{{ liveMessage }}</div>
+
+    <!-- ═══════════ STEP 1 · PLATFORM ═══════════ -->
+    <sc-if value="{{ isPick }}" hint-placeholder-val="{{ true }}">
+      <div style="animation:fadeUp .2s ease;">
+        <h1 tabindex="-1" data-focusable="" style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:24px; letter-spacing:-0.02em; margin:0 0 6px;">Connect a publishing account</h1>
+        <p style="margin:0 0 18px; font-size:13.5px; color:var(--fg-3); max-width:62ch;">You can connect more than one account per platform. Nothing is saved until you confirm which accounts to post to.</p>
+
+        <!-- CAPABILITY LEGEND — the three-state model is the spine of this screen, so it is
+             explained once, in plain words, rather than left to a tooltip on a 3px bar. -->
+        <div style="border:1px solid var(--line); background:var(--surface-2); border-radius:9px; padding:12px 14px; margin-bottom:24px;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-4); margin-bottom:9px;">Every account shows three things</div>
+          <div style="display:flex; flex-wrap:wrap; gap:16px;">
+            <sc-for list="{{ legend }}" as="l" hint-placeholder-count="3">
+              <div style="display:flex; align-items:center; gap:7px; min-width:0;">
+                <span aria-hidden="true" style="display:inline-flex; gap:2px; flex-shrink:0;">
+                  <sc-for list="{{ l.bars }}" as="b" hint-placeholder-count="3">
+                    <span style="width:11px; height:3px; border-radius:2px; background:{{ b.color }}; opacity:{{ b.op }};"></span>
+                  </sc-for>
+                </span>
+                <span style="font-size:12px; color:var(--fg-2);"><strong style="font-weight:600; color:var(--fg);">{{ l.title }}</strong> — {{ l.desc }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- Tier: fully live -->
+        <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:11px;">
+          <h2 style="font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-4); margin:0;">Ready — posts go public</h2>
+          <span aria-hidden="true" style="flex:1; height:1px; background:var(--line-soft);"></span>
+        </div>
+        <div class="tiles" style="margin-bottom:26px;">
+          <sc-for list="{{ liveTiles }}" as="p" hint-placeholder-count="3">
+            <button onClick="{{ p.onPick }}" data-focusable="" aria-label="{{ p.aria }}" style="display:flex; flex-direction:column; align-items:stretch; gap:9px; text-align:left; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px; cursor:pointer; font-family:inherit; color:var(--fg); transition:border-color .12s ease, background .12s ease;" style-hover="border-color:var(--line-strong); background:var(--surface-3);">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span aria-hidden="true" style="width:30px; height:30px; border-radius:8px; background:{{ p.tint }}; display:inline-flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:12px; color:#FFFFFF;">{{ p.abbr }}</span>
+                <sc-if value="{{ p.hasCount }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ok); border:1px solid var(--ok-line); border-radius:4px; padding:1px 5px;">{{ p.countLabel }}</span>
+                </sc-if>
+              </div>
+              <span style="font-size:13.5px; font-weight:600;">{{ p.name }}</span>
+              <div style="display:flex; align-items:center; gap:3px;">
+                <span aria-hidden="true" style="display:inline-flex; gap:2px;">
+                  <sc-for list="{{ p.caps }}" as="c" hint-placeholder-count="3">
+                    <span style="width:15px; height:3px; border-radius:2px; background:{{ c.color }};"></span>
+                  </sc-for>
+                </span>
+                <span aria-hidden="true" style="font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.08em; color:{{ p.capFg }}; margin-left:6px;">{{ p.capLabel }}</span>
+              </div>
+              <sc-if value="{{ p.hasCount }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:11.5px; color:var(--fg-3); border-top:1px solid var(--line-soft); padding-top:8px; margin-top:1px;">{{ p.addLabel }}</span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+
+        <!-- Tier: connected but capability-limited by app review -->
+        <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:11px;">
+          <h2 style="font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.14em; text-transform:uppercase; color:var(--warn); margin:0;">In review — limited for now</h2>
+          <span aria-hidden="true" style="flex:1; height:1px; background:var(--line-soft);"></span>
+        </div>
+        <div class="tiles" style="margin-bottom:26px;">
+          <sc-for list="{{ reviewTiles }}" as="p" hint-placeholder-count="2">
+            <button onClick="{{ p.onPick }}" data-focusable="" aria-label="{{ p.aria }}" style="display:flex; flex-direction:column; align-items:stretch; gap:9px; text-align:left; background:var(--surface); border:1px solid {{ p.border }}; border-radius:10px; padding:14px; cursor:pointer; font-family:inherit; color:var(--fg); transition:border-color .12s ease, background .12s ease;" style-hover="border-color:{{ p.borderHi }}; background:var(--surface-3);">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span aria-hidden="true" style="width:30px; height:30px; border-radius:8px; background:{{ p.tint }}; display:inline-flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:12px; color:#FFFFFF;">{{ p.abbr }}</span>
+                <span aria-hidden="true" style="font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.08em; color:{{ p.tagFg }}; border:1px solid {{ p.tagBorder }}; border-radius:4px; padding:1px 5px;">{{ p.reviewTag }}</span>
+              </div>
+              <span style="font-size:13.5px; font-weight:600;">{{ p.name }}</span>
+              <div style="display:flex; align-items:center; gap:3px;">
+                <span aria-hidden="true" style="display:inline-flex; gap:2px;">
+                  <sc-for list="{{ p.caps }}" as="c" hint-placeholder-count="3">
+                    <span style="width:15px; height:3px; border-radius:2px; background:{{ c.color }};"></span>
+                  </sc-for>
+                </span>
+              </div>
+              <span style="font-size:11.5px; color:{{ p.noteFg }}; line-height:1.45;">{{ p.reviewNote }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <!-- Tier: unavailable, with the reason visible rather than a dead button -->
+        <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:11px;">
+          <h2 style="font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-4); margin:0;">Not available here</h2>
+          <span aria-hidden="true" style="flex:1; height:1px; background:var(--line-soft);"></span>
+        </div>
+        <div class="tiles">
+          <sc-for list="{{ offTiles }}" as="p" hint-placeholder-count="2">
+            <div aria-label="{{ p.aria }}" style="display:flex; flex-direction:column; align-items:stretch; gap:9px; background:var(--sunken); border:1px dashed var(--line); border-radius:10px; padding:14px; cursor:default; color:var(--fg-4);">
+              <span aria-hidden="true" style="width:30px; height:30px; border-radius:8px; background:var(--line-soft); display:inline-flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:12px; color:var(--fg-4);">{{ p.abbr }}</span>
+              <span style="font-size:13.5px; font-weight:600; color:var(--fg-dim);">{{ p.name }}</span>
+              <span style="font-size:11.5px; color:var(--fg-4);">{{ p.reason }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ═══════════ STEP 2 · HEADS-UP ═══════════ -->
+    <sc-if value="{{ isHeads }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeUp .2s ease;">
+        <div style="display:flex; align-items:center; gap:11px; margin-bottom:18px;">
+          <span aria-hidden="true" style="width:38px; height:38px; border-radius:10px; background:{{ plat.tint }}; display:inline-flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; color:#FFFFFF;">{{ plat.abbr }}</span>
+          <div>
+            <h1 tabindex="-1" data-focusable="" style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:20px; letter-spacing:-0.02em; margin:0;">{{ headsTitle }}</h1>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--fg-4); margin-top:3px;">{{ plat.scopeCount }}</div>
+          </div>
+        </div>
+
+        <!-- Capability disclosure. Only rendered when the platform genuinely has one — no
+             fallback to another platform's copy, which would be worse than showing nothing. -->
+        <sc-if value="{{ hasDisclosure }}" hint-placeholder-val="{{ true }}">
+          <div role="note" style="border:1px solid {{ disc.border }}; background:{{ disc.bg }}; border-radius:10px; padding:16px 17px; margin-bottom:18px;">
+            <div style="display:flex; align-items:flex-start; gap:10px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ disc.accent }}" stroke-width="2" aria-hidden="true" style="flex-shrink:0; margin-top:2px;"><path d="M12 3l9 16H3z" stroke-linejoin="round"/><path d="M12 9v5M12 16.5v.5" stroke-linecap="round"/></svg>
+              <div style="min-width:0;">
+                <div style="font-size:14px; font-weight:600; color:{{ disc.accent }}; margin-bottom:6px;">{{ disc.title }}</div>
+                <p style="margin:0 0 8px; font-size:13px; color:var(--fg-2); line-height:1.6;">{{ disc.body }}</p>
+                <p style="margin:0 0 10px; font-size:13px; color:var(--fg-3); line-height:1.6;">{{ disc.body2 }}</p>
+                <button onClick="{{ toggleWhy }}" data-focusable="" aria-expanded="{{ whyExpanded }}" style="background:transparent; border:none; padding:4px 0; font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:{{ disc.accent }}; cursor:pointer; text-decoration:underline; text-underline-offset:3px;">{{ whyLabel }}</button>
+                <sc-if value="{{ whyOpen }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:10px 0 0; font-size:12.5px; color:var(--fg-3); line-height:1.6; border-top:1px solid var(--line); padding-top:10px;">Every platform reviews apps before letting them post publicly on people's behalf. We've submitted; reviews take a few weeks. Until ours clears, the platform caps what our posts can reach. Nothing is broken on your side.</p>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <div class="pair" style="margin-bottom:20px;">
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:15px;">
+            <h2 style="font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-4); margin:0 0 11px;">What we ask for</h2>
+            <ul style="display:flex; flex-direction:column; gap:10px; margin:0; padding:0; list-style:none;">
+              <sc-for list="{{ scopes }}" as="s" hint-placeholder-count="3">
+                <li style="display:flex; gap:9px; align-items:flex-start;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.4" aria-hidden="true" style="flex-shrink:0; margin-top:3px;"><path d="M5 12l5 5 9-11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span style="font-size:12.5px; color:var(--fg-2); line-height:1.5;">{{ s.text }}</span>
+                </li>
+              </sc-for>
+            </ul>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:15px;">
+            <h2 style="font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-4); margin:0 0 11px;">What we never do</h2>
+            <ul style="display:flex; flex-direction:column; gap:10px; margin:0; padding:0; list-style:none;">
+              <sc-for list="{{ nevers }}" as="s" hint-placeholder-count="3">
+                <li style="display:flex; gap:9px; align-items:flex-start;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--fg-4)" stroke-width="2.4" aria-hidden="true" style="flex-shrink:0; margin-top:3px;"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+                  <span style="font-size:12.5px; color:var(--fg-3); line-height:1.5;">{{ s.text }}</span>
+                </li>
+              </sc-for>
+            </ul>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:9px; align-items:center;">
+          <button onClick="{{ backToPick }}" data-focusable="" class="tap" style="background:transparent; border:1px solid var(--line-strong); color:var(--fg-2); border-radius:7px; padding:11px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="color:var(--fg);">Back</button>
+          <button onClick="{{ goAuthorize }}" data-focusable="" class="tap" disabled="{{ leaving }}" style="flex:1; display:inline-flex; align-items:center; justify-content:center; gap:9px; background:{{ ctaBg }}; color:var(--on-accent); border:none; border-radius:7px; padding:11px 16px; font-size:13px; font-weight:600; cursor:{{ ctaCursor }}; font-family:inherit;" style-hover="filter:brightness(1.08);">
+            <sc-if value="{{ leaving }}" hint-placeholder-val="{{ false }}">
+              <span aria-hidden="true" style="width:13px; height:13px; border:2px solid rgba(255,255,255,0.35); border-top-color:currentColor; border-radius:50%; animation:spin .7s linear infinite; display:inline-block;"></span>
+            </sc-if>
+            {{ ctaLabel }}
+          </button>
+        </div>
+        <div style="font-size:11.5px; color:var(--fg-4); margin-top:11px;">{{ ctaNote }}</div>
+      </div>
+    </sc-if>
+
+    <!-- ═══════════ INTERSTITIAL ═══════════ -->
+    <sc-if value="{{ isConnecting }}" hint-placeholder-val="{{ false }}">
+      <div role="status" style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:56px 0 40px; animation:fadeUp .2s ease;">
+        <span aria-hidden="true" style="width:46px; height:46px; border-radius:12px; background:{{ plat.tint }}; display:inline-flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; color:#FFFFFF; margin-bottom:20px;">{{ plat.abbr }}</span>
+        <h1 tabindex="-1" data-focusable="" style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; letter-spacing:-0.02em; margin:0 0 8px;">{{ connectingTitle }}</h1>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.1em; color:var(--fg-4); margin-bottom:22px;">{{ connectingStage }}</div>
+        <div aria-hidden="true" style="width:100%; max-width:280px; height:3px; border-radius:2px; background:var(--line-soft); overflow:hidden; position:relative;">
+          <span style="position:absolute; inset:0 auto 0 0; width:33%; background:var(--accent); border-radius:2px; animation:sweep 1.25s ease-in-out infinite;"></span>
+        </div>
+        <sc-if value="{{ slowNotice }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:22px; max-width:44ch; font-size:12.5px; color:var(--fg-3); line-height:1.6;">Still working — this can take a moment. {{ plat.name }} is slower than usual right now.</div>
+        </sc-if>
+        <sc-if value="{{ escapeHatch }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ cancelAll }}" data-focusable="" class="tap" style="margin-top:16px; background:transparent; border:1px solid var(--line-strong); color:var(--fg-2); border-radius:7px; padding:9px 15px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;">Stop and start again</button>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ═══════════ STEP 3 · CHOOSE ACCOUNTS ═══════════ -->
+    <sc-if value="{{ isChoose }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeUp .2s ease;">
+        <h1 tabindex="-1" data-focusable="" style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:22px; letter-spacing:-0.02em; margin:0 0 6px;">{{ chooseTitle }}</h1>
+        <p style="margin:0 0 18px; font-size:13.5px; color:var(--fg-3);">{{ chooseSub }}</p>
+
+        <!-- Rows exist (search may still filter them to zero — handled separately below) -->
+        <sc-if value="{{ hasAnyRows }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <label style="flex:1; display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:0 11px; min-height:44px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--fg-4)" stroke-width="2" aria-hidden="true" style="flex-shrink:0;"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21" stroke-linecap="round"/></svg>
+              <span class="sr">Search {{ plat.rowNounPlural }}</span>
+              <input value="{{ search }}" onInput="{{ onSearch }}" data-focusable="" placeholder="Search {{ plat.rowNounPlural }}" style="flex:1; background:transparent; border:none; outline:none; color:var(--fg); font-size:13px; font-family:inherit; min-height:42px;"/>
+            </label>
+            <button onClick="{{ toggleAll }}" data-focusable="" class="tap" style="background:transparent; border:1px solid var(--line); color:var(--fg-2); border-radius:8px; padding:0 13px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap;" style-hover="border-color:var(--line-strong);">{{ selectAllLabel }}</button>
+          </div>
+
+          <!-- Selection is sticky across search: the count reflects everything chosen, not
+               everything visible. Filtering the list must never silently drop a choice. -->
+          <sc-if value="{{ hiddenSelected }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--line); border-radius:7px; background:var(--surface-2); margin-bottom:10px;">
+              <span style="font-size:12px; color:var(--fg-3);">{{ hiddenSelectedText }}</span>
+              <button onClick="{{ clearSearch }}" data-focusable="" style="margin-left:auto; background:transparent; border:none; padding:4px; font-size:12px; font-weight:600; color:var(--accent); cursor:pointer; font-family:inherit;">Clear search</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ hasVisibleRows }}" hint-placeholder-val="{{ true }}">
+            <div role="group" aria-label="Choose accounts" style="border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:16px;">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                <div role="checkbox" aria-checked="{{ r.ariaChecked }}" aria-disabled="{{ r.ariaDisabled }}" tabindex="{{ r.tabindex }}" data-focusable="" onClick="{{ r.onToggle }}" onKeyDown="{{ r.onKey }}" style="display:flex; align-items:center; gap:12px; padding:13px 14px; min-height:56px; border-bottom:1px solid var(--line-soft); background:{{ r.bg }}; cursor:{{ r.cursor }};" style-hover="background:{{ r.hoverBg }};">
+                  <span aria-hidden="true" style="width:18px; height:18px; border-radius:5px; border:1.5px solid {{ r.boxBorder }}; background:{{ r.boxBg }}; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <sc-if value="{{ r.checked }}" hint-placeholder-val="{{ true }}">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="{{ r.tickColor }}" stroke-width="3.2"><path d="M5 12l5 5 9-11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </sc-if>
+                  </span>
+                  <span aria-hidden="true" style="width:32px; height:32px; border-radius:{{ r.avatarRadius }}; background:{{ r.avatarBg }}; display:inline-flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:12px; color:{{ r.avatarFg }}; flex-shrink:0;">{{ r.initials }}</span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
+                      <span style="font-size:13.5px; font-weight:600; color:{{ r.nameFg }};">{{ r.name }}</span>
+                      <sc-if value="{{ r.hasChip }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.08em; text-transform:uppercase; color:{{ r.chipFg }}; border:1px solid {{ r.chipBorder }}; border-radius:4px; padding:1px 5px;">{{ r.chip }}</span>
+                      </sc-if>
+                    </div>
+                    <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ r.meta }}</div>
+                    <!-- The fix instruction is the whole point of showing an ineligible row.
+                         Listing the problem without the remedy is why "my account isn't
+                         showing up" is the top support ticket in this category. -->
+                    <sc-if value="{{ r.hasFix }}" hint-placeholder-val="{{ false }}">
+                      <div style="font-size:12px; color:{{ r.fixFg }}; margin-top:5px; line-height:1.5; border-left:2px solid {{ r.fixLine }}; padding-left:8px;">{{ r.fix }}</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <!-- No search matches ≠ no eligible accounts. Two different problems, two states. -->
+          <sc-if value="{{ noSearchMatch }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px dashed var(--line); border-radius:10px; padding:26px 20px; background:var(--surface-2); text-align:center; margin-bottom:16px;">
+              <div style="font-size:13.5px; font-weight:600; margin-bottom:5px;">No {{ plat.rowNounPlural }} match "{{ search }}"</div>
+              <p style="margin:0 0 14px; font-size:12.5px; color:var(--fg-3);">{{ searchMissText }}</p>
+              <button onClick="{{ clearSearch }}" data-focusable="" class="tap" style="background:transparent; border:1px solid var(--line-strong); color:var(--fg-2); border-radius:7px; padding:9px 15px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;">Clear search</button>
+            </div>
+          </sc-if>
+
+          <div style="display:flex; gap:9px; align-items:center;">
+            <button onClick="{{ backToPick }}" data-focusable="" class="tap" style="background:transparent; border:1px solid var(--line-strong); color:var(--fg-2); border-radius:7px; padding:11px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="color:var(--fg);">Back</button>
+            <button onClick="{{ confirmSelection }}" data-focusable="" class="tap" disabled="{{ confirmDisabled }}" style="flex:1; background:{{ confirmBg }}; color:{{ confirmFg }}; border:none; border-radius:7px; padding:11px 16px; font-size:13px; font-weight:600; cursor:{{ confirmCursor }}; font-family:inherit;" style-hover="filter:brightness(1.08);">{{ confirmLabel }}</button>
+          </div>
+          <div style="font-size:11.5px; color:var(--fg-4); margin-top:11px;">Nothing is saved to your workspace until you confirm. Leaving now leaves no half-connected account behind.</div>
+        </sc-if>
+
+        <!-- Genuinely nothing eligible on this platform account -->
+        <sc-if value="{{ noRows }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid var(--line); border-radius:10px; padding:30px 24px; background:var(--surface-2); text-align:center;">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--bad); margin-bottom:10px;">No eligible {{ plat.rowNounPlural }}</div>
+            <div style="font-size:15px; font-weight:600; margin-bottom:8px;">We couldn't find a {{ plat.rowNoun }} on this {{ plat.name }} account.</div>
+            <p style="margin:0 auto 18px; max-width:52ch; font-size:13px; color:var(--fg-3); line-height:1.6;">{{ plat.noneHelp }}</p>
+            <div style="display:flex; gap:9px; justify-content:center; flex-wrap:wrap;">
+              <button onClick="{{ backToPick }}" data-focusable="" class="tap" style="background:transparent; border:1px solid var(--line-strong); color:var(--fg-2); border-radius:7px; padding:10px 15px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;">Use a different account</button>
+              <button onClick="{{ goAuthorize }}" data-focusable="" class="tap" style="background:var(--accent); color:var(--on-accent); border:none; border-radius:7px; padding:10px 15px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;">Create one on {{ plat.name }}</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ═══════════ STEP 4 · DONE ═══════════ -->
+    <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeUp .2s ease;">
+        <div style="display:flex; align-items:center; gap:9px; margin-bottom:14px;">
+          <span aria-hidden="true" style="width:22px; height:22px; border-radius:50%; background:var(--ok-bg); border:1px solid var(--ok-line); display:inline-flex; align-items:center; justify-content:center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="3"><path d="M5 12l5 5 9-11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <h1 tabindex="-1" data-focusable="" style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:22px; letter-spacing:-0.02em; margin:0;">{{ doneTitle }}</h1>
+        </div>
+        <p style="margin:0 0 18px; font-size:13.5px; color:var(--fg-3);">{{ doneSub }}</p>
+
+        <ul style="border:1px solid var(--line); border-radius:10px; overflow:hidden; margin:0 0 18px; padding:0; list-style:none;">
+          <sc-for list="{{ connectedRows }}" as="r" hint-placeholder-count="2">
+            <li style="display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line-soft); background:var(--surface); animation:fadeUp .3s ease;">
+              <span aria-hidden="true" style="width:34px; height:34px; border-radius:{{ r.avatarRadius }}; background:{{ r.avatarBg }}; display:inline-flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:12.5px; color:#FFFFFF; flex-shrink:0;">{{ r.initials }}</span>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:13.5px; font-weight:600;">{{ r.name }}</div>
+                <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">{{ r.meta }}</div>
+              </div>
+              <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
+                <span aria-hidden="true" style="display:inline-flex; gap:2px;">
+                  <sc-for list="{{ r.caps }}" as="c" hint-placeholder-count="3">
+                    <span style="width:15px; height:3px; border-radius:2px; background:{{ c.color }};"></span>
+                  </sc-for>
+                </span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.08em; text-transform:uppercase; color:{{ r.capFg }}; text-align:right;">{{ r.capLabel }}</span>
+              </div>
+            </li>
+          </sc-for>
+        </ul>
+
+        <sc-if value="{{ doneWarn }}" hint-placeholder-val="{{ false }}">
+          <div role="note" style="display:flex; gap:10px; align-items:flex-start; background:{{ doneWarnBg }}; border:1px solid {{ doneWarnLine }}; border-radius:9px; padding:12px 14px; margin-bottom:18px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ doneWarnAccent }}" stroke-width="2" aria-hidden="true" style="flex-shrink:0; margin-top:2px;"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5" stroke-linecap="round"/></svg>
+            <span style="font-size:12.5px; color:var(--fg-2); line-height:1.55;">{{ doneWarnText }}</span>
+          </div>
+        </sc-if>
+
+        <div style="display:flex; gap:9px; flex-wrap:wrap;">
+          <button onClick="{{ cancelAll }}" data-focusable="" class="tap" style="flex:1; min-width:180px; background:var(--accent); color:var(--on-accent); border:none; border-radius:7px; padding:11px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="filter:brightness(1.08);">{{ donePrimary }}</button>
+          <button onClick="{{ backToPick }}" data-focusable="" class="tap" style="background:transparent; border:1px solid var(--line-strong); color:var(--fg-2); border-radius:7px; padding:11px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="color:var(--fg);">Connect another</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ═══════════ FAILURE ═══════════ -->
+    <sc-if value="{{ isFail }}" hint-placeholder-val="{{ false }}">
+      <div style="animation:fadeUp .2s ease;">
+        <div role="alert" style="border:1px solid {{ fail.border }}; border-radius:12px; overflow:hidden;">
+          <div style="display:flex; align-items:center; gap:9px; padding:11px 16px; background:{{ fail.headBg }}; border-bottom:1px solid {{ fail.border }};">
+            <span aria-hidden="true" style="width:7px; height:7px; border-radius:50%; background:{{ fail.accent }};"></span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:{{ fail.accent }};">{{ fail.kind }}</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fg-4); margin-left:auto;">{{ fail.code }}</span>
+          </div>
+          <div style="padding:22px 20px; background:var(--surface);">
+            <h1 tabindex="-1" data-focusable="" style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; letter-spacing:-0.02em; margin:0 0 9px; max-width:34ch;">{{ fail.title }}</h1>
+            <p style="margin:0 0 6px; font-size:13.5px; color:var(--fg-2); line-height:1.65; max-width:60ch;">{{ fail.body }}</p>
+            <sc-if value="{{ fail.hasFix }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0 0 6px; font-size:13px; color:var(--fg-3); line-height:1.65; max-width:60ch;">{{ fail.fix }}</p>
+            </sc-if>
+            <div style="display:flex; gap:9px; margin-top:18px; flex-wrap:wrap;">
+              <button onClick="{{ fail.onPrimary }}" data-focusable="" class="tap" disabled="{{ fail.primaryDisabled }}" style="background:{{ fail.primaryBg }}; color:{{ fail.primaryFg }}; border:none; border-radius:7px; padding:10px 16px; font-size:13px; font-weight:600; cursor:{{ fail.primaryCursor }}; font-family:inherit;" style-hover="filter:brightness(1.08);">{{ fail.primaryLabel }}</button>
+              <button onClick="{{ cancelAll }}" data-focusable="" class="tap" style="background:transparent; border:1px solid var(--line-strong); color:var(--fg-2); border-radius:7px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;" style-hover="color:var(--fg);">{{ fail.secondary }}</button>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:var(--fg-4); margin-top:12px;">No account was added. Your workspace is unchanged.</div>
+      </div>
+    </sc-if>
+
+  </main>
+
+  <!-- Prototype state jumper -->
+  <sc-if value="{{ showJumper }}" hint-placeholder-val="{{ true }}">
+    <div style="position:sticky; bottom:0; background:var(--bg); border-top:1px solid var(--line-soft);">
+      <div style="max-width:760px; margin:0 auto; padding:10px 20px 12px;">
+        <button onClick="{{ toggleJumper }}" data-focusable="" aria-expanded="{{ jumperExpanded }}" style="display:flex; align-items:center; gap:7px; background:transparent; border:none; padding:4px 0; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-4);" style-hover="color:var(--fg-3);">
+          <span aria-hidden="true">{{ jumperCaret }}</span><span>Prototype states</span>
+        </button>
+        <sc-if value="{{ jumperOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">
+            <sc-for list="{{ jumps }}" as="j" hint-placeholder-count="16">
+              <button onClick="{{ j.go }}" data-focusable="" style="background:{{ j.bg }}; border:1px solid {{ j.border }}; color:{{ j.fg }}; border-radius:5px; padding:5px 9px; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.05em; cursor:pointer;" style-hover="border-color:var(--line-strong);">{{ j.label }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;returnTo&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Settings&quot;,&quot;Composer&quot;,&quot;Onboarding&quot;,&quot;Failed post&quot;],&quot;default&quot;:&quot;Settings&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Flow&quot;},&quot;youtubePolicy&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;block&quot;,&quot;warn&quot;],&quot;default&quot;:&quot;block&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Flow&quot;},&quot;slowConnect&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Flow&quot;},&quot;showStateJumper&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+/* ────────────────────────────────────────────────────────────────────────────
+   Connect Account — v3
+
+   Changes from v2, and why each one is here:
+
+   1.  Encoding repaired. v2 was UTF-8 bytes read as Latin-1 (mojibake), so
+       every middot, curly quote and em dash rendered as garbage. Cosmetic in
+       a mockup, but this copy gets pasted into production strings.
+   2.  Capability legend added. The three-bar meter is the spine of this whole
+       design and v2 left it as unlabelled 3px bars with a title tooltip —
+       invisible on touch, inaudible to screen readers, undecodable to anyone.
+   3.  Rows are real checkboxes: role, aria-checked, tabindex, Space/Enter.
+       In v2 the primary interaction of the screen was keyboard-inoperable.
+   4.  Light theme. Was dark-only; both themes are a stated build rule.
+   5.  Search bugs fixed — see visibleRows()/selectionModel() below. v2 could
+       render two mutually exclusive branches at once and silently under-count
+       the user's selection.
+   6.  Ineligible rows now render their `fix`. v2 defined the remedy text for
+       the Facebook no-permission row and never displayed it — dead data.
+   7.  connect_timed_out added, and rate_limited counts down for real.
+   8.  YouTube block-vs-warn is a prop, not a baked assumption. This is a live
+       product decision; making it switchable lets both be seen before it is
+       settled. Under "block", publishable is FALSE — v2 showed it true while
+       the copy said publishing was blocked, contradicting its own model.
+   9.  Focus moves to the step heading on every transition, and a polite live
+       region announces it.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const OK = 'var(--ok)', WARN = 'var(--warn)', BAD = 'var(--bad)';
+
+const PLATFORMS = {
+  facebook:{ id:'facebook', name:'Facebook Page', abbr:'FB', tint:'#1877F2', tier:'live',
+    rowNoun:'Page', rowNounPlural:'Pages', scopeCount:'3 permissions · pages_manage_posts',
+    noneHelp:"Publishing to Facebook needs a Page you administer — a personal profile can't be posted to by an app. Create a Page in Facebook, then come back.",
+    caps:[true,true,true], connectedCount:1 },
+  instagram:{ id:'instagram', name:'Instagram', abbr:'IG', tint:'#C13584', tier:'live',
+    rowNoun:'professional account', rowNounPlural:'accounts', scopeCount:'3 permissions · instagram_content_publish',
+    noneHelp:"Instagram only allows app publishing from Business or Creator accounts linked to a Facebook Page. Switch your account type in Instagram, then reconnect.",
+    caps:[true,true,true], connectedCount:1 },
+  linkedin:{ id:'linkedin', name:'LinkedIn', abbr:'LI', tint:'#0A66C2', tier:'live',
+    rowNoun:'profile or page', rowNounPlural:'profiles and pages', scopeCount:'2 permissions · w_member_social',
+    noneHelp:"Your personal profile should always appear here. If it doesn't, the sign-in didn't complete — try again.",
+    caps:[true,true,true], connectedCount:0 },
+  tiktok:{ id:'tiktok', name:'TikTok', abbr:'TT', tint:'#FE2C55', tier:'review',
+    reviewTag:'Only me', tone:'warn',
+    reviewNote:'Uploads post as "Only me" until our review clears.',
+    rowNoun:'account', rowNounPlural:'accounts', scopeCount:'2 permissions · video.publish',
+    noneHelp:'', caps:[true,true,false], connectedCount:0 },
+  youtube:{ id:'youtube', name:'YouTube', abbr:'YT', tint:'#FF0000', tier:'review',
+    reviewTag:'Locked private', tone:'bad',
+    reviewNote:'Videos uploaded now are locked private by YouTube — permanently.',
+    rowNoun:'channel', rowNounPlural:'channels', scopeCount:'2 permissions · youtube.upload',
+    noneHelp:"This Google account has no YouTube channel. Create one at youtube.com, then reconnect — brand channels work too.",
+    caps:[true,false,false], connectedCount:0 },
+  x:{ id:'x', name:'X', abbr:'X', tint:'#000000', tier:'off', reason:'Not configured in this environment yet.' },
+  pinterest:{ id:'pinterest', name:'Pinterest', abbr:'PN', tint:'#E60023', tier:'off', reason:'Needs a board picker we haven’t built yet.' },
+  threads:{ id:'threads', name:'Threads', abbr:'TH', tint:'#3C4046', tier:'off', reason:'No org-level posting concept — personal workspaces only.' }
+};
+
+const SUBACCOUNTS = {
+  facebook:[
+    {id:'p1', name:'Northwind Coffee', meta:'12,400 followers · Admin', ok:true, initials:'NC', tint:'#1877F2'},
+    {id:'p2', name:'Northwind Roastery', meta:'3,180 followers · Admin', ok:true, initials:'NR', tint:'#1877F2'},
+    {id:'p3', name:'Northwind Events', meta:'842 followers · Admin', ok:true, initials:'NE', tint:'#1877F2', connected:true},
+    {id:'p4', name:'Northwind Careers', meta:'Editor role · 1,020 followers', ok:false, initials:'NK', tint:'#1877F2',
+      chip:'No permission', fix:'Ask a Page admin to give you the Content Creator role, then reconnect.'}
+  ],
+  instagram:[
+    {id:'i1', name:'@northwind.coffee', meta:'Business · 18,900 followers', ok:true, initials:'NC', tint:'#C13584'},
+    {id:'i2', name:'@northwind.roast', meta:'Creator · 2,210 followers', ok:true, initials:'NR', tint:'#C13584', connected:true},
+    {id:'i3', name:'@ellis.brews', meta:'Personal account · 640 followers', ok:false, initials:'EB', tint:'#C13584',
+      chip:'Personal', fix:"Apps can't post to Personal accounts. In Instagram: Settings → Account type and tools → Switch to professional account. Then reconnect."}
+  ],
+  linkedin:[
+    {id:'l1', name:'Ellis Vance', meta:'Personal profile · 4,120 connections', ok:true, initials:'EV', tint:'#0A66C2'},
+    {id:'l2', name:'Northwind Coffee Co.', meta:'Company page · Super admin', ok:true, initials:'NC', tint:'#0A66C2'},
+    {id:'l3', name:'Northwind Foundation', meta:'Company page · Analyst role', ok:false, initials:'NF', tint:'#0A66C2',
+      chip:'Read only', fix:'Analysts can read but not post. Ask a super admin for the Content admin role.'}
+  ],
+  youtube:[
+    {id:'y1', name:'Northwind Coffee', meta:'44,100 subscribers · Brand channel', ok:true, initials:'NC', tint:'#FF0000'},
+    {id:'y2', name:'Ellis Vance', meta:'318 subscribers · Personal channel', ok:true, initials:'EV', tint:'#FF0000'}
+  ],
+  tiktok:[]
+};
+
+const FAILS = {
+  user_denied:{ kind:'Cancelled', code:'user_denied', tone:'grey',
+    title:"You didn't approve the connection.", body:'Nothing was changed and no account was added.',
+    primary:'Try again', secondary:'Back to Settings' },
+  missing_scopes:{ kind:'Permission missing', code:'missing_scopes', tone:'warn',
+    title:'Almost — we still need permission to post.',
+    body:'You approved the connection but left out the posting permission, so we can read the account and nothing else.',
+    fix:"We'll ask for just that one permission this time.", primary:'Approve posting', secondary:'Cancel' },
+  wrong_account_type:{ kind:'Account type', code:'wrong_account_type', tone:'warn',
+    title:'This Instagram account is a Personal account.',
+    body:'Instagram only lets apps publish from Business or Creator accounts.',
+    fix:'In Instagram: Settings → Account type and tools → Switch to professional account. Then retry here.',
+    primary:"I've fixed it — retry", secondary:'Use a different account' },
+  no_eligible_targets:{ kind:'Nothing to connect', code:'no_eligible_targets', tone:'bad',
+    title:"We couldn't find a Page on this Facebook account.",
+    body:'Apps can only publish to Facebook Pages, not personal profiles.',
+    fix:'Create a Page in Facebook, give yourself the Content Creator role, then come back.',
+    primary:'Create a Page on Facebook', secondary:'Use a different account' },
+  oauth_state_expired:{ kind:'Link expired', code:'oauth_state_expired', tone:'grey',
+    title:'That took a while and the link expired.',
+    body:'Connection links last ten minutes for security. No harm done — nothing was connected.',
+    primary:'Start again', secondary:'Back to Settings' },
+  oauth_state_bad_signature:{ kind:'Blocked', code:'oauth_state_bad_signature', tone:'bad',
+    title:"We couldn't verify that request, so we stopped.",
+    body:'Start the connection again from Settings. If this keeps happening, contact support with the code above.',
+    primary:'Start again', secondary:'Back to Settings' },
+  already_connected_elsewhere:{ kind:'Already in use', code:'already_connected_elsewhere', tone:'warn',
+    title:'This TikTok account is connected to another workspace.',
+    body:'An account can only publish from one workspace at a time.',
+    fix:'Disconnect it in the other workspace first, then connect it here.',
+    primary:'Got it', secondary:'Use a different account' },
+  platform_unavailable:{ kind:'Platform down', code:'platform_unavailable', tone:'warn',
+    title:"Instagram isn't responding right now.", body:'This is on their side, not yours. Nothing was changed.',
+    fix:'Give it a minute and try again.', primary:'Try again', secondary:'Back to Settings' },
+  connect_timed_out:{ kind:'Timed out', code:'connect_timed_out', tone:'warn',
+    title:'We lost contact with Instagram partway through.',
+    body:"The sign-in started but never came back, so we stopped rather than leave a half-connected account behind.",
+    fix:'Nothing was saved. Starting again is safe.', primary:'Start again', secondary:'Back to Settings' },
+  app_not_configured:{ kind:'Unavailable', code:'app_not_configured', tone:'grey',
+    title:"X isn't available yet.", body:"We haven't finished setting up X publishing in this environment.",
+    primary:'Back to platforms', secondary:'Back to Settings' },
+  rate_limited:{ kind:'Slow down', code:'rate_limited', tone:'warn', countdown:240,
+    title:'Too many attempts.', body:'LinkedIn temporarily blocked further sign-in attempts from this workspace.',
+    fix:'This clears on its own — no action needed.', primary:'Try again', secondary:'Back to Settings' }
+};
+
+const TONE = {
+  grey:{ accent:'var(--fg-3)', border:'var(--line)',      headBg:'var(--surface-2)' },
+  warn:{ accent:'var(--warn)', border:'var(--warn-line)', headBg:'var(--warn-bg)' },
+  bad: { accent:'var(--bad)',  border:'var(--bad-line)',  headBg:'var(--bad-bg)' }
+};
+
+class Component extends DCLogic {
+  state = { step:'pick', platform:'facebook', fail:null, selected:{}, search:'', leaving:false,
+            elapsed:0, whyOpen:false, jumperOpen:false, emptyRows:false, cooldown:0, live:'' };
+
+  componentDidMount(){
+    this._key = (e) => { if (e.key === 'Escape') this.reset(); };
+    window.addEventListener('keydown', this._key);
+  }
+  componentWillUnmount(){
+    window.removeEventListener('keydown', this._key);
+    clearInterval(this._tick); clearInterval(this._cool);
+  }
+
+  /* Focus the new step's heading so keyboard and screen-reader users are not
+     stranded at the old position after a transition. */
+  componentDidUpdate(prevProps, prevState){
+    if (prevState && prevState.step !== this.state.step){
+      const h = document.querySelector('main h1[tabindex="-1"]');
+      if (h) h.focus({ preventScroll:false });
+    }
+  }
+
+  reset(){ clearInterval(this._tick); clearInterval(this._cool);
+           this.setState({ step:'pick', fail:null, leaving:false, selected:{}, search:'',
+                           emptyRows:false, cooldown:0, live:'Back to platform list.' }); }
+
+  go(step, extra){ this.setState(Object.assign({ step, leaving:false }, extra||{})); }
+
+  /* Effective capabilities. YouTube's second bar depends on an open product
+     decision, so it is read from a prop rather than hard-coded. */
+  capsFor(id){
+    const p = PLATFORMS[id]; if (!p || !p.caps) return [true,true,true];
+    if (id === 'youtube') return [true, this.props.youtubePolicy === 'warn', false];
+    return p.caps;
+  }
+
+  startConnect(){
+    clearInterval(this._tick);
+    this.setState({ step:'connecting', elapsed:0, leaving:false,
+                    live:'Finishing your ' + this.plat().name + ' connection.' });
+    this._tick = setInterval(() => {
+      const e = this.state.elapsed + 1;
+      const slow = !!this.props.slowConnect;
+      /* A slow connect that never returns must terminate in a timeout, not spin
+         forever. This is the UI half of the reaper contract. */
+      if (slow && e >= 30){ clearInterval(this._tick);
+        this.setState({ step:'fail', fail:'connect_timed_out', live:'Connection timed out.' }); return; }
+      if (!slow && e >= 3){ clearInterval(this._tick); this.afterAuth(); return; }
+      this.setState({ elapsed:e });
+    }, 1000);
+  }
+
+  afterAuth(){
+    const p = this.state.platform;
+    if (p === 'tiktok'){ this.setState({ step:'done', selected:{ tt:true }, live:'TikTok connected.' }); return; }
+    const rows = this.state.emptyRows ? [] : (SUBACCOUNTS[p] || []);
+    const sel = {};
+    rows.forEach(r => { if (r.connected) sel[r.id] = true; });
+    this.setState({ step:'choose', selected:sel, search:'', live:'Choose which accounts to post to.' });
+  }
+
+  showFail(code){
+    clearInterval(this._cool);
+    const f = FAILS[code];
+    this.setState({ step:'fail', fail:code, cooldown: f && f.countdown ? f.countdown : 0, live:f ? f.title : '' });
+    if (f && f.countdown){
+      this._cool = setInterval(() => {
+        const c = this.state.cooldown - 1;
+        if (c <= 0){ clearInterval(this._cool); this.setState({ cooldown:0 }); }
+        else this.setState({ cooldown:c });
+      }, 1000);
+    }
+  }
+
+  plat(){ return PLATFORMS[this.state.platform] || PLATFORMS.facebook; }
+
+  allRows(){ return this.state.emptyRows ? [] : (SUBACCOUNTS[this.state.platform] || []); }
+
+  visibleRows(){
+    const q = this.state.search.trim().toLowerCase();
+    const rows = this.allRows();
+    return q ? rows.filter(r => r.name.toLowerCase().includes(q)) : rows;
+  }
+
+  /* Selection is computed over ALL rows, never the search-filtered subset.
+     v2 derived the confirm count from visible rows, so typing in the search
+     box appeared to discard choices the user had already made. */
+  selectionModel(){
+    const all = this.allRows();
+    const selectable = all.filter(r => r.ok && !r.connected);
+    const chosen = selectable.filter(r => this.state.selected[r.id]);
+    const visibleIds = new Set(this.visibleRows().map(r => r.id));
+    return {
+      selectable, chosen,
+      count: chosen.length,
+      allOn: selectable.length > 0 && chosen.length === selectable.length,
+      hiddenCount: chosen.filter(r => !visibleIds.has(r.id)).length
+    };
+  }
+
+  capBars(caps){
+    const titles = ['reachable', 'can post', 'public'];
+    return caps.map((v, i) => ({
+      color: v ? OK : (i === 2 ? WARN : BAD),
+      title: titles[i] + (v ? ': yes' : ': no')
+    }));
+  }
+
+  capSentence(caps){
+    return 'Reachable: ' + (caps[0] ? 'yes' : 'no') +
+           '. Can post: '  + (caps[1] ? 'yes' : 'no') +
+           '. Publicly visible: ' + (caps[2] ? 'yes' : 'no') + '.';
+  }
+
+  renderVals(){
+    const s = this.state, p = this.plat(), returnTo = this.props.returnTo || 'Settings';
+    const ytBlock = this.props.youtubePolicy !== 'warn';
+
+    /* ── progress rail ── */
+    const stepIndex = { pick:0, headsup:1, connecting:1, choose:2, done:3, fail:1 }[s.step] || 0;
+    const rail = ['Platform','Permissions','Accounts','Done'].map((label, i) => ({
+      label, hasLine: i < 3,
+      current: i === stepIndex ? 'step' : 'false',
+      sr: i < stepIndex ? '(done)' : (i === stepIndex ? '(current step)' : '(not started)'),
+      dot: i < stepIndex ? OK : (i === stepIndex ? 'var(--accent)' : 'var(--line-strong)'),
+      fg:  i <= stepIndex ? 'var(--fg)' : 'var(--fg-4)',
+      line:i < stepIndex ? 'var(--line-strong)' : 'var(--line-soft)'
+    }));
+
+    const contextMap = {
+      Settings:'You started from Settings. We’ll bring you back there when this is done.',
+      Composer:'Your draft is saved. We’ll bring you back to it with the new account already selected.',
+      Onboarding:'Step 2 of 4. You can skip this and connect an account later.',
+      'Failed post':'Reconnecting to retry a post that failed. We’ll offer the retry when you land back.'
+    };
+
+    const legend = [
+      { title:'Reachable', desc:'we hold a working sign-in',
+        bars:[{color:OK,op:1},{color:'var(--line-strong)',op:.45},{color:'var(--line-strong)',op:.45}] },
+      { title:'Can post',  desc:'the platform accepts our posts',
+        bars:[{color:'var(--line-strong)',op:.45},{color:OK,op:1},{color:'var(--line-strong)',op:.45}] },
+      { title:'Public',    desc:'your audience will actually see it',
+        bars:[{color:'var(--line-strong)',op:.45},{color:'var(--line-strong)',op:.45},{color:OK,op:1}] }
+    ];
+
+    const tiles = Object.values(PLATFORMS);
+
+    const mkLive = (pl) => {
+      const caps = this.capsFor(pl.id);
+      return {
+        name:pl.name, abbr:pl.abbr, tint:pl.tint, caps:this.capBars(caps),
+        capLabel: caps[2] ? 'PUBLIC' : 'LIMITED', capFg: caps[2] ? OK : WARN,
+        hasCount: pl.connectedCount > 0,
+        countLabel: pl.connectedCount === 1 ? '1 connected' : pl.connectedCount + ' connected',
+        addLabel: 'Add another account',
+        aria: pl.name + '. ' + this.capSentence(caps) +
+              (pl.connectedCount > 0 ? ' ' + pl.connectedCount + ' already connected. Add another.' : ''),
+        onPick: () => this.setState({ platform:pl.id, step:'headsup', whyOpen:false,
+                                      live:'Connecting ' + pl.name + '.' })
+      };
+    };
+
+    const mkReview = (pl) => {
+      const caps = this.capsFor(pl.id);
+      const t = pl.tone === 'bad' ? TONE.bad : TONE.warn;
+      return {
+        name:pl.name, abbr:pl.abbr, tint:pl.tint, caps:this.capBars(caps),
+        reviewTag:pl.reviewTag,
+        reviewNote: pl.id === 'youtube' && ytBlock
+          ? 'Publishing is blocked until review clears — YouTube would lock the video private forever.'
+          : pl.reviewNote,
+        border:t.border, borderHi:t.accent, tagFg:t.accent, tagBorder:t.border,
+        noteFg: pl.tone === 'bad' ? 'var(--fg-2)' : 'var(--warn-fg)',
+        aria: pl.name + '. ' + this.capSentence(caps) + ' ' + pl.reviewTag + '.',
+        onPick: () => this.setState({ platform:pl.id, step:'headsup', whyOpen:false,
+                                      live:'Connecting ' + pl.name + '.' })
+      };
+    };
+
+    /* Disclosure copy. No cross-platform fallback — a platform either has its
+       own disclosure or shows none. */
+    const disclosures = {
+      tiktok:{ accent:'var(--warn)', border:'var(--warn-line)', bg:'var(--warn-bg)',
+        title:'Your TikTok posts will be private for now.',
+        body:'Our TikTok integration is still in review. Until it’s approved, anything published here uploads to your account as "Only me" — you’ll see it, nobody else will. Your TikTok account also has to be set to private while it’s in review.',
+        body2:'You can make each post public yourself in the TikTok app afterwards. We’ll tell you when review is done.' },
+      youtube:{ accent:'var(--bad)', border:'var(--bad-line)', bg:'var(--bad-bg)',
+        title: ytBlock ? 'You can connect, but not publish yet.' : 'Don’t upload anything you care about yet.',
+        body: ytBlock
+          ? 'Our YouTube integration is still in review, and YouTube permanently locks videos uploaded by apps that haven’t passed. Rather than let you lose an upload, we’ve turned publishing off for YouTube until we’re approved.'
+          : 'Our YouTube integration is still in review. Videos uploaded before it’s approved are locked to private by YouTube, permanently — that can’t be undone by us or by you, and the only fix is uploading the video again once we’re approved.',
+        body2: ytBlock
+          ? 'Connecting now means your channel is ready the day review clears. We’ll email you then.'
+          : 'Connect now if you want to get set up. We’d suggest waiting to publish.' }
+    };
+
+    /* ── choose-step rows ── */
+    const sel = this.selectionModel();
+    const visible = this.visibleRows();
+    const searching = s.search.trim() !== '';
+
+    const rows = visible.map(r => {
+      const locked = !!r.connected, ineligible = !r.ok;
+      const checked = locked || !!s.selected[r.id];
+      const interactive = !ineligible && !locked;
+      const toggle = () => this.setState(st => {
+        const next = Object.assign({}, st.selected); next[r.id] = !next[r.id];
+        return { selected:next, live: (next[r.id] ? 'Selected ' : 'Unselected ') + r.name };
+      });
+      return {
+        checked, initials:r.initials, name:r.name, meta:r.meta,
+        ariaChecked: checked ? 'true' : 'false',
+        ariaDisabled: interactive ? 'false' : 'true',
+        tabindex: interactive ? '0' : '-1',
+        avatarBg: ineligible ? 'var(--line-soft)' : r.tint,
+        avatarFg: ineligible ? 'var(--fg-4)' : '#FFFFFF',
+        avatarRadius: (s.platform === 'linkedin' && r.id === 'l1') ? '50%' : '9px',
+        bg: ineligible ? 'var(--sunken)' : (checked ? 'var(--surface-3)' : 'var(--surface)'),
+        hoverBg: interactive ? 'var(--surface-3)' : (ineligible ? 'var(--sunken)' : 'var(--surface)'),
+        cursor: interactive ? 'pointer' : 'default',
+        boxBorder: ineligible ? 'var(--line)' : (checked ? 'var(--accent)' : 'var(--line-strong)'),
+        boxBg: checked ? (locked ? 'var(--line-strong)' : 'var(--accent)') : 'transparent',
+        tickColor: locked ? 'var(--fg-3)' : 'var(--on-accent)',
+        nameFg: ineligible ? 'var(--fg-dim)' : 'var(--fg)',
+        hasChip: !!(r.chip || locked),
+        chip: locked ? 'Connected' : (r.chip || ''),
+        chipFg: locked ? OK : BAD,
+        chipBorder: locked ? 'var(--ok-line)' : 'var(--bad-line)',
+        hasFix: !!r.fix,
+        fix: r.fix || '',
+        fixFg: 'var(--fg-3)',
+        fixLine: 'var(--line-strong)',
+        onToggle: interactive ? toggle : () => {},
+        onKey: interactive
+          ? (e) => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); toggle(); } }
+          : () => {}
+      };
+    });
+
+    const connectedList = (s.step === 'done' && s.platform === 'tiktok')
+      ? [{ id:'tt', name:'@northwind.coffee', meta:'TikTok · 6,340 followers', initials:'NC', tint:'#FE2C55' }]
+      : this.allRows().filter(r => s.selected[r.id] && r.ok && !r.connected);
+
+    const doneCaps = this.capsFor(s.platform);
+    const ytDone = s.platform === 'youtube';
+
+    /* ── failure ── */
+    const f = s.fail ? FAILS[s.fail] : null;
+    const tone = f ? (TONE[f.tone] || TONE.grey) : TONE.grey;
+    const mmss = (n) => Math.floor(n/60) + ':' + String(n%60).padStart(2,'0');
+    const cooling = !!(f && f.countdown && s.cooldown > 0);
+
+    /* ── prototype jumper ── */
+    const jumpDefs = [
+      ['Picker',              () => this.reset()],
+      ['Heads-up · FB',       () => this.setState({ platform:'facebook', step:'headsup', whyOpen:false })],
+      ['Heads-up · TikTok',   () => this.setState({ platform:'tiktok',   step:'headsup', whyOpen:false })],
+      ['Heads-up · YouTube',  () => this.setState({ platform:'youtube',  step:'headsup', whyOpen:false })],
+      ['Interstitial',        () => this.setState({ platform:'instagram', step:'connecting', elapsed:2 })],
+      ['Interstitial · slow', () => this.setState({ platform:'instagram', step:'connecting', elapsed:11 })],
+      ['Choose · FB',         () => this.setState({ platform:'facebook', step:'choose', emptyRows:false, selected:{p3:true}, search:'' })],
+      ['Choose · mixed',      () => this.setState({ platform:'instagram', step:'choose', emptyRows:false, selected:{i2:true}, search:'' })],
+      ['Choose · no match',   () => this.setState({ platform:'facebook', step:'choose', emptyRows:false, selected:{p1:true}, search:'zzz' })],
+      ['Choose · none',       () => this.setState({ platform:'youtube', step:'choose', emptyRows:true, selected:{} })],
+      ['Done',                () => this.setState({ platform:'facebook', step:'done', selected:{p1:true,p2:true} })],
+      ['Done · TikTok',       () => this.setState({ platform:'tiktok', step:'done', selected:{tt:true} })],
+      ['Done · YouTube',      () => this.setState({ platform:'youtube', step:'done', selected:{y1:true} })]
+    ].map(([label, go]) => ({ label, go, bg:'var(--surface-2)', border:'var(--line)', fg:'var(--fg-3)' }));
+
+    const failJumps = Object.keys(FAILS).map(code => ({
+      label: code, bg:'var(--surface-2)', border:'var(--bad-line)', fg:'var(--fg-3)',
+      go: () => this.showFail(code)
+    }));
+
+    return {
+      theme: this.props.theme || 'dark',
+      rail,
+      showContext: s.step !== 'fail',
+      contextText: contextMap[returnTo] || contextMap.Settings,
+      liveMessage: s.live,
+
+      isPick: s.step === 'pick', isHeads: s.step === 'headsup', isConnecting: s.step === 'connecting',
+      isChoose: s.step === 'choose', isDone: s.step === 'done', isFail: s.step === 'fail',
+
+      legend,
+      liveTiles:   tiles.filter(t => t.tier === 'live').map(mkLive),
+      reviewTiles: tiles.filter(t => t.tier === 'review').map(mkReview),
+      offTiles:    tiles.filter(t => t.tier === 'off').map(pl => ({
+        name:pl.name, abbr:pl.abbr, reason:pl.reason,
+        aria: pl.name + ' — unavailable. ' + pl.reason
+      })),
+
+      plat:{ name:p.name, abbr:p.abbr, tint:p.tint, scopeCount:p.scopeCount,
+             rowNoun:p.rowNoun, rowNounPlural:p.rowNounPlural, noneHelp:p.noneHelp },
+
+      /* ── heads-up ── */
+      headsTitle: 'You’ll finish this on ' + p.name,
+      hasDisclosure: !!disclosures[s.platform],
+      disc: disclosures[s.platform] || { accent:'var(--fg-3)', border:'var(--line)', bg:'var(--surface-2)',
+                                         title:'', body:'', body2:'' },
+      whyOpen: s.whyOpen,
+      whyExpanded: s.whyOpen ? 'true' : 'false',
+      whyLabel: s.whyOpen ? 'Hide explanation' : 'Why is it in review?',
+      toggleWhy: () => this.setState(st => ({ whyOpen: !st.whyOpen })),
+      scopes:[
+        { text:'Post content to your account — only when you tell us to.' },
+        { text:'Read your profile name and picture — so you can tell your accounts apart.' },
+        { text:'Read post performance — so we can show you how content did.' }
+      ],
+      nevers:[
+        { text:'Post without your instruction.' },
+        { text:'Read your messages or DMs.' },
+        { text:'Follow, like, or comment as you.' }
+      ],
+      leaving: s.leaving,
+      ctaBg: s.leaving ? 'var(--accent-press)' : 'var(--accent)',
+      ctaCursor: s.leaving ? 'default' : 'pointer',
+      ctaLabel: s.leaving ? 'Taking you to ' + p.name + '…' : 'Continue to ' + p.name,
+      ctaNote: 'You’ll sign in on ' + p.name + '. We never see your password.',
+      goAuthorize: () => { this.setState({ leaving:true }); setTimeout(() => this.startConnect(), 900); },
+      backToPick: () => this.reset(),
+      cancelAll: () => this.reset(),
+
+      /* ── interstitial ── */
+      connectingTitle: 'Finishing your ' + p.name + ' connection…',
+      connectingStage: s.elapsed < 2 ? 'EXCHANGING TOKEN'
+                     : (s.elapsed < 8 ? 'FINDING YOUR ACCOUNTS' : 'WAITING ON ' + p.name.toUpperCase()),
+      slowNotice: s.elapsed >= 8,
+      escapeHatch: s.elapsed >= 20,
+
+      /* ── choose ── */
+      chooseTitle: 'Which ' + p.rowNounPlural + ' should we post to?',
+      chooseSub: 'Pick as many as you like. You can add the rest later without reconnecting.',
+      hasAnyRows: this.allRows().length > 0,
+      hasVisibleRows: rows.length > 0,
+      noSearchMatch: searching && rows.length === 0 && this.allRows().length > 0,
+      noRows: this.allRows().length === 0,
+      searchMissText: sel.count > 0
+        ? 'Your ' + sel.count + ' selected ' + (sel.count === 1 ? 'account is' : 'accounts are') + ' still selected.'
+        : 'Try a shorter search, or clear it to see everything.',
+      rows, search: s.search,
+      onSearch: (e) => this.setState({ search: e.target.value }),
+      clearSearch: () => this.setState({ search:'' }),
+      hiddenSelected: sel.hiddenCount > 0,
+      hiddenSelectedText: sel.hiddenCount === 1
+        ? '1 selected account is hidden by your search.'
+        : sel.hiddenCount + ' selected accounts are hidden by your search.',
+      selectAllLabel: sel.allOn ? 'Clear all' : 'Select all',
+      toggleAll: () => this.setState(st => {
+        const next = Object.assign({}, st.selected);
+        sel.selectable.forEach(r => { next[r.id] = !sel.allOn; });
+        return { selected:next, live: sel.allOn ? 'Cleared all.' : 'Selected all ' + sel.selectable.length + '.' };
+      }),
+      confirmDisabled: sel.count === 0,
+      confirmBg: sel.count === 0 ? 'var(--line-soft)' : 'var(--accent)',
+      confirmFg: sel.count === 0 ? 'var(--fg-4)' : 'var(--on-accent)',
+      confirmCursor: sel.count === 0 ? 'default' : 'pointer',
+      confirmLabel: sel.count === 0 ? 'Select an account to continue'
+        : (sel.count === 1 ? 'Connect 1 account' : 'Connect ' + sel.count + ' accounts'),
+      confirmSelection: () => { if (sel.count > 0) this.go('done', { live:'Connected.' }); },
+
+      /* ── done ── */
+      doneTitle: connectedList.length === 1 ? 'Connected' : 'Connected ' + connectedList.length + ' accounts',
+      doneSub: doneCaps[2]
+        ? 'These accounts are ready to publish. They’ll appear in the composer’s target bar.'
+        : (ytDone && ytBlock
+            ? 'This channel is connected and ready — publishing switches on when review clears.'
+            : 'These accounts can publish, but not publicly yet.'),
+      connectedRows: connectedList.map(r => ({
+        name:r.name, meta:r.meta, initials:r.initials, avatarBg:r.tint, avatarRadius:'9px',
+        caps: this.capBars(doneCaps),
+        capLabel: doneCaps[2] ? 'READY' : (doneCaps[1] ? 'POSTS STAY PRIVATE' : 'PUBLISHING OFF'),
+        capFg: doneCaps[2] ? OK : WARN
+      })),
+      doneWarn: !doneCaps[2],
+      doneWarnAccent: ytDone ? 'var(--bad)' : 'var(--warn)',
+      doneWarnBg:     ytDone ? 'var(--bad-bg)' : 'var(--warn-bg)',
+      doneWarnLine:   ytDone ? 'var(--bad-line)' : 'var(--warn-line)',
+      doneWarnText: ytDone
+        ? (ytBlock
+            ? 'Publishing to this channel is switched off until our review clears — YouTube would lock the video private permanently. We’ll email you the day it opens up.'
+            : 'Anything you upload before review clears is locked private by YouTube, permanently. We’d suggest waiting.')
+        : 'Posts to this account upload as "Only me" until our review clears. You can make each one public in the TikTok app.',
+      donePrimary: returnTo === 'Composer' ? 'Back to your post'
+        : returnTo === 'Onboarding' ? 'Next'
+        : returnTo === 'Failed post' ? 'Retry publishing' : 'Done',
+
+      /* ── failure ── */
+      fail: f ? {
+        kind:f.kind, code:f.code, accent:tone.accent, border:tone.border, headBg:tone.headBg,
+        title: f.title, body: f.body,
+        hasFix: !!f.fix, fix: f.fix || '',
+        primaryLabel: cooling ? 'Try again in ' + mmss(s.cooldown) : f.primary,
+        primaryDisabled: cooling,
+        primaryBg: cooling ? 'var(--line-soft)' : 'var(--accent)',
+        primaryFg: cooling ? 'var(--fg-4)' : 'var(--on-accent)',
+        primaryCursor: cooling ? 'default' : 'pointer',
+        secondary: f.secondary,
+        onPrimary: () => { if (!cooling) this.go('headsup', { fail:null, cooldown:0 }); }
+      } : { kind:'', code:'', accent:'var(--fg-3)', border:'var(--line)', headBg:'var(--surface-2)',
+            title:'', body:'', hasFix:false, fix:'', primaryLabel:'', primaryDisabled:false,
+            primaryBg:'var(--accent)', primaryFg:'var(--on-accent)', primaryCursor:'pointer',
+            secondary:'', onPrimary:() => {} },
+
+      /* ── jumper ── */
+      showJumper: this.props.showStateJumper !== false,
+      jumperOpen: s.jumperOpen,
+      jumperExpanded: s.jumperOpen ? 'true' : 'false',
+      jumperCaret: s.jumperOpen ? '▾' : '▸',
+      toggleJumper: () => this.setState(st => ({ jumperOpen: !st.jumperOpen })),
+      jumps: jumpDefs.concat(failJumps)
+    };
+  }
+}
+</script>
+</body>
+</html>

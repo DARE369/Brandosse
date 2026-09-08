@@ -1750,6 +1750,10 @@ const useSessionStore = create((set, get) => ({
           logoPosition: settings?.logoPosition,
           logoScale: settings?.logoScale,
           referenceImageUrls: opts.referenceImages || undefined,
+          // Typography: built by src/services/designCopy.js from the plan's own
+          // headline. Undefined when the post has no headline, which leaves the
+          // edge function on its original path.
+          compose: opts.compose || undefined,
           category: 'image',
           requestId: opts.requestId,
           slotOffset: opts.requestSlot ?? 0,
@@ -1994,6 +1998,10 @@ const useSessionStore = create((set, get) => ({
           logoPosition: settingsSnapshot?.logoPosition,
           logoScale: settingsSnapshot?.logoScale,
           referenceImageUrls: opts.referenceImages || undefined,
+          // Typography: built by src/services/designCopy.js from the plan's own
+          // headline. Undefined when the post has no headline, which leaves the
+          // edge function on its original path.
+          compose: opts.compose || undefined,
           category: 'image',
           requestId: opts.requestId,
           slotOffset: opts.requestSlot ?? 0,
@@ -2111,6 +2119,10 @@ const useSessionStore = create((set, get) => ({
         logoPosition: settings?.logoPosition,
         logoScale: settings?.logoScale,
         referenceImageUrls: opts.referenceImages || undefined,
+        // Typography: built by src/services/designCopy.js from the plan's own
+        // headline. Undefined when the post has no headline, which leaves the
+        // edge function on its original path.
+        compose: opts.compose || undefined,
         category: 'image',
         requestId: opts.requestId,
         slotOffset: opts.requestSlot ?? 0,
@@ -2306,6 +2318,10 @@ const useSessionStore = create((set, get) => ({
           logoPosition: settings?.logoPosition,
           logoScale: settings?.logoScale,
           referenceImageUrls: opts.referenceImages || undefined,
+          // Typography: built by src/services/designCopy.js from the plan's own
+          // headline. Undefined when the post has no headline, which leaves the
+          // edge function on its original path.
+          compose: opts.compose || undefined,
           category: 'carousel',
           requestId: opts.requestId,
           slotOffset: opts.requestSlot ?? 0,

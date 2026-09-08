@@ -171,6 +171,13 @@ export async function generateImages({
   applyLogo = false,
   logoPosition = undefined,
   logoScale = undefined,
+  // Typography. When present, the edge function paints a TEXT-FREE background
+  // and sets the words afterwards as real vector type in the brand's own font
+  // (see src/services/designCopy.js and _shared/designCompositor.ts).
+  //
+  // Omitted entirely when there is no headline, in which case the edge function
+  // takes its original path and nothing about the render changes.
+  compose = null,
   signal,
   onProgress,
 }) {
@@ -205,6 +212,9 @@ export async function generateImages({
             ...(Number.isFinite(logoScale) ? { logo_scale: logoScale } : {}),
           }
         : {}),
+      ...(compose && compose.text && Object.keys(compose.text).length
+        ? { compose }
+        : {}),
       image_model: imageModel || undefined,
       rendering_speed: providerOptions.renderingSpeed || providerOptions.rendering_speed,
       negative_prompt: providerOptions.negativePrompt || providerOptions.negative_prompt,
@@ -226,11 +236,39 @@ export async function generateImages({
       );
     }
 
+    // Same posture as the logo above: typography that was asked for and did not
+    // land is a real defect, not a detail. The image is still returned — it was
+    // paid for — but the caller is told, and the reason travels back with it so
+    // the UI can say "your brand font could not be loaded" instead of quietly
+    // handing over a graphic with no words on it.
+    if (compose && data.compose_applied === false) {
+      console.error(
+        '[media.service] brand typography was requested but NOT applied:',
+        data.compose_error || data.compose_notes?.join(' | ') || 'unknown reason',
+      );
+    }
+
     images.push({
       url: publicUrl,
       logoRequested: Boolean(data.logo_requested),
       logoApplied: Boolean(data.logo_applied),
       logoError: data.logo_error || null,
+      composeRequested: Boolean(compose),
+      composeApplied: Boolean(data.compose_applied),
+      composeTemplate: data.compose_template || null,
+      composeError: data.compose_error || null,
+      // Plain-language account of every decision the compositor made or
+      // declined to make. Surfaced so a bare graphic is never unexplained.
+      composeNotes: Array.isArray(data.compose_notes) ? data.compose_notes : [],
+      composeFonts: data.compose_fonts || null,
+      // What the type actually achieved, per slot — the numbers the status
+      // panel shows ("7.1:1", "4.9:1 after recolour").
+      composeContrast: Array.isArray(data.compose_contrast) ? data.compose_contrast : [],
+      // What each slot asked for vs what was drawn. This is what lets the UI
+      // show WHICH words were lost, not merely that some were.
+      composeRendered: Array.isArray(data.compose_rendered) ? data.compose_rendered : [],
+      composeScrimmed: Array.isArray(data.compose_scrimmed) ? data.compose_scrimmed : [],
+      composeRecoloured: Array.isArray(data.compose_recoloured) ? data.compose_recoloured : [],
       width: dimensions.width,
       height: dimensions.height,
       storagePath: data.storagePath || data.storage_path || null,

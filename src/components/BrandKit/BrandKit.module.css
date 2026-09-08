@@ -90,11 +90,21 @@
   border: 1px solid var(--uiv2-accent-border);
   color: var(--uiv2-accent-text);
 }
-.emptyTitle { font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-2xl); letter-spacing: -0.01em; }
+/* An explicit colour is required. src/styles/App.css:15 sets
+   `h1,h2,h3,h4,h5 { color: var(--color-text-primary) }` from the OLD token
+   system, which resolves to #141210 here — near-black text on this screen's
+   near-black ground. A class with no colour of its own loses to it, so both
+   titles rendered all but invisible in dark theme. */
+.emptyTitle { color: var(--uiv2-text-primary); font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-2xl); letter-spacing: -0.01em; }
 .emptyDesc { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); max-width: 360px; }
 .emptyForm { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
 .emptyUrlRow { display: flex; gap: 8px; width: 100%; }
-.emptyInput {
+/* Scoped to the parent on purpose. src/styles/global.css styles
+   `input[type="text"]` (specificity 0-1-1), which outranks a bare class
+   (0-1-0) and repainted these inputs with OLD-system tokens: a cream
+   background and near-black text inside the dark theme. Adding the parent
+   takes the class to 0-2-0 so the design system wins its own inputs back. */
+.emptyForm .emptyInput {
   flex: 1;
   min-width: 0;
   background: var(--uiv2-bg-inset);
@@ -106,7 +116,7 @@
   font-family: inherit;
   outline: none;
 }
-.emptyInput:focus { border-color: var(--uiv2-accent-solid); }
+.emptyForm .emptyInput:focus { border-color: var(--uiv2-accent-solid); }
 .emptyDivider {
   display: flex;
   align-items: center;
@@ -133,8 +143,44 @@
   background: var(--uiv2-accent-wash); border: 1px solid var(--uiv2-accent-border); color: var(--uiv2-accent-text);
   margin-bottom: 4px;
 }
-.choiceTitle { font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-2xl); letter-spacing: -0.01em; }
+.choiceTitle { color: var(--uiv2-text-primary); font-family: var(--uiv2-font-display); font-weight: 600; font-size: var(--uiv2-text-2xl); letter-spacing: -0.01em; }
 .choiceSubtitle { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); max-width: 460px; }
+
+/* Website import — the recommended path, and the only one that MEASURES the
+   brand rather than inferring it. Deliberately mirrors .emptyUrlRow on the
+   zero-kits landing screen: a user who saw that once should recognise this. */
+.choiceUrlBlock { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.choiceUrlRow { display: flex; gap: 8px; width: 100%; }
+.choiceUrlBlock .choiceUrlInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px; /* touch target */
+  padding: 10px 12px;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm);
+  background: var(--uiv2-bg-surface);
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-body);
+  font-size: var(--uiv2-text-base);
+}
+.choiceUrlBlock .choiceUrlInput:focus { border-color: var(--uiv2-accent-solid); outline: none; }
+.choiceUrlNote {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0;
+  color: var(--uiv2-text-secondary);
+  font-size: var(--uiv2-text-xs);
+}
+.choiceUrlError { margin: 0; color: var(--uiv2-danger); font-size: var(--uiv2-text-xs); }
+.choiceDivider {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--uiv2-text-tertiary);
+  font-size: var(--uiv2-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.choiceDivider::before, .choiceDivider::after {
+  content: ""; flex: 1 1 auto; height: 1px; background: var(--uiv2-border);
+}
 
 .choiceGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 720px) { .choiceGrid { grid-template-columns: 1fr; } }
@@ -208,7 +254,7 @@
 .spin { animation: bkSpin 0.9s linear infinite; }
 @keyframes bkSpin { to { transform: rotate(360deg); } }
 
-.extractProgressTrack { width: 100%; height: 5px; border-radius: 3px; background: var(--uiv2-border); overflow: hidden; }
+.extractProgressTrack { position: relative; width: 100%; height: 5px; border-radius: 3px; background: var(--uiv2-border); overflow: hidden; }
 .extractProgressFill { height: 100%; background: var(--uiv2-accent-solid); transition: width 0.25s var(--uiv2-ease); }
 .extractPct { font-family: var(--uiv2-font-mono); font-size: 11px; color: var(--uiv2-text-tertiary); align-self: flex-end; }
 .extractEta { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); text-align: center; }
@@ -546,3 +592,243 @@
 .assetEditForm { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .assetEditActions { display: flex; gap: 8px; margin-top: 4px; }
 .uploadErrorText { font-size: var(--uiv2-text-xs); color: var(--uiv2-danger); margin-top: 8px; }
+
+/* ===================== Provenance + Design tab =====================
+   Added with the site-harvest work (2026-09-01).
+
+   The Measured chip exists to make a MEASURED value visibly different from an
+   INFERRED one. Before this, a hex parsed out of the client's own stylesheet
+   and a hex a language model imagined from marketing copy rendered
+   identically — and the "AI inferred, please verify" flag they shared had
+   never once appeared, because all three components compared a numeric
+   confidence to the string 'low'. See src/utils/brandProvenance.js.
+
+   Success (not accent) for Measured: the accent is the product's own brand
+   colour and is used for interactive affordances; a provenance chip is state,
+   not an action. */
+
+.provenanceChipMeasured,
+.measuredFlag,
+.measuredBadge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--uiv2-success);
+  border: 1px solid color-mix(in srgb, var(--uiv2-success) 35%, transparent);
+  background: color-mix(in srgb, var(--uiv2-success) 12%, transparent);
+  padding: 1px 6px; border-radius: var(--uiv2-radius-pill);
+  white-space: nowrap;
+}
+.provenanceChipMeasured { margin-left: 8px; }
+.measuredFlag { margin-left: 6px; }
+.measuredBadge { margin-left: 6px; }
+
+.provenanceChipInferred {
+  display: inline-flex; align-items: center;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--uiv2-text-tertiary);
+  border: 1px solid var(--uiv2-border);
+  padding: 1px 6px; border-radius: var(--uiv2-radius-pill);
+  margin-left: 8px; white-space: nowrap;
+}
+
+/* --- Colour roles ---
+   One column on a phone: a role card carries a swatch, a hex field and a
+   contrast reading, and squeezing two across a 360px viewport makes the hex
+   field too narrow to read a 7-character value. */
+.roleGrid {
+  display: grid; gap: 10px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .roleGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1100px) {
+  .roleGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.roleCard {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  padding: 10px;
+  min-width: 0;
+}
+.roleSwatch {
+  flex: none; width: 34px; height: 34px;
+  border-radius: var(--uiv2-radius-sm);
+  border: 1px solid var(--uiv2-border);
+}
+/* An unset role reads as unset rather than as black — a filled swatch for a
+   value nobody chose is the same lie as a fabricated palette. */
+.roleSwatch[data-empty='true'] {
+  background:
+    repeating-linear-gradient(45deg,
+      var(--uiv2-bg-surface) 0 5px,
+      var(--uiv2-bg-canvas) 5px 10px);
+}
+.roleBody { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.roleName {
+  display: flex; align-items: center; flex-wrap: wrap;
+  font-size: var(--uiv2-text-sm); font-weight: 600; color: var(--uiv2-text-primary);
+}
+.roleDescription { font-size: 11px; color: var(--uiv2-text-tertiary); line-height: 1.35; }
+.roleInputs { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.roleColorInput {
+  flex: none; width: 30px; height: 30px; padding: 0;
+  background: none; border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm); cursor: pointer;
+}
+.roleHexInput {
+  flex: 1; min-width: 0;
+  background: var(--uiv2-bg-canvas); border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-sm); padding: 5px 7px;
+  color: var(--uiv2-text-primary); font-family: var(--uiv2-font-mono, ui-monospace, monospace);
+  font-size: 12px; outline: none;
+}
+.roleHexInput:focus-visible, .roleColorInput:focus-visible {
+  border-color: var(--uiv2-accent-border);
+  box-shadow: 0 0 0 2px var(--uiv2-accent-wash);
+}
+
+.contrastPass { font-size: 10.5px; color: var(--uiv2-success); font-variant-numeric: tabular-nums; }
+.contrastFail  { font-size: 10.5px; color: var(--uiv2-danger, var(--uiv2-warning)); font-variant-numeric: tabular-nums; }
+
+/* --- Generic design field groups --- */
+.designGrid {
+  display: grid; gap: 10px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .designGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1100px) {
+  .designGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.designField { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.designFieldLabel {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+  color: var(--uiv2-text-tertiary); text-transform: capitalize;
+}
+.designStack { display: flex; flex-direction: column; gap: 12px; }
+
+.checkboxRow {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); cursor: pointer;
+}
+/* 16px is the minimum comfortable touch target for a checkbox at this density;
+   the browser default renders ~13px, which is a miss on a phone. */
+.checkboxRow input[type='checkbox'] { width: 16px; height: 16px; flex: none; accent-color: var(--uiv2-accent-solid); }
+
+
+/* ── Kit deletion ──────────────────────────────────────────────────────────
+   Deleting a brand kit is irreversible and takes its uploaded logos and
+   documents with it, so the trigger is quiet and the confirmation is explicit
+   about what goes. The trigger sits last in the row and stays visually subdued
+   until interacted with, so a thumb reaching for "Make active" never lands on
+   it by accident. */
+.kitSwitcherDelete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px; /* touch target, even though the glyph is 12px */
+  margin-left: auto;
+  border-radius: var(--uiv2-radius-sm);
+  color: var(--uiv2-text-tertiary);
+  cursor: pointer;
+  flex: none;
+}
+.kitSwitcherDelete:hover,
+.kitSwitcherDelete:focus-visible {
+  color: var(--uiv2-danger);
+  background: var(--uiv2-danger-wash);
+  outline: none;
+}
+
+.deleteOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--uiv2-scrim);
+}
+.deleteModal {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-xl);
+  background: var(--uiv2-bg-surface);
+  box-shadow: var(--uiv2-shadow-modal-current);
+}
+.deleteIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-danger-wash);
+  color: var(--uiv2-danger);
+}
+/* Explicit colour: App.css sets h1-h5 from the OLD token system, which is
+   near-black and would vanish on this surface in dark theme. */
+.deleteTitle {
+  margin: 0;
+  color: var(--uiv2-text-primary);
+  font-family: var(--uiv2-font-display);
+  font-weight: 600;
+  font-size: var(--uiv2-text-lg);
+  letter-spacing: -0.01em;
+}
+.deleteBody { margin: 0; color: var(--uiv2-text-secondary); font-size: var(--uiv2-text-sm); }
+.deleteActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.deleteConfirmBtn {
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid var(--uiv2-danger);
+  border-radius: var(--uiv2-radius-sm);
+  background: var(--uiv2-danger);
+  color: var(--uiv2-bg-surface);
+  font-family: inherit;
+  font-size: var(--uiv2-text-sm);
+  font-weight: var(--uiv2-weight-semibold);
+  cursor: pointer;
+}
+.deleteConfirmBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+@media (max-width: 480px) {
+  .deleteActions { flex-direction: column-reverse; }
+  .deleteActions > * { width: 100%; }
+}
+
+
+/* Indeterminate progress. Replaces a determinate bar whose percentage was
+   driven by setTimeout and then sat frozen for the real duration of the work —
+   which reads as a hang, and was reported as one. Motion here means "still
+   running" and nothing more, which is all the client actually knows. */
+.extractProgressIndeterminate {
+  position: absolute;
+  inset-block: 0;
+  inline-size: 38%;
+  border-radius: inherit;
+  background: var(--uiv2-accent-solid);
+  animation: extractSlide 1.35s var(--uiv2-ease) infinite;
+}
+@keyframes extractSlide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .extractProgressIndeterminate {
+    animation: none;
+    inline-size: 100%;
+    opacity: 0.45;
+  }
+}
