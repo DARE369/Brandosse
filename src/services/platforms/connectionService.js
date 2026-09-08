@@ -548,7 +548,7 @@ export async function getAccountHealth(accountId) {
  * publishing then fails, which is the "connected but can't publish" defect
  * this codebase has already shipped once.
  */
-const DIRECT_OAUTH_PLATFORMS = new Set(['linkedin']);
+const DIRECT_OAUTH_PLATFORMS = new Set(['linkedin', 'tiktok']);
 
 export async function initiateOAuthConnection({
   platform,

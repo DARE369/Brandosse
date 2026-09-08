@@ -177,7 +177,44 @@ async function discoverLinkedIn(accessToken) {
   }];
 }
 
-const DISCOVERY = { linkedin: discoverLinkedIn };
+/**
+ * TikTok: exactly one postable account per authorization — the creator
+ * themself. No sub-account picker, and none possible.
+ *
+ * The open_id is the stable per-app identifier. It is deliberately NOT the
+ * username: TikTok usernames are changeable, so keying on one would orphan the
+ * connection the first time a user renames themself.
+ */
+async function discoverTikTok(accessToken) {
+  const res = await fetchWithTimeout(
+    'https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name',
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+
+  const body = await res.json().catch(() => null);
+
+  // TikTok returns HTTP 200 for real failures, with the code in the body —
+  // checking res.ok alone would treat a scope refusal as a healthy response.
+  const code = body?.error?.code;
+  if (!res.ok || (code && code !== 'ok')) {
+    if (code === 'scope_not_authorized' || res.status === 401) throw new Error('missing_scopes');
+    throw new Error(`discovery_failed:${code || `http_${res.status}`}`);
+  }
+
+  const u = body?.data?.user || {};
+  if (!u.open_id) throw new Error('discovery_failed:no_open_id');
+
+  return [{
+    accountId: u.open_id,
+    authorUrn: null,          // TikTok addresses the creator by token, not URN
+    username: u.display_name || u.open_id,
+    displayName: u.display_name || 'TikTok account',
+    avatarUrl: u.avatar_url || null,
+    profileType: 'Creator',
+  }];
+}
+
+const DISCOVERY = { linkedin: discoverLinkedIn, tiktok: discoverTikTok };
 
 // ── Persistence ──────────────────────────────────────────────────────────────
 

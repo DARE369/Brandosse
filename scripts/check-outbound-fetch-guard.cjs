@@ -54,6 +54,19 @@ const REVIEWED = [
     reason: 'Built from the ZERNIO_BASE constant with every interpolated value passed through encodeURIComponent, so the host cannot be changed by input.',
   },
   {
+    file: '_shared/tiktok.service.ts',
+    match: /^url$/,
+    reason:
+      'fetchWithTimeout() receives only two kinds of URL, neither caller-supplied: '
+      + '(a) the module-level INIT_URL / STATUS_URL constants, both built from the '
+      + 'literal API base https://open.tiktokapis.com/v2; and (b) `uploadUrl`, read '
+      + 'from TikTok\'s OWN publish/video/init response — a single-use, one-hour URL '
+      + 'minted by the API we just authenticated to, not by our caller. '
+      + 'The one caller-influenced URL here is `mediaUrl` (generations.output_url), '
+      + 'and it goes through safeFetch() with a video/* content-type assertion, NOT '
+      + 'through fetchWithTimeout.',
+  },
+  {
     file: '_shared/linkedin.service.ts',
     match: /^url$/,
     reason:
