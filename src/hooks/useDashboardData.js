@@ -147,9 +147,16 @@ const ACCOUNT_STATUS_MAP = {
  * consumer inherits them rather than re-deriving and re-breaking this.
  */
 const PUBLISH_BLOCK_LABELS = {
-  provider_removed: "Reconnect required",
+  provider_removed: "Reconnect required",     // legacy value, kept for old rows
   provider_missing: "Reconnect required",
-  provider_unsupported: "Unsupported provider",
+  provider_unknown: "Reconnect required",
+  provider_unsupported: "Not yet supported",
+  // Added with the capability registry (20260904140000). Capability is now
+  // evidence-based: a direct-OAuth account must actually hold a live
+  // credential, so "we lost the sign-in" and "the sign-in expired" are
+  // distinct states with distinct fixes — and neither is the provider's fault.
+  credential_missing: "Reconnect required",
+  credential_expired: "Sign-in expired",
 };
 
 // Below this, the account is failing often enough that "Healthy" is a lie.

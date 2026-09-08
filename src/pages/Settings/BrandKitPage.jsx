@@ -124,6 +124,17 @@ function BrandKitBody() {
       setScreen('review');
       return;
     }
+    // Website import, reachable from the setup screen as well as the zero-kits
+    // landing screen. Same destination as handleEmptyImport: the extractor runs
+    // against the live site and the user reviews what it measured.
+    if (path === 'website' && payload) {
+      clearExtractedDraft();
+      setExtractMode('setup');
+      setUploadedFile(null);
+      setImportUrl(String(payload).trim());
+      setScreen('extracting');
+      return;
+    }
     if (path === 'import' && payload) {
       setExtractedDraft(payload, {}, []);
       setReviewMode('manual');
@@ -320,6 +331,7 @@ function BrandKitBody() {
               existingKit={diffData.existingKit}
               newKit={diffData.newKit}
               newConfidenceMap={diffData.newConfidenceMap}
+              newExtractionEvidence={diffData.newExtractionEvidence}
               onApply={async (merged) => { await applyDiff(merged, user.id); }}
               onCancel={closeDiffModal}
             />

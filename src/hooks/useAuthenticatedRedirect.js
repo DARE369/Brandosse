@@ -7,11 +7,18 @@
 // user who is in fact signed in. Whichever page forgets to handle that strands
 // them — which is exactly how "/login showed a form to someone holding a valid
 // session" happened.
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useAuth, hasStoredAuthSession } from '../Context/AuthContext';
 import { useAppNavigation } from '../Context/AppNavigationContext';
 import { APP_ROOT_PATH } from '../utils/authRouting';
 import { getPendingSignupIntent, SIGNUP_COMPLETION_PATH } from '../services/signupIntentService';
+
+/** No-op: hydration happens once, and the auth context owns every later change. */
+const subscribeToStoredSession = () => () => {};
+
+/** Stable primitives — useSyncExternalStore re-renders forever otherwise. */
+const getHydratedClientSnapshot = () => true;
+const getHydratedServerSnapshot = () => false;
 
 /**
  * @param {object}  options
@@ -28,10 +35,45 @@ export default function useAuthenticatedRedirect(options = {}) {
   const { navigate, location } = useAppNavigation();
   const navigatedRef = useRef(false);
 
-  // Checked once, on first render: localStorage is synchronous, so this is
-  // known before the async restore finishes and lets the caller avoid a flash
-  // of public content for someone who is about to be redirected.
-  const likelySignedIn = useMemo(() => hasStoredAuthSession(), []);
+  // ── Why nothing may switch trees until after hydration ────────────────────
+  //
+  // This hook decides whether the caller renders its page or a redirect
+  // overlay. That decision must be IDENTICAL on the server and in the client's
+  // hydrating render, or React throws
+  // "Hydration failed because the server rendered HTML didn't match the client"
+  // and discards the server tree.
+  //
+  // Two separate things made it differ, and fixing only the first left the bug
+  // intermittent:
+  //
+  //   1. `likelySignedIn` was `useMemo(() => hasStoredAuthSession(), [])`,
+  //      which reads localStorage DURING RENDER. The server has none, so the
+  //      server said "not signed in" and the client said "signed in".
+  //
+  //   2. `user` arrives from an async session restore. When that resolves
+  //      quickly — a warm cache — it can be set BEFORE hydration finishes, so
+  //      the client renders the overlay while the server's HTML is the page.
+  //      Nothing about (1) prevents this, which is why the error came back
+  //      after (1) was fixed and looked random: it is a race with the network.
+  //
+  // So the gate is hydration itself. `hydrated` is false on the server and in
+  // the hydrating render, and true immediately after — the sanctioned use of
+  // useSyncExternalStore. Until it flips, this hook always reports "not
+  // redirecting", which is exactly what the server rendered.
+  //
+  // The cost is one frame of public content for a returning user. The previous
+  // code traded that away for a hydration mismatch, which forces React to
+  // re-render the entire tree on the client anyway — so it paid the flash AND
+  // an error AND the doubled work.
+  const hydrated = useSyncExternalStore(
+    subscribeToStoredSession,
+    getHydratedClientSnapshot,
+    getHydratedServerSnapshot,
+  );
+
+  // Safe to read storage directly now: this is only ever true on the client,
+  // after hydration has committed.
+  const likelySignedIn = hydrated && hasStoredAuthSession();
 
   useEffect(() => {
     if (!enabled || loading || !user || navigatedRef.current) return;
@@ -58,6 +100,6 @@ export default function useAuthenticatedRedirect(options = {}) {
     // Cover both the resolved case (user known) and the pre-resolution case
     // (a token exists, auth still loading) so the overlay shows from the very
     // first paint rather than appearing after a flash of the public page.
-    redirecting: enabled && (Boolean(user) || (likelySignedIn && loading)),
+    redirecting: enabled && hydrated && (Boolean(user) || (likelySignedIn && loading)),
   };
 }

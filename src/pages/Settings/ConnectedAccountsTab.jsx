@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link2 } from 'lucide-react';
 import { useAuth } from '../../Context/AuthContext';
+import useSocialConnectResult from '../../hooks/useSocialConnectResult';
 import { useAppNavigation } from '../../Context/AppNavigationContext';
 import { getAllPlatforms } from '../../services/platforms/platformRegistry';
 import {
@@ -51,6 +52,12 @@ export default function ConnectedAccountsTab({ onToast }) {
   useEffect(() => {
     void loadData();
   }, [user?.id]);
+
+  // Renders ?connected= / ?social_error= from the OAuth callback redirect.
+  useSocialConnectResult((result) => {
+    onToast?.(result.message, result.ok ? 'success' : 'error');
+    if (result.ok) void loadData();
+  });
 
   const handleReconnect = async (account) => {
     try {

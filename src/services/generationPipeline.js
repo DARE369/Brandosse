@@ -15,6 +15,7 @@ import { runQualityGate }          from './qualityGate';
 import { loadBrandKit }            from './brandKitLoader';
 import { loadUserHistory }         from './historyLoader';
 import { triggerQualityGate }      from './media.service';
+import { buildComposePayload }     from './designCopy';
 
 let _generateImage = null;
 export function registerImageGenerator(fn) { _generateImage = fn; }
@@ -55,7 +56,22 @@ function normalizeGeneratedAsset(result) {
       ...(result.seed != null ? { seed: result.seed } : {}),
       ...(result.imageModel ? { image_model: result.imageModel } : {}),
       ...(result.promptUsed ? { enhanced_prompt: result.promptUsed } : {}),
+      // Typography outcome. Recorded on the row so a graphic that came back
+      // without its words can be explained after the fact rather than being a
+      // mystery — the edge function writes these too, but this client-side
+      // merge lands on top and would otherwise erase them.
+      ...(result.composeRequested ? { compose_requested: true } : {}),
+      ...(result.composeRequested ? { compose_applied: Boolean(result.composeApplied) } : {}),
+      ...(result.composeTemplate ? { compose_template: result.composeTemplate } : {}),
+      ...(result.composeError ? { compose_error: result.composeError } : {}),
+      ...(result.composeNotes?.length ? { compose_notes: result.composeNotes } : {}),
+      ...(result.composeFonts ? { compose_fonts: result.composeFonts } : {}),
+      ...(result.composeContrast?.length ? { compose_contrast: result.composeContrast } : {}),
+      ...(result.composeRendered?.length ? { compose_rendered: result.composeRendered } : {}),
+      ...(result.composeRecoloured?.length ? { compose_recoloured: result.composeRecoloured } : {}),
     },
+    // Not metadata — the caller uses this to vary the next slide's layout.
+    composeTemplate: result.composeTemplate || null,
   };
 }
 
@@ -392,10 +408,18 @@ async function runSingleGeneration(
   if (genErr) throw new Error(`[Pipeline] Failed to insert generation: ${genErr.message}`);
 
   try {
+    // Typography. Built from the plan's own headline; null when there is none,
+    // in which case generateImage keeps its original behaviour entirely.
+    const composePayload = buildComposePayload(
+      plan.visual_prompt?.slides?.[0],
+      plan,
+    );
+
     const generated = normalizeGeneratedAsset(
       await generateImage(prompt, aspectRatio, {
         requestId, requestSlot, signal: cancelSignal, generationId: generation.id,
         imageModel: resolvedImageModel, referenceImages: resolvedReferenceImages,
+        ...(composePayload ? { compose: composePayload } : {}),
       }),
     );
     if (!generated.url) throw new Error('[Pipeline] Image provider returned no image URL.');
@@ -475,6 +499,8 @@ async function runCarouselOrchestration(
 
   // Generate one at a time — sequential
   const outcomes = [];
+  // Layouts already used in THIS carousel, so slide 3 does not repeat slide 1.
+  const usedTemplateIds = [];
   for (const row of sortedRows) {
     const idx        = row.batch_index ?? 0;
     const fullPrompt = plan.visual_prompt?.slides?.[idx]?.full_prompt ?? slides[idx]?.image_prompt ?? '';
@@ -493,12 +519,18 @@ async function runCarouselOrchestration(
     onProgress(`Generating slide ${idx + 1} of ${slides.length}...`);
 
     try {
+      // Each slide is told which layouts the previous ones used, so a carousel
+      // does not render five identical compositions.
+      const composePayload = buildComposePayload(slides[idx], plan, usedTemplateIds);
+
       const generated = normalizeGeneratedAsset(
         await generateImage(fullPrompt, aspectRatio, {
           requestId, requestSlot: idx, signal: cancelSignal, generationId: row.id,
           imageModel: resolvedImageModel, referenceImages: resolvedReferenceImages,
+          ...(composePayload ? { compose: composePayload } : {}),
         }),
       );
+      if (generated.composeTemplate) usedTemplateIds.push(generated.composeTemplate);
       if (!generated.url) throw new Error('[Pipeline] Image provider returned no image URL.');
       await supabase.from('generations').update({
         status:       GENERATION_STATUS.COMPLETED,

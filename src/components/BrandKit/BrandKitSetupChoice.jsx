@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
-import { FileJson, FileText, MessageSquare, PenLine, Sparkles } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { FileJson, FileText, Globe, MessageSquare, PenLine, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useBrandKitStore from '../../stores/BrandKitStore';
+import { Button } from '../../ui-v2';
 import styles from './BrandKit.module.css';
 
 const ACCEPTED_DOC_MIME = [
@@ -22,14 +23,29 @@ function validateDoc(file) {
 }
 
 /**
- * Mockup's "Set up your brand kit" screen — 4 EQUAL first-class options in a
- * 2x2 grid (Upload / Guided / Manual / Import a kit file). Per
- * AS_IS_AUDIT.md §1.2, the old build had JSON-import as a small footer link
- * — promoted here to a 4th equal card per the task brief.
+ * "Set up your brand kit" — website import, then 4 options in a 2x2 grid
+ * (Upload / Guided / Manual / Import a kit file).
+ *
+ * ── Why the website row exists ──────────────────────────────────────────────
+ * It was missing entirely. The URL import lived ONLY on the zero-kits landing
+ * screen (BrandKitPage's `kits.length === 0` branch), which a user sees once and
+ * never again. Every later route into setup — "Start from scratch", "New brand
+ * kit", or simply already having one kit — lands here, where the single best
+ * extraction path was not offered at all.
+ *
+ * Best, specifically: the website path MEASURES the brand — real hex codes out
+ * of the site's own CSS, the actual typefaces, contact details and social
+ * handles from its structured data. Every other path infers from prose. That is
+ * why "Recommended" moved here from the document card.
+ *
+ * Laid out as input-then-"or"-then-grid to match the landing screen exactly, so
+ * it reads as the same mechanism rather than a new one.
  */
 export default function BrandKitSetupChoice({ onSelectPath }) {
   const fileRef = useRef(null);
   const importRef = useRef(null);
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [websiteError, setWebsiteError] = useState('');
   const setSetupPath = useBrandKitStore((state) => state.setSetupPath);
   const startDocumentExtraction = useBrandKitStore((state) => state.startDocumentExtraction);
 
@@ -46,6 +62,17 @@ export default function BrandKitSetupChoice({ onSelectPath }) {
     setSetupPath('upload');
     await startDocumentExtraction();
     onSelectPath('upload', file);
+  };
+
+  const handleWebsiteImport = () => {
+    const url = websiteUrl.trim();
+    if (!url) {
+      setWebsiteError('Enter a website address first.');
+      return;
+    }
+    setWebsiteError('');
+    setSetupPath('website');
+    onSelectPath('website', url);
   };
 
   const handleImportChange = async (event) => {
@@ -75,12 +102,35 @@ export default function BrandKitSetupChoice({ onSelectPath }) {
         </p>
       </div>
 
+      <div className={styles.choiceUrlBlock}>
+        <div className={styles.choiceUrlRow}>
+          <input
+            className={styles.choiceUrlInput}
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            placeholder="yourbrand.com"
+            aria-label="Your website address"
+            value={websiteUrl}
+            onChange={(event) => { setWebsiteUrl(event.target.value); if (websiteError) setWebsiteError(''); }}
+            onKeyDown={(event) => { if (event.key === 'Enter') handleWebsiteImport(); }}
+          />
+          <Button onClick={handleWebsiteImport}>Import</Button>
+        </div>
+        <p className={styles.choiceUrlNote}>
+          <Globe size={13} aria-hidden="true" />
+          We read your site&apos;s own colours and fonts — measured, not guessed. ~30s, editable after.
+        </p>
+        {websiteError && <p className={styles.choiceUrlError} role="alert">{websiteError}</p>}
+      </div>
+
+      <div className={styles.choiceDivider}>or</div>
+
       <div className={styles.choiceGrid}>
         <button className={styles.choiceCard} type="button" onClick={() => fileRef.current?.click()}>
           <span className={styles.choiceCardIcon}><FileText size={18} /></span>
           <span className={styles.choiceCardTitleRow}>
             <span className={styles.choiceCardTitle}>Upload a document</span>
-            <span className={styles.choiceCardBadge}>Recommended</span>
           </span>
           <p className={styles.choiceCardDesc}>
             Upload your brand guidelines or media kit and let AI extract your Brand Kit.

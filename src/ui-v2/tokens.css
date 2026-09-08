@@ -65,7 +65,11 @@
   --uiv2-accent-solid: #FF5C38;
   --uiv2-accent-solid-hover: color-mix(in srgb, #FF5C38 92%, white);
   --uiv2-accent-on-solid-dark: #17181B; /* text placed on accent-solid in dark theme */
-  --uiv2-accent-on-solid-light: #FFFFFF; /* text placed on accent-solid in light theme */
+  /* Was #FFFFFF on #FF5C38 — 3.07:1, a failing label on the PRIMARY button.
+     The dark theme already places #17181B on the same accent and reaches
+     5.78:1, so this is the treatment the system had already chosen; light
+     theme was simply inconsistent with it. */
+  --uiv2-accent-on-solid-light: #17181B; /* text placed on accent-solid in light theme */
 
   /* ---- Status (dark / light pairs, resolved per theme below) ---- */
   --uiv2-success-d: #30A46C; --uiv2-success-l: #1F8F5D;
@@ -94,7 +98,10 @@
 
   --uiv2-text-primary: #F5F5F4;
   --uiv2-text-secondary: #8B8D93;
-  --uiv2-text-tertiary: #5A5C61;
+  /* Was #5A5C61 — 2.65:1 on the dark surface. Same reasoning as the light
+     theme above; lightened until it clears AA against all three grounds —
+     canvas, surface AND elevated (5.32 / 4.93 / 4.53). */
+  --uiv2-text-tertiary: #85878A;
 
   --uiv2-accent-text: #FF5C38;
   --uiv2-accent-wash: rgba(255, 92, 56, 0.1);
@@ -136,10 +143,26 @@
   --uiv2-border-hover: #C9C6BC;
 
   --uiv2-text-primary: #17181B;
-  --uiv2-text-secondary: #6E7075;
-  --uiv2-text-tertiary: #9A9C9F;
+  /* Was #6E7075 — 4.46:1 on the elevated surface, a hair under AA. Darkened
+     to #5E6064 rather than to the bare minimum, so that tertiary can also clear
+     the floor and still read as a step below it: at the minimum both tokens
+     land within one hex point of each other and the hierarchy collapses. */
+  --uiv2-text-secondary: #5E6064;
+  /* Was #9A9C9F — 2.75:1 on white, failing WCAG AA. "Tertiary" is not an
+     exemption: 1.4.3 requires 4.5:1 for all normal text, and this app sets
+     tertiary at 11-12px. #727376 is the same neutral darkened to the minimum
+     that clears the floor against all three grounds (4.65 / 5.02 / 4.52). */
+  --uiv2-text-tertiary: #6E6F72;
 
-  --uiv2-accent-text: #E14E2F;
+  /* Was #E14E2F, which is 3.94:1 on white — below WCAG AA for normal text.
+     This token is used 62 times as a TEXT colour (calendar status labels,
+     empty-state links, active icon buttons), so every one of those failed AA
+     in light theme. #C13F16 is the same hue darkened to 5.26:1 on #FFFFFF and
+     4.87:1 on the #F7F6F2 page. Found 2026-09-02 while contrast-checking a
+     mockup, which had independently corrected it.
+     The dark-theme value is fine (5.95:1 on the card surface) and is unchanged;
+     accent-SOLID is also unchanged, since text on it uses accent-on-solid. */
+  --uiv2-accent-text: #C13F16;
   --uiv2-accent-wash: rgba(255, 92, 56, 0.08);
   --uiv2-accent-wash-strong: rgba(255, 92, 56, 0.08);
   --uiv2-accent-border: rgba(255, 92, 56, 0.3);
