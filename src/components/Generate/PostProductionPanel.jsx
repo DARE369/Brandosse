@@ -1,5 +1,5 @@
 // src/components/Generate/PostProductionPanel.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X, Wand2, Hash, Calendar, Instagram, Linkedin, Youtube,
   CheckCircle2, Send, TrendingUp, AlertTriangle, Wifi, RefreshCw, ShieldCheck, GitBranch,
@@ -16,6 +16,7 @@ import {
   submitPostToPipeline,
 } from '../../org/services/pipelineService';
 import { POST_STATUS } from '../../constants/statuses';
+import TikTokOptionsPanel from '../Publishing/TikTokOptionsPanel';
 const FALLBACK_VIDEO_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
 function resolveVideoSource(url) {
@@ -268,6 +269,40 @@ export default function PostProductionPanel({
   }, []);
 
   const charLimit = getCharLimit(postProduction.selectedPlatforms, accounts);
+
+  /**
+   * TikTok Direct Post settings, keyed by connected-account id.
+   *
+   * Per account rather than per post: privacy_level_options and the
+   * interaction locks come from creator_info, which is specific to the
+   * creator. Two connected TikTok accounts can legitimately offer different
+   * privacy levels, so one shared settings object would apply one account's
+   * rules to the other and be rejected at publish.
+   */
+  const [tiktokSettings, setTikTokSettings] = useState({});
+  const [tiktokValidity, setTikTokValidity] = useState({});
+
+  const selectedTikTokAccounts = useMemo(
+    () => postProduction.selectedPlatforms
+      .map((id) => accounts.find((a) => a.id === id))
+      .filter((a) => a && String(a.platform).toLowerCase() === 'tiktok' && !a.is_mock),
+    [postProduction.selectedPlatforms, accounts],
+  );
+
+  // Every selected TikTok account must have valid settings. Missing entries
+  // count as invalid: an account whose panel has not finished loading has not
+  // had a privacy level chosen, and TikTok requires an active choice.
+  const tiktokReady = selectedTikTokAccounts.every((a) => tiktokValidity[a.id] === true);
+
+  // Hand the settings to the shared post-production state so the publish path
+  // can persist them onto the right post rows. They cannot be derived later:
+  // privacy level is a choice the user made here, and nothing else records it.
+  useEffect(() => {
+    updatePostProduction({ tiktokSettings });
+    // updatePostProduction is a store action with a stable identity; including
+    // it would re-run this on every store write.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tiktokSettings]);
   const charCount = postProduction.caption.length;
   const isOverLimit = charCount > charLimit;
   const selectedPlatformNames = postProduction.selectedPlatforms
@@ -1170,6 +1205,41 @@ export default function PostProductionPanel({
                         )}
                       </div>
 
+                      {/*
+                        TikTok Direct Post options.
+
+                        Rendered per selected TikTok account, because privacy
+                        options and interaction settings are PER CREATOR — two
+                        TikTok accounts can offer different privacy levels, so
+                        one shared panel would apply one account's rules to
+                        another.
+
+                        Publishing is blocked until each is valid. The adapter
+                        also refuses server-side if settings are missing, but
+                        failing here means the user finds out while they can
+                        still fix it, rather than after the upload.
+                      */}
+                      {selectedTikTokAccounts.map((acc) => (
+                        <div key={`tt-${acc.id}`} className="tiktok-options-block">
+                          <div className="field-label-row">
+                            <label className="field-label">
+                              TikTok options — {acc.account_name || acc.display_name}
+                            </label>
+                          </div>
+                          <TikTokOptionsPanel
+                            accountId={acc.id}
+                            mediaType={postProduction.mediaType === 'image' ? 'photo' : 'video'}
+                            mediaDurationSec={postProduction.mediaDurationSec ?? null}
+                            onChange={(settings) => setTikTokSettings((prev) => (
+                              { ...prev, [acc.id]: settings }
+                            ))}
+                            onValidityChange={(ok) => setTikTokValidity((prev) => (
+                              prev[acc.id] === ok ? prev : { ...prev, [acc.id]: ok }
+                            ))}
+                          />
+                        </div>
+                      ))}
+
                       {/* Schedule */}
                       <div>
                         <div className="field-label-row field-label-row-spaced">
@@ -1403,7 +1473,12 @@ export default function PostProductionPanel({
                         loading ||
                         isPublishInFlight ||
                         postProduction.selectedPlatforms.length === 0 ||
-                        isOverLimit
+                        isOverLimit ||
+                        // TikTok requires an actively-chosen privacy level.
+                        // Blocking here means the user sees it while they can
+                        // still act; the adapter refuses server-side too, but
+                        // that would be after the upload.
+                        !tiktokReady
                       }
                       aria-label={
                         postProduction.scheduleDate ? 'Schedule post' : 'Publish now'
