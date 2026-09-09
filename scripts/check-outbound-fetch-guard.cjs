@@ -54,6 +54,31 @@ const REVIEWED = [
     reason: 'Built from the ZERNIO_BASE constant with every interpolated value passed through encodeURIComponent, so the host cannot be changed by input.',
   },
   {
+    file: 'refresh-social-tokens/index.ts',
+    match: /^url$/,
+    reason:
+      'fetchWithTimeout() is called from exactly one place — refreshWithProvider() — '
+      + 'and its url argument is always config.tokenUrl, read from the module-level '
+      + 'PROVIDERS table whose every entry is a literal https URL. Nothing here is '
+      + 'caller-supplied: the worker takes no request body, is reachable only with the '
+      + 'service-role bearer (requireServiceRole), and its row data supplies encrypted '
+      + 'tokens, never a URL. scripts/check-oauth-provider-parity.cjs additionally '
+      + 'asserts that table still matches app/api/_lib/socialProviders.js.',
+  },
+  {
+    file: '_shared/tiktok.service.ts',
+    match: /^url$/,
+    reason:
+      'fetchWithTimeout() receives only two kinds of URL, neither caller-supplied: '
+      + '(a) the module-level INIT_URL / STATUS_URL constants, both built from the '
+      + 'literal API base https://open.tiktokapis.com/v2; and (b) `uploadUrl`, read '
+      + 'from TikTok\'s OWN publish/video/init response — a single-use, one-hour URL '
+      + 'minted by the API we just authenticated to, not by our caller. '
+      + 'The one caller-influenced URL here is `mediaUrl` (generations.output_url), '
+      + 'and it goes through safeFetch() with a video/* content-type assertion, NOT '
+      + 'through fetchWithTimeout.',
+  },
+  {
     file: '_shared/linkedin.service.ts',
     match: /^url$/,
     reason:

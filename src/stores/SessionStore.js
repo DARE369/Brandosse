@@ -69,6 +69,10 @@ const DEFAULT_POST_PRODUCTION = {
   seoStatus: 'idle',
   seoProvider: null,
   selectedPlatforms: [],
+  // TikTok Direct Post settings, keyed by connected-account id. Populated by
+  // TikTokOptionsPanel. Per account, not per post: privacy options come from
+  // creator_info and differ between creators.
+  tiktokSettings: {},
   scheduleDate: null,
   assetReferences: [],
   metadataStatus: 'idle',
@@ -4024,6 +4028,80 @@ const useSessionStore = create((set, get) => ({
         postProduction: { ...DEFAULT_POST_PRODUCTION },
       });
       window.history.replaceState(null, '', window.location.pathname);
+
+      /**
+       * Persist TikTok Direct Post settings onto the post rows that need them.
+       *
+       * Done as one pass here rather than at each insert site, because there
+       * are three of them (primary insert, secondary insert, secondary update)
+       * and a setting missed at any one would fail only at publish.
+       *
+       * These cannot be reconstructed later. privacy_level in particular is a
+       * choice the user actively made in the compose panel — TikTok's
+       * guidelines require it and forbid a default — so if it is not carried
+       * to the post row, the adapter correctly refuses to publish.
+       */
+      const tiktokSettings = postProduction.tiktokSettings || {};
+      const tiktokTargets = publishTargets.filter((t) => {
+        const account = selectedAccountMap.get(t.accountId);
+        return String(account?.platform || '').toLowerCase() === 'tiktok'
+          && !account?.is_mock
+          && tiktokSettings[t.accountId];
+      });
+
+      /**
+       * Read before write. workflow_state is a SHARED jsonb column — approval
+       * routing (approval_status, approval_route, approval_workflow_id) and
+       * publish accounting (publish.platform_post_url, publish.retry_count)
+       * live in it too. Writing a bare { tiktok } object replaces the column
+       * and silently destroys all of it, which is why this reads the current
+       * value and merges rather than assigning.
+       */
+      const tiktokPostIds = tiktokTargets.map((t) => t.postId);
+      const existingWorkflowStates = new Map();
+      if (tiktokPostIds.length > 0) {
+        const { data: existingRows, error: readErr } = await supabase
+          .from('posts')
+          .select('id, workflow_state')
+          .in('id', tiktokPostIds);
+        // Fail loudly: proceeding on an empty map would merge onto {} and
+        // clobber exactly the state this read exists to preserve.
+        if (readErr) throw readErr;
+        for (const row of existingRows || []) {
+          existingWorkflowStates.set(
+            row.id,
+            row.workflow_state && typeof row.workflow_state === 'object' ? row.workflow_state : {},
+          );
+        }
+      }
+
+      for (const target of tiktokTargets) {
+        const s = tiktokSettings[target.accountId];
+        const priorWorkflowState = existingWorkflowStates.get(target.postId) || {};
+        const { error: ttError } = await supabase
+          .from('posts')
+          .update({
+            workflow_state: {
+              ...priorWorkflowState,
+              tiktok: {
+                privacyLevel: s.privacyLevel,
+                disableComment: s.disableComment,
+                disableDuet: s.disableDuet,
+                disableStitch: s.disableStitch,
+                brandContentToggle: s.brandContentToggle,
+                brandOrganicToggle: s.brandOrganicToggle,
+                // Stamped so a support question about a post's visibility can
+                // be answered from the row rather than from memory.
+                capturedAt: new Date().toISOString(),
+              },
+            },
+          })
+          .eq('id', target.postId);
+        // Loud, not silent: without these the adapter refuses to publish, and
+        // a swallowed error here would surface much later as a confusing
+        // "no privacy level was chosen".
+        if (ttError) throw ttError;
+      }
 
       if (isImmediatePublish) {
         const { attempts, summary } = await executeMockPublishAttempts({

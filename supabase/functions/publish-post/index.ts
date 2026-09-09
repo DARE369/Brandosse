@@ -23,6 +23,7 @@ import { createHttpError, requireActiveOrgMember } from "../_shared/org.ts";
 import { runMockPublish } from "../_shared/mockPublish.ts";
 import { publishToZernio } from "../_shared/zernio.service.ts";
 import { publishToLinkedIn } from "../_shared/linkedin.service.ts";
+import { publishToTikTok } from "../_shared/tiktok.service.ts";
 
 type PublishRequest = {
   post_id: string;
@@ -169,7 +170,7 @@ serve(async (req) => {
       // credentials and could never publish) and is wrong now.
       const provider = String(account.provider || "").trim().toLowerCase();
 
-      if (provider === "linkedin") {
+      if (provider === "linkedin" || provider === "tiktok") {
         // Secrets live in their own table with no client grant (defect D1,
         // migration 20260904120000). Only service-role reaches it, which is
         // exactly the context this function runs in.
@@ -181,7 +182,24 @@ serve(async (req) => {
 
         if (secretErr) throw secretErr;
 
-        result = await publishToLinkedIn({ post, account, secret, mediaUrl });
+        if (provider === "linkedin") {
+          result = await publishToLinkedIn({ post, account, secret, mediaUrl });
+        } else {
+          // TikTok's per-post settings — privacy level, interaction toggles,
+          // commercial disclosure — are collected by TikTokOptionsPanel and
+          // stored on the post. They are NOT defaulted here: TikTok's
+          // guidelines require the user to choose the privacy level, and the
+          // adapter refuses to publish without one rather than invent a
+          // visibility the user never agreed to.
+          const workflow = (post.workflow_state && typeof post.workflow_state === "object")
+            ? post.workflow_state as Record<string, unknown>
+            : {};
+          const tiktokOptions = (workflow.tiktok && typeof workflow.tiktok === "object")
+            ? workflow.tiktok as Record<string, unknown>
+            : null;
+
+          result = await publishToTikTok({ post, account, secret, mediaUrl, options: tiktokOptions });
+        }
 
       } else if (provider === "" || provider === "zernio") {
         result = await publishToZernio({ post, account, mediaUrl });
