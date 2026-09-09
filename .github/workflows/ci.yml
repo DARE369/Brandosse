@@ -121,6 +121,9 @@ jobs:
       # caller-influenced fetch from shipping unvalidated.
       - name: check-outbound-fetch-guard
         run: node scripts/check-outbound-fetch-guard.cjs
+
+      - name: check-oauth-provider-parity
+        run: node scripts/check-oauth-provider-parity.cjs
       # The guard above proves every risky fetch ROUTES THROUGH safeFetch. This
       # one proves safeFetch actually refuses things: metadata endpoints, every
       # private range, and the decimal/octal/hex/IPv4-mapped/NAT64/6to4

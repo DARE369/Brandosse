@@ -107,11 +107,16 @@ function mapProviderError(err, desc) {
 // ── Token exchange ───────────────────────────────────────────────────────────
 
 async function exchangeCode(providerConfig, code, redirectUri) {
+  // clientIdParam, not a hardcoded `client_id`. TikTok names the credential
+  // `client_key` on the token endpoint as well as the authorize endpoint, and
+  // sending the wrong parameter name yields an opaque error that reads like a
+  // bad secret. connect/route.js already honours this; this side did not, so
+  // TikTok cleared the consent screen and then failed the exchange every time.
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
-    client_id: providerConfig.clientId(),
+    [providerConfig.clientIdParam || 'client_id']: providerConfig.clientId(),
     client_secret: providerConfig.clientSecret(),
   });
 

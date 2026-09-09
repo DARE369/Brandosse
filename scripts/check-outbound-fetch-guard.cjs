@@ -54,6 +54,18 @@ const REVIEWED = [
     reason: 'Built from the ZERNIO_BASE constant with every interpolated value passed through encodeURIComponent, so the host cannot be changed by input.',
   },
   {
+    file: 'refresh-social-tokens/index.ts',
+    match: /^url$/,
+    reason:
+      'fetchWithTimeout() is called from exactly one place — refreshWithProvider() — '
+      + 'and its url argument is always config.tokenUrl, read from the module-level '
+      + 'PROVIDERS table whose every entry is a literal https URL. Nothing here is '
+      + 'caller-supplied: the worker takes no request body, is reachable only with the '
+      + 'service-role bearer (requireServiceRole), and its row data supplies encrypted '
+      + 'tokens, never a URL. scripts/check-oauth-provider-parity.cjs additionally '
+      + 'asserts that table still matches app/api/_lib/socialProviders.js.',
+  },
+  {
     file: '_shared/tiktok.service.ts',
     match: /^url$/,
     reason:
