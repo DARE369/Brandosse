@@ -43,6 +43,7 @@ const NO_CHROME_ROUTES = {
   "app/app/settings/connect/page.jsx": "OAuth connect wizard: navigating away mid-flow strands a half-linked account",
   "app/app/design/page.jsx": "internal design reference, not a user-facing route",
   "app/app/video/new/page.jsx": "pure redirect to /app/video/jobs?new=1 — submitting is a sheet over the job list now, because every number the form needs (slots, hourly usage, balance) lives on the list behind it",
+  "app/app/dev/tiktok-panel/page.jsx": "internal design preview for the TikTok Direct Post panel, not a user-facing route",
 };
 
 /** Surfaces with their own separate shells, out of scope for the personal one. */
