@@ -1,5 +1,10 @@
 # Brandosse — Session Summary Report
 
+> **Historical** — a record of work completed on 2026-06-20, kept for provenance.
+> It names the Playwright harness scripts (`qa-screenshot.cjs`, `qa-reload-test.cjs`)
+> that existed at the time and have since been removed; the current harness is
+> `playwright.config.cjs` + `tests/e2e/`. Do not read this as current state.
+
 _Senior-dev led, multi-agent effort. Covers: design system, dashboard rebuild + performance, mobile fixes, the performance kill, the testing/agent apparatus, the full audit, and the road to deployment. Last updated 2026-06-20._
 
 ---

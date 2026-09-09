@@ -1,4 +1,9 @@
-# Performance Kill — Load-Time Overhaul (living doc)
+# Performance Kill — Load-Time Overhaul
+
+> **Historical** — a record of work completed on 2026-06-20, kept for provenance.
+> It names the Playwright harness scripts (`qa-screenshot.cjs`, `qa-reload-test.cjs`)
+> that existed at the time and have since been removed; the current harness is
+> `playwright.config.cjs` + `tests/e2e/`. Do not read this as current state.
 
 _The owner's #1 pain: every page took 5–15s to load. Goal: <2s perceived load, app-wide. No stack change — Next.js + Supabase + Vercel is correct; the lag was self-inflicted code. Started 2026-06-20._
 
