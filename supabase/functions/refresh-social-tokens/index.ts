@@ -177,6 +177,27 @@ async function refreshWithProvider(config: ProviderConfig, refreshToken: string)
 }
 
 /**
+ * Are OUR credentials for this provider present?
+ *
+ * readEnv throws when a required variable is missing, and that throw would
+ * otherwise land in the per-row catch below and be recorded as the ACCOUNT
+ * failing to refresh. Three runs of that — 90 minutes — and every TikTok
+ * account gets marked `expired`, telling people to reconnect a perfectly good
+ * connection because a server-side secret was never set.
+ *
+ * A missing secret is our misconfiguration, not the user's problem, and it must
+ * never spend an account's failure budget. Checked BEFORE the row is claimed so
+ * a misconfigured deploy leaves the queue exactly as it found it.
+ */
+function providerConfigured(config: ProviderConfig): boolean {
+  try {
+    return Boolean(config.clientId() && config.clientSecret());
+  } catch {
+    return false;
+  }
+}
+
+/**
  * A refresh token the provider has rejected outright will never work again, so
  * retrying it wastes runs and delays the reconnect prompt the user needs. These
  * are the OAuth 2.0 terminal codes plus TikTok's spelling of them.
@@ -197,6 +218,7 @@ serve(async (req) => {
     const nowIso = new Date().toISOString();
 
     const summary = { due: 0, claimed: 0, refreshed: 0, failed: 0, expired: 0, skipped: 0 };
+    const misconfigured = new Set<string>();
 
     // ── Pass 1: rows that can actually be refreshed ──────────────────────────
     const { data: dueRows, error: dueErr } = await admin
@@ -222,6 +244,13 @@ serve(async (req) => {
       // whose adapter has not landed yet. Left untouched so its row stays due
       // and it starts refreshing the moment support is added.
       if (!config) { summary.skipped += 1; continue; }
+
+      // Our own misconfiguration — skip without claiming or counting failures.
+      if (!providerConfigured(config)) {
+        misconfigured.add(provider);
+        summary.skipped += 1;
+        continue;
+      }
 
       if (!(await claimRow(admin, row.connected_account_id, nowIso))) {
         summary.skipped += 1;
@@ -331,7 +360,21 @@ serve(async (req) => {
       summary.expired += 1;
     }
 
-    return jsonResponse({ ok: true, ...summary });
+    // Loud, and in the response body: a run that refreshed nothing because a
+    // secret is unset must not look like a run that had nothing to do.
+    if (misconfigured.size > 0) {
+      console.error(
+        "[refresh-social-tokens] NOT CONFIGURED for: "
+        + `${[...misconfigured].join(", ")}. Set the client key/secret for these `
+        + "providers as Supabase secrets. Accounts were left untouched.",
+      );
+    }
+
+    return jsonResponse({
+      ok: misconfigured.size === 0,
+      ...summary,
+      misconfigured: [...misconfigured],
+    });
   } catch (error) {
     console.error("[refresh-social-tokens] run failed:", (error as Error).message);
     return jsonResponse(toErrorPayload(error), mapErrorToStatusCode(error));
