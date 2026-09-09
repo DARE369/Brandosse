@@ -89,9 +89,48 @@ type SecretRow = {
   connected_accounts: { provider: string | null; connection_status: string | null } | null;
 };
 
-function requireServiceRole(req: Request) {
-  const expected = `Bearer ${readEnv("SUPABASE_SERVICE_ROLE_KEY")}`;
-  if (req.headers.get("Authorization") !== expected) {
+/**
+ * Short, non-reversible fingerprint of a secret, for logs.
+ *
+ * Enough to answer "are these two values the same?" and nothing else. Never
+ * log the secret, and never log enough of it to narrow a guess.
+ */
+async function fingerprint(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest).slice(0, 4))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * The caller must present the service-role key this runtime was given.
+ *
+ * ── Why the mismatch case is logged ──────────────────────────────────────────
+ * This is an exact string comparison against the platform-injected
+ * SUPABASE_SERVICE_ROLE_KEY, while the pg_cron job authenticates with whatever
+ * value is stored in Vault under 'service_role_key'. If those two ever drift —
+ * a key rotation that updated one and not the other, say — every scheduled run
+ * gets a bare 401 and simply stops refreshing tokens. Nothing raises, nothing
+ * retries, and the first symptom is expired accounts weeks later.
+ *
+ * So a rejection logs the fingerprint of both sides. Same fingerprint means the
+ * problem is elsewhere; different fingerprints name the cause outright, without
+ * either secret appearing in the logs.
+ */
+async function requireServiceRole(req: Request) {
+  const serviceKey = readEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const presented = req.headers.get("Authorization") || "";
+
+  if (presented !== `Bearer ${serviceKey}`) {
+    const token = presented.replace(/^Bearer /, "");
+    console.error(
+      "[refresh-social-tokens] rejected an unauthorized call. "
+      + `expected key fp=${await fingerprint(serviceKey)}, `
+      + `presented fp=${token ? await fingerprint(token) : "<none>"}. `
+      + "Different fingerprints with a caller that should be authorised means the "
+      + "Vault secret 'service_role_key' has drifted from the runtime's "
+      + "SUPABASE_SERVICE_ROLE_KEY — re-create it with vault.create_secret().",
+    );
     throw new Error("Unauthorized");
   }
 }
@@ -212,7 +251,7 @@ serve(async (req) => {
 
   try {
     if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-    requireServiceRole(req);
+    await requireServiceRole(req);
 
     const admin = createAdminClient();
     const nowIso = new Date().toISOString();
