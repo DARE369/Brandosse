@@ -137,8 +137,19 @@ model alias.
 ### Create it
 
 1. developers.tiktok.com → **Manage apps** → create an app
-2. Add the **Content Posting API** product
-3. Request scopes: `user.info.basic`, `video.publish`
+2. Add the **Content Posting API** product (grants `video.publish`) **and the
+   Login Kit / Display API products** (grant `user.info.*` and `video.list`)
+3. Request scopes: `user.info.basic`, `user.info.profile`, `user.info.stats`,
+   `video.publish`, `video.list`
+
+   > **All five, on the first connect.** Scopes are fixed at consent, so a
+   > scope added later forces every connected user to disconnect and reconnect.
+   > `video.list` + `user.info.stats` are what analytics ingestion reads — they
+   > are the only per-video metrics TikTok exposes at all.
+   >
+   > If a product is not enabled on the app, authorize fails for the **whole
+   > request**, not just the missing scope. Enable the products before the
+   > first connect attempt or the failure will look like a bad client key.
 4. **Configure URL properties** — verify ownership of your ToS URL, Privacy
    Policy URL, and Web URL, by DNS TXT record or by serving a signature file.
    Required for any app created after 2024-09-09.
@@ -193,6 +204,22 @@ LINKEDIN_CLIENT_SECRET="..."
 the **Community Management API** — dev tier is self-serve at 5k calls/day but
 requires a registered legal organization.
 
+**Post analytics is deliberately NOT requested yet.** It needs
+`r_member_postAnalytics` from the **Member Post Analytics** product, which
+LinkedIn must approve on the app before it can appear in an authorize request.
+Two reasons it stays out until then, both from LinkedIn's own docs:
+
+- An unapproved scope returns `401 Invalid scope` and breaks connect for
+  **every** LinkedIn user, not just the analytics feature.
+- "If you request a different scope than the previously granted scope, all the
+  previous access tokens are invalidated." LinkedIn is the one platform here
+  with accounts already connected, so widening signs all of them out.
+
+It is recorded as `pendingScopes` in `app/api/_lib/socialProviders.js` and
+enforced by `scripts/check-oauth-scope-coverage.cjs`. Apply for the product,
+then move it into `scopes` in the same change that ships LinkedIn ingestion —
+knowing it costs every existing user one reconnect.
+
 ### Gotcha
 
 Access tokens are ~60 days and **LinkedIn does not issue refresh tokens on the
@@ -228,7 +255,17 @@ for a public endpoint, this is an OAuth client acting on a user's behalf.
 ### Scopes
 
 `https://www.googleapis.com/auth/youtube.upload`,
-`https://www.googleapis.com/auth/youtube.readonly`
+`https://www.googleapis.com/auth/youtube.readonly`,
+`https://www.googleapis.com/auth/yt-analytics.readonly`
+
+Enable **both** the *YouTube Data API v3* and the *YouTube Analytics API* on the
+Cloud project. Unlike LinkedIn, Google does not gate *requesting* a sensitive
+scope on prior approval — an unverified app just shows a warning and is capped
+at 100 test users — so all three go in from the first connect.
+
+`yt-analytics-monetary.readonly` is deliberately not requested: it carries
+revenue data the product has no feature for, and every scope is assessed
+individually at review.
 
 ### Gotchas — the worst of the four
 
@@ -236,8 +273,15 @@ for a public endpoint, this is an OAuth client acting on a user's behalf.
   the lock is not appealable.** Not by us, not by the user. The only remedy is
   re-uploading after approval, which loses the URL, the views and any shares.
   Test with throwaway content on a throwaway channel.
-- Default quota is **10,000 units/day** and one upload costs ~1,600 → **about
-  six uploads per day** before you are throttled.
+- Quota is **three separate buckets**, not one: 10,000 units/day for general
+  calls, **100 `videos.insert` calls/day**, and 100 `search.list` calls/day.
+  The often-repeated "1,600 units per upload, so ~6 uploads/day" figure is out
+  of date — uploads have their own counter now.
+  <https://developers.google.com/youtube/v3/determine_quota_cost>
+- **Quota is per Cloud project, shared across every user of the app** — 100
+  uploads/day is 100 across the whole product, not per user. This is the same
+  shape as the Zernio two-account ceiling in `CLAUDE.md`, and it binds at the
+  same moment: the first day more than a handful of real users publish.
 - Unverified apps show a full-page "Google hasn't verified this app" warning.
   Test users can click through; it looks alarming and will generate support
   questions.

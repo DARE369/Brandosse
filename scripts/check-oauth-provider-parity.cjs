@@ -114,7 +114,7 @@ if (registrySrc === null) {
     + "    connected account silently expire, which is what this worker was built to stop.",
   );
 } else {
-  const FIELDS = ["tokenUrl", "clientIdParam"];
+  const FIELDS = ["tokenUrl", "clientIdParam", "refreshStyle"];
   const registry = extractProviders(registrySrc, FIELDS);
   const worker = extractProviders(workerSrc, FIELDS);
 
@@ -125,6 +125,38 @@ if (registrySrc === null) {
       "The refresh worker declares no provider that the registry also declares.\n"
       + "    Either the worker's PROVIDERS table is empty, or this guard's block parsing\n"
       + "    has stopped matching the file's shape. Both mean it is no longer checking.",
+    );
+  }
+
+  // ── Guard 3: a provider that CAN refresh must be present in the worker ─────
+  //
+  // Guards 1 and 2 compare providers that appear in BOTH tables. That leaves
+  // the most likely mistake uncaught: adding a provider to the registry and
+  // forgetting the worker entirely. The comparison set is then simply smaller,
+  // every assertion still passes, and the omission is invisible.
+  //
+  // The consequence is not theoretical. A refreshStyle:'refresh_token' provider
+  // with no worker entry hits the `if (!config) { summary.skipped += 1; }`
+  // branch — deliberately silent, because that branch exists for platforms
+  // whose adapter has not landed yet. So its tokens quietly stop being
+  // refreshed, and the first symptom is every account of that platform failing
+  // to publish one token lifetime later, with an error blaming the platform.
+  //
+  // Providers that genuinely cannot refresh are exempt: LinkedIn issues no
+  // refresh token on the standard tier (refreshStyle 'none'), and Meta
+  // re-exchanges a long-lived token instead ('reexchange').
+  for (const [id, fields] of Object.entries(registry)) {
+    if (fields.refreshStyle !== "refresh_token") continue;
+    if (id in worker) continue;
+    failures.push(
+      `Provider "${id}" declares refreshStyle: 'refresh_token' in the registry but has NO\n`
+      + "    entry in the refresh worker's PROVIDERS table.\n"
+      + "    Its stored tokens will never be refreshed. The worker skips unknown providers\n"
+      + "    SILENTLY and by design — that branch exists for platforms whose adapter has\n"
+      + "    not landed yet — so nothing fails until every account of this platform stops\n"
+      + "    publishing, one token lifetime after it was connected.\n"
+      + "    Add it to supabase/functions/refresh-social-tokens/index.ts, or correct\n"
+      + "    refreshStyle if this provider genuinely cannot refresh.",
     );
   }
 

@@ -42,6 +42,7 @@ import {
   requireProvider,
   redirectUriFor,
   providerForPlatform,
+  authorizeScopeParam,
 } from '../../../../_lib/socialProviders';
 
 function getAppUrl(request) {
@@ -141,7 +142,9 @@ export async function GET(request, context) {
       [providerConfig.clientIdParam || 'client_id']: providerConfig.clientId(),
       redirect_uri: redirectUri,
       state,
-      scope: providerConfig.scopes.join(' '),
+      // Provider-owned delimiter, never a hardcoded ' '. TikTok documents a
+      // comma-separated scope string; RFC 6749 and everyone else use a space.
+      scope: authorizeScopeParam(providerConfig),
       ...(providerConfig.extraAuthParams || {}),
     });
 
