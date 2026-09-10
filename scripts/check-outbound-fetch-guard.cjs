@@ -79,6 +79,21 @@ const REVIEWED = [
       + 'through fetchWithTimeout.',
   },
   {
+    file: '_shared/youtube.service.ts',
+    match: /^url$/,
+    reason:
+      'fetchWithTimeout() receives only two kinds of URL, neither caller-supplied: '
+      + '(a) template literals rooted in the module-level API / UPLOAD_API consts '
+      + '(https://www.googleapis.com/...), with the only interpolated value — the video '
+      + 'id returned by YouTube itself — passed through encodeURIComponent; and '
+      + '(b) `sessionUri`, read from the Location header of the resumable-init response '
+      + 'YouTube itself returned — a single-use session URI minted by the API we just '
+      + 'authenticated to, not by our caller. '
+      + 'The one genuinely caller-influenced URL here is `mediaUrl` '
+      + '(generations.output_url), and it goes through safeFetch() with per-redirect-hop '
+      + 'revalidation and a video/* content-type assertion, NOT through fetchWithTimeout.',
+  },
+  {
     file: '_shared/linkedin.service.ts',
     match: /^url$/,
     reason:

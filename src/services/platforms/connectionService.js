@@ -548,7 +548,7 @@ export async function getAccountHealth(accountId) {
  * publishing then fails, which is the "connected but can't publish" defect
  * this codebase has already shipped once.
  */
-const DIRECT_OAUTH_PLATFORMS = new Set(['linkedin', 'tiktok']);
+const DIRECT_OAUTH_PLATFORMS = new Set(['linkedin', 'tiktok', 'youtube']);
 
 export async function initiateOAuthConnection({
   platform,
@@ -588,14 +588,20 @@ export async function initiateOAuthConnection({
       return { redirecting: true };
     }
 
-    // Deliberately does NOT fall through to mock. A mock LinkedIn account
-    // would render as connected and never publish — the exact failure the
-    // capability view (20260821220000) was written to stop the UI reporting
-    // as healthy. Surface the real reason instead.
+    // Deliberately does NOT fall through to mock. A mock account would render
+    // as connected and never publish — the exact failure the capability view
+    // (20260821220000) was written to stop the UI reporting as healthy.
+    // Surface the real reason instead.
+    //
+    // The platform is interpolated rather than hardcoded: these strings said
+    // "LinkedIn" for every platform, so a failed TikTok or YouTube connect
+    // reported a LinkedIn problem and sent whoever was debugging to the wrong
+    // dashboard entirely.
+    const label = platform.charAt(0).toUpperCase() + platform.slice(1);
     throw new Error(
       payload?.error === 'app_not_configured'
-        ? 'LinkedIn publishing is not configured in this environment yet.'
-        : payload?.detail || payload?.error || 'Could not start the LinkedIn connect flow.',
+        ? `${label} publishing is not configured in this environment yet.`
+        : payload?.detail || payload?.error || `Could not start the ${label} connect flow.`,
     );
   }
 

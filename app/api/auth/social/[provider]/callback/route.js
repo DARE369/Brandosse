@@ -219,7 +219,73 @@ async function discoverTikTok(accessToken) {
   }];
 }
 
-const DISCOVERY = { linkedin: discoverLinkedIn, tiktok: discoverTikTok };
+/**
+ * YouTube: the channel, not the Google account.
+ *
+ * A Google account and a YouTube channel are NOT the same thing, and this is
+ * the case that will confuse users most. Signing in with Google always
+ * succeeds; having somewhere to publish does not follow. `mine=true` returns an
+ * EMPTY item list for a Google account that has never created a channel, with
+ * HTTP 200 and no error — so a naive reader treats "no channel" as a healthy
+ * response and writes an account row that can never publish. That is this
+ * repository's signature defect, and it is one `if` away here.
+ *
+ * Keyed on the channel id (`UC...`), never the handle: handles are changeable,
+ * so keying on one orphans the connection the first time a creator renames
+ * themselves. Same reasoning as TikTok's open_id above.
+ *
+ * A Brand Account channel the user manages is returned by this call too, so a
+ * single authorization can legitimately surface more than one channel. Only the
+ * first is taken for now — a picker belongs with Meta's, which needs the same
+ * thing.
+ */
+async function discoverYouTube(accessToken) {
+  const res = await fetchWithTimeout(
+    'https://www.googleapis.com/youtube/v3/channels'
+    + '?part=snippet,contentDetails,statistics&mine=true',
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+
+  if (!res.ok) {
+    // 403 here is usually insufficientPermissions (the readonly scope was not
+    // granted) but is also what a project with the Data API disabled returns.
+    // Both are ours to fix, not the user's, so neither is reported as a
+    // platform outage.
+    if (res.status === 401 || res.status === 403) throw new Error('missing_scopes');
+    throw new Error(`discovery_failed:http_${res.status}`);
+  }
+
+  const body = await res.json().catch(() => null);
+  const channel = Array.isArray(body?.items) ? body.items[0] : null;
+
+  if (!channel?.id) {
+    // Deliberately its own code. "No eligible targets" would send the user
+    // looking at permissions; the actual fix is to create a channel on YouTube,
+    // which nothing in this app can do for them.
+    throw new Error('discovery_failed:no_youtube_channel');
+  }
+
+  const snippet = channel.snippet || {};
+  const thumbnails = snippet.thumbnails || {};
+
+  return [{
+    accountId: channel.id,
+    // YouTube addresses the channel by id in every API call; there is no URN.
+    authorUrn: null,
+    // customUrl is the @handle when the channel has one. Display only — never
+    // the key.
+    // The leading @ is STRIPPED: every consumer renders `@${username}`
+    // (useDashboardData.js), and YouTube is the only platform whose handle
+    // arrives with the sigil already attached. Storing it as given rendered
+    // "@@dareojomo" on the connected-accounts screen.
+    username: (snippet.customUrl || channel.id).replace(/^@+/, ''),
+    displayName: snippet.title || 'YouTube channel',
+    avatarUrl: thumbnails.default?.url || thumbnails.medium?.url || null,
+    profileType: 'Channel',
+  }];
+}
+
+const DISCOVERY = { linkedin: discoverLinkedIn, tiktok: discoverTikTok, youtube: discoverYouTube };
 
 // ── Persistence ──────────────────────────────────────────────────────────────
 
@@ -434,14 +500,27 @@ export async function GET(request, context) {
     const isDbRejection = Boolean(pgCode)
       && ['23514', '23503', '23505', '23502', '42501'].includes(pgCode);
 
+    // A raw transport failure — TLS reset, DNS blip, connection refused — throws
+    // a message ("fetch failed", "socket hang up", an OpenSSL record error) that
+    // matches none of the prefixes below, so it used to land in the catch-all
+    // `connect_failed`. That is the least useful thing this flow can say, and it
+    // is WRONG: the user did nothing, nothing is misconfigured, and retrying
+    // usually works. Observed live on 2026-09-10 as
+    // ERR_SSL_DECRYPTION_FAILED_OR_BAD_RECORD_MAC on a first connect attempt that
+    // then succeeded, unchanged, on the second.
+    const isTransport =
+      /fetch failed|socket hang up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|ERR_SSL|bad record mac/i
+        .test(message);
+
     const social_error =
-      message === 'platform_timeout' ? 'connect_timed_out'
-        : message === 'missing_scopes' ? 'missing_scopes'
-          : message.startsWith('token_exchange_failed') ? 'token_exchange_failed'
-            : message.startsWith('discovery_failed') ? 'discovery_failed'
-              : message.startsWith('app_not_configured') ? 'app_not_configured'
-                : isDbRejection ? 'account_save_rejected'
-                  : 'connect_failed';
+      isTransport ? 'connect_network_error'
+        : message === 'platform_timeout' ? 'connect_timed_out'
+          : message === 'missing_scopes' ? 'missing_scopes'
+            : message.startsWith('token_exchange_failed') ? 'token_exchange_failed'
+              : message.startsWith('discovery_failed') ? 'discovery_failed'
+                : message.startsWith('app_not_configured') ? 'app_not_configured'
+                  : isDbRejection ? 'account_save_rejected'
+                    : 'connect_failed';
 
     // ── Carry a SAFE diagnostic back to the browser ──────────────────────────
     //
