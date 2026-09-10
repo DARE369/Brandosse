@@ -67,6 +67,51 @@ jobs:
           # this very file — which it did, correctly, on the first attempt.
           OAUTH_STATE_SECRET: ci-placeholder-oauth-signing-key-for-tests-only
 
+      # Deno is needed by the token custody guard below, which round-trips
+      # ciphertext between the Node and Deno implementations. Without it that
+      # check SKIPS rather than fails, which would quietly leave the twin files
+      # unguarded — the exact "a check that never runs cannot fail loudly"
+      # problem this whole workflow was written to end.
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      # Defect D1 — platform token custody. connected_accounts grants SELECT to
+      # `authenticated`, and RLS filters rows rather than columns, so a stored
+      # plaintext token would be readable from the browser by its own owner and
+      # harvestable by any XSS. Asserts tokens are encrypted with a fresh IV per
+      # write, that tampering is detected rather than silently tolerated, and —
+      # most importantly — that a missing key REFUSES rather than degrading to
+      # plaintext.
+      #
+      # Also proves CROSS-RUNTIME INTEROP: tokens are encrypted by Next.js API
+      # routes (Node) and decrypted by the publish adapter (Deno edge function),
+      # from two separate files. Drift between them would not be cosmetic — every
+      # stored token would become permanently undecryptable, and the symptom
+      # would look like a platform auth error rather than our bug.
+      #
+      # Hermetic: generates its own key, no network.
+      - name: Token custody guard
+        run: node scripts/security/token-crypto.test.mjs
+
+      # The other half of D1. Moving credentials out of connected_accounts also
+      # revoked client write access to access_token/refresh_token/mock_token —
+      # and three client paths (disconnect, reconnect, mock connect) were still
+      # writing them. All three started returning 403 the moment the migration
+      # landed, and the first symptom was a user unable to remove an account.
+      # tsc cannot see it: they are string keys in a PostgREST payload.
+      - name: Revoked-column write guard
+        run: node scripts/check-revoked-column-writes.cjs
+
+      # TikTok makes specific UI elements a CONDITION of Direct Post approval,
+      # and every violation looks like an improvement: pre-select Public,
+      # comments on by default, only show the music notice when relevant,
+      # tighten the legal wording. None of those fail a test, a type-check or a
+      # normal review — they fail an audit weeks later with a generic rejection
+      # email, costing a full review cycle.
+      - name: TikTok UX compliance guard
+        run: node scripts/check-tiktok-ux-compliance.cjs
+
       # LOCK L0.7 — the eight guard scripts that existed and never ran.
       # Later locks append their own below; all of them are blocking.
       - name: check-env-security
@@ -124,6 +169,18 @@ jobs:
 
       - name: check-oauth-provider-parity
         run: node scripts/check-oauth-provider-parity.cjs
+      # OAuth scopes are fixed at consent. A scope missing from the authorize
+      # request cannot be added later for accounts that already connected —
+      # every one of those users has to disconnect and reconnect. So the scope
+      # set is asserted before anyone connects, not checked after.
+      - name: check-oauth-scope-coverage
+        run: node scripts/check-oauth-scope-coverage.cjs
+      # "Connected but cannot publish" is this repo's signature defect, and it is
+      # always a chain with a link missing in the middle: the UI offers a platform,
+      # but discovery, the adapter, or the publish dispatch is absent. This walks
+      # the whole chain for every platform the UI promises.
+      - name: check-direct-oauth-wiring
+        run: node scripts/check-direct-oauth-wiring.cjs
       # The guard above proves every risky fetch ROUTES THROUGH safeFetch. This
       # one proves safeFetch actually refuses things: metadata endpoints, every
       # private range, and the decimal/octal/hex/IPv4-mapped/NAT64/6to4
@@ -149,6 +206,14 @@ jobs:
       # would have failed on the production database.
       - name: check-migrations-apply
         run: node scripts/check-migrations-apply.cjs
+      # The analytics schema needs a different stub set (connected_accounts,
+      # posts, organization_members, the authenticated/anon roles), so it is a
+      # sibling suite rather than a longer CHAIN above. It applies the migration
+      # twice for idempotence and then proves each constraint actually REJECTS
+      # bad data — a rejection cannot be tested from inside the migration,
+      # because it would roll the migration back.
+      - name: check-analytics-migration
+        run: node scripts/check-analytics-migration.cjs
       # The website import used to hand marketing prose to an LLM and ask for a
       # colour palette; shown no colours, it produced colours anyway. The harvester
       # reads the site's own CSS instead. This asserts exact measured hexes against
@@ -174,12 +239,36 @@ jobs:
       # arithmetic, so it gets a guard rather than a reviewer.
       - name: check-token-contrast
         run: node scripts/check-token-contrast.cjs
+      # The landing page defines its OWN --lp-* palette and uses zero --uiv2
+      # tokens, so check-token-contrast could not see it and was green while
+      # Lighthouse found 11 failing elements there — including the primary CTA
+      # at 3.07:1. A guard that cannot see the surface proves nothing about it.
+      - name: check-landing-contrast
+        run: node scripts/check-landing-contrast.cjs
       # The URL import — the only path that MEASURES a brand rather than
       # inferring it — was reachable from the zero-kits landing screen only,
       # which a user sees once. Everyone with a kit already got a setup screen
       # that did not offer it.
       - name: check-website-import-reachable
         run: node scripts/check-website-import-reachable.cjs
+      # deleteKit existed in the store, called by nothing, and with both bugs
+      # that make kit deletion dangerous: no active-kit handover (leaving zero
+      # active kits, so every later generation silently runs with no brand) and
+      # no storage cleanup (row cascade is not file cleanup).
+      - name: check-kit-deletion
+        run: node scripts/check-kit-deletion.cjs
+      # useAuthenticatedRedirect read localStorage during render, so the server
+      # rendered the public page and the client rendered the redirect overlay —
+      # a hydration mismatch on every public page a signed-in user opened. The
+      # fix has two halves and the first alone left it intermittent.
+      - name: check-ssr-hydration-safety
+        run: node scripts/check-ssr-hydration-safety.cjs
+      # The extraction screen showed timer-driven stages and a bar frozen at 30%
+      # for the real 23s of work; StrictMode also left its cancelled flag stuck
+      # true, so the finished response was discarded and the screen waited
+      # forever — while billing for two extractions per import.
+      - name: check-extract-progress-honesty
+        run: node scripts/check-extract-progress-honesty.cjs
       # Three components each showed "AI inferred this — please verify" behind
       # `confidence === 'low'`, against a value the extractor has always sent as a
       # NUMBER. The flag had never rendered once. Also asserts the harvester's
@@ -284,6 +373,17 @@ jobs:
           deno-version: v1.x
       - name: deno check
         run: deno check supabase/functions/**/index.ts supabase/functions/_shared/*.ts
+
+      # Unit tests for the pure logic in the edge adapters. Runs with
+      # --no-check because `deno check` above is the type gate; without it, the
+      # 81 pre-existing errors in other files would stop these tests running at
+      # all, which is how a passing suite gets silently switched off.
+      #
+      # These caught a real defect on their first run: a null in a post's tag
+      # array became the literal tag "null" on the user's video, because
+      # String(null) is truthy and survived .filter(Boolean).
+      - name: deno test (edge adapters)
+        run: deno test --no-check supabase/functions/_shared/*.test.ts
 
   # ── Worker unit tests ─────────────────────────────────────────────────────
   # The Python worker had no test job at all. `_repair_cookie_newlines` was

@@ -107,6 +107,50 @@ if (warnings.length > 0) {
   }
 }
 
+// ── Caller auth must not use the service-role key ───────────────────────────
+//
+// For weeks every scheduled invocation in this product returned 401 and nothing
+// reported it. pg_cron records a job as having run because issuing the HTTP
+// request IS the job; a 401 in the response body is not a failed run.
+//
+// The cause (2026-09-10): this project has Supabase's new API key system, so the
+// edge runtime is injected with `sb_secret_…` as SUPABASE_SERVICE_ROLE_KEY while
+// every caller still sent the legacy service_role JWT. PostgREST accepted that
+// JWT, so only the functions broke.
+//
+// The underlying mistake was using a DATABASE CREDENTIAL as an RPC password.
+// Caller auth now uses FUNCTION_INVOKE_SECRET via requireInvokeSecret();
+// SUPABASE_SERVICE_ROLE_KEY is for createAdminClient() and nothing else.
+//
+// This fails if anyone reintroduces the old pattern — comparing the incoming
+// Authorization header against the service-role key.
+for (const file of tsFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+
+  if (/requireServiceRole\s*\(/.test(source)) {
+    findings.push(
+      `${rel(file)} calls requireServiceRole(). That check compared the caller's ` +
+      'Authorization header against SUPABASE_SERVICE_ROLE_KEY, which the runtime no ' +
+      'longer holds. Use requireInvokeSecret() from _shared/connectionHelpers.ts.',
+    );
+  }
+
+  // The shape of the old bug: the request's own Authorization header tested
+  // against the service-role key, in any spelling.
+  const comparesAuthToServiceRole =
+    /headers\.get\(\s*["'`]Authorization["'`]\s*\)[\s\S]{0,120}SUPABASE_SERVICE_ROLE_KEY/i.test(source)
+    || /SUPABASE_SERVICE_ROLE_KEY[\s\S]{0,120}headers\.get\(\s*["'`]Authorization["'`]\s*\)/i.test(source);
+
+  if (comparesAuthToServiceRole) {
+    findings.push(
+      `${rel(file)} compares the incoming Authorization header against ` +
+      'SUPABASE_SERVICE_ROLE_KEY. That is the defect that silently disabled every ' +
+      'cron in this product. Caller auth belongs to FUNCTION_INVOKE_SECRET ' +
+      '(X-Invoke-Secret header); the service-role key is for database access only.',
+    );
+  }
+}
+
 if (findings.length > 0) {
   console.error(`\nFailures: ${findings.length}`);
   for (const finding of findings) {
