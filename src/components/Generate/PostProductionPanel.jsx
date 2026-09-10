@@ -17,6 +17,7 @@ import {
 } from '../../org/services/pipelineService';
 import { POST_STATUS } from '../../constants/statuses';
 import TikTokOptionsPanel from '../Publishing/TikTokOptionsPanel';
+import YouTubeOptionsPanel from '../Publishing/YouTubeOptionsPanel';
 const FALLBACK_VIDEO_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
 function resolveVideoSource(url) {
@@ -294,6 +295,30 @@ export default function PostProductionPanel({
   // had a privacy level chosen, and TikTok requires an active choice.
   const tiktokReady = selectedTikTokAccounts.every((a) => tiktokValidity[a.id] === true);
 
+  /**
+   * YouTube carries the same shape of requirement for a different reason.
+   *
+   * TikTok blocks on privacy level because TikTok's guidelines forbid a
+   * default. YouTube blocks on the made-for-kids declaration because it is a
+   * COPPA answer YouTube requires on every video — the first real upload
+   * through this product (video vjuIoPzSVcc, 2026-09-10) landed on the channel
+   * with it absent and YouTube Studio flagged it in red. Uploading without it
+   * does not fail; it produces a video the user has to go and finish by hand.
+   */
+  const [youtubeSettings, setYouTubeSettings] = useState({});
+  const [youtubeValidity, setYouTubeValidity] = useState({});
+
+  const selectedYouTubeAccounts = useMemo(
+    () => postProduction.selectedPlatforms
+      .map((id) => accounts.find((a) => a.id === id))
+      .filter((a) => a && String(a.platform).toLowerCase() === 'youtube' && !a.is_mock),
+    [postProduction.selectedPlatforms, accounts],
+  );
+
+  // Missing entries count as invalid, for the same reason as TikTok: an
+  // unanswered declaration is not a "no".
+  const youtubeReady = selectedYouTubeAccounts.every((a) => youtubeValidity[a.id] === true);
+
   // Hand the settings to the shared post-production state so the publish path
   // can persist them onto the right post rows. They cannot be derived later:
   // privacy level is a choice the user made here, and nothing else records it.
@@ -303,6 +328,11 @@ export default function PostProductionPanel({
     // it would re-run this on every store write.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tiktokSettings]);
+
+  useEffect(() => {
+    updatePostProduction({ youtubeSettings });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [youtubeSettings]);
   const charCount = postProduction.caption.length;
   const isOverLimit = charCount > charLimit;
   const selectedPlatformNames = postProduction.selectedPlatforms
@@ -1240,6 +1270,35 @@ export default function PostProductionPanel({
                         </div>
                       ))}
 
+                      {/*
+                        YouTube options.
+
+                        Per account for the same reason as TikTok: the
+                        made-for-kids declaration is about THIS upload to THIS
+                        channel, and two channels can legitimately answer
+                        differently.
+
+                        The panel refuses to report valid until that question is
+                        answered, which disables the schedule button above. That
+                        is deliberate — YouTube accepts the upload either way,
+                        so the only thing standing between a user and a video
+                        that needs manual repair in Studio is this gate.
+                      */}
+                      {selectedYouTubeAccounts.map((acc) => (
+                        <div key={`yt-${acc.id}`} className="youtube-options-block">
+                          <YouTubeOptionsPanel
+                            accountId={acc.id}
+                            accountName={acc.account_name || acc.display_name}
+                            onChange={(settings) => setYouTubeSettings((prev) => (
+                              { ...prev, [acc.id]: settings }
+                            ))}
+                            onValidityChange={(ok) => setYouTubeValidity((prev) => (
+                              prev[acc.id] === ok ? prev : { ...prev, [acc.id]: ok }
+                            ))}
+                          />
+                        </div>
+                      ))}
+
                       {/* Schedule */}
                       <div>
                         <div className="field-label-row field-label-row-spaced">
@@ -1478,7 +1537,11 @@ export default function PostProductionPanel({
                         // Blocking here means the user sees it while they can
                         // still act; the adapter refuses server-side too, but
                         // that would be after the upload.
-                        !tiktokReady
+                        !tiktokReady ||
+                        // YouTube requires an actively-chosen made-for-kids
+                        // answer. Same reasoning as TikTok above: surface it
+                        // while the user can still act on it.
+                        !youtubeReady
                       }
                       aria-label={
                         postProduction.scheduleDate ? 'Schedule post' : 'Publish now'

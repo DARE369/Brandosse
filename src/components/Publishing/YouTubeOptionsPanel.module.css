@@ -1,0 +1,155 @@
+/* YouTubeOptionsPanel — see the component header before changing anything.
+
+   The made-for-kids group is deliberately the loudest thing in this panel, and
+   the .groupRequired treatment is not decoration: until it is answered the
+   composer will not let the post be scheduled, so the user needs to see WHY at
+   a glance. Muting or collapsing it is a rejection, not a style choice. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--uiv2-space-4, 16px);
+  padding: var(--uiv2-space-4, 16px);
+  border: 1px solid var(--uiv2-border, #26282C);
+  border-radius: 10px;
+  background: var(--uiv2-surface, #17181B);
+  color: var(--uiv2-text-primary, #F5F5F4);
+  font-size: 13.5px;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: var(--uiv2-space-3, 12px);
+  border-bottom: 1px solid var(--uiv2-border-subtle, #1E2023);
+}
+
+.title { font-weight: 600; font-size: 13.5px; }
+
+.account {
+  font-size: 12px;
+  color: var(--uiv2-text-secondary, #8B8D93);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ── Groups ───────────────────────────────────────────────────────────────── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Unanswered legal declaration. A left border rather than a full fill, so it
+   reads as "needs attention" without shouting over the rest of the composer. */
+.groupRequired {
+  padding-left: 10px;
+  border-left: 2px solid var(--uiv2-danger, #E5484D);
+}
+
+.legend {
+  padding: 0;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--uiv2-text-primary, #F5F5F4);
+}
+
+.required { color: var(--uiv2-danger, #E5484D); }
+
+.help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--uiv2-text-secondary, #8B8D93);
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--uiv2-text-secondary, #8B8D93);
+  background: var(--uiv2-surface-2, #1E2023);
+}
+
+/* This is the reason the schedule button is disabled. It must stay legible. */
+.blocker {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--uiv2-danger, #E5484D);
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────────── */
+
+.radioRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.radio,
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  /* 40px keeps the whole row a comfortable touch target on mobile, where this
+     composer is used as much as on desktop. */
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--uiv2-border, #26282C);
+  border-radius: 8px;
+  background: var(--uiv2-surface-2, #1E2023);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.radio:hover,
+.checkbox:hover { border-color: var(--uiv2-border-strong, #3A3D42); }
+
+.radio input,
+.checkbox input {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--uiv2-accent, #FF6B2C);
+  cursor: pointer;
+}
+
+.select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--uiv2-border, #26282C);
+  border-radius: 8px;
+  background: var(--uiv2-surface-2, #1E2023);
+  color: var(--uiv2-text-primary, #F5F5F4);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* A disabled control still has to be READABLE. The visibility select is
+   disabled before the compliance audit and the adjacent note explains why —
+   fading it to near-invisible would hide the explanation along with it. */
+.select:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  color: var(--uiv2-text-secondary, #8B8D93);
+}
+
+.select:focus-visible,
+.radio input:focus-visible,
+.checkbox input:focus-visible {
+  outline: 2px solid var(--uiv2-accent, #FF6B2C);
+  outline-offset: 2px;
+}

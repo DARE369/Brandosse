@@ -73,6 +73,7 @@ const DEFAULT_POST_PRODUCTION = {
   // TikTokOptionsPanel. Per account, not per post: privacy options come from
   // creator_info and differ between creators.
   tiktokSettings: {},
+  youtubeSettings: {},
   scheduleDate: null,
   assetReferences: [],
   metadataStatus: 'idle',
@@ -4101,6 +4102,70 @@ const useSessionStore = create((set, get) => ({
         // a swallowed error here would surface much later as a confusing
         // "no privacy level was chosen".
         if (ttError) throw ttError;
+      }
+
+      /**
+       * The same read-modify-write, for YouTube.
+       *
+       * `made_for_kids` is a COPPA declaration YouTube requires on every video.
+       * The composer will not let a YouTube post be scheduled without it
+       * (PostProductionPanel, youtubeReady), so by the time this runs the
+       * answer exists — but if it were ever lost between here and the post row,
+       * the upload would still succeed and land a video that YouTube Studio
+       * flags as incomplete. That is exactly what happened to the first real
+       * upload (video vjuIoPzSVcc, 2026-09-10), before this path existed.
+       *
+       * workflow_state is SHARED (approval routing, publish accounting), so
+       * this reads before writing for the same reason the TikTok block above
+       * does. A bare assignment would silently destroy the rest of the column.
+       */
+      const youtubeSettings = postProduction.youtubeSettings || {};
+      const youtubeTargets = publishTargets.filter((t) => {
+        const account = selectedAccountMap.get(t.accountId);
+        return String(account?.platform || '').toLowerCase() === 'youtube'
+          && !account?.is_mock
+          && youtubeSettings[t.accountId];
+      });
+
+      if (youtubeTargets.length > 0) {
+        const ytPostIds = youtubeTargets.map((t) => t.postId);
+        const { data: ytRows, error: ytReadErr } = await supabase
+          .from('posts')
+          .select('id, workflow_state')
+          .in('id', ytPostIds);
+        if (ytReadErr) throw ytReadErr;
+
+        const ytPrior = new Map();
+        for (const row of ytRows || []) {
+          ytPrior.set(
+            row.id,
+            row.workflow_state && typeof row.workflow_state === 'object' ? row.workflow_state : {},
+          );
+        }
+
+        for (const target of youtubeTargets) {
+          const s = youtubeSettings[target.accountId];
+          const { error: ytError } = await supabase
+            .from('posts')
+            .update({
+              workflow_state: {
+                ...(ytPrior.get(target.postId) || {}),
+                // snake_case deliberately: these are the exact keys
+                // _shared/youtube.service.ts readOptions() looks for. A
+                // camelCase mismatch would be silent and would publish a video
+                // with none of these settings applied.
+                youtube: {
+                  privacy_status: s.privacy_status,
+                  made_for_kids: s.made_for_kids,
+                  contains_synthetic_media: s.contains_synthetic_media,
+                  category_id: s.category_id,
+                  capturedAt: new Date().toISOString(),
+                },
+              },
+            })
+            .eq('id', target.postId);
+          if (ytError) throw ytError;
+        }
       }
 
       if (isImmediatePublish) {
