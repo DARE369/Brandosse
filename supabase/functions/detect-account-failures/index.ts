@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, toErrorPayload } from "../_shared/http.ts";
-import { insertConnectionEvent, requireServiceRole } from "../_shared/connectionHelpers.ts";
+import { insertConnectionEvent, requireInvokeSecret } from "../_shared/connectionHelpers.ts";
 
 async function hasOpenAlert(adminClient: ReturnType<typeof createAdminClient>, accountId: string, alertType: string) {
   const { data, error } = await adminClient
@@ -25,7 +25,7 @@ serve(async (req) => {
   }
 
   try {
-    requireServiceRole(req);
+    requireInvokeSecret(req);
 
     const adminClient = createAdminClient();
     const now = Date.now();

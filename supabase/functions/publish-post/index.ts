@@ -18,12 +18,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
-import { requireServiceRole } from "../_shared/connectionHelpers.ts";
+import { requireInvokeSecret, presentsInvokeSecret } from "../_shared/connectionHelpers.ts";
 import { createHttpError, requireActiveOrgMember } from "../_shared/org.ts";
 import { runMockPublish } from "../_shared/mockPublish.ts";
 import { publishToZernio } from "../_shared/zernio.service.ts";
 import { publishToLinkedIn } from "../_shared/linkedin.service.ts";
 import { publishToTikTok } from "../_shared/tiktok.service.ts";
+import { publishToYouTube } from "../_shared/youtube.service.ts";
 
 type PublishRequest = {
   post_id: string;
@@ -35,9 +36,11 @@ type PublishRequest = {
 
 const MAX_RETRIES = 3;
 
-function isServiceRole(req: Request) {
-  const auth = req.headers.get("Authorization") || "";
-  return auth === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`;
+// A machine caller (the scheduler) presents the shared invoke secret; a person
+// presents their own JWT. Both remain supported — this only changes what a
+// MACHINE must show, which is the half that had been failing.
+function isMachineCaller(req: Request) {
+  return presentsInvokeSecret(req);
 }
 
 serve(async (req) => {
@@ -49,8 +52,8 @@ serve(async (req) => {
     const adminClient = createAdminClient();
     let requesterId: string | null = null;
 
-    if (isServiceRole(req)) {
-      requireServiceRole(req);
+    if (isMachineCaller(req)) {
+      requireInvokeSecret(req);
     } else {
       const authClient = createAuthClient(req.headers.get("Authorization"));
       const user = await requireUser(authClient);
@@ -82,7 +85,7 @@ serve(async (req) => {
       .select(`
         id, user_id, organization_id, title, caption, platform, status,
         scheduled_at, hashtags, workflow_state,
-        generations ( storage_path, media_type, output_url )
+        generations ( storage_path, media_type, output_url, metadata )
       `)
       .eq("id", postId)
       .maybeSingle();
@@ -130,12 +133,65 @@ serve(async (req) => {
       .update({ status: "publishing", updated_at: new Date().toISOString() })
       .eq("id", postId);
 
-    // ── Resolve media URL ─────────────────────────────────────────────────────
+    // ── Resolve the media URL ─────────────────────────────────────────────────
+    //
+    // Two shapes reach this point:
+    //   * a durable public URL in output_url (image generations live in the
+    //     public `generations` bucket), used as-is; or
+    //   * a storage_path into a PRIVATE bucket — every rendered video clip is in
+    //     `video-clips`, which is not public.
+    //
+    // For the private case the signed URL is minted HERE, seconds before the
+    // upload, and never stored. Storing one would be the quiet kind of bug this
+    // codebase keeps producing: a post scheduled three weeks out would carry a
+    // signature that expired days earlier, and the publish would fail with a 400
+    // from storage that says nothing about why.
+    //
+    // The previous version fell back to `storage_path` directly, which is a bare
+    // path like `<user>/<job>/clip_0.mp4` — not a URL at all. Anything consuming
+    // it would have failed on the first fetch. That fallback simply had no caller
+    // until now, because nothing linked a video to a post.
 
-    const gen = Array.isArray(post.generations) ? post.generations[0] : post.generations;
-    const mediaUrl: string | null = (gen as Record<string, unknown>)?.output_url as string
-      ?? (gen as Record<string, unknown>)?.storage_path as string
-      ?? null;
+    // NB: the `as` must stay on this line — TypeScript forbids a line break
+    // before it, and Deno reports that as a bare SyntaxError that stops the
+    // whole type check, which then looks like zero errors.
+    const rawGen = Array.isArray(post.generations) ? post.generations[0] : post.generations;
+    const gen = rawGen as Record<string, unknown> | null;
+
+    // 15 minutes: long enough for a large upload, short enough to be worthless
+    // if it ever leaks into a log.
+    const SIGNED_URL_TTL_SECONDS = 900;
+
+    let mediaUrl: string | null = null;
+    const declaredUrl = gen?.output_url as string | undefined;
+    const storagePath = gen?.storage_path as string | undefined;
+
+    if (declaredUrl && /^https?:\/\//i.test(declaredUrl)) {
+      mediaUrl = declaredUrl;
+    } else if (storagePath) {
+      // Which bucket the path belongs to is recorded by whoever created the
+      // generation. Defaulting to `generations` keeps every pre-existing image
+      // row working unchanged.
+      const meta = (gen?.metadata && typeof gen.metadata === "object")
+        ? gen.metadata as Record<string, unknown>
+        : {};
+      const bucket = String(meta.storage_bucket || "generations");
+
+      const { data: signed, error: signErr } = await adminClient
+        .storage.from(bucket).createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+
+      if (signErr || !signed?.signedUrl) {
+        // Loud, and specific about which bucket and path failed. A generic
+        // "could not read the video" here would send someone to the platform
+        // adapter, which is the wrong place entirely.
+        console.error(
+          `[publish-post] could not sign ${bucket}/${storagePath}:`,
+          signErr?.message ?? "no signedUrl returned",
+        );
+      } else {
+        mediaUrl = signed.signedUrl;
+      }
+    }
 
     // ── Route: mock or real ───────────────────────────────────────────────────
 
@@ -162,15 +218,22 @@ serve(async (req) => {
       // Real platform publish — routed by provider.
       //
       // Direct per-platform OAuth is replacing Zernio one platform at a time,
-      // so both paths are live during the migration. LinkedIn is migrated;
-      // everything else still goes through Zernio until its own adapter lands.
+      // so both paths are live during the migration. LinkedIn, TikTok and
+      // YouTube have adapters; Meta is the last one still on Zernio.
       //
       // The previous version of this branch refused ANY provider other than
       // "zernio", which was correct then (the old direct path had no
       // credentials and could never publish) and is wrong now.
+      //
+      // NOTE what this does NOT consult: connected_accounts_health_summary's
+      // can_publish. Dispatch is by provider alone. That is why the
+      // publish_providers registry has to be kept honest — a provider with a
+      // working adapter but is_supported = false publishes fine here while the
+      // UI tells the user the account cannot publish (which is exactly what
+      // TikTok did until 20260909160000).
       const provider = String(account.provider || "").trim().toLowerCase();
 
-      if (provider === "linkedin" || provider === "tiktok") {
+      if (provider === "linkedin" || provider === "tiktok" || provider === "youtube") {
         // Secrets live in their own table with no client grant (defect D1,
         // migration 20260904120000). Only service-role reaches it, which is
         // exactly the context this function runs in.
@@ -182,8 +245,29 @@ serve(async (req) => {
 
         if (secretErr) throw secretErr;
 
+        // Per-post platform settings live under workflow_state.<provider>.
+        // Read once here rather than in each branch: workflow_state is shared
+        // with approval routing and publish accounting, and every reader of it
+        // in this repo has to treat it as a shared object (see the defect where
+        // a bare assignment replaced it wholesale — handoff 2026-09-09 §4.2).
+        const workflow = (post.workflow_state && typeof post.workflow_state === "object")
+          ? post.workflow_state as Record<string, unknown>
+          : {};
+        const optionsFor = (key: string): Record<string, unknown> | null =>
+          (workflow[key] && typeof workflow[key] === "object")
+            ? workflow[key] as Record<string, unknown>
+            : null;
+
         if (provider === "linkedin") {
           result = await publishToLinkedIn({ post, account, secret, mediaUrl });
+        } else if (provider === "youtube") {
+          // Unlike TikTok, YouTube's guidelines do not require the user to pick
+          // a visibility, so the adapter defaults to `private` and SAYS SO in
+          // its note rather than refusing. Private is both the safe direction
+          // and, before the compliance audit, what YouTube enforces anyway.
+          result = await publishToYouTube({
+            post, account, secret, mediaUrl, options: optionsFor("youtube"),
+          });
         } else {
           // TikTok's per-post settings — privacy level, interaction toggles,
           // commercial disclosure — are collected by TikTokOptionsPanel and
@@ -191,14 +275,9 @@ serve(async (req) => {
           // guidelines require the user to choose the privacy level, and the
           // adapter refuses to publish without one rather than invent a
           // visibility the user never agreed to.
-          const workflow = (post.workflow_state && typeof post.workflow_state === "object")
-            ? post.workflow_state as Record<string, unknown>
-            : {};
-          const tiktokOptions = (workflow.tiktok && typeof workflow.tiktok === "object")
-            ? workflow.tiktok as Record<string, unknown>
-            : null;
-
-          result = await publishToTikTok({ post, account, secret, mediaUrl, options: tiktokOptions });
+          result = await publishToTikTok({
+            post, account, secret, mediaUrl, options: optionsFor("tiktok"),
+          });
         }
 
       } else if (provider === "" || provider === "zernio") {
@@ -259,6 +338,26 @@ serve(async (req) => {
             error_message: result.failureReason,
             published_at: result.success ? new Date().toISOString() : null,
             failed_at: result.success ? null : new Date().toISOString(),
+
+            // ── Record WHICH account this went to ─────────────────────────────
+            //
+            // posts.platform and posts.account_id were never written on the real
+            // publish path — only runMockPublish set them. So a mock post
+            // recorded MORE than a real one, and the first genuine upload
+            // (video vjuIoPzSVcc, 2026-09-10) landed with both NULL despite
+            // having an external_post_id.
+            //
+            // Two consequences, neither visible at publish time:
+            //   * analytics cannot tell which channel a published post belongs
+            //     to, so per-post metrics have nothing to attribute to an
+            //     account or a token; and
+            //   * the post's own history cannot answer "where did this go?"
+            //     once a user has more than one account on a platform.
+            //
+            // Written on failure too, deliberately. A failed attempt against a
+            // specific account is exactly what someone debugging needs to see.
+            platform: String(account.platform || "").toLowerCase() || null,
+            account_id: connectedAccountId,
             workflow_state: {
               ...existingWorkflowState,
               publish: { ...existingPublish, platform_post_url: result.platformPostUrl },

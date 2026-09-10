@@ -20,8 +20,8 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
-import { handleCors, jsonResponse } from "../_shared/http.ts";
-import { requireServiceRole } from "../_shared/connectionHelpers.ts";
+import { handleCors, jsonResponse, mapErrorToStatusCode, toErrorPayload } from "../_shared/http.ts";
+import { requireInvokeSecret } from "../_shared/connectionHelpers.ts";
 import { reconcileJob, finalizeFailed, type BackgroundJobRow } from "../_shared/videoJobFinalize.ts";
 
 const STALE_RUNNING_THRESHOLD_MS = 45_000; // fal webhooks are usually near-instant; 45s is generous slack before the poller double-checks
@@ -42,7 +42,7 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    requireServiceRole(req);
+    requireInvokeSecret(req);
     const adminClient = createAdminClient();
 
     const staleBefore = new Date(Date.now() - STALE_RUNNING_THRESHOLD_MS).toISOString();
@@ -84,6 +84,13 @@ serve(async (req) => {
     return jsonResponse({ swept: results.length, results });
   } catch (error) {
     console.error("[process-jobs] error:", error);
-    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 500);
+    // Map the status from the error, rather than calling everything a 500.
+    //
+    // This returned 500 unconditionally, so an auth rejection came back as
+    // `500 {"error":"Unauthorized"}` — a server fault carrying a client-fault
+    // message. That cost real time on 2026-09-10: the cron's 500s read as "the
+    // function is crashing" when it was in fact refusing the caller, which is a
+    // completely different thing to go and fix.
+    return jsonResponse(toErrorPayload(error), mapErrorToStatusCode(error));
   }
 });

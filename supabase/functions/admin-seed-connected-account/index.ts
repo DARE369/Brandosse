@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { createHttpError, isSuperAdminUser } from "../_shared/org.ts";
-import { insertConnectionEvent, requireServiceRole } from "../_shared/connectionHelpers.ts";
+import { insertConnectionEvent, requireInvokeSecret, presentsInvokeSecret } from "../_shared/connectionHelpers.ts";
 
 type SeedConnectedAccountRequest = {
   target_user_id: string;
@@ -45,8 +45,12 @@ function buildAvatarUrl(platform: string, username: string) {
   return `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(`${platform}-${username}`)}`;
 }
 
+// Machine callers present FUNCTION_INVOKE_SECRET in the X-Invoke-Secret header.
+// This used to compare Authorization against SUPABASE_SERVICE_ROLE_KEY, which the
+// runtime no longer holds (new-style sb_secret keys), so it 401'd every scheduled
+// run in silence. See _shared/connectionHelpers.ts.
 function isServiceRoleRequest(req: Request) {
-  return req.headers.get("Authorization") === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`;
+  return presentsInvokeSecret(req);
 }
 
 serve(async (req) => {
@@ -62,7 +66,7 @@ serve(async (req) => {
     let actorType = "service_role";
 
     if (isServiceRoleRequest(req)) {
-      requireServiceRole(req);
+      requireInvokeSecret(req);
     } else {
       const authClient = createAuthClient(req.headers.get("Authorization"));
       const user = await requireUser(authClient);

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, toErrorPayload } from "../_shared/http.ts";
+import { requireInvokeSecret } from "../_shared/connectionHelpers.ts";
 
 function nextResetDate() {
   const now = new Date();
@@ -16,13 +17,19 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!serviceKey) {
-      return jsonResponse({ error: "Server misconfigured" }, 500);
-    }
-    if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
+    // Machine callers present FUNCTION_INVOKE_SECRET in the X-Invoke-Secret header.
+    // This used to compare Authorization against SUPABASE_SERVICE_ROLE_KEY, which the
+    // runtime no longer holds (new-style sb_secret keys), so it 401'd every scheduled
+    // run in silence. See _shared/connectionHelpers.ts.
+    try {
+      requireInvokeSecret(req);
+    } catch (err) {
+      const message = (err as Error).message;
+      // A misconfigured deployment is OUR fault and must not read as a
+      // rejected caller — collapsing the two is what made this invisible.
+      return message === "function_invoke_secret_not_configured"
+        ? jsonResponse({ error: "Server misconfigured" }, 500)
+        : jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const adminClient = createAdminClient();

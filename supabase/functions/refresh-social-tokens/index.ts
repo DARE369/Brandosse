@@ -39,6 +39,11 @@ import { createAdminClient } from "../_shared/supabase.ts";
 import { readEnv } from "../_shared/env.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, toErrorPayload } from "../_shared/http.ts";
 import { decryptToken, encryptToken } from "../_shared/tokenCrypto.ts";
+// Caller auth lives in one place now. The fingerprint-logging copy that used
+// to sit here existed to diagnose the service-role mismatch; that was solved
+// on 2026-09-10 (the runtime is injected with new-style sb_secret keys while
+// every caller sent the legacy JWT), so the diagnostic has done its job.
+import { requireInvokeSecret } from "../_shared/connectionHelpers.ts";
 
 const TIMEOUT_MS = 20_000;
 
@@ -79,6 +84,22 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     clientSecret: () => readEnv("TIKTOK_CLIENT_SECRET"),
     clientIdParam: "client_key",
   },
+  // Google uses the standard `client_id`, unlike TikTok. Confirmed against the
+  // registry rather than assumed — that assumption is what blocked TikTok
+  // entirely (docs/handoff/2026-09-09 §4.1).
+  //
+  // Google does NOT rotate refresh tokens on the standard path: the refresh
+  // response carries no refresh_token, and refreshWithProvider() correctly
+  // keeps the existing one when none comes back. The exception is a consent
+  // screen still in "Testing" publishing status, where Google expires refresh
+  // tokens after 7 days — that presents as a sudden invalid_grant across every
+  // YouTube account at once, and it is a Google Cloud setting, not a bug here.
+  youtube: {
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    clientId: () => readEnv("GOOGLE_OAUTH_CLIENT_ID"),
+    clientSecret: () => readEnv("GOOGLE_OAUTH_CLIENT_SECRET"),
+    clientIdParam: "client_id",
+  },
 };
 
 type SecretRow = {
@@ -88,52 +109,6 @@ type SecretRow = {
   expires_at: string | null;
   connected_accounts: { provider: string | null; connection_status: string | null } | null;
 };
-
-/**
- * Short, non-reversible fingerprint of a secret, for logs.
- *
- * Enough to answer "are these two values the same?" and nothing else. Never
- * log the secret, and never log enough of it to narrow a guess.
- */
-async function fingerprint(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest).slice(0, 4))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/**
- * The caller must present the service-role key this runtime was given.
- *
- * ── Why the mismatch case is logged ──────────────────────────────────────────
- * This is an exact string comparison against the platform-injected
- * SUPABASE_SERVICE_ROLE_KEY, while the pg_cron job authenticates with whatever
- * value is stored in Vault under 'service_role_key'. If those two ever drift —
- * a key rotation that updated one and not the other, say — every scheduled run
- * gets a bare 401 and simply stops refreshing tokens. Nothing raises, nothing
- * retries, and the first symptom is expired accounts weeks later.
- *
- * So a rejection logs the fingerprint of both sides. Same fingerprint means the
- * problem is elsewhere; different fingerprints name the cause outright, without
- * either secret appearing in the logs.
- */
-async function requireServiceRole(req: Request) {
-  const serviceKey = readEnv("SUPABASE_SERVICE_ROLE_KEY");
-  const presented = req.headers.get("Authorization") || "";
-
-  if (presented !== `Bearer ${serviceKey}`) {
-    const token = presented.replace(/^Bearer /, "");
-    console.error(
-      "[refresh-social-tokens] rejected an unauthorized call. "
-      + `expected key fp=${await fingerprint(serviceKey)}, `
-      + `presented fp=${token ? await fingerprint(token) : "<none>"}. `
-      + "Different fingerprints with a caller that should be authorised means the "
-      + "Vault secret 'service_role_key' has drifted from the runtime's "
-      + "SUPABASE_SERVICE_ROLE_KEY — re-create it with vault.create_secret().",
-    );
-    throw new Error("Unauthorized");
-  }
-}
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -251,7 +226,7 @@ serve(async (req) => {
 
   try {
     if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-    await requireServiceRole(req);
+    requireInvokeSecret(req);
 
     const admin = createAdminClient();
     const nowIso = new Date().toISOString();
@@ -330,12 +305,46 @@ serve(async (req) => {
           .eq("connected_account_id", row.connected_account_id);
         if (updErr) throw updErr;
 
+        // ── Sync the DENORMALISED copy of the expiry ────────────────────────
+        //
+        // connected_accounts.token_expires_at is a second copy of what we just
+        // wrote to connected_account_secrets.expires_at, and
+        // connected_accounts_health_summary computes can_publish from the
+        // COPY, not from the secrets table (it must: secrets grants nothing to
+        // authenticated, so the view cannot join it — see 20260904140000).
+        //
+        // Leaving it stale is not cosmetic. A successful refresh would extend
+        // the real credential while the view kept reading an expiry hours in
+        // the past, so every refreshed account reports
+        // publish_block_reason = 'credential_expired' forever, and the UI tells
+        // the user to reconnect a connection that was JUST renewed. Observed
+        // live on 2026-09-10: refreshed at 10:51, still advertising an 02:07
+        // expiry.
+        //
+        // Written in the same block as the refresh so the two copies cannot
+        // diverge again.
+        const accountPatch: Record<string, unknown> = {
+          token_expires_at: patch.expires_at,
+        };
         // An account previously parked as expired is working again.
         if (row.connected_accounts?.connection_status === "expired") {
-          await admin
-            .from("connected_accounts")
-            .update({ connection_status: "active" })
-            .eq("id", row.connected_account_id);
+          accountPatch.connection_status = "active";
+        }
+
+        const { error: acctErr } = await admin
+          .from("connected_accounts")
+          .update(accountPatch)
+          .eq("id", row.connected_account_id);
+
+        if (acctErr) {
+          // Not fatal — the token itself is refreshed and publishing will work.
+          // But it IS loud, because the symptom is a healthy account that
+          // renders as broken, which sends the user to reconnect for no reason.
+          console.error(
+            `[refresh-social-tokens] refreshed ${row.connected_account_id} but could not`,
+            `sync token_expires_at onto connected_accounts: ${acctErr.message}.`,
+            "The account will report credential_expired until this is corrected.",
+          );
         }
 
         summary.refreshed += 1;

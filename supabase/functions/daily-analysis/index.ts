@@ -15,6 +15,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { requireInvokeSecret } from '../_shared/connectionHelpers.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,24 +42,26 @@ serve(async (req) => {
   //      profile with several queries, with no rate limit behind it.
   //
   // This is a scheduled batch job with no legitimate caller other than cron, so
-  // the correct audience is service-role only. Pattern copied from
-  // credit-monthly-reset/index.ts:19-26, which had it right all along.
+  // the correct audience is machine callers only.
   //
-  // The matching cron registration (20260821200000) supplies a service-role
-  // token from Vault. Apply that migration BEFORE deploying this guard, or the
+  // The matching cron registration is 20260910120000, which sends
+  // X-Invoke-Secret from Vault. Apply that migration BEFORE deploying, or the
   // nightly run will 401 in the gap.
-  const authHeader = req.headers.get('Authorization')
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!serviceKey) {
+  // Machine callers present FUNCTION_INVOKE_SECRET in the X-Invoke-Secret header.
+  // This used to compare Authorization against SUPABASE_SERVICE_ROLE_KEY, which
+  // the runtime no longer holds — the project has Supabase's new API key system,
+  // so the runtime is injected with an `sb_secret_…` value while Vault still sent
+  // the legacy JWT. Every nightly run 401'd in silence.
+  try {
+    requireInvokeSecret(req)
+  } catch (err) {
+    const message = (err as Error).message
+    // A misconfigured deployment is OUR fault and must not read as a rejected
+    // caller. Collapsing the two is what kept this invisible for so long.
+    const misconfigured = message === 'function_invoke_secret_not_configured'
     return new Response(
-      JSON.stringify({ error: 'Server misconfigured' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
-  }
-  if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      JSON.stringify({ error: misconfigured ? 'Server misconfigured' : 'Unauthorized' }),
+      { status: misconfigured ? 500 : 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
 

@@ -3,7 +3,8 @@ import { createAdminClient, createAuthClient, requireUser } from "../_shared/sup
 import { handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 import { createHttpError, requireActiveOrgMember } from "../_shared/org.ts";
 import {
-  requireServiceRole,
+  requireInvokeSecret,
+  presentsInvokeSecret,
 } from "../_shared/connectionHelpers.ts";
 import { runMockPublish } from "../_shared/mockPublish.ts";
 
@@ -15,8 +16,12 @@ type MockPublishRequest = {
   publish_request_id?: string | null;
 };
 
+// Machine callers present FUNCTION_INVOKE_SECRET in the X-Invoke-Secret header.
+// This used to compare Authorization against SUPABASE_SERVICE_ROLE_KEY, which the
+// runtime no longer holds (new-style sb_secret keys), so it 401'd every scheduled
+// run in silence. See _shared/connectionHelpers.ts.
 function isServiceRoleRequest(req: Request) {
-  return req.headers.get("Authorization") === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`;
+  return presentsInvokeSecret(req);
 }
 
 serve(async (req) => {
@@ -32,7 +37,7 @@ serve(async (req) => {
     const adminClient = createAdminClient();
 
     if (isServiceRoleRequest(req)) {
-      requireServiceRole(req);
+      requireInvokeSecret(req);
     } else {
       const authClient = createAuthClient(req.headers.get("Authorization"));
       const user = await requireUser(authClient);

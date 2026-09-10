@@ -2,6 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 import { readEnv } from "../_shared/env.ts";
 import { handleCors, jsonResponse, mapErrorToStatusCode, toErrorPayload } from "../_shared/http.ts";
+// One implementation of caller auth, not three. This file and
+// refresh-social-tokens each carried their own copy of the old service-role
+// check, so a fix to one silently left the others behind.
+import { requireInvokeSecret } from "../_shared/connectionHelpers.ts";
 
 type RiskLevel = "none" | "low" | "medium" | "high" | "very_high";
 
@@ -54,13 +58,6 @@ const RISK_LEVEL_RANK: Record<string, number> = {
   high: 3,
   very_high: 4,
 };
-
-function requireServiceRole(req: Request) {
-  const expected = `Bearer ${readEnv("SUPABASE_SERVICE_ROLE_KEY")}`;
-  if (req.headers.get("Authorization") !== expected) {
-    throw new Error("Unauthorized");
-  }
-}
 
 function localRiskLevel(failureCount: number): RiskLevel {
   if (failureCount >= 12) return "very_high";
@@ -263,7 +260,7 @@ serve(async (req) => {
       return jsonResponse({ error: "Method not allowed" }, 405);
     }
 
-    requireServiceRole(req);
+    requireInvokeSecret(req);
 
     const adminClient = createAdminClient();
     const windowStartIso = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
