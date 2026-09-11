@@ -79,6 +79,19 @@ const REVIEWED = [
       + 'through fetchWithTimeout.',
   },
   {
+    file: '_shared/youtube.analytics.service.ts',
+    match: /^url$/,
+    reason:
+      'fetchReport() builds every URL from the module-level REPORTS_URL const '
+      + '(https://youtubeanalytics.googleapis.com/v2/reports) with its query string '
+      + 'produced by URLSearchParams, so every interpolated value is encoded and the '
+      + 'HOST cannot be influenced by input. Nothing caller-supplied reaches the URL: '
+      + 'the only variable parts are dates, metric names from the module-level maps, '
+      + 'and YouTube video ids that came from YouTube itself. This module fetches no '
+      + 'media, so there is no safeFetch path here — unlike the publish adapters, it '
+      + 'never touches generations.output_url.',
+  },
+  {
     file: '_shared/youtube.service.ts',
     match: /^url$/,
     reason:
