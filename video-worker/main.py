@@ -22,6 +22,30 @@ from logger import log
 # STARTUP + SHUTDOWN
 # ─────────────────────────────────────────────
 
+async def _reaper_loop() -> None:
+    """
+    Re-run crash recovery on a timer, not just at startup.
+
+    Startup-only recovery assumes a stranded job is always accompanied by a
+    restart that happens AFTER the staleness threshold. Neither half holds: a
+    job task can die while the worker stays up, and a stopped machine can be
+    woken by traffic minutes after the stop, run the reaper too early, skip the
+    job, and then idle with it stranded.
+    """
+    while True:
+        try:
+            await asyncio.sleep(config.reaper_interval_seconds)
+            reset = await asyncio.to_thread(
+                reset_stuck_jobs, config.stuck_job_threshold_minutes
+            )
+            if reset:
+                log.warning("reaper_reset_jobs", count=reset)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.error("reaper_loop_error", error=str(exc)[:120])
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Runs on startup and shutdown."""
@@ -57,16 +81,19 @@ async def lifespan(app: FastAPI):
     
     # Start background polling loop
     poll_task = asyncio.create_task(poll_loop())
+    reaper_task = asyncio.create_task(_reaper_loop())
     log.info("worker_ready")
     
     yield  # Server is running
     
     # Shutdown
     poll_task.cancel()
-    try:
-        await poll_task
-    except asyncio.CancelledError:
-        pass
+    reaper_task.cancel()
+    for task in (poll_task, reaper_task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     log.info("worker_shutdown_complete")
 
 

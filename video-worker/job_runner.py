@@ -14,6 +14,7 @@ from database import (
     fail_job,
     get_transcript_word_segments,
     get_clips_for_job,
+    touch_job,
 )
 from stages.download import run_download
 from stages.transcribe import run_transcribe
@@ -197,6 +198,21 @@ def _job_is_terminal(job_id: str) -> bool:
         return True
 
 
+# How often a running job says it is still alive. Must be comfortably shorter
+# than WORKER_STUCK_JOB_THRESHOLD_MINUTES, or a healthy job reaps itself.
+HEARTBEAT_INTERVAL_SECONDS = 60
+
+
+async def _heartbeat(job_id: str) -> None:
+    """Move the job's updated_at forward every minute until cancelled."""
+    try:
+        while True:
+            await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
+            await asyncio.to_thread(touch_job, job_id)
+    except asyncio.CancelledError:
+        raise
+
+
 async def process_job(job: dict) -> None:
     """
     Full pipeline orchestrator for one video job with timeout protection.
@@ -231,6 +247,10 @@ async def process_job(job: dict) -> None:
         log.info("temp_dir_created", job_id=job_id, path=temp_dir)
 
         # ── Run pipeline with timeout ─────────────────────────────
+        # The heartbeat runs alongside the pipeline so the row keeps saying
+        # "alive" through the long silent stages (transcribe, render). Started
+        # here rather than inside a stage so no stage can forget to.
+        heartbeat_task = asyncio.create_task(_heartbeat(job_id))
         try:
             credits_consumed, clips_produced = await asyncio.wait_for(
                 _run_pipeline_stages(job, temp_dir),
@@ -251,6 +271,8 @@ async def process_job(job: dict) -> None:
                 should_refund=True,
                 credits_to_refund=0,  # refund logic in _run_pipeline_stages failed job path
             )
+        finally:
+            heartbeat_task.cancel()
 
     except asyncio.CancelledError:
         # Shutdown interrupted this job. The poller requeues it — so KEEP the

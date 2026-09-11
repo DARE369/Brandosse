@@ -47,7 +47,17 @@ class WorkerConfig(BaseSettings):
     temp_dir: str = Field(default="/tmp/video-engine", alias="WORKER_TEMP_DIR")
     max_concurrent_jobs: int = Field(default=2, alias="WORKER_MAX_CONCURRENT_JOBS")
     poll_interval_seconds: int = Field(default=5, alias="WORKER_POLL_INTERVAL_SECONDS")
-    stuck_job_threshold_minutes: int = Field(default=45, alias="WORKER_STUCK_JOB_THRESHOLD_MINUTES")
+    # 45 minutes was chosen when updated_at only moved on stage changes, so it
+    # had to exceed the longest possible SILENT stage or it would reset healthy
+    # jobs. process_job now heartbeats every 60s (job_runner._heartbeat), so a
+    # job that has said nothing for 10 minutes genuinely has no worker behind it.
+    # The cost of this number is how long a stranded job waits before rescue.
+    stuck_job_threshold_minutes: int = Field(default=10, alias="WORKER_STUCK_JOB_THRESHOLD_MINUTES")
+    # How often the reaper re-runs while the worker is up. Startup-only recovery
+    # cannot rescue a job stranded by a machine stop whose restart happened
+    # before the threshold elapsed — which is exactly what happened to job
+    # 2cdf61cd on 2026-09-04.
+    reaper_interval_seconds: int = Field(default=180, alias="WORKER_REAPER_INTERVAL_SECONDS")
     port: int = Field(default=8001, alias="WORKER_PORT")
     log_level: str = Field(default="INFO", alias="WORKER_LOG_LEVEL")
 

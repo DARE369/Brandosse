@@ -4,7 +4,16 @@
 # one host; two deploy configs is how a service ends up running in two places
 # and being debugged in a third.
 #
-# Deploy:  flyctl deploy --config video-worker/fly.toml --dockerfile video-worker/Dockerfile
+# Deploy:  cd video-worker && flyctl deploy --config fly.toml --dockerfile Dockerfile
+#
+# Run it FROM video-worker/, not from the repo root. flyctl's build context is
+# the working directory, and .dockerignore is only read from the context root —
+# so deploying from the repo root ignores video-worker/.dockerignore entirely
+# and uploads the whole repo. Measured 2026-09-04: 1.5 GB and still climbing
+# after 8 minutes (node_modules, .next, and the very venv/ the ignore file
+# exists to exclude). From this directory the same deploy is a 665 MB image.
+# Adding a root .dockerignore would not fix it — the root context is wrong for
+# a Dockerfile whose COPY . . expects to see only the worker.
 #
 # ── Sizing: a $5/month ceiling, not a performance target ───────────────────
 # This was shared-cpu-4x / 4GB / 25GB always-on — about $31/month, sized for

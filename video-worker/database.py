@@ -253,11 +253,52 @@ def refund_credits(user_id: str, job_id: str, amount: int, description: str) -> 
 # CRASH RECOVERY
 # ─────────────────────────────────────────────
 
+def touch_job(job_id: str) -> bool:
+    """
+    Say "this job is still alive" by moving its updated_at forward.
+
+    ── The defect this closes ──────────────────────────────────────────────────
+    reset_stuck_jobs decides whether a job is dead by how old video_jobs.updated_at
+    is. But nothing wrote to that column during the longest stages: rendering
+    writes clip rows (update_clip_render_complete touches video_clips.updated_at,
+    not the job), and transcription writes nothing at all until it finishes. So a
+    job's updated_at froze at the moment its stage began, and staleness measured
+    "how long has this stage been running" rather than "how long since anything
+    happened".
+
+    That is wrong in BOTH directions, and both were observed:
+      - A healthy 50-minute render looked 50 minutes stale and was eligible to be
+        reset out from under itself.
+      - A job whose machine was stopped 20 seconds into rendering looked only 20
+        seconds stale and was skipped by the reaper — job 2cdf61cd on 2026-09-04
+        sat in 'rendering' with five pending clips and no worker, and would not
+        have been rescued for 45 minutes.
+
+    With a real heartbeat the measure means what the reaper thinks it means, which
+    is what makes it safe to lower the threshold.
+    """
+    try:
+        supabase.table("video_jobs")            .update({"updated_at": datetime.now(timezone.utc).isoformat()})            .eq("id", job_id)            .execute()
+        return True
+    except Exception as e:
+        # A failed heartbeat must never kill the job it is reporting on. The
+        # cost of missing one is a slightly older timestamp.
+        log.warning("job_heartbeat_failed", job_id=job_id, error=str(e)[:80])
+        return False
+
+
 def reset_stuck_jobs(threshold_minutes: int) -> int:
     """
-    On worker startup, reset jobs stuck in non-terminal states.
-    A job is considered stuck if updated_at is older than threshold_minutes.
-    Returns the number of jobs reset.
+    Reset jobs stuck in non-terminal states, so they can be picked up again.
+
+    Runs at startup AND periodically while the worker is up (main.py), because a
+    job can be stranded without the worker restarting: the task can die, or the
+    machine can be stopped mid-render and started again by traffic that arrives
+    before the threshold elapses.
+
+    A job is stuck if updated_at is older than threshold_minutes. That test is
+    only meaningful because process_job now heartbeats the row every 60s — see
+    touch_job above. Returns the number of jobs reset.
     """
     try:
         cutoff_time = (
