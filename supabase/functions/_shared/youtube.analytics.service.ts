@@ -116,8 +116,14 @@ export const BREAKDOWN_DIMENSIONS: Record<string, string> = {
   country: "country",
   deviceType: "device_type",
   operatingSystem: "operating_system",
-  subscribedStatus: "subscribed_status",
 };
+
+// subscribedStatus is deliberately NOT here. It is documented as a dimension,
+// but combined with a `video==` filter the API returns 500 internalError —
+// verified against Google 2026-09-11, where every other dimension in this list
+// returned 200 for the same video and window. Requesting it cost a request,
+// failed the whole run, and produced nothing. A dimension that errors is worse
+// than one we do not ask for.
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
