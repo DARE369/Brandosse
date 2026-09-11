@@ -254,6 +254,8 @@ export default function LandingPage() {
         </div>
       </header>
 
+      <main id="lp-main">
+
       {/* ══ Hero ══════════════════════════════════════════════════════════ */}
       <section className="lp-section lp-hero" id="top">
         <div className="lp-hero-glow" aria-hidden="true" />
@@ -731,6 +733,8 @@ export default function LandingPage() {
           </p>
         </div>
       </section>
+
+      </main>
 
       <footer className="lp-footer">
         <div className="lp-wrap lp-foot-grid">

@@ -30,6 +30,7 @@
     "check:font-metrics": "node scripts/check-font-metrics.cjs",
     "check:compose-wiring": "node scripts/check-compose-wiring.cjs",
     "check:token-contrast": "node scripts/check-token-contrast.cjs",
+    "check:landing-contrast": "node scripts/check-landing-contrast.cjs",
     "check:website-import-reachable": "node scripts/check-website-import-reachable.cjs",
     "check:kit-deletion": "node scripts/check-kit-deletion.cjs",
     "check:ssr-hydration-safety": "node scripts/check-ssr-hydration-safety.cjs",

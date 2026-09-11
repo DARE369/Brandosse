@@ -21,12 +21,13 @@
   --lp-ink: #17181B;
   --lp-ink-2: #2C2E33;
   --lp-muted: #5C5E63;
-  --lp-muted-2: #85888E;
-  --lp-faint: #A3A6AB;
+  --lp-muted-2: #6C6E73;
+  --lp-faint: #707376;
 
   --lp-accent: #FF5C38;
-  --lp-accent-ink: #D9401C; /* ember on white, at text contrast */
+  --lp-accent-ink: #D23E1B; /* ember on paper, measured 4.53:1 — normal-text safe */
   --lp-accent-press: #F04A26;
+  --lp-accent-on: #17181B; /* label colour ON the accent — 5.78:1 */
   --lp-good: #26714A;
   --lp-warn: #8A5602;
   --lp-bad: #C42C31;
@@ -71,7 +72,7 @@
 .lp-root h4 { color: var(--lp-ink); }
 
 .lp-root .lp-brand { color: var(--lp-ink); }
-.lp-root .lp-btn-accent,
+.lp-root .lp-btn-accent { color: var(--lp-accent-on); }
 .lp-root .lp-btn-dark { color: #FFF; }
 .lp-root .lp-btn-outline { color: var(--lp-ink); }
 
@@ -210,10 +211,10 @@
 
 .lp-btn-accent {
   background: var(--lp-accent);
-  color: #FFF;
+  color: var(--lp-accent-on);
   box-shadow: 0 10px 24px rgba(255, 92, 56, 0.26);
 }
-.lp-btn-accent:hover { background: var(--lp-accent-press); color: #FFF; }
+.lp-btn-accent:hover { background: var(--lp-accent-press); color: var(--lp-accent-on); }
 
 .lp-btn-dark { background: var(--lp-ink); color: #FFF; }
 .lp-btn-dark:hover { background: #2C2E33; color: #FFF; }
