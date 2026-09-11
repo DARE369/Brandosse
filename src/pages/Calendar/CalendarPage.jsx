@@ -493,6 +493,7 @@ function CalendarBody({ brandKit }) {
         captions: payload.captions,
         asset: payload.asset,
         scheduledAtISO: payload.scheduledAtISO,
+        youtubeOptions: payload.youtubeOptions || null,
       });
       refetch();
       refetchDrafts();

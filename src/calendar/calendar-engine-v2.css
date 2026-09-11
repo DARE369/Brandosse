@@ -914,3 +914,33 @@
 .quickpost-hint--error {
   color: var(--danger, #b42318);
 }
+
+/* ── Quick Post: YouTube audience declaration ───────────────────────────────
+   Required by YouTube for every video and a legal statement under COPPA, so it
+   gets its own block rather than sitting among optional fields. */
+.quickpost-yt-audience {
+  margin: 12px 0 4px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle, #e5e7eb);
+  border-radius: 10px;
+}
+
+.quickpost-yt-audience__q {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Quick Post platform hints ──────────────────────────────────────────────
+   An empty toggle row with no explanation is its own silent failure: the user
+   cannot tell "still loading" from "nothing connected" from "the check failed". */
+.quickpost-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary, #6b7280);
+}
+
+.quickpost-hint--error {
+  color: var(--danger, #b42318);
+}

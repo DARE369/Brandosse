@@ -121,6 +121,16 @@ export default function QuickPostComposer({
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(prefillAsset || null);
   const [activePlatforms, setActivePlatforms] = useState([]);
+  // Tri-state on purpose: null means UNANSWERED, which is different from a
+  // declared 'no'. YouTube treats them differently and so must we — the
+  // adapter refuses to publish on null rather than declaring on the user's
+  // behalf, because this is a legal statement under COPPA.
+  const [madeForKids, setMadeForKids] = useState(null);
+
+  // Blocks SCHEDULING only, never saving a draft. A draft is explicitly an
+  // unfinished post, and refusing to save one would lose the caption the user
+  // just wrote. The declaration is required to PUBLISH, not to keep working.
+  const youtubeNeedsAudience = activePlatforms.includes('youtube') && madeForKids === null;
   const { platforms: PLATFORMS, state: platformState } = usePublishablePlatforms(open);
 
   // Select the first publishable platform once they load. Defaulting to a
@@ -236,6 +246,9 @@ export default function QuickPostComposer({
       const payload = {
         mode,
         platforms: activePlatforms,
+        youtubeOptions: activePlatforms.includes('youtube')
+          ? { madeForKids, privacyStatus: 'private' }
+          : null,
         captions,
         asset: selectedAsset,
         dateKey: mode === 'schedule' ? dateKey : null,
@@ -365,6 +378,44 @@ export default function QuickPostComposer({
               ))}
             </div>
 
+            {/* YouTube will not accept a video without this. It is a COPPA
+                declaration, so it is the user's to make — the adapter refuses
+                rather than defaulting. Collected HERE because the composer that
+                offers YouTube must be able to satisfy what YouTube requires;
+                otherwise the publish fails with an instruction ("answer the
+                audience question") pointing at a control that does not exist. */}
+            {activePlatforms.includes('youtube') && (
+              <div className="quickpost-yt-audience">
+                <p className="quickpost-yt-audience__q">
+                  Is this video made for kids? <span aria-hidden="true">*</span>
+                </p>
+                <p className="quickpost-hint">
+                  YouTube requires this for every video, by law. It cannot be answered for you.
+                </p>
+                <div className="platform-toggle-row">
+                  <button
+                    type="button"
+                    className={`platform-toggle${madeForKids === true ? ' is-active' : ''}`}
+                    onClick={() => setMadeForKids(true)}
+                  >
+                    Yes, made for kids
+                  </button>
+                  <button
+                    type="button"
+                    className={`platform-toggle${madeForKids === false ? ' is-active' : ''}`}
+                    onClick={() => setMadeForKids(false)}
+                  >
+                    No, not made for kids
+                  </button>
+                </div>
+                {madeForKids === null && (
+                  <p className="quickpost-hint quickpost-hint--error">
+                    Answer this before scheduling — YouTube rejects the upload without it.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="per-platform-caption">
               {PLATFORMS.filter((p) => activePlatforms.includes(p.key)).map((p) => {
                 const caption = captions[p.key] || '';
@@ -414,7 +465,7 @@ export default function QuickPostComposer({
           </button>
           <div className="quickpost-footer__primary">
             <button type="button" className="ui-button ui-button-secondary ui-button-md" onClick={onClose} disabled={isSubmitting}>Cancel</button>
-            <button type="button" className="ui-button ui-button-primary ui-button-md" disabled={isSubmitting || activePlatforms.length === 0} onClick={() => handleSubmit('schedule')}>
+            <button type="button" className="ui-button ui-button-primary ui-button-md" disabled={isSubmitting || activePlatforms.length === 0 || youtubeNeedsAudience} onClick={() => handleSubmit('schedule')}>
               Schedule post
             </button>
           </div>

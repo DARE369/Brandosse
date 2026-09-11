@@ -380,7 +380,7 @@ export async function fetchConnectedAccounts(scope, { platforms = null } = {}) {
  * @param {string|null} params.scheduledAtISO - already timezone-resolved UTC ISO, or null for draft
  * @returns {Promise<Array>} the created post rows
  */
-export async function createQuickPost(scope, { mode, platforms, captions, asset, scheduledAtISO }) {
+export async function createQuickPost(scope, { mode, platforms, captions, asset, scheduledAtISO, youtubeOptions = null }) {
   const userId = assertPersonalScope(scope, 'createQuickPost');
 
   const activePlatforms = Array.isArray(platforms) ? platforms.filter(Boolean) : [];
@@ -415,6 +415,26 @@ export async function createQuickPost(scope, { mode, platforms, captions, asset,
       scheduled_at: mode === 'schedule' ? scheduledAtISO : null,
       generation_id: generationId,
       title: asset?.name || null,
+      // YouTube refuses to publish without a made-for-kids declaration — it is
+      // a COPPA statement, so the adapter will not invent one (see
+      // _shared/youtube.service.ts). Carried here so the answer the user gave
+      // in the composer reaches the publisher; without it the post fails at
+      // publish time with an instruction the user cannot act on.
+      //
+      // Written as a whole object because this row is new: there is no prior
+      // workflow_state to merge with. Every LATER writer must read-modify-write
+      // instead, since approval routing and publish accounting share the column.
+      ...(platformKey === 'youtube' && youtubeOptions
+        ? {
+            workflow_state: {
+              youtube: {
+                made_for_kids: youtubeOptions.madeForKids,
+                privacy_status: youtubeOptions.privacyStatus || 'private',
+                capturedAt: new Date().toISOString(),
+              },
+            },
+          }
+        : {}),
     };
   });
 
