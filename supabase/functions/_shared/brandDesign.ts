@@ -210,6 +210,71 @@ export function wcagLevel(ratio: number): ContrastPair["wcag"] {
 /** The floor for body text. Below this, text is not placed — it is fixed. */
 export const MIN_TEXT_CONTRAST = 4.5;
 
+
+/**
+ * A plain-language name for a hex, so a palette is not a row of unlabelled
+ * squares.
+ *
+ * ── What this is and is not ────────────────────────────────────────────────
+ * It DESCRIBES the colour ("Deep navy", "Warm orange"); it does not invent the
+ * brand's own name for it. Nobody's style guide calls it "Deep navy" — but
+ * "Deep navy" is true, useful in a dropdown, and the user can rename it. An
+ * invented brand-sounding name would be fabricated data; a description is not.
+ *
+ * Computed from HSL so it is deterministic: the same hex always gets the same
+ * name, and two adjacent swatches never both come back "Blue".
+ */
+export function describeColor(hex: string): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return "";
+
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  const delta = max - min;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+
+  // Neutrals first: a near-grey with a hue is still a grey to the eye.
+  if (saturation < 0.1) {
+    if (lightness > 0.96) return "White";
+    if (lightness > 0.82) return "Off-white";
+    if (lightness > 0.6) return "Light grey";
+    if (lightness > 0.4) return "Grey";
+    if (lightness > 0.22) return "Dark grey";
+    if (lightness > 0.06) return "Charcoal";
+    return "Black";
+  }
+
+  let hue = 0;
+  if (max === r) hue = ((g - b) / delta) % 6;
+  else if (max === g) hue = (b - r) / delta + 2;
+  else hue = (r - g) / delta + 4;
+  hue = (hue * 60 + 360) % 360;
+
+  const HUES: Array<[number, string]> = [
+    [15, "Red"], [40, "Orange"], [65, "Yellow"], [95, "Lime"], [150, "Green"],
+    [185, "Teal"], [205, "Cyan"], [250, "Blue"], [280, "Indigo"],
+    [310, "Purple"], [340, "Pink"], [360, "Red"],
+  ];
+  const base = HUES.find(([limit]) => hue < limit)?.[1] ?? "Red";
+
+  // "Navy" reads better than "Very dark blue", and people use it.
+  if (base === "Blue" && lightness < 0.3) return "Navy";
+  if (base === "Orange" && lightness < 0.35) return "Brown";
+
+  const tone = lightness > 0.78 ? "Pale "
+    : lightness > 0.6 ? "Light "
+      : lightness < 0.22 ? "Deep "
+        : lightness < 0.38 ? "Dark "
+          : saturation > 0.7 ? "Bright "
+            : "";
+
+  return `${tone}${tone ? base.toLowerCase() : base}`;
+}
+
 // ── Primitive coercion ───────────────────────────────────────────────────────
 
 function asString(value: unknown, fallback = ""): string {

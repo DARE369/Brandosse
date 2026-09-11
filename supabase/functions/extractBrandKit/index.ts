@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAdminClient, createAuthClient, requireUser } from "../_shared/supabase.ts";
 import { callLlm, callAnthropicWithDocument } from "../_shared/llm.ts";
 import { harvestSite, type HarvestResult } from "../_shared/siteHarvest.ts";
-import { buildDesignUpdate } from "../_shared/brandDesign.ts";
+import { buildDesignUpdate, describeColor } from "../_shared/brandDesign.ts";
 import { corsHeaders, handleCors, jsonResponse, mapErrorToStatusCode, parseJsonBody, toErrorPayload } from "../_shared/http.ts";
 
 // Source can be a previously-uploaded brand_assets document, or a live
@@ -348,7 +348,9 @@ function applyMeasuredEvidence(
   if (harvest.measuredPalette.length > 0) {
     brandKit.color_palette = harvest.measuredPalette.slice(0, 6).map((color) => ({
       hex: color.hex,
-      name: "",
+      // A described name, not an invented brand one — a palette of unlabelled
+      // squares is unusable in a dropdown, and the user can rename any of them.
+      name: describeColor(color.hex),
       usage: color.fromCustomProperty
         ? `declared as ${color.sources[0] ?? "a CSS variable"}`
         : `used on ${color.sources.slice(0, 2).join(", ") || "the site"}`,

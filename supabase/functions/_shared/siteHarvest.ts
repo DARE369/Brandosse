@@ -46,6 +46,7 @@ import {
   MIN_TEXT_CONTRAST,
   normalizeHex,
   relativeLuminance,
+  describeColor,
 } from "./brandDesign.ts";
 
 // ── Budgets ──────────────────────────────────────────────────────────────────
@@ -382,6 +383,13 @@ function parseDeclarations(block: string): Array<{ property: string; value: stri
  * viewer sees most of.
  */
 function colorWeightFor(property: string): number {
+  // Framework internals carry colours that are not brand decisions:
+  // --tw-shadow / --tw-ring-* are shadow plumbing (#000 appeared 82 times on
+  // lordswayenergy.com purely through these), and --tw-gradient-* are set by
+  // utility classes rather than chosen. Weighting them as custom properties —
+  // the HIGHEST weight, on the grounds that a custom property names intent —
+  // let Tailwind's stock palette outrank everything and be reported as measured.
+  if (/^--tw-/.test(property)) return 0;
   if (property.startsWith("--")) return 5;
   if (/^(background|background-color)$/.test(property)) return 3;
   if (property === "color") return 2;
@@ -398,15 +406,46 @@ const GENERIC_FAMILIES = new Set([
   "initial", "unset", "revert", "-apple-system", "blinkmacsystemfont",
   "segoe ui", "roboto", "helvetica neue", "helvetica", "arial", "emoji",
   "apple color emoji", "segoe ui emoji", "noto color emoji", "math", "fangsong",
+  // Emoji and symbol fallbacks that sit at the TAIL of default stacks. Missing
+  // one of these is not cosmetic: lordswayenergy.com ships Tailwind's default
+  // stack and nothing else, and because "segoe ui symbol" was absent from this
+  // list it was reported to the user as their measured brand body typeface.
+  "segoe ui symbol", "noto sans symbols", "noto sans symbols 2", "symbol",
+  "segoe ui historic", "android emoji", "twemoji mozilla", "ui-emoji",
+  "sfmono-regular", "menlo", "monaco", "consolas", "liberation mono",
+  "courier new", "courier", "georgia", "cambria", "times new roman", "times",
+  "sf pro text", "sf pro display", "segoe ui variable",
 ]);
+
+/**
+ * Font stacks that ship with a CSS framework and say nothing about a brand.
+ *
+ * Tailwind's `font-sans` is the whole default stack; a site that never
+ * overrides it has not chosen a typeface, and reporting one from it is
+ * fabricating a brand decision the owner never made.
+ */
+const FRAMEWORK_FONT_STACK = /^\s*ui-(sans-serif|serif|monospace)\s*,/i;
 
 /** First non-generic family in a font-family value. */
 export function firstRealFamily(value: string): string {
+  // A framework's untouched default stack is not a brand typeface.
+  if (FRAMEWORK_FONT_STACK.test(value)) return "";
+
   for (const raw of value.split(",")) {
     const family = raw.trim().replace(/^['"]|['"]$/g, "").trim();
     if (!family) continue;
     if (GENERIC_FAMILIES.has(family.toLowerCase())) continue;
-    if (family.startsWith("var(")) continue;
+
+    // The `font:` SHORTHAND packs size and line-height in front of the family,
+    // so its first comma-separated token is not a family at all. A live site
+    // yielded `calc(9px * var(--total-scale-factor)) sans-serif` as its
+    // "brand body typeface" through exactly this path.
+    if (family.includes("(")) continue;      // calc(), var(), clamp()
+    if (/^[\d.]/.test(family)) continue;     // a size, not a name
+    if (family.includes("/")) continue;      // font-size/line-height
+    // CSS system-font keywords (`font: menu`), which name an OS setting.
+    if (/^(caption|icon|menu|message-box|small-caption|status-bar)$/i.test(family)) continue;
+
     return family;
   }
   return "";
@@ -586,6 +625,16 @@ export async function harvestSite(rawUrl: string): Promise<HarvestResult> {
   }
 
   const { palette, fonts } = analyseCss(cssSources, googleFontFamilies);
+
+  // Said plainly, because "no fonts were found" is a real answer about the site
+  // and the alternative is the user staring at an empty Typography section
+  // wondering what went wrong. A site can simply not have chosen a typeface.
+  if (cssSources.length > 0 && fonts.all.length === 0) {
+    notes.push(
+      "This site does not name a typeface of its own — it uses the browser or framework default "
+      + "stack. Nothing was measured for typography, so set your display and body fonts by hand.",
+    );
+  }
   const colorRoles = inferColorRoles(palette, notes);
 
   // -- Identity, contact, social, logos ---------------------------------------
@@ -900,9 +949,11 @@ export function inferColorRoles(
   const roles: Partial<Record<ColorRoleName, ColorRole>> = {};
   if (palette.length === 0) return roles;
 
-  const measured = (hex: string, name: string, bg?: string): ColorRole => ({
+  // "Background" alone tells a user nothing when they are staring at six
+  // swatches; "Background · White" does.
+  const measured = (hex: string, role: string, bg?: string): ColorRole => ({
     hex,
-    name,
+    name: describeColor(hex) ? `${role} · ${describeColor(hex)}` : role,
     source: "measured",
     contrast_vs_background: bg && bg !== hex ? contrastRatio(hex, bg) : 0,
   });
@@ -958,7 +1009,7 @@ export function inferColorRoles(
   const groundObserved = background.onGroundSelector;
   roles.background = {
     hex: background.hex,
-    name: "Background",
+    name: describeColor(background.hex) ? `Background · ${describeColor(background.hex)}` : "Background",
     source: groundObserved ? "measured" : "inferred",
     contrast_vs_background: 0,
   };
@@ -1019,7 +1070,7 @@ export function inferColorRoles(
     const ctaText = onWhite >= onBlack ? "#ffffff" : "#111111";
     roles.cta_text = {
       hex: ctaText,
-      name: "Button text",
+      name: `Button text · ${describeColor(ctaText)}`,
       // Derived from the accent, not read off the site — labelled honestly.
       source: "inferred",
       contrast_vs_background: contrastRatio(ctaText, bgHex),

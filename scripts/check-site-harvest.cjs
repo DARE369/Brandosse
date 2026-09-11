@@ -229,6 +229,44 @@ async function main() {
       h.firstRealFamily('system-ui, -apple-system, sans-serif') === '',
       'A stack of only generic families names no brand typeface and must yield nothing.',
     );
+    // Every one of these was reported to a user as their measured brand
+    // typeface at some point, from a real site.
+    assert(
+      h.firstRealFamily('ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji",Segoe UI Symbol') === '',
+      'An untouched Tailwind default stack yielded a typeface. A site that never overrides the '
+      + 'framework default has not chosen a font, and "Segoe UI Symbol" — an EMOJI fallback at the '
+      + 'tail of that stack — was shown to a founder as their brand body face.',
+    );
+    assert(
+      h.firstRealFamily('calc(9px * var(--total-scale-factor)) sans-serif') === '',
+      'The `font:` shorthand packs a size in front of the family, so its first token is not a '
+      + 'family. A live site produced exactly this string as its "brand typeface".',
+    );
+    assert(
+      h.firstRealFamily('message-box') === '',
+      'CSS system-font keywords name an OS setting, not a brand typeface.',
+    );
+    assert(
+      h.firstRealFamily('"Plus Jakarta Sans", sans-serif') === 'Plus Jakarta Sans',
+      'A genuine quoted family must still be found — the rejects above must not over-reach.',
+    );
+
+    // Framework plumbing is not a brand colour decision.
+    const twCss = `
+      .a { --tw-shadow: 0 1px 2px #000000; }
+      .b { --tw-ring-offset-color: #000000; }
+      .c { --tw-gradient-from: #000000; }
+      .d { background-color: #0c513f; }
+    `;
+    const twPalette = h.analyseCss([twCss], []).palette;
+    const twBlack = twPalette.find((c) => c.hex === '#000000');
+    assert(
+      !twBlack || twBlack.weight === 0,
+      'Colours declared only through --tw-* variables carry weight. Those are shadow, ring and '
+      + 'gradient plumbing, not brand choices — on a real site #000 appeared 82 times purely '
+      + 'through them and, weighted as a custom property (the HIGHEST weight), took the background '
+      + `role on a white page. Got weight ${twBlack && twBlack.weight}.`,
+    );
     assert(
       fonts.display && fonts.display.family === 'Bricolage Grotesque',
       `The display face is used on h1/h2 and declared via @font-face; got ${fonts.display && fonts.display.family}`,
