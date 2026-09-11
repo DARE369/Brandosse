@@ -58,6 +58,7 @@ const IMAGE = 'postgres:16-alpine';
 const MIGRATIONS_UNDER_TEST = [
   '20260909140000_social_analytics_foundation.sql',
   '20260909160000_mark_tiktok_youtube_publishable.sql',
+  '20260911120000_analytics_quota_ledger.sql',
 ];
 
 const USER_A = '11111111-1111-1111-1111-111111111111';
