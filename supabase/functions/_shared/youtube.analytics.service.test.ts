@@ -225,6 +225,23 @@ Deno.test("classifyAnalyticsError marks quota exhaustion retriable and app-wide"
   assert(/app-wide|shared/i.test(e.detail), "must say the limit is shared, not this account's fault");
 });
 
+Deno.test("classifyAnalyticsError separates a DISABLED API from a missing scope", () => {
+  // Both are 403 and both read like permissions failures, but the remedies are
+  // opposite: enabling an API takes seconds, while a scope failure needs every
+  // affected user to reconnect. Telling an operator to reconnect a working
+  // channel is worse than saying nothing — it destroys a good credential.
+  const disabled = classifyAnalyticsError(403, JSON.stringify({
+    error: {
+      errors: [{ reason: "accessNotConfigured" }],
+      message: "YouTube Analytics API has not been used in project 123 before or it is disabled.",
+    },
+  }));
+  assertEquals(disabled.code, "api_not_enabled", "identified as a project setting");
+  assertEquals(disabled.retriable, true, "succeeds on the next run once enabled");
+  assert(!/reconnect/i.test(disabled.detail), "must NOT tell anyone to reconnect a valid token");
+  assert(/enable/i.test(disabled.detail), "names the actual fix");
+});
+
 Deno.test("classifyAnalyticsError treats a missing scope as permanent", () => {
   const e = classifyAnalyticsError(403, gErr("insufficientPermissions"));
   assertEquals(e.code, "scope_not_granted", "coded");

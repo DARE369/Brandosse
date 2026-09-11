@@ -196,6 +196,23 @@ export function classifyAnalyticsError(
       retriable: true,
     };
   }
+  // A DISABLED API also returns 403, and its message reads exactly like a
+  // permissions failure. Distinguished by reason, because the two have
+  // opposite remedies: accessNotConfigured is fixed in the Cloud console in
+  // thirty seconds, while a genuine scope failure needs every affected user to
+  // reconnect. Observed live 2026-09-11: this was classified as a missing
+  // scope and told the operator to reconnect a channel whose token was fine.
+  if (reason === "accessNotConfigured" || /has not been used in project|is disabled/i.test(message)) {
+    return {
+      code: "api_not_enabled",
+      detail: "The YouTube Analytics API is not enabled on this Google Cloud project. "
+        + "Enable it in the console, wait a few minutes for propagation, then retry. "
+        + "This is a project setting — the user's token and scopes are fine.",
+      // Retriable: the moment it is enabled, the next scheduled run succeeds
+      // with no code change and no user action.
+      retriable: true,
+    };
+  }
   if (reason === "insufficientPermissions" || httpStatus === 403) {
     return {
       code: "scope_not_granted",
