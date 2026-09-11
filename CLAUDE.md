@@ -140,3 +140,84 @@ Notes:
   design, QA personas, security, devops-scalability, etc.) already in
   `.claude/agents/` — prefer those for their specific domains; use the six
   above for the broader business/product/growth angles they don't cover.
+
+---
+
+# 🔌 ECC plugin — routing guide
+
+Installed 2026-09-08: `ecc@ecc` v2.2.1, user scope, from
+`https://github.com/affaan-m/ECC.git`. Verified on disk at
+`~/.claude/plugins/cache/ecc/ecc/2.2.1`: **286 skill dirs (380 registered),
+68 agents, 94 commands, 23 rules, 7 hook events, 1 MCP server**.
+Config: `hooks_enabled: true`, `hook_profile: standard`.
+
+## Precedence — read this first
+
+Bare name = built-in or this repo. `ecc:` prefix = ECC.
+
+| You type | You get |
+|---|---|
+| `/code-review`, `/security-review` | **built-in** Claude Code |
+| `/ecc:code-review`, `/ecc:security-scan` | ECC's versions |
+| `tech-lead`, `qa-security`, `security-auditor`, … | this repo's `.claude/agents/` |
+| `ecc:code-reviewer`, `ecc:security-reviewer` | ECC's generalists |
+
+**Order of reach: repo agent → built-in → ECC.** The 23 agents in
+`.claude/agents/` know this product, its personas, and its packet gates. ECC
+knows *frameworks*. Use ECC where no repo agent owns the discipline.
+(Agent names resolve in the agent list after a restart; the `ecc:` prefix
+disambiguates a collision.)
+
+## Reach for ECC here
+
+| Situation | Use | Note |
+|---|---|---|
+| React/Next changes need a specialist read | `/ecc:react-review`, `ecc:react-patterns`, `ecc:react-performance` | No repo agent covers React idiom or render cost |
+| Next.js build/bundler behaviour | `ecc:nextjs-turbopack` | We are on Next, not Vite |
+| Supabase schema, indexes, query cost | `ecc:postgres-patterns`, `ecc:database-migrations`, agent `ecc:database-reviewer` | **Does not** substitute for the migration rules above |
+| `video-worker/` Python | `/ecc:python-review`, `ecc:python-patterns`, agent `ecc:python-reviewer` | L0.4b instrumentation is still open |
+| Build or type errors | `/ecc:build-fix` | Auto-delegates to the right build-resolver |
+| Swallowed errors, bad fallbacks, no-ops | agent `ecc:silent-failure-hunter` | **Highest-value ECC agent here** — Law 3 is exactly this defect class |
+| Unwired / dead modules | agent `ecc:refactor-cleaner`, `/ecc:prune` | The `OptimalTimesService.js` class of defect. Not a replacement for Gate 3 |
+| Coverage gaps | `/ecc:test-coverage`, `ecc:tdd-workflow` | Feeds the *proven* half of Law 1 |
+| E2E patterns, Playwright config | `ecc:e2e-testing`, `ecc:browser-qa` | For *how to write* them. To actually drive the app, `frontend-visual-qa` already logs in with the QA account |
+| Context/token bloat, spend | `ecc:context-budget`, `ecc:cost-tracking` | Relevant to the open cost ledger (L5.14) |
+| Accessibility | agent `ecc:a11y-architect`, `ecc:frontend-a11y` | WCAG 2.2 — nothing in this repo covers it |
+| UI polish, motion, token audit | `ecc:make-interfaces-feel-better`, `ecc:motion-ui`, `ecc:design-system` | Subordinate to the locked v2 design system, never overriding it |
+
+## Do **not** reach for ECC here
+
+- **Product, business, growth, pricing calls** → the six advisory agents above.
+  ECC has no context on this market or this founder's constraints.
+- **Calendar / Library design packets** → repo designers + the packet gate.
+- **RLS or tenant isolation** → `node scripts/security/cross-tenant-probe.mjs`.
+  A reviewer agent reading policies proves nothing. Non-negotiable, unchanged.
+- **Social publishing code** → `ecc:social-publisher` targets *SocialClaw*, a
+  third-party service. This repo does **direct per-platform OAuth**. Keep it
+  away from `supabase/functions/` publishing paths.
+- **Any claim about this codebase.** Law 2 governs ECC output too: `file:line`
+  or `UNVERIFIED`.
+
+## Hooks — two gates now fire, not one
+
+ECC registers `PreToolUse` on **Bash, PowerShell, and Write**, plus
+`PostToolUse`, `PostToolUseFailure`, `SessionStart`, `Stop`, `SessionEnd`,
+`PreCompact`. Its **GateGuard** blocks Edit/Write/Bash until concrete
+investigation (importers, data schema, user instruction) is produced — which is
+the *"check the caller, not just the code"* rule enforced mechanically.
+
+This repo's own `block-prod-code-until-mockup-approved.js` (`Write|Edit`) still
+runs. **Both gates fire and both must pass.**
+
+If a gate obstructs: `/plugin configure ecc@ecc` → `hook_profile: minimal`, or
+`hooks_enabled: false`. **Never disable a gate to get past a block you have not
+read** — that is the failure mode the three laws exist to prevent.
+
+## Cost
+
+**~40,637 tokens always-on**, every session. Breakdown:
+`claude plugin details ecc@ecc`. Trim with `ecc:context-budget`.
+
+## Full inventory
+
+`/ecc:ecc-guide`, or `COMMANDS-QUICK-REF.md` in the install path.

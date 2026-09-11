@@ -61,6 +61,10 @@ const MESSAGES = {
   // Our schema refused the write. Not the platform's fault and not the user's —
   // saying so points whoever is debugging at the right place.
   account_save_rejected: 'Your sign-in worked, but saving the account was rejected by the database. This is a configuration problem on our side, not yours.',
+  // A transport failure on our side of the call — TLS reset, DNS blip. The
+  // user did nothing wrong and nothing is misconfigured, so this must not
+  // read like a bug or send them to check their account. Retrying works.
+  connect_network_error: 'The connection dropped on the way to the platform. Nothing was saved — try again.',
   connect_failed: 'The connection could not be completed.',
 };
 
