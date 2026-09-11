@@ -64,3 +64,14 @@ docs/video-compiler/BACKEND-BREAKDOWN.md
 # Python bytecode
 __pycache__/
 *.pyc
+
+# ── Build output and QA artefacts ────────────────────────────────────────────
+# These were tracked by accident and then deleted from disk, which left 99
+# permanent "deleted" entries in every git status — enough noise to bury the
+# files that actually needed review. They are regenerated on demand and must
+# never be committed again.
+qa-shots*/
+qa-tmp/
+test-results/
+playwright-report/
+*.log
