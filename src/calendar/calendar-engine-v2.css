@@ -898,3 +898,19 @@
 .agenda-bulkbar__danger {
   color: var(--color-danger, #d92d20);
 }
+
+/* ── Quick Post platform hints ──────────────────────────────────────────────
+   Shown while the composer works out which accounts can publish, and when
+   none can. An empty toggle row with no explanation is its own silent
+   failure: the user cannot tell "still loading" from "nothing connected"
+   from "the check failed". */
+.quickpost-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary, #6b7280);
+}
+
+.quickpost-hint--error {
+  color: var(--danger, #b42318);
+}

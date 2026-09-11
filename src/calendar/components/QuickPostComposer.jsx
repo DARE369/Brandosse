@@ -19,14 +19,84 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText, FileImage, Sparkles } from 'lucide-react';
 import { generateQuickPostCaption } from '../services/calendarService';
+import { supabase } from '../../services/supabaseClient';
 import { getZonedTodayKey, zonedDateTimeToUTC } from '../../utils/timezone';
 
-const PLATFORMS = [
-  { key: 'instagram', label: 'Instagram', varName: '--platform-instagram', limit: 2200 },
-  { key: 'tiktok', label: 'TikTok', varName: '--platform-tiktok-alt', limit: 2200 },
-  { key: 'linkedin', label: 'LinkedIn', varName: '--platform-linkedin', limit: 3000 },
-  { key: 'x', label: 'X', varName: '--platform-x', limit: 280 },
-];
+/**
+ * Presentation metadata ONLY — label, brand colour, caption ceiling.
+ *
+ * This is deliberately not the list of platforms the composer offers. It used
+ * to be, and that was wrong in both directions at once: it offered Instagram
+ * and X, neither of which has a publishing adapter, while omitting YouTube,
+ * which does and which the user had connected. A user could compose a post for
+ * a platform that could never publish it, and could not compose one for a
+ * platform that could.
+ *
+ * What is offered is now derived from connected_accounts_health_summary —
+ * see usePublishablePlatforms below. A platform appears here only to say how
+ * it should LOOK once something else has established that it works.
+ */
+const PLATFORM_PRESENTATION = {
+  instagram: { label: 'Instagram', varName: '--platform-instagram', limit: 2200 },
+  tiktok:    { label: 'TikTok',    varName: '--platform-tiktok-alt', limit: 2200 },
+  linkedin:  { label: 'LinkedIn',  varName: '--platform-linkedin',  limit: 3000 },
+  x:         { label: 'X',         varName: '--platform-x',         limit: 280 },
+  youtube:   { label: 'YouTube',   varName: '--platform-youtube',   limit: 5000 },
+  facebook:  { label: 'Facebook',  varName: '--platform-facebook',  limit: 63206 },
+  pinterest: { label: 'Pinterest', varName: '--platform-pinterest', limit: 500 },
+};
+
+/**
+ * The platforms this user can actually publish to, right now.
+ *
+ * Read from connected_accounts_health_summary rather than connected_accounts:
+ * that view computes can_publish from the provider registry PLUS evidence of a
+ * live credential (migration 20260904140000), so an account whose token failed
+ * to save or has expired is correctly excluded. RLS scopes it to the caller.
+ *
+ * Failing to load is NOT treated as "no platforms": that would silently empty
+ * the composer and look like the user has nothing connected. The error is
+ * surfaced instead, because "we could not check" and "you have none" are
+ * different statements.
+ */
+function usePublishablePlatforms(open) {
+  const [platforms, setPlatforms] = useState([]);
+  const [state, setState] = useState('loading');   // loading | ready | error
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+
+    (async () => {
+      setState('loading');
+      const { data, error } = await supabase
+        .from('connected_accounts_health_summary')
+        .select('platform, can_publish')
+        .eq('scope', 'personal');
+
+      if (cancelled) return;
+      if (error) {
+        console.error('[quickpost] could not load connected accounts:', error.message);
+        setState('error');
+        return;
+      }
+
+      const keys = [...new Set(
+        (data || [])
+          .filter((r) => r.can_publish)
+          .map((r) => String(r.platform || '').toLowerCase())
+          .filter((k) => PLATFORM_PRESENTATION[k]),
+      )];
+
+      setPlatforms(keys.map((key) => ({ key, ...PLATFORM_PRESENTATION[key] })));
+      setState('ready');
+    })();
+
+    return () => { cancelled = true; };
+  }, [open]);
+
+  return { platforms, state };
+}
 
 export default function QuickPostComposer({
   open,
@@ -50,7 +120,16 @@ export default function QuickPostComposer({
 }) {
   const [assetPickerOpen, setAssetPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(prefillAsset || null);
-  const [activePlatforms, setActivePlatforms] = useState(['instagram']);
+  const [activePlatforms, setActivePlatforms] = useState([]);
+  const { platforms: PLATFORMS, state: platformState } = usePublishablePlatforms(open);
+
+  // Select the first publishable platform once they load. Defaulting to a
+  // hardcoded 'instagram' selected a platform the user may not have connected.
+  useEffect(() => {
+    if (platformState === 'ready' && PLATFORMS.length > 0 && activePlatforms.length === 0) {
+      setActivePlatforms([PLATFORMS[0].key]);
+    }
+  }, [platformState, PLATFORMS, activePlatforms.length]);
   const [captions, setCaptions] = useState({});
   const [prefilling, setPrefilling] = useState({});
   const [dateKey, setDateKey] = useState(() => getZonedTodayKey(timezone));
@@ -251,6 +330,27 @@ export default function QuickPostComposer({
 
           <div>
             <p className="quickpost-step__label"><span className="quickpost-step__num">2</span>Platforms &amp; captions</p>
+            {platformState === 'loading' && (
+              <p className="quickpost-hint">Checking which accounts can publish…</p>
+            )}
+
+            {/* "We could not check" is not "you have none". Saying the second
+                when the first is true would have the user reconnecting a
+                working account to fix a network blip. */}
+            {platformState === 'error' && (
+              <p className="quickpost-hint quickpost-hint--error">
+                Could not check your connected accounts. Reload to try again — nothing is wrong
+                with your connections.
+              </p>
+            )}
+
+            {platformState === 'ready' && PLATFORMS.length === 0 && (
+              <p className="quickpost-hint quickpost-hint--error">
+                No connected account can publish yet. Connect one in Settings first — a post
+                scheduled with no target would fail at publish time.
+              </p>
+            )}
+
             <div className="platform-toggle-row">
               {PLATFORMS.map((p) => (
                 <button
