@@ -215,6 +215,11 @@ SET granularity          = excluded.granularity,
     platform_metric_name = excluded.platform_metric_name,
     caveat               = excluded.caveat;
 
+-- Revoke first, for the reason given in section 4f: Supabase's default
+-- privileges already granted ALL on these tables the moment they were created.
+REVOKE ALL ON public.social_metric_definitions      FROM authenticated, anon;
+REVOKE ALL ON public.social_metric_platform_support FROM authenticated, anon;
+
 GRANT SELECT ON public.social_metric_definitions      TO authenticated, anon;
 GRANT SELECT ON public.social_metric_platform_support TO authenticated, anon;
 
@@ -605,15 +610,36 @@ BEGIN
 
     -- SELECT only. Writes are service-role, from the ingestion worker: these
     -- rows are claims about what a platform reported, and a client that could
-    -- write them could fabricate its own analytics. No INSERT/UPDATE/DELETE
-    -- grant is issued to authenticated or anon anywhere in this migration.
+    -- write them could fabricate its own analytics.
+    --
+    -- The REVOKE is not belt-and-braces, it is load-bearing. Supabase ships
+    -- `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ...
+    -- anon, authenticated, service_role`, so a newly created table arrives
+    -- ALREADY writable by every logged-in user. Granting SELECT does not undo
+    -- that — nothing removes a privilege except REVOKE.
+    --
+    -- Caught by post-condition 7b on the live database 2026-09-11: the tables
+    -- were created client-writable. RLS would still have refused the inserts
+    -- (there is no INSERT policy, and RLS denies by default), but a grant
+    -- nobody intended is a grant nobody is watching — exactly the reasoning in
+    -- 20260904140000 §4, where write grants outlived the read grants they were
+    -- paired with.
+    EXECUTE format('REVOKE ALL ON public.%I FROM authenticated, anon', t);
     EXECUTE format('GRANT SELECT ON public.%I TO authenticated', t);
   END LOOP;
 END
 $$;
 
--- The ledger and raw payloads are operational, not user-facing. No grant at
--- all: service-role only, like connected_account_secrets (20260904120000).
+-- The ledger and raw payloads are operational, not user-facing. Service-role
+-- only, like connected_account_secrets (20260904120000).
+--
+-- "No grant" is not the same as "no privilege": Supabase's default privileges
+-- granted ALL on both tables at creation, so they must be REVOKED rather than
+-- simply not granted. social_ingestion_raw holds verbatim platform responses,
+-- which is the last thing that should be readable from a browser.
+REVOKE ALL ON public.social_ingestion_runs FROM authenticated, anon;
+REVOKE ALL ON public.social_ingestion_raw  FROM authenticated, anon;
+
 ALTER TABLE public.social_ingestion_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.social_ingestion_raw  ENABLE ROW LEVEL SECURITY;
 
