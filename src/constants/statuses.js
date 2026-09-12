@@ -6,6 +6,18 @@ export const GENERATION_STATUS = {
   PROCESSING: 'processing',
   COMPLETED: 'completed',
   FAILED: 'failed',
+  // A file the user UPLOADED rather than generated. It still needs a
+  // generations row, because that row is the only media identity the publisher
+  // can resolve (publish-post/index.ts:81-88 joins posts -> generations) — an
+  // upload without one cannot be published at all.
+  //
+  // Deliberately a separate status rather than 'completed': 'completed' fires
+  // ensure_draft_post_for_generation(), which would turn every uploaded file
+  // into a draft post, and it would place uploads in Studio's generation
+  // history (historyLoader.js filters on 'completed'), which lists work the
+  // user generated. Anything counting or listing GENERATIONS should exclude
+  // this value; anything resolving MEDIA should not care about it.
+  UPLOADED: 'uploaded',
 };
 
 // Canonical status values used by the posts publishing flow.

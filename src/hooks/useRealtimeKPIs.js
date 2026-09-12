@@ -38,7 +38,12 @@ export function useRealtimeKPIs(userId) {
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
           .is('organization_id', null)
-          .neq('status', GENERATION_STATUS.FAILED),
+          .neq('status', GENERATION_STATUS.FAILED)
+          // Uploaded files carry a generations row so they can be published at
+          // all, but the user did not generate them. Counting them here would
+          // inflate "generations" with the user's own uploads — a number that
+          // reads as work the product did.
+          .neq('status', GENERATION_STATUS.UPLOADED),
         supabase
           .from('posts')
           .select('id', { count: 'exact', head: true })

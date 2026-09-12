@@ -172,6 +172,62 @@ assert(
   + 'from Video Jobs prefills an asset the publisher cannot resolve.',
 );
 
+// ── 5. UPLOADS ARE PUBLISHABLE ──────────────────────────────────────────────
+// An uploaded file used to be unpublishable by construction: the edge function
+// hardcoded generation_id = NULL and a CHECK constraint forbade anything else.
+// The asset showed a name and a thumbnail in the composer and published as a
+// post with no media.
+
+const uploadFn = read('supabase/functions/personal-asset-upload/index.ts');
+
+assert(
+  !/generation_id:\s*null/.test(uploadFn),
+  'personal-asset-upload writes generation_id: null again. Every uploaded file '
+  + 'becomes unpublishable the moment this regresses.',
+);
+
+assert(
+  /from\("generations"\)[\s\S]{0,400}?status:\s*"uploaded"/.test(uploadFn),
+  'personal-asset-upload no longer creates an `uploaded` generations row. That '
+  + 'row is the only media identity publish-post can resolve for an upload.',
+);
+
+// 'completed' would fire ensure_draft_post_for_generation() and turn every
+// uploaded file into a draft post, and would put uploads into Studio's
+// generation history. Both are wrong, and both are silent.
+assert(
+  !/from\("generations"\)[\s\S]{0,400}?status:\s*"completed"/.test(uploadFn),
+  'personal-asset-upload creates its generation with status "completed". That '
+  + 'fires the auto-draft trigger, manufacturing a draft post for every '
+  + 'uploaded file, and lists uploads as generated work.',
+);
+
+const statuses = read('src/constants/statuses.js');
+assert(
+  /UPLOADED:\s*'uploaded'/.test(statuses),
+  'GENERATION_STATUS.UPLOADED is gone, but the upload path and the KPI filter '
+  + 'both depend on that value.',
+);
+
+// Uploads carry a generations row so they can be published. Counting them as
+// generations would report the user's own uploads back to them as work the
+// product did.
+const kpis = read('src/hooks/useRealtimeKPIs.js');
+assert(
+  /neq\('status',\s*GENERATION_STATUS\.UPLOADED\)/.test(kpis),
+  'useRealtimeKPIs no longer excludes uploaded rows from the generations count. '
+  + 'The dashboard now inflates "generations" with files the user uploaded.',
+);
+
+// The CHECK constraint that made this impossible must stay widened.
+const backfill = read('supabase/migrations/20260912090000_backfill_upload_generations.sql');
+assert(
+  /source = 'upload' AND post_id IS NULL/.test(backfill),
+  'The migration that separated provenance from media identity no longer '
+  + 'widens personal_assets_source_fk_matches. Uploads become unpublishable by '
+  + 'constraint again.',
+);
+
 // ── Report ──────────────────────────────────────────────────────────────────
 
 if (failures.length > 0) {

@@ -191,13 +191,70 @@ serve(async (req) => {
     const { data: publicUrlData } = adminClient.storage.from(PERSONAL_ASSET_BUCKET).getPublicUrl(storagePath);
     const mediaType = inferMediaType(mime);
 
+    // ── Give the upload a publishable identity ───────────────────────────────
+    //
+    // The publisher resolves media through posts -> generations ONLY
+    // (publish-post/index.ts:81-88). It cannot see personal_assets. An upload
+    // carrying no generation is, to the publisher, no media at all — which is
+    // how posts reached YouTube and failed with "This post has no media
+    // attached" while the composer showed a filename and a thumbnail.
+    //
+    // So an upload gets a `generations` row as its media identity. This is the
+    // same adapter pattern app/api/video/clips/[id]/publish/route.ts uses for
+    // rendered clips, and for the reason stated there: `generations` is already
+    // the publisher's media contract, and teaching every consumer about a
+    // second media table would multiply the surface that must know where a file
+    // lives.
+    //
+    // status = 'uploaded', deliberately NOT 'completed', for two reasons:
+    //   1. ensure_draft_post_for_generation() fires only on 'completed'
+    //      (20260227103000...sql:85-125). Uploading files to a library is not
+    //      drafting posts; 20 brand photos must not become 20 draft posts.
+    //   2. historyLoader.js:27 filters generations to status='completed' for
+    //      Studio's history. An uploaded file was not generated and does not
+    //      belong in that list.
+    // publish-post applies no status filter, so publishing is unaffected.
+    //
+    // output_url carries the durable PUBLIC url (this bucket is created public
+    // — see ensureBucketExists above), so no signature can expire.
+    // storage_path and metadata.storage_bucket are recorded too, so the
+    // publisher can still sign the object if this bucket is ever made private.
+    const { data: generation, error: generationError } = await adminClient
+      .from("generations")
+      .insert({
+        user_id: user.id,
+        organization_id: null,
+        status: "uploaded",
+        media_type: mediaType,
+        storage_path: storagePath,
+        output_url: publicUrlData.publicUrl,
+        metadata: {
+          storage_bucket: PERSONAL_ASSET_BUCKET,
+          source: "personal_asset_upload",
+          original_file_name: file.name,
+        },
+      })
+      .select("id")
+      .single();
+
+    if (generationError || !generation?.id) {
+      // Loud and specific. Continuing would hand back an asset that looks
+      // complete in the Library and silently cannot be published — the precise
+      // failure this row exists to prevent.
+      console.error("[personal-asset-upload] generation insert failed:", generationError);
+      throw createHttpError(
+        "Uploaded, but this file could not be prepared for publishing. Try again.",
+        500,
+      );
+    }
+
     const { data: inserted, error: insertError } = await adminClient
       .from("personal_assets")
       .insert({
         user_id: user.id,
         organization_id: null,
         source: "upload",
-        generation_id: null,
+        generation_id: generation.id,
         post_id: null,
         title: title || file.name,
         description,
@@ -224,6 +281,20 @@ serve(async (req) => {
       .single();
 
     if (insertError) {
+      // Compensate: a generation with no asset pointing at it is an orphan the
+      // user can never see or reach, and half-written state is this
+      // repository's signature defect. Best-effort — the asset insert failure
+      // is the error that matters and must still surface.
+      const { error: cleanupError } = await adminClient
+        .from("generations")
+        .delete()
+        .eq("id", generation.id);
+      if (cleanupError) {
+        console.error(
+          `[personal-asset-upload] orphaned generation ${generation.id} — cleanup failed:`,
+          cleanupError,
+        );
+      }
       throw insertError;
     }
 
