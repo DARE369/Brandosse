@@ -112,6 +112,16 @@ jobs:
       - name: TikTok UX compliance guard
         run: node scripts/check-tiktok-ux-compliance.cjs
 
+      # A post reached YouTube on 2026-09-11 with generation_id = NULL and
+      # failed 14 seconds later: "YouTube requires a video. This post has no
+      # media attached." 83 of 128 drafts carried no media link at all. Nothing
+      # computed a wrong answer — the platform's requirement was simply never
+      # connected to the button that submits. This asserts that connection, and
+      # that the frontend's requiresMedia flags still mirror the adapters which
+      # actually enforce them.
+      - name: Media-required composer guard
+        run: node scripts/check-media-required-guard.cjs
+
       # LOCK L0.7 — the eight guard scripts that existed and never ran.
       # Later locks append their own below; all of them are blocking.
       - name: check-env-security

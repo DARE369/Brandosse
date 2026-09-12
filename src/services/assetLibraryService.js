@@ -582,9 +582,19 @@ export async function fetchVersionChain(assetId) {
 // the query string inline, so the contract (param names) lives in one
 // place. See PersonalCalendarPage.jsx's matching reader + DECISIONS_LOG.md
 // 2026-06-25T10:35:00.
-export function buildScheduleHandoffPath(assetId) {
-  if (!assetId) return '/app/calendar?quickPost=1';
-  return `/app/calendar?quickPost=1&prefillAssetId=${encodeURIComponent(assetId)}`;
+// `generationId` is optional and exists for one reason: an asset created by the
+// UPLOAD pipeline has generation_id = NULL by construction
+// (personal-asset-upload/index.ts:199-200 hardcodes it), while the publisher can
+// only resolve media through posts -> generations. A video clip saved to the
+// Library therefore arrives at Quick Post looking complete while carrying
+// nothing the publisher can fetch — which is how posts reached YouTube with no
+// media attached. When the caller knows the real generation, it passes it here
+// so the composer prefills something actually publishable.
+export function buildScheduleHandoffPath(assetId, generationId = null) {
+  const params = new URLSearchParams({ quickPost: '1' });
+  if (assetId) params.set('prefillAssetId', assetId);
+  if (generationId) params.set('prefillGenerationId', generationId);
+  return `/app/calendar?${params.toString()}`;
 }
 
 // Shapes a personal_assets row into the { id, name, thumbnail_url,

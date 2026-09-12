@@ -74,6 +74,7 @@ publishing, which four pillars depend on.
 
 | ID | File | Contents |
 |---|---|---|
+| **D12** | [`12-publishing-journey.md`](12-publishing-journey.md) | **⭐ Generate → publish: 12 gaps + build plan. Why generated media never reaches a platform** |
 | **D11** | [`11-lockdown-plan.md`](11-lockdown-plan.md) | **⭐ The execution plan — finish and lock everything before new work** |
 | **D10** | [`10-completion-split.md`](10-completion-split.md) | **⭐ Exists vs. must-be-built — the inventory behind D11** |
 | D0 | [`00-audit-charter.md`](00-audit-charter.md) | Repo map, agent roster, schema, Gate 0 decisions |

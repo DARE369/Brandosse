@@ -27,6 +27,6 @@ export async function saveClipToLibrary(clip) {
   return assetId;
 }
 
-export function scheduleHandoffPathForAsset(assetId) {
-  return buildScheduleHandoffPath(assetId);
+export function scheduleHandoffPathForAsset(assetId, generationId = null) {
+  return buildScheduleHandoffPath(assetId, generationId);
 }

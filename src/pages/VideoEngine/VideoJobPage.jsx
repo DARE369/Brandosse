@@ -12,6 +12,7 @@ import {
   deleteVideoJob,
   downloadJobArchive,
   downloadJobTranscript,
+  publishClipToDraft,
   rerunVideoJob,
 } from "../../services/videoEngineApi";
 import { saveClipToLibrary, scheduleHandoffPathForAsset } from "../../components/video-engine/clipLibraryActions";
@@ -321,7 +322,35 @@ function JobView({ initialJob, initialClips, userId, ledger, setLedger, navigate
         // Scheduling implies keeping, so the save happens silently and the
         // button still says exactly one thing.
         const assetId = await keepClip(clip, overrides ?? overridesFor(clip));
-        if (assetId) navigate(scheduleHandoffPathForAsset(assetId));
+
+        // keepClip() stores the clip through the Library UPLOAD pipeline, which
+        // hardcodes generation_id = NULL. The publisher resolves media only via
+        // posts -> generations, so handing Quick Post that asset alone prefills
+        // a composer that LOOKS complete and yields a post with no media — the
+        // failure that put a YouTube post on the failed pile reading
+        // "YouTube requires a video. This post has no media attached."
+        //
+        // publishClipToDraft() is the bridge giving the clip a real generations
+        // row (storage path + bucket, signed fresh at publish, never stored
+        // signed). Carrying its id through the handoff is what makes the
+        // resulting post publishable.
+        let generationId = null;
+        try {
+          const bridged = await publishClipToDraft(clip.id);
+          generationId = bridged?.generationId || null;
+        } catch (bridgeError) {
+          // Non-fatal on purpose: the clip IS saved to the Library, and the
+          // composer's media guard now refuses to schedule a media-required
+          // platform with nothing publishable attached. Failing the whole
+          // action here would discard a save that succeeded.
+          console.error("[VideoJobPage] could not link clip to a generation:", bridgeError);
+          toast("Saved to your Library, but this clip isn't publishable yet — try Schedule again.", {
+            tone: "danger",
+            duration: 7000,
+          });
+        }
+
+        if (assetId) navigate(scheduleHandoffPathForAsset(assetId, generationId));
       } catch (scheduleError) {
         toast(scheduleError?.message || "Could not prepare that clip.", { tone: "danger", duration: 6000 });
       } finally {

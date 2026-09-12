@@ -1,0 +1,188 @@
+#!/usr/bin/env node
+/**
+ * check-media-required-guard.cjs — a post cannot reach a media-mandatory
+ * platform with no media attached.
+ *
+ * ── The defect this exists to prevent ───────────────────────────────────────
+ * On 2026-09-11 a post was created and failed fourteen seconds later with
+ * "YouTube requires a video. This post has no media attached." Its
+ * generation_id was NULL. It was not an isolated row: 83 of 128 drafts and 48
+ * of 63 failed posts carried no media link at all.
+ *
+ * The chain that produced it:
+ *   1. A rendered clip was saved via the Library UPLOAD pipeline, which
+ *      hardcodes generation_id = NULL (personal-asset-upload/index.ts:199-200).
+ *   2. Quick Post prefilled that asset. It LOOKED complete — name, thumbnail.
+ *   3. createQuickPost did `generation_id = asset?.generation_id || null`.
+ *   4. The publisher resolves media only through posts -> generations
+ *      (publish-post/index.ts:81-88), so it found nothing to upload.
+ *
+ * Every layer behaved reasonably on its own. The post still went out empty.
+ *
+ * ── Why a static check and not a unit test ──────────────────────────────────
+ * The failure was never a wrong computation — each function returned exactly
+ * what it promised. It was a missing CONNECTION between a platform's
+ * requirement and the button that submits. That is the class of defect this
+ * repository keeps producing, and it is invisible to a test exercising any
+ * single unit.
+ *
+ * ── What this asserts ───────────────────────────────────────────────────────
+ *  1. TRUTH   — the platforms whose adapters hard-refuse missing media are
+ *               declared requiresMedia on the frontend spec, and the adapters
+ *               still contain those refusals, so the mirror cannot drift.
+ *  2. GUARD   — Quick Post consults that declaration and disables its submit.
+ *  3. LINKAGE — the guard keys on generation_id, not on "an asset is picked",
+ *               because an uploaded asset has no generation_id.
+ *  4. HANDOFF — the clip path carries a real generation to the composer
+ *               instead of relying on the upload row.
+ *
+ * READ-ONLY. Exit 0 = connected. Exit 1 = a link is broken (fails CI).
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = process.cwd();
+const failures = [];
+
+function read(rel) {
+  const abs = path.join(ROOT, rel);
+  if (!fs.existsSync(abs)) {
+    failures.push(`MISSING FILE: ${rel}`);
+    return '';
+  }
+  return fs.readFileSync(abs, 'utf8');
+}
+
+function assert(condition, message) {
+  if (!condition) failures.push(message);
+}
+
+// ── 1. TRUTH ────────────────────────────────────────────────────────────────
+// The frontend flag exists only to move the adapter's refusal forward to where
+// the user can still act on it. If an adapter's refusal disappears, or a
+// platform stops being declared, the two have drifted and the guard is lying.
+
+const specs = read('src/services/platforms/platformCaptionSpecs.js');
+
+assert(
+  /export function platformsRequiringMedia/.test(specs),
+  'platformCaptionSpecs.js no longer exports platformsRequiringMedia() — the '
+  + 'composer guard has nothing to consult.',
+);
+
+for (const platform of ['youtube', 'tiktok', 'instagram']) {
+  const line = new RegExp(`^\\s*${platform}:.*requiresMedia:\\s*true`, 'm');
+  assert(
+    line.test(specs),
+    `platformCaptionSpecs.js no longer declares requiresMedia:true for "${platform}". `
+    + 'That platform rejects text-only posts, so the composer will let one through.',
+  );
+}
+
+// LinkedIn must NOT be marked — it accepts text-only posts, and marking it
+// would block legitimate publishing. A guard that over-blocks gets switched off.
+assert(
+  !/^\s*linkedin:.*requiresMedia:\s*true/m.test(specs),
+  'platformCaptionSpecs.js marks linkedin as requiresMedia, but linkedin.service.ts '
+  + 'accepts a text-only post. This blocks valid publishes.',
+);
+
+// The adapters are the enforcement point. If their refusal is gone, the mirror
+// above is stale and this guard asserts something no longer true.
+const youtubeSvc = read('supabase/functions/_shared/youtube.service.ts');
+assert(
+  /if\s*\(\s*!mediaUrl\s*\)/.test(youtubeSvc),
+  'youtube.service.ts no longer refuses a null mediaUrl — platformCaptionSpecs '
+  + 'still claims YouTube requires media. One of the two is now wrong.',
+);
+
+const tiktokSvc = read('supabase/functions/_shared/tiktok.service.ts');
+assert(
+  /if\s*\(\s*!mediaUrl\s*\)/.test(tiktokSvc),
+  'tiktok.service.ts no longer refuses a null mediaUrl — platformCaptionSpecs '
+  + 'still claims TikTok requires media. One of the two is now wrong.',
+);
+
+// ── 2 & 3. GUARD + LINKAGE ──────────────────────────────────────────────────
+
+const composer = read('src/calendar/components/QuickPostComposer.jsx');
+
+assert(
+  /platformsRequiringMedia/.test(composer),
+  'QuickPostComposer.jsx does not consult platformsRequiringMedia(). It can '
+  + 'submit a post for a media-mandatory platform with nothing attached — the '
+  + 'exact 2026-09-11 failure.',
+);
+
+// The distinction that matters: an UPLOADED Library asset is a selected asset
+// with no generation_id. Guarding on `selectedAsset` alone re-opens the bug
+// while looking correct.
+assert(
+  /selectedAsset\?\.generation_id/.test(composer),
+  'QuickPostComposer.jsx no longer keys its media check on '
+  + 'selectedAsset?.generation_id. An uploaded asset satisfies "an asset is '
+  + 'selected" while carrying nothing the publisher can resolve.',
+);
+
+assert(
+  /disabled=\{[^}]*needsMedia/.test(composer),
+  'QuickPostComposer.jsx computes a media requirement but its submit button is '
+  + 'not disabled by it. A guard that does not block is decoration.',
+);
+
+// The picker must actually contain something. Blocking submit while the picker
+// is empty turns a silent failure into a dead end.
+const calendarPage = read('src/pages/Calendar/CalendarPage.jsx');
+assert(
+  /fetchPersonalAssets/.test(calendarPage),
+  'CalendarPage.jsx no longer loads Library assets for Quick Post. The picker '
+  + 'is empty, so a user told "media is required" has no way to supply it.',
+);
+
+// ── 4. HANDOFF ──────────────────────────────────────────────────────────────
+// A clip saved to the Library goes through the upload pipeline and therefore
+// has generation_id = NULL. The bridge gives it a real generation; the handoff
+// carries that generation to the composer.
+
+const videoJobPage = read('src/pages/VideoEngine/VideoJobPage.jsx');
+assert(
+  /publishClipToDraft/.test(videoJobPage),
+  'VideoJobPage.jsx no longer calls publishClipToDraft(). Clips revert to being '
+  + 'saved as uploads with no generation, and scheduling one produces a post '
+  + 'with no media.',
+);
+
+const api = read('src/services/videoEngineApi.js');
+assert(
+  /export async function publishClipToDraft/.test(api),
+  'videoEngineApi.js no longer exports publishClipToDraft() — the clip->post '
+  + 'bridge route has no caller again, which is how every rendered clip became '
+  + 'unpublishable in the first place.',
+);
+
+assert(
+  fs.existsSync(path.join(ROOT, 'app/api/video/clips/[id]/publish/route.ts')),
+  'The clip->post bridge route is gone, but callers still reference it.',
+);
+
+assert(
+  /prefillGenerationId/.test(calendarPage),
+  'CalendarPage.jsx no longer honours prefillGenerationId. A clip handed off '
+  + 'from Video Jobs prefills an asset the publisher cannot resolve.',
+);
+
+// ── Report ──────────────────────────────────────────────────────────────────
+
+if (failures.length > 0) {
+  console.error('\n\x1b[31m✖ check-media-required-guard FAILED\x1b[0m\n');
+  for (const failure of failures) console.error(`  • ${failure}\n`);
+  process.exit(1);
+}
+
+console.log(
+  '\x1b[32m✔ check-media-required-guard\x1b[0m  adapters still refuse null media; '
+  + 'the spec mirrors them; Quick Post blocks on generation_id (not merely a '
+  + 'selected asset); the picker is populated; the clip bridge is called and its '
+  + 'generation survives the handoff.',
+);

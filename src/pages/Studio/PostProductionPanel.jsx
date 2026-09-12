@@ -5,6 +5,8 @@ import { Save, Calendar, Send, Sparkles, RefreshCw } from "lucide-react";
 import { Card, Button, Dropdown } from "../../ui-v2";
 import { platformNeedsTitle, getPlatformSpec } from "../../services/platforms/platformCaptionSpecs";
 import PlatformFitStrip from "../../components/PostProduction/PlatformFitStrip";
+import TikTokOptionsPanel from "../../components/Publishing/TikTokOptionsPanel";
+import YouTubeOptionsPanel from "../../components/Publishing/YouTubeOptionsPanel";
 import styles from "./PostProductionPanel.module.css";
 
 const SCORE_DIMS = [
@@ -123,6 +125,44 @@ export default function PostProductionPanel({
   }, [postProduction.caption, postProduction.hashtags, postProduction.title, selectedPlatformList, mediaType]);
   const hasBlockingFit = overLimitPlatforms.length > 0;
 
+  // ── Per-platform publishing options ──────────────────────────────────────
+  //
+  // TikTok and YouTube demand per-post declarations no other platform does,
+  // and their adapters refuse (TikTok) or silently default (YouTube) without
+  // them. Both panels already existed and were wired into the ORG composer
+  // only, so the personal path could not supply what the adapters require:
+  // TikTok publishes failed outright, and YouTube uploaded every video as
+  // `private` while the UI reported success.
+  //
+  // Per ACCOUNT, not per platform: made-for-kids is a COPPA statement about
+  // THIS upload to THIS channel, and two channels may answer differently.
+  const selectedAccounts = useMemo(
+    () => selectedIds.map((id) => accounts.find((a) => a.id === id)).filter(Boolean),
+    [selectedIds, accounts],
+  );
+  const accountsOfPlatform = (platform) =>
+    selectedAccounts.filter((a) => String(a.platform || "").toLowerCase() === platform);
+
+  const tiktokAccounts = accountsOfPlatform("tiktok");
+  const youtubeAccounts = accountsOfPlatform("youtube");
+
+  // Validity is tracked separately from settings: a panel reports invalid
+  // while a required declaration is unanswered, and publishing must be blocked
+  // rather than guessing on the user's behalf.
+  const [optionValidity, setOptionValidity] = useState({});
+  const setValidity = (id, ok) =>
+    setOptionValidity((prev) => (prev[id] === ok ? prev : { ...prev, [id]: ok }));
+
+  // Merge into the shared settings map rather than replacing it — two accounts
+  // on the same platform each own their own entry.
+  const mergeSettings = (key, accountId, settings) =>
+    updatePostProduction({
+      [key]: { ...(postProduction[key] || {}), [accountId]: settings },
+    });
+
+  const optionsIncomplete = [...tiktokAccounts, ...youtubeAccounts]
+    .some((a) => optionValidity[a.id] !== true);
+
   const addHashtag = () => {
     const t = tagValue.trim();
     if (!t) return;
@@ -190,6 +230,30 @@ export default function PostProductionPanel({
           onAutoFit={handleAutoFit}
         />
       )}
+
+      {/* Per-account options for the two platforms that require a per-post
+          declaration. Rendered only when such an account is selected, so the
+          panel stays quiet for Instagram/LinkedIn/Facebook. */}
+      {tiktokAccounts.map((acc) => (
+        <TikTokOptionsPanel
+          key={`tt-${acc.id}`}
+          accountId={acc.id}
+          mediaType={mediaType === "image" ? "photo" : "video"}
+          mediaDurationSec={postProduction.mediaDurationSec ?? null}
+          onChange={(settings) => mergeSettings("tiktokSettings", acc.id, settings)}
+          onValidityChange={(ok) => setValidity(acc.id, ok)}
+        />
+      ))}
+
+      {youtubeAccounts.map((acc) => (
+        <YouTubeOptionsPanel
+          key={`yt-${acc.id}`}
+          accountId={acc.id}
+          accountName={acc.display_name || acc.account_name || "YouTube"}
+          onChange={(settings) => mergeSettings("youtubeSettings", acc.id, settings)}
+          onValidityChange={(ok) => setValidity(acc.id, ok)}
+        />
+      ))}
 
       {/* WEEK 2 FIX 3 (+ ADDENDUM UPGRADE 2): manual recovery control —
           works whether the automatic publish-stage hydrate never ran, is
@@ -392,14 +456,22 @@ export default function PostProductionPanel({
         </Button>
         <Button
           onClick={onOpenPublishConfirm}
-          disabled={publishing || selectedIds.length === 0 || hasBlockingFit}
-          title={hasBlockingFit ? `Fix the caption for ${overLimitPlatforms.map((p) => p.label).join(", ")} first` : undefined}
+          disabled={publishing || selectedIds.length === 0 || hasBlockingFit || optionsIncomplete}
+          title={
+            hasBlockingFit
+              ? `Fix the caption for ${overLimitPlatforms.map((p) => p.label).join(", ")} first`
+              : optionsIncomplete
+                ? "Answer the required publishing options above first"
+                : undefined
+          }
           style={{ marginLeft: "auto" }}
         >
           <Send size={13} aria-hidden="true" />
           {hasBlockingFit
             ? `${overLimitPlatforms.length} platform${overLimitPlatforms.length > 1 ? "s" : ""} need${overLimitPlatforms.length > 1 ? "" : "s"} attention`
-            : "Publish now"}
+            : optionsIncomplete
+              ? "Publishing options needed"
+              : "Publish now"}
         </Button>
       </div>
     </Card>

@@ -57,7 +57,7 @@ import { useCalendarDrafts, useCalendarPosts } from '../../calendar/hooks/useCal
 import { useScheduleAction } from '../../calendar/hooks/useScheduleAction';
 import { createPost, createQuickPost, deletePost, fetchPostById, updatePost } from '../../calendar/services/calendarService';
 import { useMutableSearchParams } from '../../next/useMutableSearchParams';
-import { fetchAssetForHandoff, toQuickPostAssetShape } from '../../services/assetLibraryService';
+import { fetchAssetForHandoff, toQuickPostAssetShape, fetchPersonalAssets } from '../../services/assetLibraryService';
 
 import CalendarGrid from '../../calendar/components/CalendarGrid';
 import CalendarListView from '../../calendar/components/CalendarListView';
@@ -191,8 +191,46 @@ function CalendarBody({ brandKit }) {
   const [searchParams, setSearchParams] = useMutableSearchParams();
   const [prefillAsset, setPrefillAsset] = useState(null);
 
+  // ── The Quick Post asset picker's contents ───────────────────────────────
+  //
+  // This used to be `prefillAsset ? [prefillAsset] : []`, which meant the
+  // picker was EMPTY unless the user had arrived from the Library via
+  // ?prefillAssetId=. Opening Quick Post from the Calendar itself offered a
+  // "pick from Library" control with nothing behind it — so a post that needed
+  // media had no way to acquire any, and was saved without it.
+  //
+  // Loaded only while the composer is open: this is a modal the user opens
+  // deliberately, and fetching the Library on every Calendar mount would pay
+  // for a list most visits never look at.
+  const [libraryAssets, setLibraryAssets] = useState([]);
+
+  useEffect(() => {
+    if (!quickPostOpen) return;
+    let mounted = true;
+
+    fetchPersonalAssets({ includeArchived: false, includeTrashed: false })
+      .then((assets) => {
+        if (!mounted) return;
+        setLibraryAssets((assets || []).map(toQuickPostAssetShape).filter(Boolean));
+      })
+      .catch((err) => {
+        // Non-fatal: the composer still works for text-only platforms, and the
+        // media guard inside it keeps a media-requiring platform from being
+        // scheduled with nothing attached. Never silently swallow it though —
+        // an empty picker with no explanation is the bug this replaced.
+        console.error('[CalendarPage] Could not load Library assets for Quick Post:', err);
+      });
+
+    return () => { mounted = false; };
+  }, [quickPostOpen]);
+
   useEffect(() => {
     const prefillAssetId = searchParams.get('prefillAssetId');
+    // Sent by callers that know the asset's real generation — currently the
+    // video clip handoff, whose asset went through the upload pipeline and so
+    // carries generation_id = NULL. Without this the composer prefills an asset
+    // the publisher cannot resolve, and the post publishes with no media.
+    const prefillGenerationId = searchParams.get('prefillGenerationId');
     const shouldOpenQuickPost = searchParams.get('quickPost') === '1';
     if (!shouldOpenQuickPost) return;
 
@@ -203,7 +241,15 @@ function CalendarBody({ brandKit }) {
     if (prefillAssetId) {
       fetchAssetForHandoff(prefillAssetId)
         .then((asset) => {
-          if (mounted && asset) setPrefillAsset(toQuickPostAssetShape(asset));
+          if (!mounted || !asset) return;
+          const shaped = toQuickPostAssetShape(asset);
+          // Only ever fills a gap — never overrides a generation the asset
+          // already has, since the stored row is the more trustworthy source.
+          setPrefillAsset(
+            shaped && !shaped.generation_id && prefillGenerationId
+              ? { ...shaped, generation_id: prefillGenerationId }
+              : shaped,
+          );
         })
         .catch((err) => {
           console.error('[CalendarPage] Could not load hand-off asset:', err);
@@ -213,6 +259,7 @@ function CalendarBody({ brandKit }) {
     setSearchParams((params) => {
       params.delete('quickPost');
       params.delete('prefillAssetId');
+      params.delete('prefillGenerationId');
       return params;
     }, { replace: true });
 
@@ -698,6 +745,20 @@ function CalendarBody({ brandKit }) {
             ? when.toISOString()
             : null;
 
+          // `draftId` is a POSTS id — calendarAIService.js:150 describes it as
+          // "linked draft if matched", and every other reader treats it that
+          // way (`drafts.find((d) => d.id === draftId)` at :380 and :783).
+          // It was being assigned straight into generation_id, which is a FK to
+          // generations(id): a post id will not resolve there, so the row was
+          // either rejected outright or, when it slipped through, produced a
+          // post the publisher could find no media for.
+          //
+          // What the plan actually means is "reuse the media this matched draft
+          // already has", so carry the DRAFT'S generation_id across.
+          const linkedDraft = item?.draftId
+            ? drafts.find((d) => d.id === item.draftId) || posts.find((p) => p.id === item.draftId)
+            : null;
+
           await createPost(scope, {
             title: item?.hook || null,
             caption: item?.caption || '',
@@ -705,7 +766,7 @@ function CalendarBody({ brandKit }) {
             platform: item?.platform || null,
             scheduled_at: scheduledAt,
             status: POST_STATUS.DRAFT,
-            generation_id: item?.draftId || null,
+            generation_id: linkedDraft?.generation_id || null,
           });
           created += 1;
         } catch (err) {
@@ -998,7 +1059,16 @@ function CalendarBody({ brandKit }) {
             <QuickPostComposer
               open
               timezone={timezone}
-              libraryAssets={prefillAsset ? [prefillAsset] : []}
+              /* The handed-off asset goes first and is deduped against the
+                 list, so it stays visible even if it would be filtered out of
+                 a normal Library fetch (archived, superseded) — arriving from
+                 the Library and not finding your own asset would be its own
+                 bug. */
+              libraryAssets={
+                prefillAsset
+                  ? [prefillAsset, ...libraryAssets.filter((a) => a.id !== prefillAsset.id)]
+                  : libraryAssets
+              }
               prefillAsset={prefillAsset}
               onClose={() => { setQuickPostOpen(false); setPrefillAsset(null); }}
               onSubmit={handleQuickPostSubmit}

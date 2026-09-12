@@ -21,6 +21,7 @@ import { FileText, FileImage, Sparkles } from 'lucide-react';
 import { generateQuickPostCaption } from '../services/calendarService';
 import { supabase } from '../../services/supabaseClient';
 import { getZonedTodayKey, zonedDateTimeToUTC } from '../../utils/timezone';
+import { platformsRequiringMedia } from '../../services/platforms/platformCaptionSpecs';
 
 /**
  * Presentation metadata ONLY — label, brand colour, caption ceiling.
@@ -131,6 +132,30 @@ export default function QuickPostComposer({
   // unfinished post, and refusing to save one would lose the caption the user
   // just wrote. The declaration is required to PUBLISH, not to keep working.
   const youtubeNeedsAudience = activePlatforms.includes('youtube') && madeForKids === null;
+
+  // ── Media requirement ────────────────────────────────────────────────────
+  //
+  // Deliberately keyed on generation_id, NOT on "an asset is selected".
+  // `generation_id` is the ONLY link the publisher can follow
+  // (publish-post/index.ts:81-88 joins posts -> generations), so an asset that
+  // carries none is, to the publisher, no media at all. Library rows created by
+  // UPLOAD have a null generation_id by schema
+  // (20260625100000_personal_assets_table.sql:41), which is why selecting one
+  // must NOT satisfy this check — that path produced posts that looked complete
+  // and then failed at publish.
+  //
+  // Same rule as youtubeNeedsAudience: blocks SCHEDULING, never draft-saving.
+  // A draft is explicitly unfinished work, and refusing to save one would throw
+  // away the caption the user just wrote.
+  const attachedGenerationId = selectedAsset?.generation_id || null;
+  const platformsNeedingMedia = attachedGenerationId
+    ? []
+    : platformsRequiringMedia(activePlatforms);
+  const needsMedia = platformsNeedingMedia.length > 0;
+
+  // An asset IS selected but carries no publishable link — this needs its own
+  // message, because "attach media" reads as nonsense next to a filled picker.
+  const assetHasNoPublishableMedia = Boolean(selectedAsset) && !attachedGenerationId;
   const { platforms: PLATFORMS, state: platformState } = usePublishablePlatforms(open);
 
   // Select the first publishable platform once they load. Defaulting to a
@@ -286,7 +311,10 @@ export default function QuickPostComposer({
 
         <div className="quickpost-steps">
           <div>
-            <p className="quickpost-step__label"><span className="quickpost-step__num">1</span>Library asset (optional)</p>
+            {/* Optional is a property of the SELECTED PLATFORMS, not of the
+                step. Labelling it "(optional)" while YouTube is selected is
+                how a post reached publish with no media at all. */}
+            <p className="quickpost-step__label"><span className="quickpost-step__num">1</span>Library asset {needsMedia ? '(required)' : '(optional)'}</p>
             {/* Phase 4 QA fix (schedule hand-off composer race, see
                 DECISIONS_LOG.md): this was a real <button> wrapping another
                 real <button> (the "Clear selected asset" control) whenever
@@ -326,7 +354,11 @@ export default function QuickPostComposer({
                 {selectedAsset?.thumbnail_url ? <img src={selectedAsset.thumbnail_url} alt="" /> : <FileText size={16} aria-hidden="true" />}
               </span>
               <span className="asset-picker-trigger__text">
-                {selectedAsset ? selectedAsset.name : 'No asset — click to pick from Library (optional)'}
+                {selectedAsset
+                  ? selectedAsset.name
+                  : needsMedia
+                    ? 'No asset — click to pick from Library (required for the selected platforms)'
+                    : 'No asset — click to pick from Library (optional)'}
               </span>
               {selectedAsset && (
                 <button
@@ -459,13 +491,33 @@ export default function QuickPostComposer({
 
         {submitError && <div className="ui-field-error" role="alert">{submitError}</div>}
 
+        {/* Says which platform objects and why, rather than a bare disabled
+            button. Saving a draft stays available, and the copy says so —
+            otherwise this reads as "your work is stuck". */}
+        {needsMedia && (
+          <div className="ui-field-error" role="alert">
+            {assetHasNoPublishableMedia ? (
+              <>
+                {platformsNeedingMedia.join(' and ')} {platformsNeedingMedia.length > 1 ? 'need' : 'needs'} a
+                {' '}photo or video, and the selected asset doesn&apos;t have one that can be published yet.
+                Pick a generated asset instead, or save this as a draft.
+              </>
+            ) : (
+              <>
+                {platformsNeedingMedia.join(' and ')} {platformsNeedingMedia.length > 1 ? 'do' : 'does'} not
+                {' '}accept text-only posts. Attach a Library asset above, or save this as a draft.
+              </>
+            )}
+          </div>
+        )}
+
         <div className="quickpost-footer">
           <button type="button" className="ui-button ui-button-secondary ui-button-md" disabled={isSubmitting} onClick={() => handleSubmit('draft')}>
             Save as draft
           </button>
           <div className="quickpost-footer__primary">
             <button type="button" className="ui-button ui-button-secondary ui-button-md" onClick={onClose} disabled={isSubmitting}>Cancel</button>
-            <button type="button" className="ui-button ui-button-primary ui-button-md" disabled={isSubmitting || activePlatforms.length === 0 || youtubeNeedsAudience} onClick={() => handleSubmit('schedule')}>
+            <button type="button" className="ui-button ui-button-primary ui-button-md" disabled={isSubmitting || activePlatforms.length === 0 || youtubeNeedsAudience || needsMedia} onClick={() => handleSubmit('schedule')}>
               Schedule post
             </button>
           </div>

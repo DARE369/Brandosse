@@ -56,6 +56,30 @@ export async function refreshClipUrl(clipId) {
   return parseApiResponse(response);
 }
 
+/**
+ * Turn a rendered clip into a draft post the publisher can actually reach.
+ *
+ * The route this calls has existed and been correct since it was written; it
+ * simply had no caller, so every clip this product rendered was unpublishable
+ * — downloadable and nothing else. This function is that missing caller.
+ *
+ * Why it matters mechanically: the publisher resolves media through
+ * posts -> generations (publish-post/index.ts:81-88) and cannot see
+ * `video_clips` at all. The route writes the adapter row, storing the storage
+ * PATH plus bucket rather than a signed URL, so a post scheduled weeks out
+ * still resolves at dispatch instead of carrying a signature that died days
+ * earlier.
+ *
+ * Resolves to { postId, generationId, reused, title, durationSeconds,
+ * fileSizeBytes }.
+ */
+export async function publishClipToDraft(clipId) {
+  const response = await videoEngineFetch(`/api/video/clips/${clipId}/publish`, {
+    method: "POST",
+  });
+  return parseApiResponse(response);
+}
+
 export async function deleteVideoJob(jobId) {
   const response = await videoEngineFetch(`/api/video/jobs/${jobId}`, {
     method: "DELETE",

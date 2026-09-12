@@ -25,15 +25,34 @@
 // titleForMedia — when set, the title only applies for these media types
 //               (TikTok: photo/image posts get a 90-char title; video posts
 //               are caption-only).
+// requiresMedia — the platform will not accept a text-only post, so a composer
+//               must refuse to submit without an attached asset.
+//
+//               These values MIRROR THE ADAPTERS, which remain the enforcement
+//               point — this flag only moves the refusal forward to where the
+//               user can still act on it. Verified 2026-09-12:
+//                 youtube   — _shared/youtube.service.ts:234 "YouTube requires
+//                             a video. This post has no media attached."
+//                 tiktok    — _shared/tiktok.service.ts:184, same shape.
+//                 linkedin  — _shared/linkedin.service.ts:241 refuses only when
+//                             caption AND media are both empty, so a text-only
+//                             post is legal: requiresMedia stays false.
+//                 instagram — no direct adapter yet, but every Instagram
+//                             publish is a media container; a text-only
+//                             Instagram post does not exist.
+//                 facebook  — no direct adapter yet; a text-only Page post is
+//                             valid, so this stays false.
+//               When an adapter's media rule changes, change it here in the
+//               same commit.
 const SPECS = {
-  instagram: { label: "Instagram", captionMax: 2200, hashtagMax: 30 },
-  tiktok:    { label: "TikTok",    captionMax: 2200, hashtagMax: 8, titleMax: 90, titleForMedia: ["image", "carousel"] },
-  youtube:   { label: "YouTube",   captionMax: 5000, hashtagMax: 15, titleField: true, titleMax: 100 },
+  instagram: { label: "Instagram", captionMax: 2200, hashtagMax: 30, requiresMedia: true },
+  tiktok:    { label: "TikTok",    captionMax: 2200, hashtagMax: 8, titleMax: 90, titleForMedia: ["image", "carousel"], requiresMedia: true },
+  youtube:   { label: "YouTube",   captionMax: 5000, hashtagMax: 15, titleField: true, titleMax: 100, requiresMedia: true },
   facebook:  { label: "Facebook",  captionMax: 63206, hashtagMax: 6 },
   linkedin:  { label: "LinkedIn",  captionMax: 3000, hashtagMax: 8 },
   twitter:   { label: "X",         captionMax: 280,  hashtagMax: 4 },
   x:         { label: "X",         captionMax: 280,  hashtagMax: 4 },
-  pinterest: { label: "Pinterest", captionMax: 500,  hashtagMax: 8, titleField: true, titleMax: 100 },
+  pinterest: { label: "Pinterest", captionMax: 500,  hashtagMax: 8, titleField: true, titleMax: 100, requiresMedia: true },
   threads:   { label: "Threads",   captionMax: 500,  hashtagMax: 5 },
 };
 
@@ -42,6 +61,30 @@ const DEFAULT_SPEC = { label: "Post", captionMax: 2200, hashtagMax: 30 };
 export function getPlatformSpec(platform) {
   const key = String(platform || "").trim().toLowerCase();
   return SPECS[key] || DEFAULT_SPEC;
+}
+
+// Does this platform refuse a text-only post?
+//
+// The adapter refuses too, and that refusal is the one that actually protects
+// the publish. This exists so the refusal can happen while the user is still
+// looking at the composer, instead of arriving as a failed post later.
+export function platformRequiresMedia(platform) {
+  return getPlatformSpec(platform).requiresMedia === true;
+}
+
+// Of the given platforms, which would reject a post with no media attached?
+// Returns labels rather than keys because every caller puts these straight in
+// front of a person.
+export function platformsRequiringMedia(platforms) {
+  const seen = new Set();
+  const out = [];
+  for (const p of platforms || []) {
+    const key = String(p || "").trim().toLowerCase();
+    if (!key || seen.has(key) || !platformRequiresMedia(key)) continue;
+    seen.add(key);
+    out.push(getPlatformSpec(key).label);
+  }
+  return out;
 }
 
 // Does this platform expect a separate title for the given media type?
