@@ -151,3 +151,97 @@ Re-grepped the full `mockup.css`/`mockup-gallery.html` for `#[0-9a-fA-F]{3,8}` (
 **PASS.** The original blocking flag (`mockup-gallery.html:781` → now `:812`, `var(--radius-2xl)` → `var(--radius-xl)`) is confirmed resolved by direct re-grep (zero `radius-2xl` matches anywhere in the packet) and by reading the corrected line in context. The fix round's six changes (mobile rail toggle + bottom sheet, dead `.asset-card__more-trigger` CSS removal, table checkbox hit-pad, `.sm` modifier on four drawer footer buttons, `.gallery-section__desc` fluid-clamp font-size) were independently re-audited as their own fresh compliance pass and introduce **zero new colors, zero new spacing/font-size primitives, and zero new token names** — every value used is either an existing token or a parametrization/extension of an already-precedented raw-value pattern (the `::before { inset: -Npx }` hit-pad technique, the `clamp()` fluid-sizing idiom, the 44px touch-target floor).
 
 **This mockup is cleared on design-system-compliance grounds.** Note: this report covers compliance only. Per the division of labor recorded in this file's original §6 (2026-06-25T05:12:00 decision), mobile-parity/touch-target/feature-parity correctness for these same six fixes is `mobile-responsive-parity-agent`'s independent re-test, recorded separately in `MOBILE_PARITY.md` — this packet should not be treated as fully cleared for human review until that report's own re-test (if not already done) also confirms PASS.
+
+---
+
+# NEW MOCKUP REVIEW — `design-mockups/library-v3.dc.html` (Content Library v3) — 2026-09-12
+
+**Reviewer:** design-system-compliance-agent
+**Reviewed:** `design-mockups/library-v3.dc.html` (a later, separate `.dc.html`-format mockup, not the `mockup-gallery.html` reviewed above — this file post-dates the completion lockdown and was not previously reviewed).
+**Authoritative sources used:** `src/ui-v2/tokens.css` (the real, locked v2 token file — not the old `mockup.css`-local `tokens.css` reviewed above, which is a different, superseded naming scheme), `src/pages/Library/LibraryPage.jsx`/`LibraryPage.module.css`, `src/ui-v2/primitives/*.module.css` (Button, IconButton, Badge, Card, Drawer, Modal, Dropdown, EmptyState, Skeleton, Toast), `src/pages/Library/components/AssetCard.module.css` and `AssetDetailDrawer.module.css`.
+**Method:** The mockup mirrors every `src/ui-v2/tokens.css` value into a local, theme-scoped custom-property block (`[data-theme="dark"|"light"]`) rather than importing tokens.css directly, "so this mockup cannot drift from the locked system" (mockup's own header comment, line 16-21). I verified this claim value-by-value against `tokens.css` rather than trusting it, then checked every class in the file for hard-coded values, both-theme completeness, contrast, component duplication, and typography.
+
+## VERDICT: FAIL — unresolved blocking flags (2 hard token-value defects: #1, #2). Not cleared for human review until resolved.
+
+### 1. Invented tokens: `--success-wash` / `--success-border` do not exist in `tokens.css` — BLOCKING
+
+**Lines:** `library-v3.dc.html:38` (dark: `--success-wash:rgba(48,164,108,.10); --success-border:rgba(48,164,108,.30);`), `:52` (light: `--success-wash:rgba(31,143,93,.07); --success-border:rgba(31,143,93,.28);`).
+**Consumed at:** `.tag--ready` (line 192), `.fit--yes` (line 208), `.pill--published` (line 257).
+**Problem:** `src/ui-v2/tokens.css` defines `--uiv2-danger-wash/-border`, `--uiv2-warning-wash/-border`, and `--uiv2-info-wash/-border` for both themes (lines 117-122 dark, 176-181 light) — but **no `--uiv2-success-wash` or `--uiv2-success-border` exists anywhere in the file**. The real, shipped precedent for a "success" status tone is `src/ui-v2/primitives/Badge.module.css:22`: `.success { background: color-mix(in srgb, var(--uiv2-success) 15%, transparent); color: var(--uiv2-success); }` — no border at all, and a 15%-opacity `color-mix()`, not a fixed rgba wash constant. The mockup's invented wash is 10%/7% opacity (dark/light), not 15%, and it adds a border Badge deliberately does not have. This is a new color pairing invented per-mockup, not traced to any existing token — exactly what Master Brief §0 rule 5 prohibits.
+**Fix:** Replace every `var(--success-wash)`/`var(--success-border)` reference with the Badge primitive's actual recipe — background `color-mix(in srgb, var(--success) 15%, transparent)`, no border — or, if a bordered success treatment is genuinely needed, that is a real token-system gap to raise explicitly (add `--uiv2-success-wash`/`--uiv2-success-border` to `tokens.css` itself, once, with sign-off), not something a single mockup should silently define for itself.
+
+### 2. `.btn--danger` hardcodes `color:#fff`, reintroducing the exact AA failure class `tokens.css`'s own comments warn about — BLOCKING
+
+**Line:** `library-v3.dc.html:115` — `.btn--danger { background:var(--danger); color:#fff; }`.
+**Used at:** line 673, `<button class="btn btn--danger btn--sm" onClick="{{onRepair}}">Re-upload</button>` (asset-detail drawer, "This file can't reach a platform" notice) — a real, live control, not decorative.
+**Problem:** Computed contrast of white (`#fff`) on the dark-theme danger color `--danger:#E5484D` (mockup line 38, = `--uiv2-danger-d`, tokens.css:77) is **3.92:1**, which fails WCAG AA's 4.5:1 floor for normal-size text (the button label is 13px). This is the identical failure class documented in `tokens.css:68-71`'s own comment for `--uiv2-accent-on-solid` ("Was #FFFFFF on #FF5C38 — 3.07:1, a failing label") — white-on-saturated-color button text failing AA. The real, shipped `Button.module.css:58-61` primitive already solved this exact problem: `.dangerSolid { background: var(--uiv2-danger); color: var(--uiv2-accent-on-solid); }` — using the near-black `accent-on-solid` token (`#17181B`), which computes to 4.54:1 on the same danger red (passes AA). The mockup's `.btn--danger` is visually the filled/solid danger treatment (matching `.dangerSolid`, not the outlined `.danger` variant), so it should follow `.dangerSolid`'s text-color choice.
+**Fix:** `.btn--danger { color: var(--accent-on-solid); }` (the mockup already defines this local alias correctly at line 31 and uses it correctly elsewhere, e.g. `.btn--primary` line 109, `.dest__box--on` line 278 — this one instance was missed).
+
+### 3. `.shimmer` gradient uses the wrong middle-stop token and is unwired dead CSS — non-blocking, but flag before build
+
+**Lines:** `library-v3.dc.html:44` (dark: `linear-gradient(90deg,#1E2023 0%,#26282C 50%,#1E2023 100%)`), `:58` (light: `linear-gradient(90deg,#F4F3EE 0%,#E4E2DC 50%,#F4F3EE 100%)`), consumed at `.shimmer` (line 215: `background-size:500px 100%; animation:sh 1.2s linear infinite;`).
+**Problem:** `#26282C`/`#E4E2DC` are `--border`/`--border-strong`, not `--bg-inset`. Both real shimmer implementations in the codebase — `Skeleton.module.css:2-9` (`bg-elevated 0px, bg-inset 200px, bg-elevated 400px`, `background-size:800px`) and `AssetCard.module.css:163-169` (`bg-elevated 0px, bg-inset 120px, bg-elevated 240px`, `background-size:480px`) — use `bg-inset` as the highlight stop, never `border`. The mockup substitutes a border color into a shimmer-highlight role that has never held that value anywhere else in the system. Compounding this: `class="shimmer"` is never actually applied to any element in the markup (grepped the full file), despite the flow-view copy at line 600 explicitly promising "The card shimmers until they land" for tagging-pending assets — the card only renders a `.tag--tagging` text badge today, not a shimmer. So this is currently a wrong-valued, unused token sitting ready to be wired up incorrectly.
+**Fix:** Change both gradients' middle stop to `var(--bg-inset)`'s literal value (`#131417` dark / `#F4F3EE` light) and `background-size` to match one of the two existing recipes (e.g. 480px, matching `AssetCard.module.css`'s per-card-scale shimmer), and either wire `.shimmer` onto the tagging-pending card state to match the copy's promise, or drop the promise/class if it's out of scope for this pass.
+
+### 4. `.chip` background token doesn't match its own shipped equivalent (`LibraryPage.module.css`'s `.filterChip`)
+
+**Line:** `library-v3.dc.html:154` — `background:var(--bg-surface)`.
+**Real precedent:** `src/pages/Library/LibraryPage.module.css:151` — `.filterChip { background: var(--uiv2-bg-elevated); ... }`, the already-shipped equivalent of this exact "inactive filter chip" role (same pill radius, same border, same active-state accent-wash treatment as the mockup's `.chip--active`, line 157).
+**Fix:** `.chip` should use `var(--bg-elevated)`, matching the shipped filter-chip precedent, not `--bg-surface`.
+
+### 5. `.drawer` background token doesn't match the shipped `Drawer` primitive
+
+**Line:** `library-v3.dc.html:221` — `.drawer { width:460px; ...background:var(--bg-surface); ...}`.
+**Real precedent:** `src/ui-v2/primitives/Drawer.module.css:13` — `.panel { ...background: var(--uiv2-bg-inset); ...}`. Width is legitimately parametrizable (`Drawer.jsx` accepts a `width` prop, so 460px vs. the default 400px is not itself a violation), but the background token is a genuine mismatch against the primitive this component is standing in for.
+**Fix:** `.drawer { background: var(--bg-inset); }`.
+
+### 6. `.menu` (Add-content dropdown) reinvents `Dropdown` rather than reusing it, with drifted values
+
+**Lines:** `library-v3.dc.html:126-134`.
+**Real precedent:** `src/ui-v2/primitives/Dropdown.module.css` — `.panel { background: var(--uiv2-bg-surface); border: 1px solid var(--uiv2-border-strong); padding: 8px; ...}` (lines 9-12).
+**Drift found:** mockup uses `background:var(--bg-elevated)` (not bg-surface), `border:1px solid var(--border)` (not border-strong), `padding:6px` (not 8px).
+**Recommendation (component vocabulary, §4 of the review brief):** map `.menu`/`.menu__item` directly onto `Dropdown.jsx` + `.panel`/`.alignRight` rather than a parallel hand-rolled implementation, correcting the three drifted values above in the process.
+
+### 7. `.pill--*` / `.tag--*` / `.fit--*` all duplicate `Badge` — map at build time
+
+`Badge.jsx`/`Badge.module.css` already implements exactly this job (a tone-based small status label: success/warning/danger/info/neutral/accent). The mockup instead hand-rolls three parallel families (`.pill--published/scheduled/draft/failed`, `.tag--ready/blocked/tagging/nodest/record`, `.fit--yes/no`) with their own bespoke background/border values (see finding #1 for the success case specifically). Recommended mapping for the build phase, so nothing is re-implemented: `.pill--published`/`.tag--ready`/`.fit--yes` → `Badge tone="success"`; `.pill--scheduled`/`.tag--tagging` → `tone="info"`; `.pill--draft`/`.tag--record` → `tone="neutral"`; `.pill--failed`/`.tag--blocked` → `tone="danger"`; `.tag--nodest` → `tone="warning"`. Adopting this mapping also resolves finding #1 automatically, since `Badge`'s success tone never used an invented wash/border pair.
+
+### 8. `.iconbtn` doesn't match the shipped `IconButton` primitive's size; `.iconbtn--on` is a real, missing variant worth promoting
+
+**Line:** `library-v3.dc.html:119` — `.iconbtn { width:38px; height:38px; ...}` vs. `src/ui-v2/primitives/IconButton.module.css:2-3` — `.iconBtn { width: 30px; height: 30px; }`. Concrete size mismatch against the primitive it stands in for.
+`.iconbtn--on` (line 124: `background:var(--accent-wash); color:var(--accent-text); border-color:var(--accent-border);`) has no equivalent in `IconButton.module.css` at all (only `.iconBtn`/`.dot` exist there) — but the value combination used is itself correctly token-derived and matches the "active" idiom used everywhere else in this system (`.navitem--active`, `LibraryPage.module.css`'s `.filterChipActive`/`.viewToggleBtnActive`). Recommend adding this as a real `.iconBtnActive` variant to the shipped `IconButton.module.css` (using exactly these three tokens) rather than leaving each screen to reinvent it.
+
+### 9. `.btn--sm` font-size doesn't match the shipped `Button` primitive's small size
+
+**Line:** `library-v3.dc.html:116` — `.btn--sm { ...font-size:12px; ...}` vs. `src/ui-v2/primitives/Button.module.css:22` — `.sizeSm { padding: 6px 12px; font-size: var(--uiv2-text-xs); }` = 11.5px. Minor but exact, checkable numeric drift from the primitive being mirrored.
+
+### 10. `.btn--primary:hover` hardcodes a literal hex instead of mirroring the matching token, and departs from the Button primitive's own hover technique
+
+**Line:** `library-v3.dc.html:110` — `.btn--primary:hover { background:color-mix(in srgb, #FF5C38 92%, white); }`.
+The expression is byte-identical to `tokens.css:66`'s `--uiv2-accent-solid-hover: color-mix(in srgb, #FF5C38 92%, white);` — but the mockup inlines the literal instead of mirroring it as a local `--accent-solid-hover` alias, unlike every other tokens.css value it faithfully aliased in its `[data-theme]` block (lines 25-60). Separately, the actual shipped `Button.module.css:28` primitive uses a different technique entirely for this same state: `.solid:hover:not(:disabled) { filter: brightness(1.06); }`.
+**Fix:** Either add `--accent-solid-hover` to the mockup's token block and reference it, or (preferred, to match the primitive of record) replace the rule with `filter: brightness(1.06)` to exactly mirror `Button.module.css`.
+
+### 11. Toast padding and shadow token both drift from the shipped `Toast` primitive
+
+**Line:** `library-v3.dc.html:311` — `.toast { padding:11px 16px; ...box-shadow:var(--shadow-pop); }` vs. `src/ui-v2/primitives/Toast.module.css:9,17` — `padding: 11px 18px;` and `box-shadow: var(--uiv2-shadow-modal-current);`. The mockup's `--shadow-pop` (line 57, light theme) resolves to `0 12px 28px rgba(0,0,0,.14)`, which is tokens.css's **popover** shadow (`--uiv2-shadow-popover`, tokens.css:83) — the real Toast primitive uses the larger **modal** shadow (`0 20px 50px rgba(0,0,0,.15)` in light theme, tokens.css:81). Both the padding (16px vs. 18px) and the shadow tier are checkable, exact mismatches against the component being mirrored.
+
+### 12. Mono font stack isn't tokenized and doesn't match `--uiv2-font-mono` exactly
+
+**Line:** `library-v3.dc.html:300` — `.node__src { font-family:"JetBrains Mono", ui-monospace, monospace; ...}`. Unlike `--font-display`/`--font-body`, which are correctly aliased in the `[data-theme]` block (lines 26-27) from `tokens.css:16-17`, no `--font-mono` alias is ever defined, and the hardcoded fallback stack differs from `tokens.css:18`'s `--uiv2-font-mono: "JetBrains Mono", "Fira Code", monospace` ("Fira Code" replaced with "ui-monospace"). **Fix:** add `--font-mono: "JetBrains Mono", "Fira Code", monospace;` to the `[data-theme]` block and reference `var(--font-mono)` at line 300.
+
+### 13. `.chip__n` (and other counters) skip the established mono-numeral convention for counts
+
+**Line:** `library-v3.dc.html:158` — `.chip__n { font-size:11px; color:var(--text-3); font-variant-numeric:tabular-nums; }`. Every other numeric-count instance in the shipped codebase uses `font-family: var(--uiv2-font-mono)` for this role (`LibraryPage.module.css:101-105` `.mobileRailToggleCount`, `:228-233` `.railItemCount`; `AssetCard.module.css:149` `.metaRow`) — the mockup instead relies only on `font-variant-numeric`, a different (and non-token) mechanism, for the same "tabular number" intent. Minor; align with the mono-numeral convention if this class is carried into the build.
+
+## Checks that passed cleanly (not flagged further)
+
+- **Both themes complete:** every local custom property defined in `[data-theme="dark"]` has a symmetric counterpart in `[data-theme="light"]` (verified line-by-line, lines 33-60); no color is theme-orphaned and no raw color outside the two theme blocks fails to flip (the one apparent exception, `.tag--src`/`.tag--dur`'s hardcoded `rgba(14,15,17,.72)`/`#F5F5F4` scrim-over-media badges at lines 190-191, is intentional and byte-identical to the already-shipped `AssetCard.module.css:44-56` `.mediaBadge` — a fixed-contrast overlay badge that must stay legible over an arbitrary photo regardless of theme, not a theme bug).
+- **Contrast — `accent-on-solid`:** `.btn--primary`/`.dest__box--on` correctly use `--accent-on-solid` (#17181B in both themes), matching `tokens.css:67-72`'s AA-fixed value. Passes.
+- **Contrast — light-theme `accent-text`:** correctly uses the AA-fixed `#C13F16` (line 51), not the failing `#E14E2F` `tokens.css:157-164`'s comment documents replacing. Passes.
+- **Contrast — `.fit--no`:** computed contrast of `--text-3` on `--bg-inset` clears AA in both themes (dark ≈5.1:1, light ≈4.5:1, consistent with the floor `tokens.css`'s own tertiary-text comments already establish). Passes.
+- **Typography — Space Grotesk vs. Inter:** every heading/title correctly uses `var(--font-display)` (`.rail__name`, `.topbar h1`, `.drawer__t`, `.empty__t`, the publish-sheet title); body text correctly inherits `var(--font-body)`. No misuse found.
+- Radius, spacing, and most font-size values trace either to a real `--r-*` token or to a raw-px micro-chrome convention with direct, exact precedent already shipped in `LibraryPage.module.css`/`AssetCard.module.css`/`AssetDetailDrawer.module.css`/`StudioPage.module.css` (10px/10.5px/11px/11.5px/12px/12.5px/15px/16px/19px all independently confirmed present in shipped ui-v2 CSS in the same usage role) — not re-listed individually per the "don't pad the report" instruction.
+
+## Summary
+
+**13 findings, 2 blocking (#1 invented success-wash/border tokens; #2 the `.btn--danger` white-on-red AA failure).** The remaining 11 are real, checkable, file:line-precise token/value drift against the specific shipped primitive each mockup class is standing in for (Drawer, Dropdown, IconButton, Button, Toast, the mono font token, LibraryPage's filter chip) — none individually blocking on their own, but all should be corrected before this mockup is treated as build-ready, since Master Brief §0 rule 5 makes "matches an existing primitive exactly" the bar, not "is close enough." Per the standing rule, **this mockup does not go to human review until findings #1 and #2 are resolved and re-verified.**

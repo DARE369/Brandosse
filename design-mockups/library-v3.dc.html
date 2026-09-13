@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* =====================================================================
+       Library v3 — built on design-system-v2 tokens (src/ui-v2/tokens.css).
+       Palette, type, radii and motion are copied from that file verbatim so
+       this mockup cannot drift from the locked system. Dark ("Midnight") is
+       the default, light ("Paper") is the alternate — both are required,
+       because the shipped app ships both.
+       ===================================================================== */
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; }
+
+    [data-theme] {
+      --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+      --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", "Fira Code", monospace;
+      --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 10px; --r-xl: 12px; --r-pill: 999px;
+      --ease: cubic-bezier(.4,0,.2,1);
+      --accent-solid: #FF5C38;
+      --accent-solid-hover: color-mix(in srgb, #FF5C38 92%, white);
+      /* Same value in both themes, and the same value the system puts on
+         accent-solid: white on the danger red is 3.92:1 and fails AA. */
+      --accent-on-solid: #17181B;
+    }
+    [data-theme="dark"] {
+      --bg-canvas:#0E0F11; --bg-surface:#17181B; --bg-elevated:#1E2023; --bg-inset:#131417;
+      --border:#26282C; --border-strong:#2E3136; --border-hover:#3C4046;
+      --text-1:#F5F5F4; --text-2:#8B8D93; --text-3:#85878A;
+      --accent-text:#FF5C38; --accent-wash:rgba(255,92,56,.10); --accent-border:rgba(255,92,56,.35);
+      --success:#30A46C; --warning:#FFB224; --danger:#E5484D; --info:#3E7BD6;
+      /* No --success-wash/--success-border exist in the system: only danger,
+         warning and info carry wash+border pairs. Success is derived the way
+         Badge.module.css:22 already derives it, rather than inventing tokens. */
+      --danger-wash:rgba(229,72,77,.08);
+      --warning-wash:rgba(255,178,36,.10); --info-wash:rgba(62,123,214,.10);
+      --danger-border:rgba(229,72,77,.30);
+      --warning-border:rgba(255,178,36,.30); --info-border:rgba(62,123,214,.30);
+      --scrim:rgba(0,0,0,.55); --shadow-pop:0 14px 32px rgba(0,0,0,.45);
+      --shimmer:linear-gradient(90deg,var(--bg-inset) 0%,var(--bg-elevated) 50%,var(--bg-inset) 100%);
+      color-scheme: dark;
+    }
+    [data-theme="light"] {
+      --bg-canvas:#F7F6F2; --bg-surface:#FFFFFF; --bg-elevated:#F4F3EE; --bg-inset:#F4F3EE;
+      --border:#E4E2DC; --border-strong:#C9C6BC; --border-hover:#C9C6BC;
+      --text-1:#17181B; --text-2:#5E6064; --text-3:#6E6F72;
+      --accent-text:#C13F16; --accent-wash:rgba(255,92,56,.08); --accent-border:rgba(255,92,56,.30);
+      --success:#1F8F5D; --warning:#9A6400; --danger:#C22A30; --info:#2A5FBD;
+      --danger-wash:rgba(194,42,48,.06);
+      --warning-wash:rgba(154,100,0,.08); --info-wash:rgba(42,95,189,.07);
+      --danger-border:rgba(194,42,48,.28);
+      --warning-border:rgba(154,100,0,.28); --info-border:rgba(42,95,189,.25);
+      --scrim:rgba(23,24,27,.35); --shadow-pop:0 12px 28px rgba(0,0,0,.14);
+      --shimmer:linear-gradient(90deg,var(--bg-inset) 0%,var(--border) 50%,var(--bg-inset) 100%);
+      color-scheme: light;
+    }
+
+    .app {
+      display:flex; height:100vh; width:100%; overflow:hidden; position:relative;
+      background:var(--bg-canvas); color:var(--text-1);
+      font-family:var(--font-body); font-size:14px; line-height:1.5;
+    }
+    ::-webkit-scrollbar { width:8px; height:8px; }
+    ::-webkit-scrollbar-thumb { background:var(--border-hover); border-radius:4px; }
+
+    /* ---------- Rail ---------- */
+    .rail {
+      width:224px; flex-shrink:0; background:var(--bg-surface);
+      border-right:1px solid var(--border);
+      display:flex; flex-direction:column; padding:16px 12px; gap:2px; overflow-y:auto;
+    }
+    .rail__brand { display:flex; align-items:center; gap:9px; padding:2px 8px 16px; margin-bottom:8px; border-bottom:1px solid var(--border); }
+    .rail__mark { width:9px; height:9px; border-radius:50%; background:var(--accent-solid); flex-shrink:0; }
+    .rail__name { font-family:var(--font-display); font-weight:700; font-size:17px; letter-spacing:-.02em; }
+    .rail__group { font-size:10.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-3); padding:14px 10px 6px; }
+    .navitem {
+      display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:var(--r-md);
+      cursor:pointer; font-size:13px; font-weight:500; color:var(--text-2);
+      transition:background var(--ease) 120ms, color var(--ease) 120ms; min-height:38px;
+    }
+    .navitem:hover { background:var(--bg-elevated); color:var(--text-1); }
+    .navitem--active { background:var(--accent-wash); color:var(--accent-text); font-weight:600; }
+    .navitem__count { margin-left:auto; font-size:11px; color:var(--text-3); font-variant-numeric:tabular-nums; }
+    .rail__spacer { flex:1; min-height:12px; }
+    .conn { display:flex; align-items:center; gap:8px; padding:6px 10px; font-size:12px; color:var(--text-2); }
+    .conn__dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .conn__meta { margin-left:auto; font-size:10.5px; color:var(--text-3); }
+    .rail__connect { display:flex; align-items:center; gap:8px; padding:8px 10px; margin-top:4px; border-radius:var(--r-md); border:1px dashed var(--border-strong); font-size:12px; color:var(--text-2); cursor:pointer; }
+
+    /* ---------- Main ---------- */
+    .main { flex:1; min-width:0; overflow-y:auto; display:flex; flex-direction:column; }
+    .page { padding:20px 24px 96px; display:flex; flex-direction:column; gap:16px; }
+
+    .topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .topbar h1 { font-family:var(--font-display); font-weight:700; font-size:22px; letter-spacing:-.01em; margin:0; }
+    .topbar__sub { font-size:13px; color:var(--text-2); margin-top:3px; }
+    .topbar__actions { display:flex; gap:8px; align-items:center; position:relative; flex-wrap:wrap; }
+
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      border-radius:var(--r-md); font-family:inherit; font-size:13px; font-weight:600;
+      padding:0 14px; min-height:38px; cursor:pointer; border:1px solid transparent;
+      transition:background var(--ease) 120ms, border-color var(--ease) 120ms; white-space:nowrap;
+    }
+    .btn--primary { background:var(--accent-solid); color:var(--accent-on-solid); }
+    .btn--primary:hover { background:var(--accent-solid-hover); }
+    .btn--subtle { background:var(--bg-elevated); color:var(--text-1); border-color:var(--border); }
+    .btn--subtle:hover { border-color:var(--border-hover); }
+    .btn--ghost { background:transparent; color:var(--text-2); }
+    .btn--ghost:hover { background:var(--bg-elevated); color:var(--text-1); }
+    .btn--danger { background:var(--danger); color:var(--accent-on-solid); }
+    .btn--sm { min-height:30px; font-size:12px; padding:0 10px; }
+    .btn[disabled], .btn--disabled { opacity:.45; cursor:not-allowed; }
+    .iconbtn {
+      width:38px; height:38px; display:inline-flex; align-items:center; justify-content:center;
+      border-radius:var(--r-md); border:1px solid var(--border); background:var(--bg-elevated);
+      color:var(--text-2); cursor:pointer;
+    }
+    .iconbtn:hover { color:var(--text-1); border-color:var(--border-hover); }
+    .iconbtn--on { background:var(--accent-wash); color:var(--accent-text); border-color:var(--accent-border); }
+
+    .menu {
+      position:absolute; top:44px; right:0; z-index:40; width:252px; padding:6px;
+      background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--r-lg);
+      box-shadow:var(--shadow-pop);
+    }
+    .menu__item { display:flex; gap:10px; align-items:flex-start; padding:9px 10px; border-radius:var(--r-sm); cursor:pointer; }
+    .menu__item:hover { background:var(--bg-surface); }
+    .menu__t { font-size:13px; font-weight:600; color:var(--text-1); }
+    .menu__d { font-size:11.5px; color:var(--text-3); margin-top:1px; }
+
+    /* ---------- Filters ---------- */
+    .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .search {
+      display:flex; align-items:center; gap:8px; flex:1; min-width:200px;
+      background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--r-md); padding:0 12px; min-height:38px;
+    }
+    .search input { border:none; outline:none; background:transparent; width:100%; font-family:inherit; font-size:13px; color:var(--text-1); }
+    .select {
+      background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--r-md);
+      min-height:38px; padding:0 10px; font-family:inherit; font-size:12.5px; color:var(--text-1); cursor:pointer;
+    }
+
+    /* Horizontal scroll is the only path to the 5th/6th chip, so the fact that
+       it scrolls must be visible: the mask fades the trailing edge, which reads
+       as "there is more" without stealing a row for an affordance. */
+    .railrow {
+      display:flex; gap:6px; align-items:center; overflow-x:auto; padding-bottom:2px; scrollbar-width:none;
+      -webkit-mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+      mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+    }
+    .railrow::-webkit-scrollbar { display:none; }
+    .railrow__label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); flex-shrink:0; margin-right:2px; }
+    .chip {
+      display:inline-flex; align-items:center; gap:6px; flex-shrink:0; cursor:pointer;
+      padding:0 12px; min-height:32px; border-radius:var(--r-pill); font-size:12.5px; font-weight:500;
+      background:var(--bg-surface); border:1px solid var(--border); color:var(--text-2);
+    }
+    .chip:hover { border-color:var(--border-hover); color:var(--text-1); }
+    .chip--active { background:var(--accent-wash); border-color:var(--accent-border); color:var(--accent-text); font-weight:600; }
+    .chip__n { font-family:var(--font-mono); font-size:10.5px; color:var(--text-3); font-variant-numeric:tabular-nums; }
+    .chip--active .chip__n { color:var(--accent-text); }
+
+    /* ---------- Notice ---------- */
+    .notice {
+      display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border-radius:var(--r-lg);
+      background:var(--warning-wash); border:1px solid var(--warning-border);
+    }
+    .notice--danger { background:var(--danger-wash); border-color:var(--danger-border); }
+    .notice__body { flex:1; min-width:0; }
+    .notice__t { font-size:12.5px; font-weight:600; color:var(--text-1); }
+    .notice__d { font-size:12px; color:var(--text-2); margin-top:2px; }
+
+    /* ---------- Grid + cards ---------- */
+    .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fill, minmax(196px, 1fr)); }
+    .grid--roomy { gap:18px; grid-template-columns:repeat(auto-fill, minmax(244px, 1fr)); }
+
+    .card {
+      background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--r-xl);
+      overflow:hidden; display:flex; flex-direction:column; cursor:pointer;
+      transition:border-color var(--ease) 120ms, transform var(--ease) 120ms;
+    }
+    .card:hover { border-color:var(--border-hover); }
+    .card--blocked { border-color:var(--danger-border); }
+    .card__media { position:relative; aspect-ratio:4/5; background:var(--bg-inset); }
+    .card__tl { position:absolute; top:8px; left:8px; display:flex; gap:4px; }
+    .card__tr { position:absolute; top:8px; right:8px; }
+    .card__br { position:absolute; bottom:8px; right:8px; }
+    .tag {
+      display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border-radius:var(--r-sm);
+      font-size:10px; font-weight:600; letter-spacing:.02em; backdrop-filter:blur(6px);
+    }
+    .tag--src { background:rgba(14,15,17,.72); color:#F5F5F4; }
+    .tag--dur { background:rgba(14,15,17,.72); color:#F5F5F4; font-variant-numeric:tabular-nums; }
+    .tag--ready { background:color-mix(in srgb, var(--success) 15%, transparent); color:var(--success); }
+    .tag--blocked { background:var(--danger-wash); color:var(--danger); border:1px solid var(--danger-border); }
+    .tag--tagging { background:var(--info-wash); color:var(--info); border:1px solid var(--info-border); }
+    .tag--nodest { background:var(--warning-wash); color:var(--warning); border:1px solid var(--warning-border); }
+    .tag--record { background:var(--bg-elevated); color:var(--text-2); border:1px solid var(--border); }
+
+    .card__body { padding:10px 12px 12px; display:flex; flex-direction:column; gap:8px; }
+    .card__title { font-size:13px; font-weight:600; color:var(--text-1); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .card__meta { font-size:11px; color:var(--text-3); display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
+    .card__prov { font-size:11px; color:var(--text-2); display:flex; gap:5px; align-items:center; }
+
+    .fits { display:flex; gap:4px; align-items:center; }
+    .fit {
+      width:22px; height:20px; border-radius:var(--r-xs); font-size:9.5px; font-weight:700; letter-spacing:.02em;
+      display:inline-flex; align-items:center; justify-content:center; border:1px solid transparent;
+    }
+    .fit--yes { background:color-mix(in srgb, var(--success) 15%, transparent); color:var(--success); border-color:transparent; }
+    .fit--no { background:var(--bg-inset); color:var(--text-3); border-color:var(--border); }
+    .fit__note { font-size:10.5px; color:var(--text-3); margin-left:2px; }
+
+    .card__actions { display:flex; gap:6px; margin-top:2px; }
+    .card__actions .btn { flex:1; min-height:32px; font-size:12px; padding:0 8px; }
+
+    .shimmer { background:var(--shimmer); background-size:500px 100%; animation:sh 1.2s linear infinite; }
+    @keyframes sh { 0%{background-position:-500px 0} 100%{background-position:500px 0} }
+
+    /* ---------- Drawer ---------- */
+    .scrim { position:fixed; inset:0; background:var(--scrim); z-index:50; display:flex; justify-content:flex-end; }
+    .drawer {
+      width:460px; max-width:100%; height:100%; background:var(--bg-surface);
+      border-left:1px solid var(--border); display:flex; flex-direction:column;
+    }
+    .drawer__head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px 18px 12px; border-bottom:1px solid var(--border); }
+    .drawer__t { font-family:var(--font-display); font-size:16px; font-weight:700; line-height:1.3; }
+    .drawer__s { font-size:11.5px; color:var(--text-3); margin-top:3px; }
+    .drawer__scroll { flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:16px; }
+    .drawer__foot { padding:12px 18px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:8px; background:var(--bg-surface); }
+
+    .tabs { display:flex; gap:18px; padding:0 18px; border-bottom:1px solid var(--border); }
+    .tab { padding:10px 0 11px; font-size:12.5px; font-weight:600; color:var(--text-2); cursor:pointer; border-bottom:2px solid transparent; }
+    .tab--active { color:var(--text-1); border-bottom-color:var(--accent-solid); }
+
+    .kicker { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
+    .field { display:flex; flex-direction:column; gap:5px; }
+    .field label { font-size:11.5px; font-weight:600; color:var(--text-2); }
+    .field input, .field textarea {
+      background:var(--bg-inset); border:1px solid var(--border); border-radius:var(--r-md);
+      padding:9px 10px; font-family:inherit; font-size:13px; color:var(--text-1); outline:none; width:100%;
+    }
+    .field input:focus, .field textarea:focus { border-color:var(--accent-border); }
+    .hint { font-size:11px; color:var(--text-3); }
+
+    .facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .fact { background:var(--bg-inset); border:1px solid var(--border); border-radius:var(--r-md); padding:8px 10px; }
+    .fact__k { font-size:10.5px; color:var(--text-3); }
+    .fact__v { font-size:12.5px; font-weight:600; color:var(--text-1); margin-top:2px; word-break:break-word; }
+
+    .row {
+      display:flex; align-items:center; gap:10px; padding:10px;
+      border:1px solid var(--border); border-radius:var(--r-md); background:var(--bg-inset);
+    }
+    .row__main { flex:1; min-width:0; }
+    .row__t { font-size:12.5px; font-weight:600; }
+    .row__d { font-size:11px; color:var(--text-3); margin-top:2px; }
+    .pill { padding:3px 8px; border-radius:var(--r-pill); font-size:10.5px; font-weight:700; }
+    .pill--published { background:color-mix(in srgb, var(--success) 15%, transparent); color:var(--success); }
+    .pill--scheduled { background:var(--info-wash); color:var(--info); }
+    .pill--draft { background:var(--bg-elevated); color:var(--text-2); }
+    .pill--failed { background:var(--danger-wash); color:var(--danger); }
+
+    /* ---------- Publish sheet ---------- */
+    .sheet { position:fixed; inset:0; z-index:60; background:var(--scrim); display:flex; align-items:center; justify-content:center; padding:24px; }
+    .sheet__panel {
+      width:100%; max-width:980px; max-height:100%; background:var(--bg-surface);
+      border:1px solid var(--border); border-radius:var(--r-xl); display:flex; flex-direction:column; overflow:hidden;
+    }
+    .sheet__head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border); }
+    .sheet__cols { display:flex; flex:1; min-height:0; }
+    .sheet__left { width:320px; flex-shrink:0; border-right:1px solid var(--border); padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
+    .sheet__right { flex:1; min-width:0; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+    .sheet__foot { padding:12px 18px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+
+    .dest { display:flex; gap:10px; align-items:flex-start; padding:11px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--bg-inset); cursor:pointer; }
+    .dest--on { border-color:var(--accent-border); background:var(--accent-wash); }
+    .dest--off { opacity:.6; cursor:not-allowed; }
+    .dest__box { width:16px; height:16px; border-radius:var(--r-xs); border:1.5px solid var(--border-strong); flex-shrink:0; margin-top:1px; display:flex; align-items:center; justify-content:center; font-size:10px; }
+    .dest__box--on { background:var(--accent-solid); border-color:var(--accent-solid); color:var(--accent-on-solid); }
+    .dest__t { font-size:13px; font-weight:600; }
+    .dest__d { font-size:11px; color:var(--text-3); margin-top:2px; }
+    .dest__why { font-size:11px; color:var(--warning); margin-top:3px; }
+
+    .req { border:1px solid var(--border); border-radius:var(--r-lg); background:var(--bg-inset); padding:12px; display:flex; flex-direction:column; gap:10px; }
+    .req__h { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; }
+    .seg { display:inline-flex; border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; }
+    .seg__o { padding:6px 12px; font-size:12px; font-weight:600; color:var(--text-2); cursor:pointer; background:var(--bg-surface); }
+    .seg__o--on { background:var(--accent-wash); color:var(--accent-text); }
+    .seg__o--off { color:var(--text-3); text-decoration:line-through; cursor:not-allowed; }
+    .reqnote {
+      font-size:11.5px; line-height:1.45; color:var(--text-2);
+      background:var(--warning-wash); border:1px solid var(--warning-border);
+      border-radius:var(--r-md); padding:8px 10px;
+    }
+    .counter { font-size:11px; color:var(--text-3); font-variant-numeric:tabular-nums; }
+    .counter--over { color:var(--danger); font-weight:600; }
+
+    /* ---------- Flow view ---------- */
+    .flow { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; }
+    .flowcol { display:flex; flex-direction:column; gap:8px; }
+    .flowcol__h { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); padding-bottom:2px; }
+    .node { border:1px solid var(--border); border-radius:var(--r-lg); background:var(--bg-surface); padding:11px 12px; }
+    .node--accent { border-color:var(--accent-border); background:var(--accent-wash); }
+    .node--gate { border-style:dashed; border-color:var(--warning-border); background:var(--warning-wash); }
+    .node__t { font-size:12.5px; font-weight:600; color:var(--text-1); }
+    .node__d { font-size:11px; color:var(--text-2); margin-top:3px; line-height:1.45; }
+    .node__src { font-size:10.5px; color:var(--text-3); margin-top:5px; font-family:var(--font-mono); word-break:break-all; }
+
+    /* ---------- Empty ---------- */
+    .empty { border:1px dashed var(--border-strong); border-radius:var(--r-xl); padding:40px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:10px; }
+    .empty__t { font-family:var(--font-display); font-size:16px; font-weight:700; }
+    .empty__d { font-size:13px; color:var(--text-2); max-width:420px; }
+
+    /* =====================================================================
+       Merged in from the packet's approved mockup-gallery.html — the flows it
+       proved and this file originally lacked: the real upload pipeline
+       (multi-file queue, per-file failure, duplicate detection), the table
+       view, trash with its recovery window, and the Calendar hand-off.
+       ===================================================================== */
+
+    /* ---------- Modal ---------- */
+    .modal { position:fixed; inset:0; z-index:70; background:var(--scrim); display:flex; align-items:center; justify-content:center; padding:24px; }
+    .modal__panel {
+      width:100%; max-width:520px; max-height:100%; display:flex; flex-direction:column;
+      background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--r-xl);
+      box-shadow:var(--shadow-pop); overflow:hidden;
+    }
+    .modal__head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border); }
+    .modal__t { font-family:var(--font-display); font-size:15px; font-weight:700; }
+    .modal__body { padding:16px 18px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
+    .modal__foot { padding:12px 18px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+
+    /* ---------- Upload ---------- */
+    .dropzone {
+      border:1.5px dashed var(--border-strong); border-radius:var(--r-xl); background:var(--bg-inset);
+      padding:28px 20px; text-align:center; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:6px;
+      transition:border-color var(--ease) 120ms, background var(--ease) 120ms;
+    }
+    .dropzone:hover, .dropzone:focus-visible { border-color:var(--accent-border); background:var(--accent-wash); outline:none; }
+    .dropzone__t { font-size:13.5px; font-weight:600; color:var(--text-1); }
+    .dropzone__h { font-size:11.5px; color:var(--text-3); }
+
+    .queue { display:flex; flex-direction:column; gap:8px; }
+    .qitem { display:flex; align-items:flex-start; gap:10px; padding:10px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--bg-inset); }
+    .qitem--failed { border-color:var(--danger-border); background:var(--danger-wash); }
+    .qitem__thumb {
+      width:34px; height:34px; flex-shrink:0; border-radius:var(--r-sm); background:var(--bg-elevated);
+      display:flex; align-items:center; justify-content:center; color:var(--text-3);
+    }
+    .qitem__body { flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+    .qitem__namerow { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+    .qitem__name { font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .qitem__pct { font-family:var(--font-mono); font-size:10.5px; color:var(--text-3); flex-shrink:0; font-variant-numeric:tabular-nums; }
+    .qitem__track { height:4px; border-radius:var(--r-pill); background:var(--bg-elevated); overflow:hidden; }
+    .qitem__fill { height:100%; background:var(--accent-solid); border-radius:var(--r-pill); transition:width var(--ease) 240ms; }
+    .qitem__fill--ok { background:var(--success); }
+    .qitem__fill--bad { background:var(--danger); }
+    .qitem__err { font-size:11.5px; color:var(--danger); }
+
+    /* Never blocks the upload — a duplicate is often a deliberate re-upload of
+       an edited file, so this asks rather than refuses. */
+    .dupwarn {
+      display:flex; gap:10px; align-items:flex-start; margin-top:8px; padding:11px 12px;
+      border-radius:var(--r-md); background:var(--warning-wash); border:1px solid var(--warning-border);
+    }
+    .dupwarn__t { font-size:12.5px; font-weight:600; color:var(--text-1); }
+    .dupwarn__d { font-size:11.5px; color:var(--text-2); margin-top:3px; }
+    .dupwarn__actions { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+
+    .recovery {
+      display:flex; gap:10px; align-items:flex-start; padding:11px 12px; border-radius:var(--r-md);
+      background:var(--info-wash); border:1px solid var(--info-border); font-size:12.5px; color:var(--text-1); line-height:1.45;
+    }
+
+    /* ---------- Table view ---------- */
+    /* Built from divs, not <table>: the HTML parser foster-parents unknown
+       elements (sc-if/sc-for) out of table content before any runtime sees
+       them, which silently drops every row. role="table" keeps it a table to
+       assistive tech. */
+    .tablewrap { overflow-x:auto; border:1px solid var(--border); border-radius:var(--r-xl); background:var(--bg-surface); }
+    .ltable { min-width:760px; }
+    .lrow {
+      display:grid; align-items:center; gap:12px; padding:10px 12px;
+      grid-template-columns:minmax(220px,2.2fr) 92px 132px 104px 80px 92px 80px;
+      border-bottom:1px solid var(--border); font-size:12.5px;
+    }
+    .lrow:last-child { border-bottom:none; }
+    .lrow--head {
+      font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+      color:var(--text-3); white-space:nowrap; background:var(--bg-inset);
+    }
+    .lrow--data { cursor:pointer; }
+    .lrow--data:hover { background:var(--bg-elevated); }
+    .lcell { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+    .tthumb {
+      width:38px; height:38px; border-radius:var(--r-sm); background:var(--bg-inset); flex-shrink:0;
+      display:flex; align-items:center; justify-content:center; color:var(--text-3); overflow:hidden;
+    }
+    .tname { display:flex; align-items:center; gap:10px; min-width:0; }
+    .tname__t { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px; }
+
+    /* ---------- Media preview in the composer ---------- */
+    /* flex-shrink:0 — it is a child of a flex column that scrolls, so without
+       this it gets compressed and the metadata row underneath is squashed to
+       nothing before the column ever scrolls. */
+    .previewbox { border:1px solid var(--border); border-radius:var(--r-lg); background:var(--bg-inset); overflow:hidden; flex-shrink:0; }
+    /* Fixed-height stage, media centred inside at its OWN aspect ratio, so a
+       9:16 clip previews as 9:16. (aspect-ratio + max-height on one box makes
+       the browser shrink its width instead, which left-aligns it in dead space.) */
+    .previewbox__media {
+      position:relative; height:230px; background:var(--bg-canvas);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .previewbox__stage { position:relative; height:100%; max-width:100%; }
+    .previewbox__meta { padding:9px 11px; display:flex; flex-direction:column; gap:3px; }
+    .previewbox__t { font-size:12.5px; font-weight:600; }
+    .previewbox__d { font-size:11px; color:var(--text-3); }
+
+    /* ---------- Discovery score ---------- */
+    .score { display:flex; align-items:center; gap:10px; }
+    .score__n { font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+    .score--good { color:var(--success); }
+    .score--ok { color:var(--warning); }
+    .score--bad { color:var(--danger); }
+    .score__bar { flex:1; height:5px; border-radius:var(--r-pill); background:var(--bg-elevated); overflow:hidden; }
+    .score__fill { height:100%; border-radius:var(--r-pill); background:currentColor; }
+    .tip { display:flex; gap:8px; align-items:flex-start; font-size:11.5px; color:var(--text-2); line-height:1.45; }
+    .tip__dot { width:4px; height:4px; border-radius:50%; background:var(--text-3); flex-shrink:0; margin-top:6px; }
+
+    /* ---------- Schedule picker ---------- */
+    .when { display:flex; gap:8px; flex-wrap:wrap; }
+    .when input {
+      background:var(--bg-inset); border:1px solid var(--border); border-radius:var(--r-md);
+      padding:10px; font-family:inherit; font-size:13.5px; color:var(--text-1); outline:none;
+      color-scheme:inherit; flex:1; min-width:140px;
+    }
+    .when input:focus { border-color:var(--accent-border); }
+
+    /* ---------- Receipt ---------- */
+    .receipt { max-width:680px; display:flex; flex-direction:column; gap:14px; }
+    .receipt__hero { display:flex; gap:14px; align-items:flex-start; padding:16px; border-radius:var(--r-xl); background:color-mix(in srgb, var(--success) 12%, transparent); }
+    .receipt__tick {
+      width:34px; height:34px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+      background:var(--success); color:var(--bg-canvas);
+    }
+    .receipt__t { font-family:var(--font-display); font-size:17px; font-weight:700; }
+    .receipt__d { font-size:12.5px; color:var(--text-2); margin-top:3px; }
+
+    /* =====================================================================
+       Platform previews. The point of these is TRUNCATION, not decoration:
+       each platform cuts the caption at a different place, and a hook that
+       falls past the fold is invisible. The chrome is deliberately generic —
+       recognisable enough to orient, never a pixel copy of someone's app.
+       ===================================================================== */
+    .pvTabs { display:flex; gap:6px; flex-wrap:wrap; }
+    .pvStage { display:flex; justify-content:center; padding:4px 0 2px; }
+
+    .pv { width:100%; max-width:340px; font-size:12px; }
+    .pv__head { display:flex; align-items:center; gap:8px; padding:10px 12px; }
+    .pv__av { width:30px; height:30px; border-radius:50%; background:var(--accent-solid); color:var(--accent-on-solid);
+              display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; flex-shrink:0; }
+    .pv__who { font-weight:600; font-size:12.5px; }
+    .pv__sub { font-size:10.5px; color:var(--text-3); }
+    .pv__body { padding:0 12px 10px; line-height:1.45; }
+    .pv__more { color:var(--text-3); }
+    .pv__tags { color:var(--info); }
+    .pv__media { background:var(--bg-canvas); position:relative; display:flex; align-items:center; justify-content:center; }
+    .pv__bar { display:flex; gap:16px; padding:9px 12px; border-top:1px solid var(--border); color:var(--text-3); font-size:11px; }
+
+    /* Card-shaped feeds */
+    .pv--card { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; }
+
+    /* Phone-shaped full-bleed feeds */
+    .pv--phone { max-width:230px; background:#000; border-radius:18px; overflow:hidden; border:5px solid var(--bg-elevated); position:relative; }
+    .pv--phone .pv__media { aspect-ratio:9/16; }
+    .pv__overlay { position:absolute; inset:auto 0 0 0; padding:10px; display:flex; gap:8px; align-items:flex-end; }
+    .pv__overlayText { flex:1; min-width:0; color:#fff; font-size:11px; line-height:1.4; text-shadow:0 1px 4px rgba(0,0,0,.75); }
+    .pv__rail { display:flex; flex-direction:column; gap:12px; align-items:center; color:#fff; opacity:.95; }
+    .pv__railDot { width:24px; height:24px; border-radius:50%; background:rgba(255,255,255,.22); }
+
+    .pvNote {
+      font-size:11.5px; color:var(--text-2); line-height:1.45; padding:9px 11px;
+      border-radius:var(--r-md); background:var(--info-wash); border:1px solid var(--info-border);
+    }
+    .pvNote--warn { background:var(--warning-wash); border-color:var(--warning-border); }
+
+    /* ---------- Reviewer state strip ----------
+       The gallery format this merges in could show loading/empty/failure side
+       by side; a single running app cannot. This strip keeps those states
+       reachable for review without needing to fake data. */
+    .statestrip {
+      display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:8px 10px;
+      border:1px dashed var(--border-strong); border-radius:var(--r-lg); background:var(--bg-inset);
+    }
+    .statestrip__l { font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
+
+    /* ---------- Skeletons ---------- */
+    .skcard { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--r-xl); overflow:hidden; }
+    .skmedia { aspect-ratio:4/5; }
+    .skbody { padding:10px 12px; display:flex; flex-direction:column; gap:7px; }
+    .skline { height:10px; border-radius:var(--r-xs); }
+    .tagshim { height:18px; width:64px; border-radius:var(--r-pill); }
+
+    /* ---------- Toast + bottom nav ---------- */
+    .toast {
+      position:fixed; left:50%; transform:translateX(-50%); bottom:24px; z-index:80;
+      background:var(--bg-elevated); border:1px solid var(--border); color:var(--text-1);
+      padding:11px 16px; border-radius:var(--r-lg); font-size:13px; font-weight:500; box-shadow:var(--shadow-pop);
+    }
+    .bottomnav { display:none; }
+    .selbar {
+      position:fixed; left:50%; transform:translateX(-50%); bottom:24px; z-index:70;
+      display:flex; gap:8px; align-items:center; justify-content:center; padding:8px 10px;
+      flex-wrap:wrap; max-width:calc(100vw - 32px);
+      background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--r-xl); box-shadow:var(--shadow-pop);
+    }
+    .selbar__n { font-size:12.5px; font-weight:600; padding:0 6px; }
+
+    /* Mobile-only mirror of the rail's "Publishing to" block. The rail is
+       hidden below 900px, and knowing which accounts are connected — plus
+       being able to add one — is the precondition for every Publish button
+       on this screen, so it cannot ride inside the collapsed sidebar. */
+    .destbar { display:none; }
+    .destbar__chip {
+      display:inline-flex; align-items:center; gap:6px; padding:0 10px; min-height:32px;
+      border-radius:var(--r-pill); background:var(--bg-surface); border:1px solid var(--border);
+      font-size:12px; color:var(--text-2); flex-shrink:0;
+    }
+    .destbar__label { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); flex-shrink:0; }
+
+    /* =====================================================================
+       Responsive — every control above stays reachable. Nothing is dropped
+       on small screens; the rail becomes a bottom nav + a filter sheet, the
+       drawer and publish sheet become full-height sheets.
+       ===================================================================== */
+    @media (max-width: 1080px) {
+      .sheet__left { width:280px; }
+    }
+    @media (max-width: 900px) {
+      .rail { display:none; }
+      .page { padding:16px 16px 104px; }
+      .bottomnav {
+        display:flex; position:fixed; left:0; right:0; bottom:0; z-index:45;
+        background:var(--bg-surface); border-top:1px solid var(--border);
+        padding:6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+      }
+      .bottomnav__i {
+        flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+        padding:7px 4px; border-radius:var(--r-md); font-size:10px; font-weight:600;
+        color:var(--text-3); cursor:pointer; min-height:48px; justify-content:center;
+      }
+      .bottomnav__i--on { color:var(--accent-text); }
+      .drawer { width:100%; border-left:none; border-top:1px solid var(--border); border-radius:var(--r-xl) var(--r-xl) 0 0; height:92%; align-self:flex-end; }
+      .scrim { align-items:flex-end; }
+      .sheet { padding:0; align-items:flex-end; }
+      .sheet__panel { max-width:100%; height:94%; border-radius:var(--r-xl) var(--r-xl) 0 0; border-bottom:none; }
+      .sheet__cols { flex-direction:column; }
+      .sheet__left { width:100%; border-right:none; border-bottom:1px solid var(--border); }
+      .flow { grid-template-columns:1fr; }
+
+      /* The primary commit actions sit flush against the physical bottom edge
+         once these become bottom sheets, so they must clear the home indicator. */
+      .drawer__foot, .sheet__foot { padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px)); }
+      .toast, .selbar { bottom:calc(80px + env(safe-area-inset-bottom, 0px)); }
+
+      /* `top:44px; right:0` anchors to .topbar__actions, whose height is
+         unbounded once it wraps — the menu would land on top of the button
+         that opened it. Becomes the same bottom sheet the drawer already uses. */
+      .menu {
+        position:fixed; inset:auto 0 0 0; top:auto; width:100%; z-index:55;
+        border-radius:var(--r-xl) var(--r-xl) 0 0; border-bottom:none;
+        padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+      }
+
+      .destbar {
+        display:flex; gap:6px; align-items:center; overflow-x:auto; scrollbar-width:none;
+        padding:2px 0;
+      }
+      .destbar::-webkit-scrollbar { display:none; }
+      .destbar .btn { margin-left:auto; flex-shrink:0; }
+    }
+
+    /* =====================================================================
+       Touch sizing. The base control heights (btn 38, btn--sm 30, iconbtn 38,
+       chip 32, seg 30, tab 40) are desktop-density values; none of them clears
+       the 44px floor. Raised for any coarse pointer rather than by width, so a
+       touch laptop and a tablet get it too.
+       ===================================================================== */
+    @media (pointer: coarse), (max-width: 900px) {
+      .btn { min-height:44px; }
+      .btn--sm, .card__actions .btn { min-height:44px; font-size:13px; }
+      .iconbtn { width:44px; height:44px; }
+      .chip, .destbar__chip { min-height:44px; padding:0 14px; }
+      .seg__o { min-height:44px; display:inline-flex; align-items:center; padding:0 16px; }
+      .tab { padding:13px 6px 12px; }
+      .search, .select { min-height:44px; }
+      .menu__item { min-height:52px; align-items:center; }
+      .dest { padding:13px 12px; }
+    }
+    @media (max-width: 640px) {
+      .grid, .grid--roomy { grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+      .topbar h1 { font-size:19px; }
+      .facts { grid-template-columns:1fr; }
+      .card__actions { flex-direction:column; }
+      .card__actions .btn { width:100%; flex:none; }
+    }
+    @media (max-width: 380px) {
+      .grid, .grid--roomy { grid-template-columns:1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+    }
+  </style>
+  <script src="./image-slot.js"></script>
+</helmet>
+
+<div class="app" data-theme="{{theme}}">
+
+  <!-- ══════════════════ RAIL ══════════════════ -->
+  <aside class="rail">
+    <div class="rail__brand">
+      <div class="rail__mark"></div>
+      <span class="rail__name">Brandosse</span>
+    </div>
+
+    <div class="rail__group">Create</div>
+    <div class="navitem" onClick="{{noopNav}}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.8L19 9.6l-4.6 2L12 17l-2.4-5.4L5 9.6l5.1-1.8z"></path></svg>
+      AI Studio
+    </div>
+    <div class="navitem" onClick="{{noopNav}}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="14" height="14" rx="2"></rect><path d="M16 10l6-3v10l-6-3z"></path></svg>
+      Video Clips
+    </div>
+
+    <div class="rail__group">Organise</div>
+    <div class="navitem navitem--active" onClick="{{goLibrary}}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
+      Library
+      <span class="navitem__count">{{totalCount}}</span>
+    </div>
+    <div class="navitem" onClick="{{noopNav}}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M3 9h18M8 2v4M16 2v4"></path></svg>
+      Calendar
+    </div>
+    <div class="navitem" onClick="{{noopNav}}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg>
+      Analytics
+    </div>
+
+    <div class="rail__spacer"></div>
+
+    <div class="rail__group">Publishing to</div>
+    <sc-for list="{{connectedAccounts}}" as="acct" hint-placeholder-count="3">
+      <div class="conn">
+        <span class="conn__dot" style="background:{{acct.dot}}"></span>
+        <span>{{acct.label}}</span>
+        <span class="conn__meta">{{acct.handle}}</span>
+      </div>
+    </sc-for>
+    <div class="rail__connect" onClick="{{onConnect}}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"></path></svg>
+      Connect an account
+    </div>
+  </aside>
+
+  <!-- ══════════════════ MAIN ══════════════════ -->
+  <main class="main">
+
+    <!-- ─────────── LIBRARY ─────────── -->
+    <sc-if value="{{isLibrary}}" hint-placeholder-val="{{true}}">
+      <div class="page">
+
+        <div class="topbar">
+          <div>
+            <h1>Content Library</h1>
+            <div class="topbar__sub">{{headline}}</div>
+          </div>
+          <div class="topbar__actions">
+            <button class="iconbtn" onClick="{{toggleTheme}}" title="Switch theme" aria-label="Switch theme">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"></path></svg>
+            </button>
+            <button class="iconbtn {{gridBtnClass}}" onClick="{{setGrid}}" title="Grid view" aria-label="Grid view">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
+            </button>
+            <button class="iconbtn {{listBtnClass}}" onClick="{{setList}}" title="Table view" aria-label="Table view">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <button class="btn btn--subtle" onClick="{{toggleSelect}}">{{selectLabel}}</button>
+            <button class="btn btn--primary" onClick="{{toggleAddMenu}}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"></path></svg>
+              Add content
+            </button>
+            <sc-if value="{{addMenuOpen}}">
+              <div class="menu">
+                <div class="menu__item" onClick="{{onAddUpload}}">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2" style="margin-top:2px"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
+                  <div><div class="menu__t">Upload files</div><div class="menu__d">Images and video from this device</div></div>
+                </div>
+                <div class="menu__item" onClick="{{onAddStudio}}">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2" style="margin-top:2px"><path d="M12 3l1.9 4.8L19 9.6l-4.6 2L12 17l-2.4-5.4L5 9.6l5.1-1.8z"></path></svg>
+                  <div><div class="menu__t">Generate in AI Studio</div><div class="menu__d">Lands here automatically when it finishes</div></div>
+                </div>
+                <div class="menu__item" onClick="{{onAddClip}}">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2" style="margin-top:2px"><rect x="2" y="5" width="14" height="14" rx="2"></rect><path d="M16 10l6-3v10l-6-3z"></path></svg>
+                  <div><div class="menu__t">Clip a long video</div><div class="menu__d">Paste a URL — we cut it into shorts</div></div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- Mobile-only: the rail is hidden below 900px, and "which accounts
+             am I publishing to" gates every Publish button on this screen. -->
+        <div class="destbar">
+          <span class="destbar__label">Publishing to</span>
+          <sc-for list="{{connectedAccounts}}" as="acct" hint-placeholder-count="2">
+            <span class="destbar__chip"><span class="conn__dot" style="background:{{acct.dot}}"></span>{{acct.label}}</span>
+          </sc-for>
+          <button class="btn btn--ghost btn--sm" onClick="{{onConnect}}">Manage</button>
+        </div>
+
+        <!-- Honest, derived notice. Not a fabricated "license alert". -->
+        <sc-if value="{{showNoDestNotice}}">
+          <div class="notice">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M12 9v5M12 17.5v.5"></path><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+            <div class="notice__body">
+              <div class="notice__t">{{noDestCount}} images have nowhere to go</div>
+              <div class="notice__d">Only YouTube and TikTok are connected, and both take video only. Connect LinkedIn to publish stills.</div>
+            </div>
+            <button class="btn btn--subtle btn--sm" onClick="{{onConnect}}">Connect LinkedIn</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{showBlockedNotice}}">
+          <div class="notice notice--danger">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg>
+            <div class="notice__body">
+              <div class="notice__t">{{blockedCount}} asset can’t be published</div>
+              <div class="notice__d">Its file isn’t reachable by the publisher, so a post made from it would go out empty. Re-upload to repair it.</div>
+            </div>
+            <button class="btn btn--subtle btn--sm" onClick="{{showBlockedOnly}}">Show it</button>
+          </div>
+        </sc-if>
+
+        <div class="toolbar">
+          <div class="search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+            <input placeholder="Search titles, descriptions, tags, spoken words…" defaultValue="{{query}}" />
+          </div>
+          <select class="select" aria-label="Media type"><option>All media</option><option>Video</option><option>Image</option></select>
+          <select class="select" aria-label="Sort by"><option>Newest first</option><option>Oldest first</option><option>Largest file</option><option>Most used</option></select>
+        </div>
+
+        <div class="railrow">
+          <span class="railrow__label">Source</span>
+          <sc-for list="{{sourceChips}}" as="chip" hint-placeholder-count="5">
+            <div class="chip {{chip.cls}}" onClick="{{chip.onClick}}">{{chip.label}}<span class="chip__n">{{chip.count}}</span></div>
+          </sc-for>
+        </div>
+
+        <div class="railrow">
+          <span class="railrow__label">State</span>
+          <sc-for list="{{stateChips}}" as="chip" hint-placeholder-count="4">
+            <div class="chip {{chip.cls}}" onClick="{{chip.onClick}}">{{chip.label}}<span class="chip__n">{{chip.count}}</span></div>
+          </sc-for>
+          <div class="chip" onClick="{{openFlow}}">How content flows →</div>
+        </div>
+
+        <!-- Review aid, not a product surface: the gallery this merges in could
+             show loading / empty / upload-failure side by side. A single running
+             app can't, so these force each state instead. -->
+        <div class="statestrip">
+          <span class="statestrip__l">Force state</span>
+          <sc-for list="{{demoStates}}" as="ds" hint-placeholder-count="3">
+            <div class="chip {{ds.cls}}" onClick="{{ds.onClick}}">{{ds.label}}</div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{isLoading}}">
+          <div class="grid {{gridCls}}">
+            <sc-for list="{{skeletons}}" as="sk" hint-placeholder-count="8">
+              <div class="skcard">
+                <div class="skmedia shimmer"></div>
+                <div class="skbody">
+                  <div class="skline shimmer" style="width:72%"></div>
+                  <div class="skline shimmer" style="width:44%;height:8px"></div>
+                  <div class="tagshim shimmer"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isFirstRun}}">
+          <div class="empty">
+            <div class="empty__t">Nothing in your Library yet</div>
+            <div class="empty__d">Everything you upload, generate in AI Studio, or clip from a long video lands here — and this is where you publish it from.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+              <button class="btn btn--primary" onClick="{{onAddUpload}}">Upload your first asset</button>
+              <button class="btn btn--subtle" onClick="{{onAddStudio}}">Generate one in AI Studio</button>
+              <button class="btn btn--ghost" onClick="{{onAddClip}}">Clip a long video</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isEmpty}}">
+          <div class="empty">
+            <div class="empty__t">Nothing matches those filters</div>
+            <div class="empty__d">Try clearing the source or state filter, or add something new.</div>
+            <button class="btn btn--subtle" onClick="{{resetFilters}}">Clear filters</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{showTable}}">
+          <div class="tablewrap">
+            <div class="ltable" role="table" aria-label="Library assets">
+              <div class="lrow lrow--head" role="row">
+                <span class="lcell" role="columnheader">Asset</span>
+                <span class="lcell" role="columnheader">Source</span>
+                <span class="lcell" role="columnheader">Publishable</span>
+                <span class="lcell" role="columnheader">Fits</span>
+                <span class="lcell" role="columnheader">Format</span>
+                <span class="lcell" role="columnheader">Used in</span>
+                <span class="lcell" role="columnheader">Added</span>
+              </div>
+              <sc-for list="{{visibleAssets}}" as="asset" hint-placeholder-count="10">
+                <div class="lrow lrow--data" role="row" onClick="{{asset.onOpen}}">
+                  <span class="lcell" role="cell">
+                    <span class="tname">
+                      <span class="tthumb">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 15l5-5 4 4 3-3 6 6"></path></svg>
+                      </span>
+                      <span class="tname__t">{{asset.title}}</span>
+                    </span>
+                  </span>
+                  <span class="lcell" role="cell">{{asset.sourceLabel}}</span>
+                  <span class="lcell" role="cell"><span class="tag {{asset.stateTag.cls}}">{{asset.stateTag.label}}</span></span>
+                  <span class="lcell" role="cell">
+                    <span class="fits">
+                      <sc-for list="{{asset.fits}}" as="fit" hint-placeholder-count="2">
+                        <span class="fit {{fit.cls}}" title="{{fit.title}}">{{fit.short}}</span>
+                      </sc-for>
+                    </span>
+                  </span>
+                  <span class="lcell" role="cell">{{asset.format}}</span>
+                  <span class="lcell" role="cell">{{asset.usedCountLabel}}</span>
+                  <span class="lcell" role="cell">{{asset.date}}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{showGrid}}">
+          <div class="grid {{gridCls}}">
+            <sc-for list="{{visibleAssets}}" as="asset" hint-placeholder-count="10">
+              <div class="card {{asset.cardCls}}" onClick="{{asset.onOpen}}">
+                <div class="card__media {{asset.mediaCls}}">
+                  <image-slot id="{{asset.thumbId}}" shape="rect" placeholder="{{asset.placeholder}}" style="width:100%;height:100%"></image-slot>
+                  <div class="card__tl">
+                    <span class="tag tag--src">{{asset.sourceLabel}}</span>
+                    <sc-if value="{{asset.isVideo}}"><span class="tag tag--dur">{{asset.duration}}</span></sc-if>
+                  </div>
+                  <div class="card__tr">
+                    <span class="tag {{asset.stateTag.cls}}">{{asset.stateTag.label}}</span>
+                  </div>
+                </div>
+                <div class="card__body">
+                  <div class="card__title">{{asset.title}}</div>
+                  <div class="card__prov">{{asset.provenance}}</div>
+                  <div class="card__meta">{{asset.format}} · {{asset.dims}} · {{asset.date}}</div>
+                  <div class="fits">
+                    <sc-for list="{{asset.fits}}" as="fit" hint-placeholder-count="3">
+                      <span class="fit {{fit.cls}}" title="{{fit.title}}">{{fit.short}}</span>
+                    </sc-for>
+                    <span class="fit__note">{{asset.fitNote}}</span>
+                  </div>
+                  <div class="card__actions">
+                    <button class="btn btn--subtle btn--sm" onClick="{{asset.onSchedule}}">Schedule</button>
+                    <button class="btn btn--primary btn--sm {{asset.publishCls}}" onClick="{{asset.onPublish}}">{{asset.publishLabel}}</button>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ─────────── FLOW (reference view) ─────────── -->
+    <sc-if value="{{isFlow}}">
+      <div class="page">
+        <div class="topbar">
+          <div>
+            <h1>How content flows</h1>
+            <div class="topbar__sub">Every path a file can take from creation to a live post. Each node names the code that owns it.</div>
+          </div>
+          <button class="btn btn--subtle" onClick="{{goLibrary}}">← Back to Library</button>
+        </div>
+
+        <div class="flow">
+          <div class="flowcol">
+            <div class="flowcol__h">1 · Sources</div>
+            <div class="node">
+              <div class="node__t">Upload</div>
+              <div class="node__d">Drag files in. Checksum + perceptual hash run before the row is written, so a duplicate is caught at the door.</div>
+              <div class="node__src">personal-asset-upload</div>
+            </div>
+            <div class="node">
+              <div class="node__t">AI Studio generation</div>
+              <div class="node__d">Finishing a generation writes the Library row itself — you never “save to Library”.</div>
+              <div class="node__src">sync_personal_asset_from_post()</div>
+            </div>
+            <div class="node">
+              <div class="node__t">Video clip</div>
+              <div class="node__d">A long video is cut into shorts; saving a clip reuses the upload pipeline so it gets the same checks.</div>
+              <div class="node__src">clipLibraryActions.saveClipToLibrary</div>
+            </div>
+            <div class="node">
+              <div class="node__t">Post-linked record</div>
+              <div class="node__d">A text-only post still gets a row, so the Library is a complete history. It has no file and never offers Publish.</div>
+              <div class="node__src">source = 'post'</div>
+            </div>
+          </div>
+
+          <div class="flowcol">
+            <div class="flowcol__h">2 · Library</div>
+            <div class="node node--accent">
+              <div class="node__t">One collection</div>
+              <div class="node__d">Source is provenance, not a separate silo. Everything lands in the same grid and is filtered, never segregated.</div>
+            </div>
+            <div class="node">
+              <div class="node__t">Auto-enrichment</div>
+              <div class="node__d">Tags, alt text and a transcript are generated in the background. The card shimmers until they land.</div>
+            </div>
+            <div class="node">
+              <div class="node__t">Lifecycle</div>
+              <div class="node__d">Versions supersede rather than overwrite. Archive hides. Delete is a recoverable trash, not a destruction.</div>
+            </div>
+          </div>
+
+          <div class="flowcol">
+            <div class="flowcol__h">3 · The gate</div>
+            <div class="node node--gate">
+              <div class="node__t">Is there a file the publisher can fetch?</div>
+              <div class="node__d">The publisher resolves media one way only: post → generation. An asset without that link publishes an empty post. The card says so before you click, not fourteen seconds after.</div>
+              <div class="node__src">publish-post/index.ts</div>
+            </div>
+            <div class="node node--gate">
+              <div class="node__t">Does a connected account accept it?</div>
+              <div class="node__d">YouTube and TikTok take video. LinkedIn takes image, video or text. A still with no image-capable account connected has nowhere to go — shown as a warning, not a failed publish.</div>
+              <div class="node__src">publish_providers</div>
+            </div>
+          </div>
+
+          <div class="flowcol">
+            <div class="flowcol__h">4 · Out</div>
+            <div class="node node--accent">
+              <div class="node__t">Compose once, tailor per destination</div>
+              <div class="node__d">One caption by default; override per platform. Each platform’s required answers are collected here, before the post exists.</div>
+            </div>
+            <div class="node">
+              <div class="node__t">Publish now, or schedule</div>
+              <div class="node__d">Scheduling hands off to Calendar with the asset and its generation already attached.</div>
+              <div class="node__src">/app/calendar?quickPost=1</div>
+            </div>
+            <div class="node">
+              <div class="node__t">Back to the asset</div>
+              <div class="node__d">The post is written back onto the asset’s “Used in” list, so you can always see where a file went.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ─────────── PUBLISHED (the post's own screen) ─────────── -->
+    <sc-if value="{{isReceipt}}">
+      <div class="page">
+        <div class="receipt">
+          <div class="receipt__hero">
+            <span class="receipt__tick">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </span>
+            <div style="min-width:0">
+              <div class="receipt__t">Published to {{receiptCount}} of your accounts</div>
+              <div class="receipt__d">{{selected.title}} · sent at {{receiptWhen}}</div>
+            </div>
+          </div>
+
+          <!-- Reported per destination, because a multi-destination publish can
+               genuinely half-succeed, and because two of these are live with a
+               platform restriction that "Published!" alone would hide. -->
+          <div class="kicker">Where it went</div>
+          <sc-for list="{{receiptRows}}" as="r" hint-placeholder-count="2">
+            <div class="row">
+              <span class="conn__dot" style="background:{{r.dot}}"></span>
+              <div class="row__main">
+                <div class="row__t">{{r.label}} · {{r.handle}}</div>
+                <div class="row__d">{{r.caveat}}</div>
+              </div>
+              <sc-if value="{{r.restricted}}"><span class="pill pill--scheduled">Restricted</span></sc-if>
+              <button class="btn btn--ghost btn--sm" onClick="{{r.onPreview}}">Preview</button>
+              <button class="btn btn--subtle btn--sm" onClick="{{r.onOpen}}">View post →</button>
+            </div>
+          </sc-for>
+
+          <div class="kicker" style="margin-top:6px">What happens next</div>
+          <div class="row">
+            <div class="row__main">
+              <div class="row__t">Performance starts arriving in about an hour</div>
+              <div class="row__d">Views, likes and comments land on this post and in Analytics once the platforms report them.</div>
+            </div>
+            <button class="btn btn--ghost btn--sm" onClick="{{noopNav}}">Open Analytics</button>
+          </div>
+          <div class="row">
+            <div class="row__main">
+              <div class="row__t">This asset now shows as used</div>
+              <div class="row__d">It appears under “Where it’s used” on the asset, so you’ll never wonder whether you already posted it.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+            <button class="btn btn--primary" onClick="{{backToLibrary}}">Back to Library</button>
+            <button class="btn btn--subtle" onClick="{{noopNav}}">Open Calendar</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ─────────── TRASH ─────────── -->
+    <sc-if value="{{isTrash}}">
+      <div class="page">
+        <div class="topbar">
+          <div>
+            <h1>Trash</h1>
+            <div class="topbar__sub">Deleted assets are recoverable for 30 days, then removed for good.</div>
+          </div>
+          <button class="btn btn--subtle" onClick="{{goLibrary}}">← Back to Library</button>
+        </div>
+
+        <div class="recovery">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+          <span>Nothing here is gone yet. A post that already went out keeps the file it was published with, even after that file is deleted here.</span>
+        </div>
+
+        <sc-for list="{{trashItems}}" as="t" hint-placeholder-count="3">
+          <div class="row">
+            <span class="tthumb">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 15l5-5 4 4 3-3 6 6"></path></svg>
+            </span>
+            <div class="row__main">
+              <div class="row__t">{{t.title}}</div>
+              <div class="row__d">Deleted {{t.deleted}} · {{t.daysLeft}} days left to recover</div>
+            </div>
+            <button class="btn btn--subtle btn--sm" onClick="{{t.onRestore}}">Restore</button>
+            <button class="btn btn--ghost btn--sm" onClick="{{t.onPurge}}">Delete now</button>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </main>
+
+  <!-- ══════════════════ DETAIL DRAWER ══════════════════ -->
+  <sc-if value="{{drawerOpen}}">
+    <div class="scrim" onClick="{{closeDrawer}}">
+      <div class="drawer" onClick="{{stop}}">
+        <div class="drawer__head">
+          <div style="min-width:0">
+            <div class="drawer__t">{{selected.title}}</div>
+            <div class="drawer__s">{{selected.provenance}} · {{selected.date}}</div>
+          </div>
+          <button class="iconbtn" onClick="{{closeDrawer}}" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+
+        <div class="tabs">
+          <sc-for list="{{drawerTabs}}" as="tab" hint-placeholder-count="3">
+            <div class="tab {{tab.cls}}" onClick="{{tab.onClick}}">{{tab.label}}</div>
+          </sc-for>
+        </div>
+
+        <div class="drawer__scroll">
+          <sc-if value="{{tabIsDetails}}">
+            <image-slot id="{{selected.thumbId}}" shape="rounded" radius="10" placeholder="{{selected.placeholder}}" style="width:100%;height:200px"></image-slot>
+
+            <sc-if value="{{selected.isBlocked}}">
+              <div class="notice notice--danger">
+                <div class="notice__body">
+                  <div class="notice__t">This file can’t reach a platform</div>
+                  <div class="notice__d">The Library has the file, but the publisher has no way to fetch it. Re-uploading rebuilds the link.</div>
+                </div>
+                <button class="btn btn--danger btn--sm" onClick="{{onRepair}}">Re-upload</button>
+              </div>
+            </sc-if>
+
+            <div class="field">
+              <label for="d-title">Title</label>
+              <input id="d-title" defaultValue="{{selected.title}}" />
+            </div>
+            <div class="field">
+              <label for="d-desc">Description</label>
+              <textarea id="d-desc" rows="3" defaultValue="{{selected.description}}"></textarea>
+            </div>
+            <div class="field">
+              <label for="d-alt">Alt text</label>
+              <input id="d-alt" defaultValue="{{selected.altText}}" />
+              <span class="hint">Drafted automatically, yours to correct. Sent with the post so screen-reader users get it too.</span>
+            </div>
+            <div class="field">
+              <label for="d-tags">Tags</label>
+              <input id="d-tags" defaultValue="{{selected.tagsText}}" />
+              <span class="hint">{{selected.tagHint}}</span>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn btn--subtle btn--sm" onClick="{{onSaveMetadata}}">Save changes</button>
+              <span class="hint">{{saveHint}}</span>
+            </div>
+
+            <div>
+              <div class="kicker" style="margin-bottom:8px">File</div>
+              <div class="facts">
+                <div class="fact"><div class="fact__k">Format</div><div class="fact__v">{{selected.format}}</div></div>
+                <div class="fact"><div class="fact__k">Dimensions</div><div class="fact__v">{{selected.dims}}</div></div>
+                <div class="fact"><div class="fact__k">Duration</div><div class="fact__v">{{selected.durationText}}</div></div>
+                <div class="fact"><div class="fact__k">Size</div><div class="fact__v">{{selected.size}}</div></div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{tabIsDiscovery}}">
+            <div class="kicker">How findable this is, per platform</div>
+            <sc-for list="{{drawerSeo}}" as="s" hint-placeholder-count="2">
+              <div class="req">
+                <div class="req__h"><span class="conn__dot" style="background:{{s.dot}}"></span>{{s.label}}<span class="score__n {{s.cls}}" style="font-size:16px;margin-left:auto">{{s.score}}</span></div>
+                <sc-for list="{{s.tips}}" as="tip" hint-placeholder-count="2">
+                  <div class="tip"><span class="tip__dot"></span><span>{{tip}}</span></div>
+                </sc-for>
+              </div>
+            </sc-for>
+            <button class="btn btn--subtle" onClick="{{onOptimise}}">Optimise this asset’s metadata</button>
+            <div class="hint">Only platforms that accept this file type are scored. Advisory — nothing here blocks publishing.</div>
+          </sc-if>
+
+          <sc-if value="{{tabIsUsage}}">
+            <sc-if value="{{selected.hasUsage}}">
+              <div class="kicker">Posts made from this asset</div>
+              <sc-for list="{{selected.usedIn}}" as="use" hint-placeholder-count="2">
+                <div class="row">
+                  <div class="row__main">
+                    <div class="row__t">{{use.platform}}</div>
+                    <div class="row__d">{{use.when}}</div>
+                  </div>
+                  <span class="pill {{use.cls}}">{{use.status}}</span>
+                  <button class="btn btn--ghost btn--sm" onClick="{{use.onOpen}}">Open</button>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{selected.noUsage}}">
+              <div class="empty">
+                <div class="empty__t">Never published</div>
+                <div class="empty__d">This asset has been sitting here since {{selected.date}}. Publishing it takes two clicks.</div>
+                <button class="btn btn--primary" onClick="{{openPublishFromDrawer}}">Publish it</button>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{tabIsVersions}}">
+            <div class="kicker">Version history</div>
+            <sc-for list="{{selected.versions}}" as="v" hint-placeholder-count="2">
+              <div class="row">
+                <div class="row__main">
+                  <div class="row__t">{{v.label}}</div>
+                  <div class="row__d">{{v.when}} · {{v.note}}</div>
+                </div>
+                <sc-if value="{{v.isCurrent}}"><span class="pill pill--published">Current</span></sc-if>
+              </div>
+            </sc-for>
+            <div class="hint">Replacing an asset supersedes the old one instead of overwriting it — posts already published keep the file they went out with.</div>
+            <button class="btn btn--subtle" onClick="{{onNewVersion}}">Upload a replacement</button>
+          </sc-if>
+        </div>
+
+        <div class="drawer__foot">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn--subtle" style="flex:1" onClick="{{onSchedule}}">Schedule</button>
+            <button class="btn btn--primary {{selected.publishCls}}" style="flex:1" onClick="{{openPublishFromDrawer}}">{{selected.publishLabel}}</button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn--ghost btn--sm" style="flex:1" onClick="{{onDuplicate}}">Duplicate</button>
+            <button class="btn btn--ghost btn--sm" style="flex:1" onClick="{{onArchive}}">Archive</button>
+            <button class="btn btn--ghost btn--sm" style="flex:1" onClick="{{onTrash}}">Move to trash</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════════ PUBLISH SHEET ══════════════════ -->
+  <sc-if value="{{publishOpen}}">
+    <div class="sheet">
+      <div class="sheet__panel">
+        <div class="sheet__head">
+          <div style="display:flex;align-items:center;gap:12px;min-width:0">
+            <button class="iconbtn" onClick="{{closePublish}}" aria-label="Close">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button>
+            <div style="min-width:0">
+              <div style="font-family:var(--font-display);font-size:15px;font-weight:700">Publish · {{selected.title}}</div>
+              <div style="font-size:11.5px;color:var(--text-3)">{{selected.format}} · {{selected.dims}} · {{selected.durationText}}</div>
+            </div>
+          </div>
+          <button class="btn btn--ghost btn--sm" onClick="{{closePublish}}">Save as draft</button>
+        </div>
+
+        <div class="sheet__cols">
+          <div class="sheet__left">
+            <div class="kicker">Where it goes</div>
+            <sc-for list="{{destinations}}" as="dest" hint-placeholder-count="3">
+              <div class="dest {{dest.cls}}" onClick="{{dest.onToggle}}">
+                <div class="dest__box {{dest.boxCls}}">{{dest.check}}</div>
+                <div style="min-width:0;flex:1">
+                  <div class="dest__t">{{dest.label}}</div>
+                  <div class="dest__d">{{dest.handle}}</div>
+                  <sc-if value="{{dest.blocked}}"><div class="dest__why">{{dest.why}}</div></sc-if>
+                </div>
+              </div>
+            </sc-for>
+            <div class="hint">A destination that can’t take this file, or that this product can’t publish to yet, is shown greyed with the reason rather than hidden — an option that fails at send time is worse than no option.</div>
+
+            <!-- What is actually going out. Without this you are choosing
+                 destinations for a file you can't see. -->
+            <div class="kicker" style="margin-top:4px">What goes out</div>
+            <div class="previewbox">
+              <div class="previewbox__media">
+                <div class="previewbox__stage" style="aspect-ratio:{{selected.ratio}}">
+                  <image-slot id="{{selected.thumbId}}" shape="rect" placeholder="{{selected.placeholder}}" style="width:100%;height:100%"></image-slot>
+                  <sc-if value="{{selected.isVideo}}">
+                    <div class="card__br"><span class="tag tag--dur">{{selected.duration}}</span></div>
+                  </sc-if>
+                </div>
+              </div>
+              <div class="previewbox__meta">
+                <div class="previewbox__t">{{selected.title}}</div>
+                <div class="previewbox__d">{{selected.format}} · {{selected.dims}} · {{selected.size}}</div>
+                <div class="previewbox__d">{{selected.provenance}}</div>
+              </div>
+            </div>
+            <button class="btn btn--ghost btn--sm" onClick="{{closePublish}}">Choose a different asset</button>
+          </div>
+
+          <div class="sheet__right">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+              <div class="seg">
+                <sc-for list="{{captionTabs}}" as="ct" hint-placeholder-count="3">
+                  <div class="seg__o {{ct.cls}}" onClick="{{ct.onClick}}">{{ct.label}}</div>
+                </sc-for>
+              </div>
+              <div class="counter {{counterCls}}">{{counterText}}</div>
+            </div>
+
+            <div class="field">
+              <label for="p-caption">{{captionLabel}}</label>
+              <textarea id="p-caption" rows="5" defaultValue="{{captionValue}}"></textarea>
+              <span class="hint">{{captionHint}}</span>
+            </div>
+
+            <sc-for list="{{requirements}}" as="req" hint-placeholder-count="2">
+              <div class="req">
+                <div class="req__h"><span class="conn__dot" style="background:{{req.dot}}"></span>{{req.platform}} needs this before it will accept the post</div>
+                <sc-if value="{{req.hasNote}}">
+                  <div class="reqnote">{{req.note}}</div>
+                </sc-if>
+                <sc-for list="{{req.fields}}" as="f" hint-placeholder-count="2">
+                  <div class="field">
+                    <label>{{f.label}}</label>
+                    <sc-if value="{{f.isChoice}}">
+                      <div class="seg">
+                        <sc-for list="{{f.options}}" as="o" hint-placeholder-count="2">
+                          <div class="seg__o {{o.cls}}" onClick="{{o.onClick}}">{{o.label}}</div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{f.isText}}">
+                      <input defaultValue="{{f.value}}" />
+                    </sc-if>
+                    <span class="hint">{{f.hint}}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+
+            <!-- Discovery score. Advisory only — it never blocks Publish;
+                 only a genuine platform rejection does that. -->
+            <sc-if value="{{hasSeo}}">
+              <div class="req">
+                <div class="req__h" style="justify-content:space-between">
+                  <span>Discovery score</span>
+                  <button class="btn btn--ghost btn--sm" onClick="{{onOptimise}}">Optimise with AI</button>
+                </div>
+                <div class="score {{seoOverallCls}}">
+                  <span class="score__n">{{seoOverall}}</span>
+                  <span class="hint" style="margin-right:auto">/ 100 across destinations</span>
+                </div>
+                <sc-for list="{{seoPerDest}}" as="s" hint-placeholder-count="2">
+                  <div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                      <span class="conn__dot" style="background:{{s.dot}}"></span>
+                      <span style="font-size:12px;font-weight:600">{{s.label}}</span>
+                      <span class="score__n {{s.cls}}" style="font-size:14px;margin-left:auto">{{s.score}}</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:5px">
+                      <sc-for list="{{s.tips}}" as="tip" hint-placeholder-count="2">
+                        <div class="tip"><span class="tip__dot"></span><span>{{tip}}</span></div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-for>
+                <div class="hint">Scored per destination, because the platform changes what counts as discoverable. Advisory — a low score never stops you publishing.</div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div class="sheet__foot">
+          <div style="font-size:12.5px;color:var(--text-2)">{{publishSummary}}</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn--subtle" onClick="{{openPreview}}">Preview</button>
+            <button class="btn btn--subtle" onClick="{{onScheduleFromSheet}}">Schedule…</button>
+            <button class="btn btn--primary {{confirmCls}}" onClick="{{onConfirmPublish}}">{{confirmLabel}}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════════ UPLOAD ══════════════════ -->
+  <sc-if value="{{uploadOpen}}">
+    <div class="modal" onClick="{{closeUpload}}">
+      <div class="modal__panel" onClick="{{stop}}">
+        <div class="modal__head">
+          <div class="modal__t">Upload to Library</div>
+          <button class="iconbtn" onClick="{{closeUpload}}" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="dropzone" role="button" tabindex="0" onClick="{{startUpload}}" aria-describedby="dz-hint">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
+            <div class="dropzone__t">Drop files here, or browse</div>
+            <div class="dropzone__h" id="dz-hint">Images and video · up to 50MB each · several at once</div>
+          </div>
+
+          <sc-if value="{{hasQueue}}">
+            <div class="queue" aria-live="polite">
+              <sc-for list="{{queue}}" as="q" hint-placeholder-count="3">
+                <div class="qitem {{q.cls}}">
+                  <span class="qitem__thumb">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 15l5-5 4 4 3-3 6 6"></path></svg>
+                  </span>
+                  <div class="qitem__body">
+                    <div class="qitem__namerow">
+                      <span class="qitem__name">{{q.name}}</span>
+                      <span class="qitem__pct">{{q.pct}}</span>
+                    </div>
+                    <div class="qitem__track"><div class="qitem__fill {{q.fillCls}}" style="width:{{q.width}}"></div></div>
+                    <sc-if value="{{q.failed}}"><div class="qitem__err">{{q.error}}</div></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <div class="hint">A file that fails validation never holds up the rest of the batch — the others finish normally.</div>
+          </sc-if>
+
+          <!-- Checksum + perceptual hash run on completion. A match is a
+               question, not a refusal: re-uploading an edited file is normal. -->
+          <sc-if value="{{showDuplicate}}">
+            <div class="dupwarn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M12 9v5M12 17.5v.5"></path><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+              <div style="min-width:0">
+                <div class="dupwarn__t">This looks like a duplicate of “Product hero — burnt orange”</div>
+                <div class="dupwarn__d">Uploaded Sep 2. Your upload has already finished — this is only asking how to file it.</div>
+                <div class="dupwarn__actions">
+                  <button class="btn btn--subtle btn--sm" onClick="{{onMarkVersion}}">It’s a new version of that</button>
+                  <button class="btn btn--ghost btn--sm" onClick="{{onSeparateAsset}}">It’s a separate asset</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <div class="modal__foot">
+          <button class="btn btn--subtle" onClick="{{closeUpload}}">Close</button>
+          <button class="btn btn--primary {{uploadDoneCls}}" onClick="{{finishUpload}}">{{uploadDoneLabel}}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════════ DELETE CONFIRM ══════════════════ -->
+  <sc-if value="{{deleteOpen}}">
+    <div class="modal" onClick="{{closeDelete}}">
+      <div class="modal__panel" style="max-width:460px" onClick="{{stop}}">
+        <div class="modal__head">
+          <div class="modal__t">Move this asset to Trash?</div>
+          <button class="iconbtn" onClick="{{closeDelete}}" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="recovery">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+            <span>This is not a permanent delete. You can recover it from Trash for <strong>30 days</strong> — after that it’s gone for good.</span>
+          </div>
+          <div class="hint">If a post was already published with this asset, that post keeps the file it went out with. Deleting here never changes something already live.</div>
+        </div>
+        <div class="modal__foot">
+          <button class="btn btn--subtle" onClick="{{closeDelete}}">Cancel</button>
+          <button class="btn btn--danger" onClick="{{confirmDelete}}">Move to Trash</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════════ PLATFORM PREVIEW ══════════════════ -->
+  <sc-if value="{{previewOpen}}">
+    <div class="modal" onClick="{{closePreview}}">
+      <div class="modal__panel" style="max-width:520px" onClick="{{stop}}">
+        <div class="modal__head">
+          <div class="modal__t">How it looks on {{pvLabel}}</div>
+          <button class="iconbtn" onClick="{{closePreview}}" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="pvTabs">
+            <sc-for list="{{previewTabs}}" as="t" hint-placeholder-count="5">
+              <div class="chip {{t.cls}}" onClick="{{t.onClick}}">{{t.label}}</div>
+            </sc-for>
+          </div>
+
+          <div class="pvStage">
+            <!-- Full-bleed vertical feed (TikTok) -->
+            <sc-if value="{{pvIsPhone}}">
+              <div class="pv pv--phone">
+                <div class="pv__media">
+                  <image-slot id="{{selected.thumbId}}" shape="rect" placeholder="{{selected.placeholder}}" style="width:100%;height:100%"></image-slot>
+                  <div class="pv__overlay">
+                    <div class="pv__overlayText">
+                      <div style="font-weight:700;margin-bottom:3px">{{pvWho}}</div>
+                      <div>{{pvHead}}<sc-if value="{{pvCut}}"><span style="opacity:.75">{{pvHiddenLabel}}</span></sc-if></div>
+                      <div style="margin-top:4px;opacity:.85">♪ {{pvSub}}</div>
+                    </div>
+                    <div class="pv__rail">
+                      <div class="pv__av">{{pvInitial}}</div>
+                      <div class="pv__railDot"></div>
+                      <div class="pv__railDot"></div>
+                      <div class="pv__railDot"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- Card feeds (Instagram, LinkedIn, Facebook, YouTube) -->
+            <sc-if value="{{pvIsCard}}">
+              <div class="pv pv--card">
+                <sc-if value="{{pvTitled}}">
+                  <div style="padding:10px 12px 0;font-weight:700;font-size:13px;line-height:1.3">{{pvTitle}}</div>
+                </sc-if>
+                <div class="pv__head">
+                  <div class="pv__av">{{pvInitial}}</div>
+                  <div style="min-width:0">
+                    <div class="pv__who">{{pvWho}}</div>
+                    <div class="pv__sub">{{pvSub}}</div>
+                  </div>
+                </div>
+                <div class="pv__media" style="aspect-ratio:{{pvRatio}}">
+                  <image-slot id="{{selected.thumbId}}" shape="rect" placeholder="{{selected.placeholder}}" style="width:100%;height:100%"></image-slot>
+                </div>
+                <div class="pv__body" style="padding-top:9px">
+                  {{pvHead}}<sc-if value="{{pvCut}}"><span class="pv__more">{{pvHiddenLabel}}</span></sc-if>
+                </div>
+                <div class="pv__bar">
+                  <span>Like</span><span>Comment</span><span>Share</span>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
+          <!-- The reason this screen exists. -->
+          <div class="pvNote {{pvNoteCls}}">{{pvNote}}</div>
+          <div class="hint">Layout is approximate — platforms change their own chrome. What is exact is where the text is cut, which is the part that decides whether anyone reads your hook.</div>
+        </div>
+        <div class="modal__foot">
+          <button class="btn btn--primary" onClick="{{closePreview}}">Done</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════════ SCHEDULE PICKER ══════════════════ -->
+  <sc-if value="{{scheduleOpen}}">
+    <div class="modal" onClick="{{closeSchedule}}">
+      <div class="modal__panel" style="max-width:460px" onClick="{{stop}}">
+        <div class="modal__head">
+          <div class="modal__t">When should this go out?</div>
+          <button class="iconbtn" onClick="{{closeSchedule}}" aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <!-- Seeded from the clock at the moment you opened this, rounded up
+               to the next 5 minutes and past the 10-minute platform floor —
+               never a fixed 09:00 you have to undo. -->
+          <div class="when">
+            <input type="date" defaultValue="{{scheduleDate}}" aria-label="Date" />
+            <input type="time" defaultValue="{{scheduleTime}}" aria-label="Time" />
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{scheduleNudges}}" as="nudge" hint-placeholder-count="4">
+              <div class="chip" onClick="{{nudge.onClick}}">{{nudge.label}}</div>
+            </sc-for>
+          </div>
+          <div class="recovery">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+            <span><strong>{{scheduleHuman}}</strong> — {{scheduleRelative}}, your local time.</span>
+          </div>
+          <!-- Naming what actually travels: the composer needs the generation,
+               not just the asset, or the post it creates has no media the
+               publisher can fetch. -->
+          <div class="kicker">What gets scheduled</div>
+          <div class="facts">
+            <div class="fact"><div class="fact__k">Asset</div><div class="fact__v">{{selected.title}}</div></div>
+            <div class="fact"><div class="fact__k">Media reference</div><div class="fact__v">{{selected.genLabel}}</div></div>
+          </div>
+          <div class="hint">Scheduling is held here and sent at that moment, not handed to the platform — so a failure surfaces in your Calendar where you can retry it, instead of disappearing.</div>
+        </div>
+        <div class="modal__foot">
+          <button class="btn btn--subtle" onClick="{{closeSchedule}}">Cancel</button>
+          <button class="btn btn--primary" onClick="{{confirmSchedule}}">Schedule it</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════════ BULK BAR ══════════════════ -->
+  <sc-if value="{{selectMode}}">
+    <div class="selbar">
+      <span class="selbar__n">{{selectedCount}} selected</span>
+      <button class="btn btn--ghost btn--sm" onClick="{{noop}}">Tag</button>
+      <button class="btn btn--ghost btn--sm" onClick="{{noop}}">Archive</button>
+      <button class="btn btn--ghost btn--sm" onClick="{{noop}}">Trash</button>
+      <button class="btn btn--subtle btn--sm" onClick="{{toggleSelect}}">Done</button>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════════ MOBILE NAV ══════════════════ -->
+  <nav class="bottomnav">
+    <div class="bottomnav__i" onClick="{{noopNav}}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.8L19 9.6l-4.6 2L12 17l-2.4-5.4L5 9.6l5.1-1.8z"></path></svg>
+      Studio
+    </div>
+    <div class="bottomnav__i" onClick="{{noopNav}}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="14" height="14" rx="2"></rect><path d="M16 10l6-3v10l-6-3z"></path></svg>
+      Clips
+    </div>
+    <div class="bottomnav__i bottomnav__i--on" onClick="{{goLibrary}}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
+      Library
+    </div>
+    <div class="bottomnav__i" onClick="{{noopNav}}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M3 9h18M8 2v4M16 2v4"></path></svg>
+      Calendar
+    </div>
+    <div class="bottomnav__i" onClick="{{noopNav}}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg>
+      Analytics
+    </div>
+  </nav>
+
+  <sc-if value="{{toast}}">
+    <div class="toast">{{toast}}</div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;section&quot;:&quot;Theme&quot;},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;compact&quot;,&quot;tsType&quot;:&quot;'compact'|'roomy'&quot;,&quot;options&quot;:[&quot;compact&quot;,&quot;roomy&quot;],&quot;section&quot;:&quot;Library&quot;}}">
+/* ===========================================================================
+   Library v3 — logic
+   ---------------------------------------------------------------------------
+   Every capability modelled here maps to something that exists in the code:
+
+     source taxonomy            personal_assets.source  ('upload'|'generation'|'post')
+                                + 'clip', the one ADDITION this design proposes
+     unused / archived / trash  LibraryStore counts + soft-delete methods
+     ai tagging shimmer         personal_assets.ai_tagging_status
+     version chain              markAssetAsNewVersion / fetchVersionChain
+     used-in list               fetchAssetUsedInPosts
+     publishability             generation_id present  (publish-post resolves
+                                media only through posts -> generations)
+     destination eligibility    publish_providers: linkedin | tiktok | youtube
+                                — instagram/meta unsupported, X not a provider
+
+   Deliberately NOT modelled, because no data exists behind it:
+     campaigns, licence expiry, rights/model releases, per-platform smart
+     crops, safe zones, and a draft/scheduled/published pipeline on assets
+     (that pipeline belongs to Calendar).
+   =========================================================================== */
+
+const SOURCE = {
+  upload:     { label: 'Upload',    prov: 'Uploaded by you' },
+  clip:       { label: 'Clip',      prov: 'Clipped from' },
+  generation: { label: 'Generated', prov: 'Made in AI Studio' },
+  post:       { label: 'Post',      prov: 'Record of a post — no file' },
+};
+
+// Accepts lists and limits are the real per-platform constraints, sourced from
+// PLATFORM-PUBLISH-FIELDS.md. `captionLabel` differs per platform on purpose:
+// "title" means four different things across these APIs, so one generic field
+// would be wrong on three of four (YouTube has a real separate title; TikTok
+// video's `title` IS the caption; LinkedIn's title is a label on the media).
+const PLATFORM = {
+  youtube:  { short:'YT', label:'YouTube',   handle:'Brandosse',   dot:'#E5484D',
+              accepts:['video'], limit:5000, captionLabel:'Description', built:true },
+  tiktok:   { short:'TT', label:'TikTok',    handle:'@brandosse',  dot:'#30A46C',
+              accepts:['video'], limit:2200, captionLabel:'Caption', built:true },
+  linkedin: { short:'LI', label:'LinkedIn',  handle:'Dare O.',     dot:'#3E7BD6',
+              accepts:['image','video','none'], limit:3000, captionLabel:'Post text', built:true },
+  instagram:{ short:'IG', label:'Instagram', handle:'@brandosse',  dot:'#C13F16',
+              accepts:['image','video'], limit:2200, captionLabel:'Caption', built:false,
+              why:'Adapter not built yet — credentials exist, the publishing path does not.' },
+  facebook: { short:'FB', label:'Facebook',  handle:'Brandosse Co.', dot:'#3E7BD6',
+              accepts:['image','video','none'], limit:63206, captionLabel:'Post text', built:false,
+              why:'Adapter not built yet. Would be the only destination with native API-side scheduling.' },
+};
+
+// Connected AND publishable today. Instagram/Facebook appear in the sheet as
+// locked rows rather than being hidden, so the gap is visible instead of silent.
+const CONNECTED = ['youtube', 'tiktok'];
+const LOCKED_DESTS = ['instagram', 'facebook'];
+
+class Component extends DCLogic {
+  state = {
+    view: 'library',
+    theme: null,          // null = follow the prop
+    source: 'all',
+    stateFilter: null,    // 'unused' | 'archived' | 'blocked' | null
+    query: '',
+    viewMode: 'grid',
+    selectMode: false,
+    addMenuOpen: false,
+    selectedId: null,
+    // Separate from selectedId on purpose. selectedId means "the asset being
+    // acted on" — scheduling or publishing from a card sets it without any
+    // intent to open the drawer. Conflating the two made the drawer fly open
+    // behind the schedule picker.
+    drawerOn: false,
+    drawerTab: 'details',
+    publishOpen: false,
+    uploadOpen: false,
+    uploadStage: 'empty',   // 'empty' | 'running' | 'done'
+    dupResolved: null,      // 'version' | 'separate' | null
+    deleteOpen: false,
+    scheduleOpen: false,
+    previewOpen: false,
+    previewPlatform: 'tiktok',
+    // null until the picker is first opened, then seeded from the clock at that
+    // moment — never a fixed 09:00. Scheduling at 11:50 starts at 11:50.
+    scheduleAt: null,
+    receipt: null,          // set once Publish completes → the receipt screen
+    demoState: 'normal',    // 'normal' | 'loading' | 'firstrun'  (review aid)
+    chosen: ['youtube'],
+    captionTab: 'all',
+    madeForKids: 'no',
+    privacy: 'self',   // the only value TikTok accepts from an unaudited client
+    toast: null,
+  };
+
+  ASSETS = [
+    { id:1, title:'Founder Q&A — the cold open', source:'clip', media:'video', format:'MP4', dims:'1080×1920',
+      dur:'0:41', size:'18.4 MB', date:'Sep 11', tagging:'done', gen:'gen_8831', archived:false,
+      from:'Founder AMA — full stream', at:'12:04–12:45',
+      desc:'The forty seconds where she actually answers the pricing question. Strongest hook of the whole stream.',
+      alt:'Founder speaking to camera in a home studio, warm lamp light.',
+      tags:['founder','pricing','hook'], used:[], versions:1 },
+
+    { id:2, title:'Restock teaser — 9:16', source:'clip', media:'video', format:'MP4', dims:'1080×1920',
+      dur:'0:22', size:'9.1 MB', date:'Sep 10', tagging:'done', gen:'gen_8790', archived:false,
+      from:'Autumn lookbook cut', at:'00:38–01:00',
+      desc:'Fast cut of the three new pieces against the charcoal backdrop.',
+      alt:'Three garments on a rail, camera pushing in.',
+      tags:['restock','product'], used:[{platform:'TikTok', when:'Sep 10, 6:30 PM', status:'Published', cls:'pill--published'}], versions:1 },
+
+    { id:3, title:'Autumn palette moodboard', source:'generation', media:'image', format:'PNG', dims:'1024×1024',
+      dur:null, size:'1.8 MB', date:'Sep 12', tagging:'done', gen:'gen_8902', archived:false,
+      desc:'Studio-generated moodboard exploring the warm-neutral direction.',
+      alt:'Grid of nine fabric swatches in rust, clay and bone tones.',
+      tags:['moodboard','palette'], used:[], versions:1 },
+
+    { id:4, title:'Studio bench, morning light', source:'generation', media:'image', format:'PNG', dims:'1024×1536',
+      dur:null, size:'2.4 MB', date:'Sep 12', tagging:'pending', gen:'gen_8905', archived:false,
+      desc:'', alt:'', tags:[], used:[], versions:1 },
+
+    { id:5, title:'Behind the scenes — rail build', source:'upload', media:'video', format:'MOV', dims:'1920×1080',
+      dur:'1:14', size:'112 MB', date:'Sep 8', tagging:'done', gen:'gen_8702', archived:false,
+      desc:'Raw phone footage from building the new shoot corner.',
+      alt:'Hands assembling a metal clothing rail.',
+      tags:['bts','raw'], used:[], versions:1 },
+
+    { id:6, title:'Product hero — burnt orange', source:'upload', media:'image', format:'JPG', dims:'2000×2500',
+      dur:null, size:'4.6 MB', date:'Sep 2', tagging:'done', gen:'gen_8410', archived:false,
+      desc:'Hero shot of the new line, warm-lit against charcoal.',
+      alt:'A burnt-orange jacket lit from the left on a charcoal backdrop.',
+      tags:['hero','product'], used:[{platform:'LinkedIn', when:'Sep 3, 9:00 AM', status:'Published', cls:'pill--published'}], versions:2 },
+
+    { id:7, title:'Testimonial — Maya R.', source:'upload', media:'video', format:'MP4', dims:'1080×1920',
+      dur:'0:55', size:'31 MB', date:'Aug 29', tagging:'done', gen:'gen_8199', archived:false,
+      desc:'Unscripted testimonial recorded at the pop-up.',
+      alt:'A customer talking to camera at a market stall.',
+      tags:['testimonial','ugc'], used:[{platform:'YouTube', when:'Aug 30, 7:00 PM', status:'Published', cls:'pill--published'},{platform:'TikTok', when:'Sep 1, 8:00 AM', status:'Scheduled', cls:'pill--scheduled'}], versions:1 },
+
+    { id:8, title:'Launch week recap graphic', source:'upload', media:'image', format:'PNG', dims:'1600×900',
+      dur:null, size:'900 KB', date:'Aug 25', tagging:'done', gen:null, archived:false,
+      desc:'Static recap summarising launch week. Uploaded before the media-link repair.',
+      alt:'A chart summarising launch-week results.',
+      tags:['recap','graphic'], used:[], versions:1 },
+
+    { id:9, title:'“Three things I got wrong” — text post', source:'post', media:'none', format:'—', dims:'—',
+      dur:null, size:'—', date:'Sep 6', tagging:'n/a', gen:null, archived:false,
+      desc:'A text-only LinkedIn post. Kept here so the Library is a complete history.',
+      alt:'', tags:['essay'], used:[{platform:'LinkedIn', when:'Sep 6, 8:15 AM', status:'Published', cls:'pill--published'}], versions:1 },
+
+    { id:10, title:'Pop-up crowd — wide', source:'upload', media:'image', format:'JPG', dims:'3000×2000',
+      dur:null, size:'6.1 MB', date:'Aug 21', tagging:'done', gen:'gen_8004', archived:false,
+      desc:'Wide shot of the Saturday crowd.',
+      alt:'A busy market stall with a queue of customers.',
+      tags:['event','crowd'], used:[], versions:1 },
+
+    { id:11, title:'Old hero — spring line', source:'upload', media:'image', format:'JPG', dims:'2000×2500',
+      dur:null, size:'4.2 MB', date:'May 4', tagging:'done', gen:'gen_6110', archived:true,
+      desc:'Superseded by the autumn hero.',
+      alt:'A pale linen jacket on a bright backdrop.',
+      tags:['hero','archive'], used:[], versions:1 },
+
+    { id:12, title:'Sound check — unusable', source:'clip', media:'video', format:'MP4', dims:'1080×1920',
+      dur:'0:12', size:'4.4 MB', date:'Sep 9', tagging:'done', gen:'gen_8760', archived:true,
+      from:'Founder AMA — full stream', at:'00:02–00:14',
+      desc:'Clipped before the mic was live.',
+      alt:'Founder adjusting a microphone.',
+      tags:['offcut'], used:[], versions:1 },
+  ];
+
+  /* ---------- derived helpers ---------- */
+
+  isConnectedFor(media) {
+    return CONNECTED.filter((k) => PLATFORM[k].accepts.includes(media));
+  }
+
+  // The single most important derived fact on this screen. Everything the
+  // card promises is gated on it.
+  publishState(a) {
+    if (a.source === 'post') return 'record';           // never had a file
+    if (a.tagging === 'pending') return 'tagging';      // still enriching
+    if (!a.gen) return 'blocked';                       // publisher cannot fetch it
+    if (this.isConnectedFor(a.media).length === 0) return 'nodest';
+    return 'ready';
+  }
+
+  /* ---------- actions ---------- */
+
+  setSource = (v) => this.setState({ source: v, stateFilter: null });
+  setStateFilter = (v) => this.setState({ stateFilter: v, source: 'all' });
+  resetFilters = () => this.setState({ source:'all', stateFilter:null, query:'' });
+  goLibrary = () => this.setState({ view:'library' });
+  openFlow = () => this.setState({ view:'flow' });
+  toggleAddMenu = () => this.setState((s) => ({ addMenuOpen: !s.addMenuOpen }));
+  toggleSelect = () => this.setState((s) => ({ selectMode: !s.selectMode }));
+  setGrid = () => this.setState({ viewMode:'grid' });
+  setList = () => this.setState({ viewMode:'list' });
+  stop = (e) => e && e.stopPropagation();
+  noop = () => {};
+  noopNav = () => this.toast('That screen is out of scope for this mockup.');
+  toggleTheme = () => this.setState((s) => ({ theme: (s.theme || this.props.theme || 'dark') === 'dark' ? 'light' : 'dark' }));
+
+  openAsset = (id) => this.setState({ selectedId: id, drawerOn: true, drawerTab: 'details' });
+  closeDrawer = () => this.setState({ selectedId: null, drawerOn: false });
+  setDrawerTab = (t) => this.setState({ drawerTab: t });
+
+  openPublish = (id) => {
+    const a = this.ASSETS.find((x) => x.id === id);
+    const eligible = a ? this.isConnectedFor(a.media) : [];
+    this.setState({ selectedId: id, publishOpen: true, chosen: eligible.slice(0, 1), captionTab: 'all' });
+  };
+  closePublish = () => this.setState({ publishOpen: false });
+  toggleDest = (key) => this.setState((s) => ({
+    chosen: s.chosen.includes(key) ? s.chosen.filter((k) => k !== key) : [...s.chosen, key],
+  }));
+
+  /* ---------- upload ---------- */
+  openUpload = () => this.setState({ uploadOpen:true, uploadStage:'empty', dupResolved:null, addMenuOpen:false });
+  closeUpload = () => this.setState({ uploadOpen:false });
+  // Two ticks, not a fake instant success: the point of the queue is that a
+  // failure lands on one file while the others carry on.
+  startUpload = () => {
+    this.setState({ uploadStage:'running' });
+    setTimeout(() => this.setState({ uploadStage:'done' }), 1400);
+  };
+  finishUpload = () => (this.state.uploadStage === 'done'
+    ? this.setState({ uploadOpen:false }, () => this.toast('2 of 3 files added to your Library'))
+    : this.toast('Still uploading…'));
+  onMarkVersion = () => this.setState({ dupResolved:'version' }, () => this.toast('Filed as a new version — the older file is kept and superseded.'));
+  onSeparateAsset = () => this.setState({ dupResolved:'separate' }, () => this.toast('Kept as its own asset.'));
+
+  /* ---------- destructive + hand-off ---------- */
+  openDelete = () => this.setState({ deleteOpen:true });
+  closeDelete = () => this.setState({ deleteOpen:false });
+  confirmDelete = () => this.setState({ deleteOpen:false, selectedId:null, drawerOn:false }, () => this.toast('Moved to Trash — recoverable for 30 days'));
+
+  /* ---------- scheduling ----------
+     Seeded from the clock at the instant the picker opens, rounded up to the
+     next 5 minutes, and always at least TikTok/Facebook's 10-minute floor away.
+     A default of "next Tuesday 09:00" is the thing that makes schedulers feel
+     like they are fighting you. */
+  // One schedule path from everywhere — card, drawer, or composer. Previously
+  // a card scheduled via a hand-off modal while the composer used a picker,
+  // which meant the same button did two different things depending on where
+  // you pressed it. The publish sheet is left open underneath so cancelling
+  // returns you to it rather than dumping you back at the grid.
+  openSchedule = (assetId) => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 10);
+    now.setMinutes(Math.ceil(now.getMinutes() / 5) * 5, 0, 0);
+    this.setState((s) => ({
+      scheduleOpen: true,
+      scheduleAt: now,
+      selectedId: typeof assetId === 'string' || typeof assetId === 'number' ? assetId : s.selectedId,
+    }));
+  };
+  closeSchedule = () => this.setState({ scheduleOpen: false });
+  nudgeSchedule = (mins) => this.setState((s) => {
+    const d = new Date(s.scheduleAt ? s.scheduleAt.getTime() : Date.now());
+    d.setMinutes(d.getMinutes() + mins);
+    return { scheduleAt: d };
+  });
+  confirmSchedule = () => this.setState({ scheduleOpen: false }, () => this.toast('Scheduled — it will appear on your Calendar'));
+
+  /* ---------- publish → receipt ----------
+     Publishing lands on the post's own screen, not a throwaway "Success!"
+     dialog. That screen is permanent and reachable later from the asset's
+     "Where it's used" list, so the confirmation and the record are one thing
+     rather than two. It reports each destination separately, because a
+     multi-destination publish genuinely can half-succeed. */
+  doPublish = (destKeys) => this.setState({
+    publishOpen: false,
+    view: 'receipt',
+    receipt: { at: new Date(), dests: destKeys },
+  });
+
+  openPreview = (platform) => this.setState((s) => ({
+    previewOpen: true,
+    previewPlatform: typeof platform === 'string' ? platform : s.previewPlatform,
+  }));
+  closePreview = () => this.setState({ previewOpen: false });
+
+  openTrash = () => this.setState({ view:'trash', selectedId:null });
+  setDemoState = (v) => this.setState({ demoState:v, selectedId:null });
+
+  toast = (msg) => {
+    this.setState({ toast: msg });
+    setTimeout(() => this.setState({ toast: null }), 2600);
+  };
+
+  /* ---------- view builders ---------- */
+
+  buildCard(a) {
+    const st = this.publishState(a);
+    const conn = CONNECTED.map((key) => {
+      const p = PLATFORM[key];
+      const ok = p.accepts.includes(a.media);
+      return {
+        short: p.short,
+        cls: ok && st === 'ready' ? 'fit--yes' : 'fit--no',
+        title: ok ? `${p.label} accepts this` : `${p.label} takes video only`,
+      };
+    });
+    const fitCount = conn.filter((c) => c.cls === 'fit--yes').length;
+
+    const stateTag = {
+      ready:   { label: 'Ready', cls: 'tag--ready' },
+      blocked: { label: 'No file', cls: 'tag--blocked' },
+      tagging: { label: 'Tagging…', cls: 'tag--tagging' },
+      nodest:  { label: 'No destination', cls: 'tag--nodest' },
+      record:  { label: 'Post record', cls: 'tag--record' },
+    }[st];
+
+    const provenance = a.source === 'clip'
+      ? `Clipped from “${a.from}” · ${a.at}`
+      : SOURCE[a.source].prov;
+
+    const fitNote = st === 'ready'
+      ? `fits ${fitCount} of ${CONNECTED.length}`
+      : (st === 'nodest' ? 'no connected account takes images' : '');
+
+    // One reason string, computed once and used by BOTH the card button and the
+    // drawer button, so the same asset can never be refused with two different
+    // explanations depending on where you clicked.
+    const blockReason = {
+      ready:   '',
+      record:  'This is a record of a text post — open it in Calendar.',
+      blocked: 'Re-upload this file before publishing it: the publisher can’t reach it.',
+      nodest:  'Connect LinkedIn to publish stills — YouTube and TikTok take video only.',
+      tagging: 'Still generating tags and alt text — one moment.',
+    }[st];
+
+    return {
+      ...a,
+      thumbId: `asset-${a.id}`,
+      placeholder: a.title,
+      isVideo: a.media === 'video',
+      duration: a.dur || '',
+      durationText: a.dur || '—',
+      sourceLabel: SOURCE[a.source].label,
+      provenance,
+      stateTag,
+      fits: conn,
+      fitNote,
+      cardCls: st === 'blocked' ? 'card--blocked' : '',
+      // The flow view claims the card shimmers while tagging runs. It has to
+      // actually do it, or the reference screen is documenting a fiction.
+      mediaCls: st === 'tagging' ? 'shimmer' : '',
+      publishLabel: st === 'ready' ? 'Publish' : (st === 'record' ? 'View post' : 'Can’t publish'),
+      publishCls: st === 'ready' || st === 'record' ? '' : 'btn--disabled',
+      blockReason,
+      canPublish: st === 'ready',
+      // "No destination" still opens the composer, read-only. A toast says the
+      // asset can't go anywhere; only the composer can say WHY, per platform —
+      // and the reasons differ (LinkedIn isn't connected; TikTok photo posts
+      // need a verified domain). Refusing to open hides the actionable part.
+      canOpenComposer: st === 'ready' || st === 'nodest',
+      usedCountLabel: a.used.length === 0 ? 'Never' : `${a.used.length} post${a.used.length === 1 ? '' : 's'}`,
+      // Parsed from the stored dimensions so the composer previews the shape
+      // that will actually go out, not a generic square.
+      ratio: (function () {
+        const d = String(a.dims || '').split('×').map(Number);
+        return d.length === 2 && d[0] > 0 && d[1] > 0 ? `${d[0]} / ${d[1]}` : '1 / 1';
+      })(),
+      // Named plainly, because this is the field whose absence caused a real
+      // post to publish with no media on 2026-09-11.
+      genLabel: a.gen ? a.gen : 'none — this is why it can’t publish',
+      isBlocked: st === 'blocked',
+      tagsText: a.tags.join(', '),
+      tagHint: a.tagging === 'pending' ? 'Tags are still being generated…' : 'Comma-separated. Used by search and by the AI when it writes captions.',
+      description: a.desc,
+      altText: a.alt,
+      hasUsage: a.used.length > 0,
+      noUsage: a.used.length === 0,
+      usedIn: a.used.map((u) => ({ ...u, onOpen: () => this.toast(`Opening the ${u.platform} post in Calendar`) })),
+      versions: a.versions > 1
+        ? [
+            { label: 'v2 — current', when: a.date, note: 'colour-corrected', isCurrent: true },
+            { label: 'v1', when: 'Aug 28', note: 'original upload', isCurrent: false },
+          ]
+        : [{ label: 'v1 — current', when: a.date, note: 'original', isCurrent: true }],
+      onOpen: () => this.openAsset(a.id),
+      onSchedule: (e) => { this.stop(e); this.openSchedule(a.id); },
+      onPublish: (e) => {
+        this.stop(e);
+        if (st === 'ready' || st === 'nodest') return this.openPublish(a.id);
+        return this.toast(blockReason);
+      },
+    };
+  }
+
+  renderVals() {
+    const density = this.props.density ?? 'compact';
+    const theme = this.state.theme || this.props.theme || 'dark';
+    const { view, source, stateFilter, query, viewMode, selectMode, addMenuOpen,
+            selectedId, drawerTab, publishOpen, chosen, captionTab, toast,
+            uploadOpen, uploadStage, dupResolved, deleteOpen, demoState } = this.state;
+
+    /* ---- filtering ---- */
+    const active = this.ASSETS.filter((a) => !a.archived);
+    let list;
+    if (stateFilter === 'archived') list = this.ASSETS.filter((a) => a.archived);
+    else if (stateFilter === 'unused') list = active.filter((a) => a.used.length === 0);
+    else if (stateFilter === 'blocked') list = active.filter((a) => this.publishState(a) === 'blocked');
+    else if (source === 'all') list = active;
+    else list = active.filter((a) => a.source === source);
+
+    const visibleAssets = list.map((a) => this.buildCard(a));
+
+    const counts = {
+      all: active.length,
+      upload: active.filter((a) => a.source === 'upload').length,
+      clip: active.filter((a) => a.source === 'clip').length,
+      generation: active.filter((a) => a.source === 'generation').length,
+      post: active.filter((a) => a.source === 'post').length,
+      unused: active.filter((a) => a.used.length === 0).length,
+      archived: this.ASSETS.filter((a) => a.archived).length,
+    };
+
+    const sourceChips = [
+      ['all','All'], ['upload','Uploads'], ['clip','Clips'], ['generation','Generated'], ['post','Post records'],
+    ].map(([key,label]) => ({
+      key, label, count: counts[key],
+      cls: !stateFilter && source === key ? 'chip--active' : '',
+      onClick: () => this.setSource(key),
+    }));
+
+    const stateChips = [
+      { key:'unused',   label:'Never used', count: counts.unused },
+      { key:'archived', label:'Archived',   count: counts.archived },
+    ].map((c) => ({ ...c, cls: stateFilter === c.key ? 'chip--active' : '', onClick: () => this.setStateFilter(c.key) }))
+     .concat([{ key:'trash', label:'Trash', count:3, cls:'', onClick: this.openTrash }]);
+
+    const blockedCount = active.filter((a) => this.publishState(a) === 'blocked').length;
+    const noDestCount = active.filter((a) => this.publishState(a) === 'nodest').length;
+
+    const readyCount = active.filter((a) => this.publishState(a) === 'ready').length;
+    // Counts the grid's own default view, then names what it excludes — so the
+    // headline number and the number of cards on screen always agree.
+    const headline = `${counts.all} in the library · ${readyCount} ready to publish · ${counts.unused} never used · ${counts.archived} archived`;
+
+    /* ---- drawer ---- */
+    const selected = selectedId ? this.buildCard(this.ASSETS.find((a) => a.id === selectedId)) : null;
+    const drawerTabs = [['details','Details'],['discovery','Discovery'],['usage','Where it’s used'],['versions','Versions']].map(([key,label]) => ({
+      key, label, cls: drawerTab === key ? 'tab--active' : '', onClick: () => this.setDrawerTab(key),
+    }));
+
+    /* ---- publish sheet ---- */
+    const destinations = CONNECTED.map((key) => {
+      const p = PLATFORM[key];
+      const ok = selected ? p.accepts.includes(selected.media) : false;
+      const on = chosen.includes(key);
+      const takes = p.accepts.filter((x) => x !== 'none').join(' or ');
+      // TikTok DOES support photo posts — with a title and a description, which
+      // no other TikTok surface has. They are unreachable here for a structural
+      // reason, not a missing feature: photo posts are PULL_FROM_URL only and
+      // the URL must sit on a verified domain. Saying "takes video only" would
+      // misattribute a domain-verification gap to the platform.
+      const why = (key === 'tiktok' && selected && selected.media === 'image')
+        ? 'TikTok photo posts need a verified domain we haven’t set up — they’re pull-from-URL only, with no file-upload path. The fields exist; the route doesn’t yet.'
+        : `Takes ${takes} — this asset is ${selected ? selected.media : 'not media'}.`;
+      return {
+        key, label: p.label, handle: p.handle,
+        cls: !ok ? 'dest--off' : (on ? 'dest--on' : ''),
+        boxCls: on && ok ? 'dest__box--on' : '',
+        check: on && ok ? '✓' : '',
+        blocked: !ok,
+        why,
+        onToggle: () => (ok ? this.toggleDest(key) : this.toast(`${p.label} can’t take this file type.`)),
+      };
+    }).concat(LOCKED_DESTS.map((key) => {
+      // Shown, not hidden. A destination the product intends to support but
+      // cannot yet is a fact the user should be able to see and plan around.
+      const p = PLATFORM[key];
+      return {
+        key, label: p.label, handle: 'Not connected',
+        cls: 'dest--off', boxCls: '', check: '',
+        blocked: true, why: p.why,
+        onToggle: () => this.toast(`${p.label}: ${p.why}`),
+      };
+    }));
+
+    const chosenValid = destinations.filter((d) => d.cls !== 'dest--off' && chosen.includes(d.key));
+    const captionTabs = [{ key:'all', label:'All destinations' }]
+      .concat(chosenValid.map((d) => ({ key: d.key, label: d.label })))
+      .map((t) => ({ ...t, cls: captionTab === t.key ? 'seg__o--on' : '', onClick: () => this.setState({ captionTab: t.key }) }));
+
+    // Deliberately a realistic caption that buries its hook ~136 characters in.
+    // That is the common real mistake, and it makes the preview show both
+    // outcomes: it survives LinkedIn's and TikTok's fold, and is cut off on
+    // Instagram and YouTube. A short sample caption would fit everywhere and
+    // quietly demonstrate nothing.
+    const baseCaption = 'After three months of sampling, six factory visits and one very expensive mistake with the dye lot, the autumn restock is finally live — five pieces, one warm palette, built for the season ahead.';
+    const limit = captionTab === 'all' ? Math.min(...(chosenValid.length ? chosenValid.map((d) => PLATFORM[d.key].limit) : [2200])) : PLATFORM[captionTab]?.limit ?? 2200;
+    const used = baseCaption.length;
+
+    const requirements = chosenValid.map((d) => {
+      if (d.key === 'youtube') {
+        return {
+          platform: 'YouTube', dot: PLATFORM.youtube.dot,
+          // youtube.service.ts:30-35 — YouTube itself restricts every upload from
+          // an unverified API project to private, and the lock is not appealable.
+          // Letting someone finish this flow believing they published publicly is
+          // the fabricated-success case Law 3 forbids, so it is said up front.
+          hasNote: true,
+          note: 'Until Google’s compliance review passes, YouTube locks every upload from this app to private. That lock is applied by YouTube and can’t be appealed — re-uploading later loses the URL and the views.',
+          fields: [
+            { label:'Video title', isText:true, isChoice:false, value:'Autumn restock — the five pieces', hint:'Required. Shown above the player, separate from the caption.' },
+            { label:'Is this made for kids?', isChoice:true, isText:false, hint:'YouTube rejects the upload without an answer. There is no safe default, so we ask.',
+              options:[
+                { label:'No', cls: this.state.madeForKids === 'no' ? 'seg__o--on' : '', onClick: () => this.setState({ madeForKids:'no' }) },
+                { label:'Yes', cls: this.state.madeForKids === 'yes' ? 'seg__o--on' : '', onClick: () => this.setState({ madeForKids:'yes' }) },
+              ] },
+          ],
+        };
+      }
+      // tiktok.service.ts:25-30 — an unaudited client MUST send SELF_ONLY or the
+      // init call returns 403 unaudited_client_can_only_post_to_private_accounts.
+      // Offering "Public" as a selectable default would guarantee that failure.
+      return {
+        platform: 'TikTok', dot: PLATFORM.tiktok.dot,
+        hasNote: true,
+        note: 'TikTok only accepts private posts from this app until its content audit passes. “Public” is offered by TikTok, not by us — selecting it would be rejected at send time, so it stays locked.',
+        fields: [
+          { label:'Who can see it', isChoice:true, isText:false, hint:'Publish it, then flip it to public in the TikTok app if you want it seen.',
+            options:[
+              { label:'Only me', cls: this.state.privacy === 'self' ? 'seg__o--on' : '', onClick: () => this.setState({ privacy:'self' }) },
+              { label:'Public — locked', cls:'seg__o--off', onClick: () => this.toast('TikTok rejects public posts from unaudited apps. Publish privately, then switch it in TikTok.') },
+            ] },
+        ],
+      };
+    });
+
+    const n = chosenValid.length;
+    const publishSummary = n === 0
+      ? 'Pick at least one destination.'
+      : `Publishing to ${n} of ${CONNECTED.length} connected ${CONNECTED.length === 1 ? 'account' : 'accounts'}.`;
+
+    /* ---- upload queue (merged in from the approved gallery) ---- */
+    const QUEUE = {
+      empty: [],
+      running: [
+        { name:'product-shot-1.jpg', pct:'64%',  width:'64%', cls:'', fillCls:'', failed:false, error:'' },
+        { name:'brand-promo.mov',    pct:'—',    width:'12%', cls:'', fillCls:'', failed:false, error:'' },
+        { name:'product-shot-2.jpg', pct:'31%',  width:'31%', cls:'', fillCls:'', failed:false, error:'' },
+      ],
+      done: [
+        { name:'product-shot-1.jpg', pct:'100%',   width:'100%', cls:'',              fillCls:'qitem__fill--ok',  failed:false, error:'' },
+        { name:'brand-promo.mov',    pct:'Failed', width:'100%', cls:'qitem--failed', fillCls:'qitem__fill--bad', failed:true,
+          error:'File type “.mov” isn’t supported yet — try MP4 or WebM instead.' },
+        { name:'product-shot-2.jpg', pct:'100%',   width:'100%', cls:'',              fillCls:'qitem__fill--ok',  failed:false, error:'' },
+      ],
+    }[uploadStage];
+
+    /* ---- trash (30-day recovery window) ---- */
+    const trashItems = [
+      { title:'Mood board pic 7',        deleted:'Sep 10', daysLeft:28 },
+      { title:'Pop-up flyer — draft',    deleted:'Aug 30', daysLeft:17 },
+      { title:'Old testimonial — Ben K.', deleted:'Aug 19', daysLeft:6 },
+    ].map((t) => ({
+      ...t,
+      onRestore: () => this.toast(`“${t.title}” restored to your Library`),
+      onPurge: () => this.toast('Deleted permanently.'),
+    }));
+
+    /* ---- review-only forced states ---- */
+    const demoStates = [
+      ['normal','Populated'], ['loading','Loading'], ['firstrun','Empty — new account'],
+    ].map(([key,label]) => ({ key, label, cls: demoState === key ? 'chip--active' : '', onClick: () => this.setDemoState(key) }));
+
+    const isLoading = demoState === 'loading';
+    const isFirstRun = demoState === 'firstrun';
+    const hasRows = !isLoading && !isFirstRun && visibleAssets.length > 0;
+
+    /* ---- Discovery score ----
+       Not new: supabase/functions/seo-score already exists, already takes
+       `platform` as an input, and already writes posts.seo_state. It is wired
+       into Studio and Calendar and simply never called from here. The score
+       differs per destination because the function is platform-aware — one
+       number for "the post" would be throwing away what it already computes. */
+    const SEO_ADVICE = {
+      youtube: { score: 61, tips: [
+        'The search term isn’t in the first 100 characters of the description — YouTube weights those heavily.',
+        'Only 2 tags set. The combined budget is 500 characters; you’re using 31.',
+        'Title doesn’t lead with the phrase someone would actually type.',
+      ] },
+      tiktok: { score: 78, tips: [
+        'Add 3–5 niche hashtags. Broad ones (#fyp) do nothing here.',
+        'The hook lands at 0:04 — moving it before 0:02 is the single biggest retention lever.',
+      ] },
+      linkedin: { score: 74, tips: [
+        'Your point doesn’t arrive until character 136. It survives LinkedIn’s fold, but only just — and it is cut off entirely on Instagram.',
+        'No question or prompt at the end — LinkedIn’s ranking leans on comments.',
+      ] },
+    };
+    const seoPerDest = chosenValid.map((d) => {
+      const a = SEO_ADVICE[d.key] || { score: 70, tips: [] };
+      return {
+        key: d.key,
+        label: PLATFORM[d.key].label,
+        dot: PLATFORM[d.key].dot,
+        score: a.score,
+        cls: a.score >= 75 ? 'score--good' : (a.score >= 50 ? 'score--ok' : 'score--bad'),
+        tips: a.tips,
+      };
+    });
+    const seoOverall = seoPerDest.length
+      ? Math.round(seoPerDest.reduce((sum, s) => sum + s.score, 0) / seoPerDest.length)
+      : 0;
+
+    /* ---- Platform previews ----
+       `cut` is where each platform collapses the caption behind a "more"
+       affordance. These are the numbers that decide whether your hook is read
+       at all, so the preview computes the real split rather than drawing a
+       pretty card. Chrome is generic on purpose — recognisable, never a copy. */
+    const PREVIEW = {
+      tiktok:   { kind:'phone', who:'@brandosse',    sub:'Original sound — Brandosse', cut:150 },
+      instagram:{ kind:'card',  who:'brandosse',     sub:'Lagos, Nigeria',             cut:125, ratio:'4 / 5' },
+      linkedin: { kind:'card',  who:'Dare O.',       sub:'Founder, Brandosse · now',   cut:210, ratio:'1.91 / 1' },
+      facebook: { kind:'card',  who:'Brandosse Co.', sub:'now · Public',               cut:250, ratio:'1.91 / 1' },
+      youtube:  { kind:'card',  who:'Brandosse',     sub:'0 views · just now',         cut:100, ratio:'9 / 16', titled:true },
+    };
+    const HASHTAGS = ['#autumnrestock', '#smallbusiness', '#madeinlagos'];
+    const fullText = `${baseCaption} ${HASHTAGS.join(' ')}`;
+
+    const pvKey = this.state.previewPlatform;
+    const pvDef = PREVIEW[pvKey] || PREVIEW.tiktok;
+    const pvCut = fullText.length > pvDef.cut;
+    const pvHead = pvCut ? fullText.slice(0, pvDef.cut).trimEnd() : fullText;
+    const pvHidden = pvCut ? fullText.length - pvDef.cut : 0;
+    // Does the hook survive the fold? The caption's first sentence is the hook.
+    const hookEnd = (baseCaption.indexOf('—') + 1) || baseCaption.length;
+    const pvHookVisible = hookEnd <= pvDef.cut;
+
+    const previewTabs = Object.keys(PREVIEW).map((key) => ({
+      key,
+      label: PLATFORM[key].label,
+      cls: pvKey === key ? 'chip--active' : '',
+      onClick: () => this.openPreview(key),
+    }));
+
+    /* ---- Schedule picker ---- */
+    const sAt = this.state.scheduleAt;
+    const two = (x) => String(x).padStart(2, '0');
+    const scheduleDate = sAt ? `${sAt.getFullYear()}-${two(sAt.getMonth() + 1)}-${two(sAt.getDate())}` : '';
+    const scheduleTime = sAt ? `${two(sAt.getHours())}:${two(sAt.getMinutes())}` : '';
+    const scheduleHuman = sAt
+      ? sAt.toLocaleString(undefined, { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+      : '';
+    const minsFromNow = sAt ? Math.round((sAt.getTime() - Date.now()) / 60000) : 0;
+    const scheduleRelative = minsFromNow < 60
+      ? `in ${minsFromNow} minutes`
+      : (minsFromNow < 1440 ? `in ${Math.round(minsFromNow / 60)} hours` : `in ${Math.round(minsFromNow / 1440)} days`);
+
+    /* ---- Receipt ---- */
+    const rc = this.state.receipt;
+    const receiptRows = rc ? rc.dests.map((key) => {
+      const p = PLATFORM[key];
+      // Reported per destination and truthfully: YouTube's forced-private lock
+      // is a successful publish with a caveat, not a failure, and saying
+      // "Published!" without it would be the fabricated-success case.
+      const caveat = key === 'youtube'
+        ? 'Live, but locked to private by YouTube until the compliance review passes.'
+        : (key === 'tiktok' ? 'Live, visible only to you until TikTok’s content audit passes.' : 'Live and public.');
+      return {
+        key, label: p.label, handle: p.handle, dot: p.dot, caveat,
+        restricted: key === 'youtube' || key === 'tiktok',
+        onOpen: () => this.toast(`Opening the ${p.label} post`),
+        // Useful here mainly because these two are restricted: what you can see
+        // as the owner is not what a viewer would have seen.
+        onPreview: () => this.openPreview(key),
+      };
+    }) : [];
+    const receiptWhen = rc ? rc.at.toLocaleString(undefined, { hour:'2-digit', minute:'2-digit' }) : '';
+
+    return {
+      theme,
+      isLibrary: view === 'library',
+      isFlow: view === 'flow',
+      isTrash: view === 'trash',
+      trashItems,
+
+      demoStates, isLoading, isFirstRun,
+      skeletons: [1,2,3,4,5,6,7,8],
+      showGrid: hasRows && viewMode === 'grid',
+      showTable: hasRows && viewMode === 'list',
+
+      uploadOpen, closeUpload: this.closeUpload, startUpload: this.startUpload, finishUpload: this.finishUpload,
+      queue: QUEUE, hasQueue: QUEUE.length > 0,
+      // Shown only once the batch has settled, and only until the user answers.
+      showDuplicate: uploadStage === 'done' && !dupResolved,
+      onMarkVersion: this.onMarkVersion, onSeparateAsset: this.onSeparateAsset,
+      uploadDoneLabel: uploadStage === 'done' ? 'Done' : 'Uploading…',
+      uploadDoneCls: uploadStage === 'done' ? '' : 'btn--disabled',
+
+      deleteOpen, closeDelete: this.closeDelete, confirmDelete: this.confirmDelete,
+      goLibrary: this.goLibrary, openFlow: this.openFlow, noopNav: this.noopNav, noop: this.noop,
+      toggleTheme: this.toggleTheme,
+      totalCount: counts.all,
+      headline,
+      connectedAccounts: CONNECTED.map((k) => ({ label: PLATFORM[k].label, handle: PLATFORM[k].handle, dot: PLATFORM[k].dot })),
+      onConnect: () => this.toast('Opening Settings → Connected accounts'),
+
+      gridCls: density === 'roomy' ? 'grid--roomy' : '',
+      gridBtnClass: viewMode === 'grid' ? 'iconbtn--on' : '',
+      listBtnClass: viewMode === 'list' ? 'iconbtn--on' : '',
+      setGrid: this.setGrid, setList: this.setList,
+      selectMode, selectLabel: selectMode ? 'Cancel' : 'Select', toggleSelect: this.toggleSelect, selectedCount: 3,
+
+      addMenuOpen, toggleAddMenu: this.toggleAddMenu,
+      onAddUpload: this.openUpload,
+      onAddStudio: () => this.setState({ addMenuOpen:false }, () => this.toast('Opening AI Studio')),
+      onAddClip: () => this.setState({ addMenuOpen:false }, () => this.toast('Opening Video Clips — paste a URL')),
+
+      showNoDestNotice: noDestCount > 0, noDestCount,
+      showBlockedNotice: blockedCount > 0, blockedCount,
+      showBlockedOnly: () => this.setStateFilter('blocked'),
+
+      query, sourceChips, stateChips, resetFilters: this.resetFilters,
+      visibleAssets, isEmpty: !isLoading && !isFirstRun && visibleAssets.length === 0,
+
+      // The drawer belongs to the Library grid only. `selected` stays set after
+      // a publish (the receipt needs it), so without the view check the drawer
+      // reappears on top of the receipt.
+      drawerOpen: this.state.drawerOn && !!selected && !publishOpen && view === 'library',
+      selected, drawerTabs,
+      tabIsDetails: drawerTab === 'details',
+      tabIsDiscovery: drawerTab === 'discovery',
+      tabIsUsage: drawerTab === 'usage',
+      tabIsVersions: drawerTab === 'versions',
+      // Scored against every platform the asset could go to, not just the ones
+      // picked in a composer — this tab exists so you can judge an asset
+      // without starting a publish.
+      drawerSeo: Object.keys(SEO_ADVICE)
+        .filter((key) => PLATFORM[key].accepts.includes(selected ? selected.media : 'none'))
+        .map((key) => ({
+          key, label: PLATFORM[key].label, dot: PLATFORM[key].dot,
+          score: SEO_ADVICE[key].score, tips: SEO_ADVICE[key].tips,
+          cls: SEO_ADVICE[key].score >= 75 ? 'score--good' : (SEO_ADVICE[key].score >= 50 ? 'score--ok' : 'score--bad'),
+        })),
+      closeDrawer: this.closeDrawer, stop: this.stop,
+      onRepair: () => this.toast('Re-uploading rebuilds the publisher’s link to this file.'),
+      onNewVersion: () => this.toast('Pick a replacement file — the old version is kept.'),
+      onSchedule: this.openSchedule,
+      onDuplicate: () => this.toast('Duplicated'),
+      onArchive: () => this.toast('Archived — still searchable, hidden from the grid'),
+      onTrash: this.openDelete,
+      openPublishFromDrawer: () => (selected && selected.canOpenComposer
+        ? this.openPublish(selected.id)
+        : this.toast(selected ? selected.blockReason : '')),
+      onSaveMetadata: () => this.toast('Saved. Alt text goes out with the post.'),
+      saveHint: 'Edits apply to this asset everywhere, including posts not yet sent.',
+
+      publishOpen, closePublish: this.closePublish,
+      destinations, captionTabs,
+      seoPerDest, seoOverall, hasSeo: seoPerDest.length > 0,
+      seoOverallCls: seoOverall >= 75 ? 'score--good' : (seoOverall >= 50 ? 'score--ok' : 'score--bad'),
+      onOptimise: () => this.toast('Rewriting title, description and tags for discovery…'),
+
+      scheduleOpen: this.state.scheduleOpen,
+      scheduleDate, scheduleTime, scheduleHuman, scheduleRelative,
+      closeSchedule: this.closeSchedule,
+      confirmSchedule: this.confirmSchedule,
+      scheduleNudges: [
+        { label: '+15m', onClick: () => this.nudgeSchedule(15) },
+        { label: '+1h', onClick: () => this.nudgeSchedule(60) },
+        { label: 'Tomorrow', onClick: () => this.nudgeSchedule(1440) },
+        { label: '+1 week', onClick: () => this.nudgeSchedule(10080) },
+      ],
+
+      previewOpen: this.state.previewOpen,
+      openPreview: this.openPreview,
+      closePreview: this.closePreview,
+      previewTabs,
+      pvLabel: PLATFORM[pvKey].label,
+      pvIsPhone: pvDef.kind === 'phone',
+      pvIsCard: pvDef.kind === 'card',
+      pvTitled: !!pvDef.titled,
+      pvWho: pvDef.who,
+      pvSub: pvDef.sub,
+      pvInitial: pvDef.who.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase(),
+      pvRatio: pvDef.ratio || '9 / 16',
+      pvHead, pvCut, pvHiddenLabel: `… more (${pvHidden} more characters)`,
+      pvTitle: 'Autumn restock — the five pieces',
+      pvNoteCls: pvHookVisible ? '' : 'pvNote--warn',
+      pvNote: pvHookVisible
+        ? `${PLATFORM[pvKey].label} shows about ${pvDef.cut} characters before “more”. Your hook lands inside that, so it gets read.`
+        : `${PLATFORM[pvKey].label} collapses after about ${pvDef.cut} characters — your hook currently falls past the fold, so most people never see it. Move it to the front, or push the hashtags to the end.`,
+
+      isReceipt: view === 'receipt',
+      receiptRows, receiptWhen,
+      receiptCount: receiptRows.length,
+      backToLibrary: () => this.setState({ view:'library', receipt:null, selectedId:null }),
+      captionLabel: captionTab === 'all' ? 'Caption — used everywhere unless overridden' : `Caption — ${PLATFORM[captionTab]?.label ?? ''} only`,
+      captionValue: baseCaption,
+      captionHint: captionTab === 'all'
+        ? 'Switch to a platform tab to write a different caption just for it.'
+        : 'This overrides the shared caption for this destination only.',
+      counterText: `${used} / ${limit}`,
+      counterCls: used > limit ? 'counter--over' : '',
+      requirements,
+      publishSummary,
+      confirmLabel: n === 0 ? 'Publish' : (n === 1 ? 'Publish now' : `Publish to ${n}`),
+      confirmCls: n === 0 ? 'btn--disabled' : '',
+      onConfirmPublish: () => (n === 0
+        ? this.toast('Pick a destination first.')
+        : this.doPublish(chosenValid.map((d) => d.key))),
+      onScheduleFromSheet: this.openSchedule,
+
+      toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

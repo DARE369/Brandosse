@@ -1,0 +1,297 @@
+# Library → Publish — user journey and implementation plan
+
+Written 2026-09-13, against `design-mockups/library-v3.dc.html`.
+
+Companion documents: [`PLATFORM-PUBLISH-FIELDS.md`](PLATFORM-PUBLISH-FIELDS.md) (what each destination accepts), and the packet reviews under `docs/calendar-library-rebuild/packet-2-personal-library/`.
+
+---
+
+## 0. The headline, before the diagram
+
+**Most of this is wiring, not building.** Going in, the assumption was that a publish composer, a schedule picker and a discovery score would all be new. None of them are:
+
+| Assumed new | Actually exists | Where |
+|---|---|---|
+| Publish composer | `QuickPostComposer.jsx` | `src/calendar/components/` |
+| Schedule picker | `ScheduleModal.jsx` | `src/calendar/components/` |
+| SEO / discovery score | `seo-score` + `optimize-seo` edge functions, already platform-aware | `supabase/functions/` |
+| Upload with dedupe | `UploadModal.jsx` + checksum + perceptual hash | `src/pages/Library/components/`, `assetLibraryService.js` |
+| Trash / restore | `TrashView.jsx` + soft-delete methods | `src/pages/Library/` |
+| Asset drawer | `AssetDetailDrawer.jsx` | `src/pages/Library/components/` |
+| AI disclosure to YouTube | `status.containsSyntheticMedia` | `_shared/youtube.service.ts:276` |
+
+Genuinely new: the **two publishability gates**, the **platform preview**, the **published receipt**, and the **Instagram/Facebook adapters**. Everything else is connecting things that already work to a surface that never called them.
+
+This matters for sequencing. The cheap, high-value work is front-loaded, and the one genuinely large item (Meta adapters) is isolated at the end where it can slip without blocking anything.
+
+---
+
+## 1. User journey — existing screens, new screens, and the joins
+
+```mermaid
+flowchart TD
+    Dash["Dashboard<br/>/app/dashboard"]:::existing
+
+    subgraph CREATE ["1 · Create — where media comes from"]
+        Studio["AI Studio<br/>/app/generate"]:::existing
+        StudioSess["Session history + projects<br/>SessionHistoryDrawer"]:::existing
+        StudioPP["Post-production panel<br/>caption · hashtags · SEO score"]:::existing
+        VidNew["New clip job<br/>/app/video/new"]:::existing
+        VidJobs["Clip jobs + detail<br/>/app/video/jobs"]:::existing
+        Clips["Clips gallery<br/>Save to Library"]:::existing
+        UploadM["Upload modal<br/>drag-drop · per-file progress"]:::modified
+    end
+
+    subgraph INGEST ["2 · Ingest — one collection, four provenances"]
+        TrigGen["DB trigger<br/>generation → personal_assets"]:::existing
+        ClipSave["saveClipToLibrary()<br/>reuses upload pipeline"]:::existing
+        TrigPost["DB trigger<br/>post → personal_assets"]:::existing
+        Dedupe["Checksum + perceptual hash<br/>duplicate = a question, not a refusal"]:::modified
+        ClipProv["Clip provenance<br/>source video + timecode"]:::new
+    end
+
+    subgraph LIB ["3 · Library — the spine"]
+        Grid["Library grid<br/>/app/library"]:::modified
+        Rails["Rails: source + state<br/>uploads · clips · generated · post records"]:::modified
+        Drawer["Asset drawer"]:::existing
+        TabDet["Details<br/>title · alt text · tags"]:::existing
+        TabDisc["Discovery<br/>score per platform"]:::new
+        TabUsed["Where it's used"]:::existing
+        TabVer["Versions"]:::existing
+        Trash["Trash · 30-day recovery"]:::existing
+    end
+
+    subgraph GATE ["4 · The two gates — new logic, and the point of the redesign"]
+        G1{"Media the publisher<br/>can actually fetch?"}:::gate
+        G2{"Any connected account<br/>accepts this type?"}:::gate
+        Repair["Re-upload to repair<br/>state: No file"]:::new
+        Connect["Settings → Connect<br/>/app/settings/connect"]:::existing
+    end
+
+    subgraph PUB ["5 · Publish"]
+        Composer["Publish composer<br/>extends QuickPostComposer"]:::modified
+        MediaPrev["Media preview<br/>real aspect ratio"]:::new
+        PerPlat["Per-platform required fields<br/>made-for-kids · privacy · title"]:::modified
+        Disc["Discovery score, per destination<br/>calls seo-score"]:::modified
+        Preview["Platform preview<br/>where the caption is cut"]:::new
+        Sched["Schedule picker<br/>extends ScheduleModal · seeded from now"]:::modified
+        Send["publish-post<br/>edge function"]:::existing
+    end
+
+    subgraph OUT ["6 · After"]
+        Receipt["Published screen<br/>per-destination outcome"]:::new
+        Cal["Calendar<br/>/app/calendar"]:::existing
+        Anal["Analytics<br/>/app/analytics"]:::existing
+    end
+
+    Dash --> Studio & VidNew & Grid
+    Studio --> StudioSess & StudioPP
+    StudioPP --> TrigGen
+    VidNew --> VidJobs --> Clips --> ClipSave
+    Clips --> ClipProv
+    UploadM --> Dedupe
+    Dedupe -->|"new version"| TabVer
+    Dedupe -->|"separate asset"| Grid
+    TrigGen & ClipSave & TrigPost & Dedupe & ClipProv --> Grid
+
+    Grid --> Rails
+    Grid --> Drawer
+    Drawer --> TabDet & TabDisc & TabUsed & TabVer
+    Grid -.->|delete| Trash
+    Trash -.->|restore| Grid
+    TabUsed -.-> Cal
+
+    Grid --> G1
+    G1 -->|no| Repair --> UploadM
+    G1 -->|yes| G2
+    G2 -->|"no destination"| Composer
+    G2 -->|"nowhere at all"| Connect --> Grid
+    G2 -->|yes| Composer
+
+    Composer --> MediaPrev & PerPlat & Disc & Preview
+    Disc -.->|"optimise with AI"| Composer
+    Preview -.->|"hook past the fold"| Composer
+    Composer -->|"Publish now"| Send --> Receipt
+    Composer -->|"Schedule…"| Sched --> Cal
+    Cal -->|"at the scheduled time"| Send
+
+    Receipt --> Cal & Anal & Grid
+    Receipt -.->|"preview how it looked"| Preview
+    Anal -.->|"what worked → make more"| Studio
+
+    classDef existing fill:#1E2023,stroke:#3C4046,color:#F5F5F4
+    classDef modified fill:#2A2016,stroke:#FFB224,color:#FFD79A
+    classDef new fill:#2A1712,stroke:#FF5C38,color:#FFB9A6
+    classDef gate fill:#141F2E,stroke:#3E7BD6,color:#A8C8F0
+```
+
+**Reading the colours:** grey = exists and is reused unchanged · amber = exists and is extended · orange = genuinely new · blue = the new decision logic.
+
+**The three joins that don't exist today, and are the whole point:**
+
+1. **Library → Composer.** Today Library's Schedule button navigates to Calendar with a URL parameter, and a Publish button does not exist at all. The composer never opens from Library.
+2. **Composer → `seo-score`.** The function exists, is platform-aware, and is called from Studio and Calendar — never from a publish flow.
+3. **Send → Receipt.** There is no post-publish destination. The publish happens and the user is left where they were, with a toast.
+
+---
+
+## 2. What we would actually be working on
+
+### 2.1 The two gates (the core)
+
+Everything else is presentation; this is the part that prevents a real defect. On 2026-09-11 a YouTube post failed fourteen seconds after creation with "This post has no media attached", because an uploaded asset carried no `generation_id` and the publisher resolves media only through `posts → generations`.
+
+- **Gate 1 — resolvable media.** Derive per asset: is there a media reference the publisher can follow? Surface as a card state (`Ready` / `No file`), disable Publish, offer a repair path.
+- **Gate 2 — destination fit.** Cross `personal_assets.media_type` against `publish_providers` and the user's connected accounts. Surface as per-platform fit chips and a "no destination" state that offers *Connect* rather than a dead end.
+
+Both are **derived, not stored** — no new columns. That matters: a stored flag goes stale silently, which is this codebase's signature failure.
+
+### 2.2 Library surface
+
+Replace the status rails with provenance rails (`upload` / `clip` / `generation` / `post`) plus `never used` / `archived` / `trash`. Add **clip** as a distinguishable source — today `saveClipToLibrary` writes `source='upload'`, so the product's most distinctive capability is invisible in its own library.
+
+### 2.3 Composer
+
+Extend `QuickPostComposer` rather than fork it: media preview at true aspect ratio, per-destination caption overrides with real character limits, per-platform required fields, locked destinations shown with reasons, and the discovery score.
+
+### 2.4 Platform preview
+
+New, and the one piece with a maintenance cost worth naming: platform chrome changes. **Keep the chrome generic and the truncation exact** — the value is showing where the caption is cut, not imitating anyone's app. A preview that is subtly wrong about layout is tolerable; one that is wrong about the fold is worse than none.
+
+### 2.5 Receipt
+
+New screen, reached after publish, reporting **per destination** because a multi-destination publish can half-succeed — and stating platform restrictions plainly (YouTube forced-private, TikTok `SELF_ONLY`) instead of an unqualified success.
+
+### 2.6 Instagram + Facebook adapters
+
+The only genuinely large item. Credentials exist; no publishing path does. Instagram is two-step (create container → publish) and JPEG-only for images; Facebook has different endpoints per media type and is the only platform with native API-side scheduling. See `PLATFORM-PUBLISH-FIELDS.md` §4–5.
+
+---
+
+## 3. Sequencing
+
+Ordered so each phase ships something usable, and nothing later is blocked by something earlier slipping.
+
+### Phase 0 — Make every screen match before adding to any of them
+*Measured 2026-09-13, not asserted. See §6 for the commands and their output.*
+
+The personal workspace is largely on design-system v2 already: `check:ui-v2-isolation` passes, `check:app-shell` confirms one nav, one theme toggle and every personal route on `AppShell`, and `check:token-contrast` clears WCAG AA on all 26 token/background pairs in both themes. Three real gaps remain, and they are cheap:
+
+- **Video Clips is the least-migrated screen.** 14 of its 17 components don't import `src/ui-v2`, and `videoEngine.css` carries 8 raw-colour findings — the joint-worst file in the repo. It is one of the five nav destinations and the source of the product's most distinctive capability. Migrate it to `ui-v2` primitives and tokens.
+- **Calendar carries the other 8 raw-colour findings** (`calendar-engine-v2.css`) plus the only three accessibility failures in the app: `<img>` without `alt` in `CalendarGrid.jsx:254`, `CalendarListView.jsx:211`, `UnscheduledRail.jsx:73`. The Library already generates alt text per asset — these three are a wiring fix, not an authoring job.
+- ~~**Seven legacy stylesheets are imported by nothing.**~~ **WRONG — corrected 2026-09-13.** All seven are loaded, via `@import` in `src/styles/app-entry.css`, which `app/layout.jsx` imports on every page. The original check looked only for JS imports and missed the CSS import chain. They are also still *used*: `GeneratePromptBar.css` has 32 of its first 40 classes referenced in live JSX, `GenerateV2.css` 12, `responsive-contract.css` 9. Retiring them is a class-by-class migration, not a delete. **Left in place.**
+
+- **The real dead code was elsewhere, and it was much larger.** A transitive import graph from all 106 Next.js entry points found **20 unreachable modules** across the two video trees — `src/components/video-engine/` (16 of 20 files) and `src/pages/VideoEngine/` (4 page components with no importers). Deleted 2026-09-13. Among them `VideoPlayer.jsx`, the single worst raw-colour file in the repo at 21 findings, reachable by nobody.
+
+- **A guard was protecting a dead file.** `check-video-prefs-contract.cjs` verified that `SubmitForm.jsx` sends six preference fields to the video worker. `SubmitForm.jsx` was unreachable; the live submit UI is `NewJobSheet.jsx`. The check passed while proving nothing about the path users take. Repointed at the live form — which was already sending all six, so no user-facing defect, but the guard had been giving false assurance. **This is the more valuable finding than the deletion**: a stale guard is worse than no guard, because it stops anyone looking.
+
+**One decision sits underneath all three.** There are two live token vocabularies: `--uiv2-*` (78 files) and `--color-*` (70 files). They are not cleanly separated — `src/pages/Settings.module.css:22` aliases `--color-bg-page: var(--uiv2-bg-canvas)`, while `src/styles/tokens.css:125` defines the same name as a literal `#FAFAF7`. So the *same token name resolves to different colours depending on which file is in scope*. That ambiguity, not any single wrong colour, is the consistency risk. Either finish the alias bridge everywhere or complete the migration — but stop leaving both true.
+
+**Proven:** `npm run check:ui-consistency` drops to zero raw-colour findings in `videoEngine.css` and `calendar-engine-v2.css`, and zero missing-alt findings.
+**Guarded:** a per-path ratchet, `UI_CONSISTENCY_STRICT_PATHS=a,b`, added 2026-09-13. Flipping the whole repo strict would mean clearing 180+ findings before anything else could merge, so nobody would do it and the check would stay advisory forever. Instead, cleaned paths are enforced individually and the enforced set grows; a listed path can never regress.
+
+**Done so far in Phase 0 (2026-09-13):**
+
+| Change | Effect |
+|---|---|
+| Fixed the `<img>` regex in `check-ui-consistency` | The 3 "missing alt" failures were the literal string `<img>` **inside code comments**. Every real `<img>` already had alt, inside a `<button>` carrying the post title — `alt=""` was correct. 3 → 0, no app change. |
+| Allowlisted `src/ui-v2/tokens.css` as a token source | The old `src/styles/tokens.css` was allowlisted; the canonical v2 file never was, so the design system reported 62 findings against itself. 245 → 183 raw colours, no app change. |
+| Added the per-path ratchet | `UI_CONSISTENCY_STRICT_PATHS` enforces named paths while the rest still reports. Verified: exit 1 on dirty paths, 0 when clean. |
+| Deleted 20 unreachable video modules | Confirmed by transitive graph from 106 entry points, not by grep. All were git-tracked before removal. |
+| Repointed `check-video-prefs-contract` | From the unreachable `SubmitForm.jsx` to the live `NewJobSheet.jsx`. |
+
+Total findings 254 → 189 **before** the deletion, entirely by removing false positives — that is, a third of what the check reported was noise, which is precisely why it was never made strict.
+
+### Phase 1 — The gates and an honest grid
+*Highest value per unit of work in the plan: it closes a defect class that has already shipped.*
+
+- Derive publishability and destination fit; render as card state + fit chips.
+- Provenance rails; clip as a first-class source with source-video and timecode.
+- Repair path for assets with no resolvable media.
+
+**Proven:** unit tests over the derivation for every combination of `media_type` × connected-provider set, including the empty set.
+**Guarded:** a CI check asserting no asset can render a Publish affordance while failing Gate 1 — the detector the original defect lacked.
+
+### Phase 2 — Composer
+- Open `QuickPostComposer` from Library with the asset and its generation attached.
+- Media preview; per-destination captions with real limits; per-platform required fields; locked destinations with reasons.
+
+**Proven:** an E2E run per platform asserting the request body matches `PLATFORM-PUBLISH-FIELDS.md` — in particular that YouTube receives a title and TikTok receives `SELF_ONLY`, and that neither is silently defaulted.
+**Guarded:** a contract test that fails if a required field is dropped between composer and adapter.
+
+### Phase 3 — Schedule, unified
+- One picker from card, drawer and composer. Seeded from the clock at open, rounded up, past the 10-minute floor. Timezone explicit.
+
+**Proven:** tests for seeding, the floor, and DST boundaries.
+**Guarded:** a reaper — any post stuck in `scheduled` past its time alerts. Every non-terminal state needs one.
+
+### Phase 4 — Receipt
+- Post-publish screen, per-destination outcome, restrictions stated, links to the live posts.
+
+**Proven:** an E2E asserting a partial failure renders as partial, never as blanket success.
+**Guarded:** a check that no publish path returns the user to the grid without a receipt.
+
+### Phase 5 — Discovery score
+- Call `seo-score` per destination from the composer; add the drawer's Discovery tab.
+
+**Proven:** a test that the score is advisory — Publish stays enabled at any score.
+**Guarded:** a check that a scoring failure degrades to "not scored" and never blocks the composer.
+
+### Phase 6 — Platform preview
+- Five previews; exact truncation; generic chrome.
+
+**Proven:** snapshot tests on the truncation maths per platform, not on the visuals.
+**Guarded:** fold constants live in one table with a comment pointing at their source; a test fails if a limit is edited without updating that reference.
+
+### Phase 7 — Meta adapters
+- Instagram, then Facebook. Independent of everything above; ships when ready.
+
+**Proven:** the cross-tenant probe plus per-adapter contract tests.
+**Guarded:** flip `publish_providers.is_supported` **only** after the adapter passes — the registry is evidence-based, and a premature flip makes every earlier gate lie.
+
+---
+
+## 4. Decisions still open
+
+These block design, not effort. Each needs an answer before the phase that depends on it.
+
+| # | Question | Blocks | Why it can't be defaulted |
+|---|---|---|---|
+| 1 | **Studio versions vs Library versions.** Studio has five regenerate paths producing variants; the Library tracks supersession chains. Neither knows the other. Does regenerating create a new *version* of one asset, or a separate asset? | Phase 1 | Either answer is defensible; picking wrong either fills the Library with near-duplicates or hides work the user wants to compare. |
+| 2 | **Where AI disclosure is answered.** Maps to YouTube `containsSyntheticMedia` and Instagram `is_ai_generated`. Recommendation: once at generation, carried to every destination. | Phase 2 | Asking per-publish invites contradictory answers for the same file — the field most likely to get an account actioned. |
+| 3 | **Post naming.** Quick Post writes `title: asset?.name` (`calendarService.js:417`), but a post created without an asset gets `null` and falls back to caption → prompt → "Untitled". | Phase 2 | Needs the reported screenshot to identify which path produced an ID rather than a name. |
+| 4 | **TikTok domain verification.** Photo posts are pull-from-URL only and need a verified domain. Until then TikTok images are designed but locked. | Phase 7 | An ops task, not an engineering one. |
+
+---
+
+## 5. Verification run — 2026-09-13
+
+Run before writing this plan, so the claims above are measured rather than assumed. Every command is in `package.json`.
+
+| Check | Result | What it establishes |
+|---|---|---|
+| `check:ui-v2-isolation` | **pass** — 41 files | `src/ui-v2` doesn't leak into or import from the legacy system. |
+| `check:app-shell` | **pass** | One nav, one theme toggle, every personal route on `AppShell`. |
+| `check:token-contrast` | **pass** — 26 pairs | All token/background pairs clear AA in both themes; tightest is `--uiv2-text-tertiary` on `--uiv2-bg-elevated` (light) at 4.52:1. |
+| `check:ssr-hydration-safety` | **pass** | No render-time read of a browser-only global in `src/`. |
+| `check:status-literals` | **pass** | No hardcoded status strings bypassing `POST_STATUS`. |
+| `check:post-status-accounting` | **pass** | All 6 `POST_STATUS` values are counted and rendered — none can go missing from a view silently. |
+| `check:media-required-guard` | **pass** | Adapters refuse null media; **Quick Post already blocks on `generation_id`, not merely on a selected asset**. |
+| `check:compose-wiring` | **pass** — 4/4 sites | Pipeline → store → media service → edge body is connected end to end. |
+| `check:outbound-fetch-guard` | **pass** — 91 files | Every outbound fetch in an edge function is validated, literal, or reviewed. |
+| `check:ui-consistency` | **254 findings, does not fail** | 245 raw-colour candidates, 6 generic global selectors, 3 missing `alt`. Non-strict by default. |
+
+**The one result that changes the plan:** `check:media-required-guard` shows Gate 1 is *already partly guarded* on the Calendar side — Quick Post will not create a post from an asset with no resolvable generation. Phase 1 therefore extends an existing guard to the Library surface rather than inventing one, which makes it smaller than it first appeared.
+
+**The one result that should worry us:** `check:ui-consistency` reports 254 findings and exits zero. A check that reports and passes teaches the team to ignore it. Phase 0 ends with it strict.
+
+Not run here, and deliberately: `check:migrations-apply` and `scripts/security/cross-tenant-probe.mjs` need live database credentials, and `test:e2e` needs a running app. Both belong in the phase gates, not in a planning pass.
+
+---
+
+## 6. What this plan deliberately does not do
+
+- **No new tables.** Both gates are derived. A stored publishability flag would go stale silently — the exact failure mode the three laws exist to catch.
+- **No fork of QuickPostComposer.** One composer, extended. Two composers means one of them rots.
+- **No pixel-copied platform chrome.** Generic layout, exact truncation.
+- **No premature `is_supported` flip.** Instagram and Facebook stay locked in the UI, with reasons, until their adapters actually work.

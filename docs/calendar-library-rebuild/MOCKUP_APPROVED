@@ -1,1 +1,21 @@
 approved
+
+2026-09-13 — superseded by design-mockups/library-v3.dc.html
+------------------------------------------------------------
+The original approval (2026-06-25) covered
+docs/calendar-library-rebuild/packet-2-personal-library/mockups/mockup-gallery.html.
+
+Founder decision, 2026-09-13: library-v3.dc.html supersedes that gallery for the
+Personal Content Library. It merges the gallery's proven flows (multi-file upload
+queue with per-file failure, non-blocking duplicate warning, trash with its
+30-day recovery window, table view) into the v3 information architecture
+(provenance rails, the two publishability gates, clips as a first-class source,
+publish composer, platform preview, schedule picker, published receipt).
+
+The gallery is retained as historical record per Master Brief §0.3 — it is not
+the operative artifact for new work.
+
+Reviews of the superseding mockup:
+  DESIGN_SYSTEM_COMPLIANCE.md  — FAIL (2 blocking), both resolved and re-verified
+  MOBILE_PARITY                — 3 blocking, all resolved
+  QA_PERSONA_REVIEW_mockup_v3.md

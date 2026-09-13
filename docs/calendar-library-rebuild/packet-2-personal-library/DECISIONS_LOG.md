@@ -1148,3 +1148,47 @@ Human explicitly asked to "fix all of what was left untouched" from the prior bu
 **Scope strictly observed:** Only `src/styles/BrandosseGenerateStudio.css` was edited. No `.jsx` files under `src/components/Generate*/` or `src/components/GenerateStudio*/` were touched. No changes to `UserDashboard.jsx/.css`. Desktop behavior (≥900px) completely unaffected — the new block is inside the breakpoint guard.
 
 `docs/calendar-library-rebuild/MOCKUP_APPROVED` deleted after this fix, re-gating the hook.
+
+---
+
+**2026-09-12T00:00:00 — `qa-persona-agent`**
+**Decision:** Walked `design-mockups/library-v3.dc.html` (a distinct artifact from this packet's own `mockups/mockup-gallery.html`) against all four Master Brief §5 personas and the seven flows (A–G) given in the invoking task, and wrote the result to a **new** file, `QA_PERSONA_REVIEW_mockup_v3.md`, rather than overwriting the existing `QA_PERSONA_REVIEW_mockup.md`.
+**Reasoning:** `library-v3.dc.html` lives outside this packet's `mockups/` directory, in the repo-root `design-mockups/` folder alongside other `*-v3.dc.html` files and the design-system-v2 direction explorations — it reads as a separate, newer redesign pass, not this packet's already-reviewed Phase 2 deliverable (which already has both a passed `QA_PERSONA_REVIEW_mockup.md` and a completed `QA_PERSONA_REVIEW_build.md`, meaning that artifact already went through implementation). Master Brief §0.3 forbids deleting or retiring existing documentation without an explicit, signed-off reuse/remove recommendation; overwriting the prior mockup review with findings about a different underlying file would have destroyed a still-valid record of a still-existing file, and silently made a "the same phase was re-reviewed" claim that isn't true — the two files being reviewed are not the same artifact.
+**Also decided:** performed this as a static structural trace of the mockup's embedded `<script type="text/x-dc">` state machine rather than a live Playwright session (no browser-driving tool was available in this invocation), and cross-checked every ground-truth-dependent claim (YouTube forced-private, TikTok SELF_ONLY constraint, publish-post's post→generations media resolution, the upload/generation_id backfill) against the actual backend files before writing it down, rather than trusting the mockup's own inline comments. One claim I drafted and then discarded before publishing: I initially read the mockup's per-asset `gen` field on upload-sourced assets as contradicting `personal_assets`'s `source_fk_matches` CHECK constraint (which forbids `generation_id` on upload rows) — this would have been a serious, wrongly-attributed finding. Re-reading `supabase/migrations/20260912090000_backfill_upload_generations.sql` showed the constraint was **widened today** (2026-09-12) specifically to allow this, and that migration's own history is the real-world event the mockup's asset #8 ("Uploaded before the media-link repair") is depicting. Verified before writing, not asserted from a first read.
+**What would need to change if this turns out wrong:** if the founder confirms `library-v3.dc.html` is in fact intended to supersede/retire the packet's original gallery mockup (rather than being an independent redesign exploration), this review should be renamed to `QA_PERSONA_REVIEW_mockup.md` (replacing the old one) and the old file moved to an explicitly historical location rather than left ambiguously in place — that renaming decision belongs to a human, not to this agent, given §0.3's sign-off requirement.
+
+---
+
+## 2026-09-12 — `design-system-compliance-agent` review of `design-mockups/library-v3.dc.html`
+
+> Merged in from `DECISIONS_LOG_ADDENDUM_2026-09-12_library-v3-compliance.md`, which the
+> reviewing agent wrote as a separate file because its toolset had no append primitive and a
+> full rewrite of this 299KB protected record risked silent transcription corruption. That
+> reasoning was sound; the addendum has been folded in here verbatim in substance and the
+> separate file deleted. Placed after the same day's `qa-persona-agent` entry above purely
+> because that one was appended first — both reviews ran in parallel on 2026-09-12.
+
+**2026-09-12 — Treated `library-v3.dc.html` as a new artifact needing its own compliance pass**, not a re-skin of this packet's already-PASSED `mockups/mockup-gallery.html`.
+**Reasoning:** the two use different authoring conventions. `mockup-gallery.html` uses a `--radius-*`/`--color-*`/`--text-*` scheme local to a superseded packet-2 `tokens.css`; `library-v3.dc.html` is a `.dc.html` file mirroring `src/ui-v2/tokens.css` directly under short local aliases. The 2026-06-25 review's authority was the old packet-local token file, so its verdict cannot transfer.
+**If wrong:** the findings need no retraction either way — they are accurate about that file's contents — only their urgency would drop to zero.
+
+**2026-09-12 — Verified every token claim against primary sources** rather than trusting the mockup's own header comment ("copied from that file verbatim so this mockup cannot drift").
+**Reasoning:** consistent with every prior compliance pass in this log, which all decline a designer's self-report. The claim held for the bulk of the token block and failed in two checkable places — exactly the drift a self-report claiming perfection cannot surface.
+**Read directly:** `tokens.css`, `Button/Badge/Drawer/Dropdown/IconButton/Toast/Skeleton.module.css`, `AssetCard.module.css`, `LibraryPage.module.css`.
+
+**2026-09-12 — Split severity 2 blocking / 11 required-before-build** rather than blocking on all thirteen.
+**Reasoning:** mirrors this log's own 2026-06-25 calibration. A defect that makes a live control render genuinely wrong output — an AA-failing button label; a colour pairing with no token backing, so a future edit to the real success colour silently stops matching — blocks. A numeric drift against the primitive it mirrors (11.5px vs 12px, 400px vs 460px drawer) is real and worth fixing before the build reuses these classes, but misrepresents no colour or contrast fact.
+**If wrong:** fix cost is identical either way; only the headline count changes.
+
+**2026-09-12 — Did not flag `.tag--src`/`.tag--dur`'s hardcoded `rgba(14,15,17,.72)`/`#F5F5F4`.**
+**Reasoning:** byte-identical to the shipped `AssetCard.module.css:44-56` `.mediaBadge`, for the same reason — a badge over an arbitrary thumbnail needs fixed legible contrast because the thumbnail never re-themes. Flagging a correctly-copied precedent would enforce a different rule than "matches the existing design system".
+**If wrong:** that change belongs to the primitive first, not to this mockup.
+
+**Verdict as filed: FAIL — 2 blocking, 11 required-before-build.**
+
+**2026-09-12, orchestrator — both blocking flags resolved and re-verified.**
+- `--success-wash`/`--success-border` (which do not exist in `src/ui-v2/tokens.css` — only danger, warning and info carry wash+border pairs) removed from both theme blocks. `.tag--ready`, `.fit--yes` and `.pill--published` now derive success the way `Badge.module.css:22` already does: `color-mix(in srgb, var(--success) 15%, transparent)`, no border.
+- `.btn--danger { color:#fff }` (3.92:1 on the dark-theme danger red, below the AA floor, on the drawer's live Re-upload control) now uses `--accent-on-solid`, matching `Button.module.css`'s `.dangerSolid`.
+- Also cleared from the non-blocking list: the shimmer gradient hardcoded theme colours and was unwired (now token-derived and bound to the AI-tagging card state), `.btn--primary:hover` hardcoded a hex (now `--accent-solid-hover`), and the mono stack was untokenised (now `--font-mono`).
+- Verified by grep: no `success-wash`/`success-border` reference and no `color:#fff` remains in the file.
+**Still open, deliberately:** the primitive-mapping findings (`.chip`, `.drawer`, `.menu`, `.pill--*`, `.tag--*`, `.fit--*`, `.iconbtn`, `.btn--sm`, `.toast` should map onto the existing `src/ui-v2/primitives` rather than be re-implemented). These are build-phase instructions, not mockup defects — a mockup legitimately inlines what the build must import.
