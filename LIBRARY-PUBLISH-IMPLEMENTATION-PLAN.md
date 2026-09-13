@@ -190,7 +190,16 @@ The personal workspace is largely on design-system v2 already: `check:ui-v2-isol
 **Proven:** `npm run check:ui-consistency` drops to zero raw-colour findings in `videoEngine.css` and `calendar-engine-v2.css`, and zero missing-alt findings.
 **Guarded:** a per-path ratchet, `UI_CONSISTENCY_STRICT_PATHS=a,b`, added 2026-09-13. Flipping the whole repo strict would mean clearing 180+ findings before anything else could merge, so nobody would do it and the check would stay advisory forever. Instead, cleaned paths are enforced individually and the enforced set grows; a listed path can never regress.
 
-**Done so far in Phase 0 (2026-09-13):**
+### Phase 0 — COMPLETE, 2026-09-13
+
+Seven commits on `feat/direct-social-publishing`. Final state: **every enforceable bucket in `check:ui-consistency` is zero** — no raw colours, no generic global selectors, no missing alt, no unlabelled icon buttons, no `transition: all` — and CI enforces `UI_CONSISTENCY_STRICT_PATHS=src`, the whole tree. It began the day reporting 254 findings and exiting zero. 19 guard scripts pass; `next build` exits 0.
+
+Two real defects were found and fixed along the way, neither of which was the work being looked for:
+
+1. **The TikTok and YouTube publishing panels rendered dark surfaces in light theme.** Six `--uiv2-*` tokens were referenced and defined nowhere, each with a hardcoded dark fallback. A custom property with a fallback never errors — it silently does the wrong thing. Now guarded by `check:uiv2-tokens`.
+2. **A guard was aimed at dead code.** `check-video-prefs-contract` verified a form no route could reach, passing on every run while proving nothing. Repointed at the live form.
+
+**Detail:**
 
 | Change | Effect |
 |---|---|
@@ -199,6 +208,10 @@ The personal workspace is largely on design-system v2 already: `check:ui-v2-isol
 | Added the per-path ratchet | `UI_CONSISTENCY_STRICT_PATHS` enforces named paths while the rest still reports. Verified: exit 1 on dirty paths, 0 when clean. |
 | Deleted 20 unreachable video modules | Confirmed by transitive graph from 106 entry points, not by grep. All were git-tracked before removal. |
 | Repointed `check-video-prefs-contract` | From the unreachable `SubmitForm.jsx` to the live `NewJobSheet.jsx`. |
+| Fixed 6 undefined `--uiv2-*` tokens | TikTok/YouTube publishing panels and StudioPage painted fixed dark colours that never followed the theme. New guard `check:uiv2-tokens` prevents recurrence. |
+| Cleared Studio, Legal, VideoEngine, ConnectAccount | Real drift migrated to tokens; local palettes promoted to named tokens; intentional cases marked with an inline reason. |
+| Promoted Landing's palette | 27 new `--lp-*` tokens for the dark bands and state washes that were never tokenised — `#FFF` alone had been retyped nine times. |
+| Ratchet reached the whole tree | `UI_CONSISTENCY_STRICT_PATHS=src` in CI. 254 findings → 0 enforceable. |
 
 Total findings 254 → 189 **before** the deletion, entirely by removing false positives — that is, a third of what the check reported was noise, which is precisely why it was never made strict.
 
