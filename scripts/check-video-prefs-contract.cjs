@@ -27,7 +27,14 @@ const FIELDS = [
 
 const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 
-const form = read('src/components/video-engine/SubmitForm.jsx');
+// Repointed 2026-09-13. This read src/components/video-engine/SubmitForm.jsx,
+// which is unreachable from any route — a transitive import graph from all 106
+// Next.js entry points never reaches it. So the contract passed while proving
+// nothing about the form a user can actually open. The live submit UI is
+// NewJobSheet.jsx, reached from VideosPage via /app/video/jobs.
+// Verified at the time of the change: NewJobSheet already sends all six fields,
+// so this corrects the guard's aim without changing what it asserts.
+const form = read('src/pages/VideoEngine/components/NewJobSheet.jsx');
 const route = read('app/api/video/submit/route.ts');
 const analyze = read('video-worker/stages/analyze.py');
 const render = read('video-worker/stages/render.py');
