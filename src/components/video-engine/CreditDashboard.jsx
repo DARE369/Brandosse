@@ -5,6 +5,10 @@ import { CREDIT_PACKAGES } from "../../lib/video-engine/credit-packages";
 import { fetchCreditBalance, purchaseCredits } from "../../services/videoEngineApi";
 import CreditPackageCard from "./CreditPackageCard";
 import { EmptyState } from "../../ui-v2";
+// Route-scoped 2026-09-13. This stylesheet was @imported by app-entry.css, so it
+// shipped on every page while only the credits surface uses it — and after the
+// dead video-engine tree was removed, 95 of its 112 classes style nothing at all.
+import "./videoEngine.css";
 const transactionLabels = {
   purchase: "Purchase",
   consumption: "Used",

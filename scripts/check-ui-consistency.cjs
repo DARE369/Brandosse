@@ -7,7 +7,7 @@ const strict = process.env.UI_CONSISTENCY_STRICT === '1';
 const extensions = new Set(['.css', '.scss', '.js', '.jsx', '.ts', '.tsx']);
 
 const ignoredDirs = new Set(['node_modules', 'dist', 'build', '.git', 'coverage']);
-const maxSamples = 18;
+const maxSamples = Number(process.env.UI_CONSISTENCY_SAMPLES || 18);
 
 const findings = {
   rawColors: [],
@@ -54,7 +54,14 @@ function lineNumberFor(source, index) {
 
 function isAllowedRawColor(line, file) {
   const normalized = `${rel(file)} ${line}`.toLowerCase();
+  // A token source file is where raw colour is SUPPOSED to live — that is what
+  // makes it the single definition point. src/styles/tokens.css was allowlisted
+  // for exactly this reason; src/ui-v2/tokens.css is the canonical source for
+  // design-system v2 and was not, so the locked design system was reporting 62
+  // findings against itself. Flagging the definition alongside the misuse is
+  // what buries the real signal.
   if (rel(file) === 'src/styles/tokens.css') return true;
+  if (rel(file) === 'src/ui-v2/tokens.css') return true;
 
   return [
     'platform',
@@ -125,12 +132,23 @@ function scanFile(file) {
     }
   });
 
-  const imgRegex = /<img\b[^>]*>/g;
+  // Requires whitespace after the tag name, so a bare `<img>` written inside
+  // prose is not treated as markup. Without this the checker reported three
+  // "missing alt" failures in src/calendar/** that were all the literal string
+  // "<img>" inside code comments explaining a past fix — every real <img> in
+  // those files already carried alt. False positives are what stop a check
+  // being made strict, so this is a prerequisite for enforcing it.
+  const imgRegex = /<img\b\s[^>]*>/g;
+  const sourceLines = source.split(/\r?\n/);
   let match;
   while ((match = imgRegex.exec(source))) {
     const tag = match[0];
+    const lineNumber = lineNumberFor(source, match.index);
+    const lineText = sourceLines[lineNumber - 1] || '';
+    // Belt and braces: skip anything sitting on a comment line.
+    if (/^\s*(\/\/|\*|\/\*)/.test(lineText)) continue;
     if (!/\salt=/.test(tag)) {
-      addFinding('missingAlt', file, lineNumberFor(source, match.index), tag, 'Images need alt text. Use alt="" only for decorative images.');
+      addFinding('missingAlt', file, lineNumber, tag, 'Images need alt text. Use alt="" only for decorative images.');
     }
   }
 }
@@ -158,11 +176,43 @@ printBucket('Possibly unlabeled icon buttons', findings.unlabeledIconButtons);
 const total = Object.values(findings).reduce((sum, list) => sum + list.length, 0);
 console.log(`\nTotal findings: ${total}`);
 
+// ── Ratchet ──────────────────────────────────────────────────────────────────
+// Flipping the whole repo strict in one move would mean fixing 180+ findings
+// before anything else could merge, so nobody would do it and the check would
+// stay advisory forever. Instead, paths that have been cleaned are enforced
+// individually and the enforced set grows. A file listed here can never
+// regress; everything else still reports.
+const strictPaths = (process.env.UI_CONSISTENCY_STRICT_PATHS || '')
+  .split(',')
+  .map((p) => p.trim())
+  .filter(Boolean);
+
+if (strictPaths.length > 0) {
+  const violations = Object.values(findings)
+    .flat()
+    .filter((item) => strictPaths.some((prefix) => item.file === prefix || item.file.startsWith(prefix)));
+
+  console.log(`\nEnforced paths (${strictPaths.length}): ${strictPaths.join(', ')}`);
+
+  if (violations.length > 0) {
+    console.error(`\nUI consistency check FAILED: ${violations.length} finding(s) in enforced paths.`);
+    for (const v of violations.slice(0, maxSamples)) {
+      console.error(`  ${v.file}:${v.lineNumber} - ${v.note}`);
+      console.error(`    ${v.line}`);
+    }
+    process.exit(1);
+  }
+  console.log('  clean — no findings in any enforced path.');
+}
+
 if (strict && total > 0) {
   console.error('UI consistency check failed in strict mode.');
   process.exit(1);
 }
 
 if (!strict && total > 0) {
-  console.log('Non-strict mode: findings are reported without failing. Use UI_CONSISTENCY_STRICT=1 to enforce.');
+  console.log(
+    'Non-strict mode: findings outside enforced paths are reported without failing. '
+    + 'Use UI_CONSISTENCY_STRICT_PATHS=a,b to enforce specific paths, or UI_CONSISTENCY_STRICT=1 for everything.'
+  );
 }

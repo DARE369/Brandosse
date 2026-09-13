@@ -857,7 +857,7 @@
 }
 
 .post-row-wrap.is-selected {
-  background: var(--color-surface-hover, rgba(127, 127, 127, 0.08));
+  background: var(--uiv2-bg-elevated);
   border-radius: var(--radius-md, 8px);
 }
 
@@ -870,7 +870,7 @@
   margin-inline-start: var(--space-2);
   padding: 12px;
   cursor: pointer;
-  accent-color: var(--color-accent, #eb3514);
+  accent-color: var(--uiv2-accent-solid);
 }
 
 /* Sticks to the bottom so it stays reachable in a long agenda without
@@ -896,7 +896,7 @@
 }
 
 .agenda-bulkbar__danger {
-  color: var(--color-danger, #d92d20);
+  color: var(--uiv2-danger);
 }
 
 /* ── Quick Post platform hints ──────────────────────────────────────────────
@@ -908,11 +908,11 @@
   margin: 0 0 10px;
   font-size: 13px;
   line-height: 1.45;
-  color: var(--text-secondary, #6b7280);
+  color: var(--uiv2-text-secondary);
 }
 
 .quickpost-hint--error {
-  color: var(--danger, #b42318);
+  color: var(--uiv2-danger);
 }
 
 /* ── Quick Post: YouTube audience declaration ───────────────────────────────
@@ -921,7 +921,7 @@
 .quickpost-yt-audience {
   margin: 12px 0 4px;
   padding: 12px;
-  border: 1px solid var(--border-subtle, #e5e7eb);
+  border: 1px solid var(--uiv2-border);
   border-radius: 10px;
 }
 
@@ -938,9 +938,9 @@
   margin: 0 0 10px;
   font-size: 13px;
   line-height: 1.45;
-  color: var(--text-secondary, #6b7280);
+  color: var(--uiv2-text-secondary);
 }
 
 .quickpost-hint--error {
-  color: var(--danger, #b42318);
+  color: var(--uiv2-danger);
 }

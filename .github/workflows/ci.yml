@@ -135,6 +135,14 @@ jobs:
       - name: check-docs-canonical
         run: node scripts/check-docs-canonical.cjs
       - name: check-ui-consistency
+        # Ratchet, added 2026-09-13. Flipping the whole repo strict would mean
+        # clearing 149 findings before anything else could merge, so it would
+        # never happen and this check would stay advisory forever. These paths
+        # are clean TODAY and may never regress; everything else still reports
+        # without failing. Add a path here the moment it is cleared — that is
+        # the whole mechanism.
+        env:
+          UI_CONSISTENCY_STRICT_PATHS: src/components/video-engine,src/calendar,src/pages/AnalyticsPage,src/services,src/hooks,src/ui-v2/tokens.css
         run: node scripts/check-ui-consistency.cjs
       # The six published legal documents: no template placeholder or draft
       # banner reaches production, every incorporation by reference resolves,
