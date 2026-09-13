@@ -76,7 +76,7 @@ export default function StudioLightbox({ generation, index, count, onClose, onPr
                 <span
                   className={styles.shotTag}
                   title={(quality.flags || []).join(" · ") || "Quality score"}
-                  style={{ color: quality.verdict === "fail" ? "#e06a5a" : quality.verdict === "warn" ? "#d6a53a" : undefined }}
+                  style={{ color: quality.verdict === "fail" ? "var(--uiv2-danger)" : quality.verdict === "warn" ? "var(--uiv2-warning)" : undefined }}
                 >
                   quality {quality.quality_score}
                 </span>

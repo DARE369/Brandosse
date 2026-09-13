@@ -62,7 +62,7 @@ function QualityFlag({ quality }) {
         display: "inline-flex", alignItems: "center", gap: 4,
         padding: "2px 7px", borderRadius: 999, fontSize: 10.5, fontWeight: 600,
         fontFamily: "var(--uiv2-font-mono)",
-        background: isFail ? "var(--uiv2-danger, #c0392b)" : "var(--uiv2-warning, #b98900)",
+        background: isFail ? "var(--uiv2-danger)" : "var(--uiv2-warning)",
         color: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
       }}
     >
@@ -1216,7 +1216,7 @@ function StudioBody({ brandKit }) {
                 <div className={styles.videoJobHead}>
                   <span style={{ fontSize: 12.5, fontWeight: 500 }}>{(job.prompt || "Video job").slice(0, 40)}</span>
                   <span style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--uiv2-font-mono)", fontSize: 10.5, color: job.status === "failed" ? "var(--uiv2-danger)" : "var(--uiv2-warning)" }}>
-                    <span className={styles.statusDot} style={{ background: job.status === "completed" ? "var(--uiv2-success, #2a9d5c)" : job.status === "failed" ? "var(--uiv2-danger)" : "var(--uiv2-warning)" }} />
+                    <span className={styles.statusDot} style={{ background: job.status === "completed" ? "var(--uiv2-success)" : job.status === "failed" ? "var(--uiv2-danger)" : "var(--uiv2-warning)" }} />
                     {job.status}
                   </span>
                 </div>
@@ -1491,7 +1491,7 @@ function StudioBody({ brandKit }) {
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{slide.headline}</span>
-                  {slide.purpose && <span style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--uiv2-accent-solid, #d97757)" }}>{slide.purpose}</span>}
+                  {slide.purpose && <span style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--uiv2-accent-solid)" }}>{slide.purpose}</span>}
                 </div>
                 {slide.body && <div style={{ fontSize: 12, color: "var(--uiv2-text-secondary)", marginTop: 3 }}>{slide.body}</div>}
               </div>
@@ -2189,6 +2189,7 @@ function StudioBody({ brandKit }) {
                             position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 3,
                             display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                             padding: "7px 10px", border: "none", cursor: "pointer",
+                            // ui-consistency-allow: label on the solid danger gradient below, not a themed surface.
                             fontSize: 11.5, fontWeight: 600, color: "#fff",
                             background: "linear-gradient(to top, rgba(192,57,43,0.96), rgba(192,57,43,0.82))",
                           }}

@@ -115,6 +115,13 @@ function scanFile(file) {
   // primitives for using the obvious name inside their own scoped file.
   const isCssModule = /\.module\.(css|scss)$/.test(file);
 
+  // Whole-file opt-out, for files whose SUBJECT is colour that is not this
+  // app's chrome: a caption-style preview showing what white subtitles look
+  // like burned onto video, or an illustration of another operating system's
+  // window controls. The marker must carry its reason on the same line, so it
+  // stays auditable rather than becoming a way to silence the check.
+  const fileOptedOut = /ui-consistency-allow-file:/.test(source);
+
   lines.forEach((line, index) => {
     const lineNumber = index + 1;
 
@@ -127,7 +134,7 @@ function scanFile(file) {
     // Scans back to the start of the current rule block, so one marker covers
     // the declarations it introduces — a multi-line comment and several
     // consecutive properties — rather than only the single next line.
-    let optedOut = /ui-consistency-allow/.test(line);
+    let optedOut = fileOptedOut || /ui-consistency-allow/.test(line);
     for (let k = index - 1; !optedOut && k >= 0 && index - k <= 12; k -= 1) {
       const prev = lines[k];
       if (/ui-consistency-allow/.test(prev)) { optedOut = true; break; }

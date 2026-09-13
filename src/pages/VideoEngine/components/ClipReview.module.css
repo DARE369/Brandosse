@@ -133,6 +133,7 @@
   font-family: var(--uiv2-font-mono);
   font-size: var(--uiv2-text-2xs);
   color: var(--uiv2-text-primary);
+  /* ui-consistency-allow: over an arbitrary video frame. */
   background: rgba(14, 15, 17, 0.72);
   border-radius: var(--uiv2-radius-xs);
   padding: 2px 6px;
@@ -187,6 +188,7 @@
 .kbd {
   font-family: var(--uiv2-font-mono);
   font-size: 12px;
+  /* ui-consistency-allow: over an arbitrary video frame. */
   background: rgba(0, 0, 0, 0.16);
   border-radius: var(--uiv2-radius-xs);
   padding: 1px 5px;

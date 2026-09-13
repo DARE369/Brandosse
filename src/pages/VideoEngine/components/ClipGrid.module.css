@@ -67,6 +67,7 @@
   position: absolute;
   font-family: var(--uiv2-font-mono);
   font-size: var(--uiv2-text-2xs);
+  /* ui-consistency-allow: over an arbitrary video frame. */
   background: rgba(14, 15, 17, 0.75);
   border-radius: var(--uiv2-radius-xs);
   padding: 2px 6px;

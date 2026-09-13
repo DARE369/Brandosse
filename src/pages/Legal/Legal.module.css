@@ -42,6 +42,12 @@
   --faint: #a3a6ab;
 
   --accent: #ff5c38;
+  --accent-link-hover: #b5300f;
+  --accent-underline: rgba(217, 64, 28, 0.4);
+  --accent-mark: rgba(255, 92, 56, 0.22);
+  --accent-wash: #fdf3f0;
+  --paper-veil: rgba(251, 250, 248, 0.92);
+  --callout-rule: #2f4f43;
   --accent-ink: #d9401c; /* ember on white, at text contrast */
 
   --display: "Space Grotesk", "Inter", system-ui, sans-serif;
@@ -67,7 +73,7 @@
 }
 
 .page ::selection {
-  background: rgba(255, 92, 56, 0.22);
+  background: var(--accent-mark);
   color: var(--ink);
 }
 
@@ -75,7 +81,7 @@
 
 .topbar {
   border-bottom: 1px solid var(--line);
-  background: rgba(251, 250, 248, 0.92);
+  background: var(--paper-veil);
   backdrop-filter: saturate(1.4) blur(8px);
   position: sticky;
   top: 0;
@@ -285,7 +291,7 @@
 /* ── Callout ──────────────────────────────────────────────────────────────── */
 
 .callout {
-  border-left: 2px solid #2f4f43;
+  border-left: 2px solid var(--callout-rule);
   background: var(--paper-2);
   padding: 16px 18px;
   margin: 0 0 30px;
@@ -312,7 +318,7 @@
 /* A callout that warns rather than summarises. */
 .calloutStrict {
   border-left-color: var(--accent);
-  background: #fdf3f0;
+  background: var(--accent-wash);
 }
 
 /* ── Inline contents (mobile / tablet) ────────────────────────────────────── */
@@ -443,11 +449,11 @@
   text-decoration: underline;
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
-  text-decoration-color: rgba(217, 64, 28, 0.4);
+  text-decoration-color: var(--accent-underline);
 }
 
 .doc a:hover {
-  color: #b5300f;
+  color: var(--accent-link-hover);
   text-decoration-color: currentColor;
 }
 
@@ -727,6 +733,7 @@
    keep the document, and stop clauses breaking across pages mid-heading. */
 @media print {
   .page {
+    /* ui-consistency-allow: print stylesheet. Paper is white. */
     background: #fff;
     font-size: 10.5pt;
   }

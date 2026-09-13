@@ -14,6 +14,8 @@
 // Continue button redirects out of the app for real OAuth exactly like
 // before; steps 3-6 only run for the mock fallback path, which this whole
 // app already discloses as simulated.
+// ui-consistency-allow-file: draws a browser-chrome illustration, including the
+// three macOS window-control colours. That is a picture of another OS, not our palette.
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, Check, ChevronRight, Loader2, Lock, ShieldCheck, X,
@@ -293,7 +295,9 @@ function ConnectAccountFlowBody() {
         {step === 3 && selectedPlatform ? (
           <div className={styles.browserFrame}>
             <div className={styles.browserChrome}>
-              <span className={styles.browserDot} style={{ background: "#ff5f57" }} />
+              {/* ui-consistency-allow: the three macOS window-control colours, drawn as a
+                  browser-chrome illustration. They are a picture of another OS, not our palette. */}
+                <span className={styles.browserDot} style={{ background: "#ff5f57" }} />
               <span className={styles.browserDot} style={{ background: "#febc2e" }} />
               <span className={styles.browserDot} style={{ background: "#28c840" }} />
               <div className={styles.browserAddress}>

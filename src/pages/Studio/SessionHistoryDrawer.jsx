@@ -5,6 +5,8 @@ import { Plus, Pencil, Search, ChevronDown, ArrowUp, ArrowDown, Check } from "lu
 import { Drawer, EmptyState, Button, Skeleton } from "../../ui-v2";
 import styles from "./SessionHistoryDrawer.module.css";
 
+// ui-consistency-allow: a user-pickable palette for project folders. These are
+// content, not chrome — the user chooses one and it must stay that colour.
 const PROJECT_COLORS = ["#7C5CFC", "#FF4D2E", "#1C7A5A", "#C77F12", "#2563EB", "#9333EA", "#0891B2", "#059669"];
 const EXPANDED_STORAGE_KEY = "studio-session-drawer-expanded";
 const GENERAL_KEY = "__general__";
@@ -299,7 +301,8 @@ export default function SessionHistoryDrawer({
                 onClick={() => setNewProjectColor(c)}
                 aria-label={`Use color ${c}`}
               >
-                {newProjectColor === c && <Check size={12} color="#fff" />}
+                {/* ui-consistency-allow: tick on the user-chosen swatch colour above. */}
+              {newProjectColor === c && <Check size={12} color="#fff" />}
               </button>
             ))}
           </div>

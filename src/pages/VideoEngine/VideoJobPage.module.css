@@ -432,8 +432,8 @@
   align-items: center;
   gap: var(--uiv2-space-3);
   padding: var(--uiv2-space-3) var(--uiv2-space-4);
-  border: 1px solid rgba(48, 164, 108, 0.35);
-  background: rgba(48, 164, 108, 0.06);
+  border: 1px solid color-mix(in srgb, var(--uiv2-success) 35%, transparent);
+  background: color-mix(in srgb, var(--uiv2-success) 6%, transparent);
   border-radius: var(--uiv2-radius-md);
 }
 

@@ -148,7 +148,7 @@ jobs:
         # without failing. Add a path here the moment it is cleared — that is
         # the whole mechanism.
         env:
-          UI_CONSISTENCY_STRICT_PATHS: src/ui-v2,src/pages/Library,src/calendar,src/components/video-engine,src/pages/AnalyticsPage,src/pages/Onboarding,src/pages/Billing,src/pages/HelpPage,src/services,src/hooks,src/utils,src/constants,src/Context
+          UI_CONSISTENCY_STRICT_PATHS: src/ui-v2,src/components,src/calendar,src/org,src/admin,src/styles,src/next,src/services,src/hooks,src/utils,src/constants,src/Context,src/pages/Library,src/pages/Studio,src/pages/VideoEngine,src/pages/Legal,src/pages/ConnectAccount,src/pages/AnalyticsPage,src/pages/Onboarding,src/pages/Billing,src/pages/HelpPage
         run: node scripts/check-ui-consistency.cjs
       # The six published legal documents: no template placeholder or draft
       # banner reaches production, every incorporation by reference resolves,

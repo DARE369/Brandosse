@@ -1,3 +1,6 @@
+/* ui-consistency-allow-file: caption PREVIEW samples. These render what a subtitle
+   will look like burned onto video — white-on-video is the subject being
+   previewed, not this app's chrome, and must not follow the app theme. */
 /* CaptionStylePicker — six treatments, each showing what it does.
    The animations are CSS approximations of the encoder's output: enough to
    choose between six options, not a frame-exact render. */
@@ -139,6 +142,7 @@
   .demo {
     animation: none !important;
   }
-  .animKaraoke { color: #ffffff; }
+  /* ui-consistency-allow */
+.animKaraoke { color: #ffffff; }
   .animColour { color: var(--uiv2-accent-solid); }
 }
