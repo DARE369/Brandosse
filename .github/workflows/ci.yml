@@ -134,6 +134,12 @@ jobs:
         run: node scripts/check-production-workflow.cjs
       - name: check-docs-canonical
         run: node scripts/check-docs-canonical.cjs
+      - name: check-uiv2-token-definitions
+        # A --uiv2-* token that is never defined does not error — the fallback
+        # wins forever and the element stops following the theme. Six were live
+        # on 2026-09-13, four of them in the TikTok and YouTube publishing
+        # panels, all with dark fallbacks that painted black on a light page.
+        run: node scripts/check-uiv2-token-definitions.cjs
       - name: check-ui-consistency
         # Ratchet, added 2026-09-13. Flipping the whole repo strict would mean
         # clearing 149 findings before anything else could merge, so it would
@@ -142,7 +148,7 @@ jobs:
         # without failing. Add a path here the moment it is cleared — that is
         # the whole mechanism.
         env:
-          UI_CONSISTENCY_STRICT_PATHS: src/components/video-engine,src/calendar,src/pages/AnalyticsPage,src/services,src/hooks,src/ui-v2/tokens.css
+          UI_CONSISTENCY_STRICT_PATHS: src/ui-v2,src/pages/Library,src/calendar,src/components/video-engine,src/pages/AnalyticsPage,src/pages/Onboarding,src/pages/Billing,src/pages/HelpPage,src/services,src/hooks,src/utils,src/constants,src/Context
         run: node scripts/check-ui-consistency.cjs
       # The six published legal documents: no template placeholder or draft
       # banner reaches production, every incorporation by reference resolves,

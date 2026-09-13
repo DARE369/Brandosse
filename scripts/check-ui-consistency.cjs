@@ -11,6 +11,7 @@ const maxSamples = Number(process.env.UI_CONSISTENCY_SAMPLES || 18);
 
 const findings = {
   rawColors: [],
+  tokenDefinitions: [],
   genericGlobals: [],
   transitionAll: [],
   missingAlt: [],
@@ -108,18 +109,51 @@ function scanFile(file) {
   const source = fs.readFileSync(file, 'utf8');
   const lines = source.split(/\r?\n/);
 
+  // CSS Modules hash every class name at build time, so a class called `.card`
+  // in Badge.module.css is not a global selector and cannot collide with
+  // anything. The generic-global rule was flagging the design system's own
+  // primitives for using the obvious name inside their own scoped file.
+  const isCssModule = /\.module\.(css|scss)$/.test(file);
+
   lines.forEach((line, index) => {
     const lineNumber = index + 1;
 
-    if (/(^|[^-\w])#[0-9a-fA-F]{3,8}\b|rgba?\s*\(/.test(line) && !isAllowedRawColor(line, file)) {
-      addFinding('rawColors', file, lineNumber, line, 'Prefer canonical CSS tokens over raw colors.');
+    // A colour named in prose is documentation, not a style declaration.
+    const isComment = /^\s*(\/\/|\*|\/\*|<!--)/.test(line);
+    // Explicit, auditable opt-out for the cases that are genuinely correct —
+    // e.g. a scrim over an arbitrary thumbnail, which must hold its contrast
+    // because the image behind it never re-themes. Deliberately per-line and
+    // self-documenting, rather than widening the category allowlist.
+    // Scans back to the start of the current rule block, so one marker covers
+    // the declarations it introduces — a multi-line comment and several
+    // consecutive properties — rather than only the single next line.
+    let optedOut = /ui-consistency-allow/.test(line);
+    for (let k = index - 1; !optedOut && k >= 0 && index - k <= 12; k -= 1) {
+      const prev = lines[k];
+      if (/ui-consistency-allow/.test(prev)) { optedOut = true; break; }
+      if (/[{}]\s*$/.test(prev) || prev.trim() === '') break;
+    }
+
+    if (!isComment && !optedOut
+      && (/(^|[^-\w])#[0-9a-fA-F]{3,8}\b|rgba?\s*\(/.test(line)) && !isAllowedRawColor(line, file)) {
+      // Defining a colour and hardcoding one at the point of use are opposite
+      // things, and lumping them together is what buried the signal here.
+      // `--lp-accent: #FF5C38;` is a token definition — the thing we WANT, and
+      // the only place a literal may live. `color: #FF5C38;` is the defect.
+      // Definitions are reported in their own bucket so an ad-hoc local palette
+      // is still visible, but they never block the ratchet.
+      if (/^\s*--[\w-]+\s*:/.test(line)) {
+        addFinding('tokenDefinitions', file, lineNumber, line, 'Custom property defined with a literal colour — fine in a token source, drift anywhere else.');
+      } else {
+        addFinding('rawColors', file, lineNumber, line, 'Prefer canonical CSS tokens over raw colors.');
+      }
     }
 
     if (/transition\s*:\s*all\b/.test(line)) {
       addFinding('transitionAll', file, lineNumber, line, 'Use explicit transition properties.');
     }
 
-    if ((ext === '.css' || ext === '.scss') && /^\.(card|badge|btn-primary|btn-secondary|btn-danger|modal-overlay|status-badge|empty-state)(?=$|[\s.{:#,[>])/.test(line)) {
+    if ((ext === '.css' || ext === '.scss') && !isCssModule && /^\.(card|badge|btn-primary|btn-secondary|btn-danger|modal-overlay|status-badge|empty-state)(?=$|[\s.{:#,[>])/.test(line)) {
       addFinding('genericGlobals', file, lineNumber, line, 'Scope legacy component classes or migrate to shared ui primitives.');
     }
 
@@ -168,6 +202,7 @@ for (const file of walk(srcDir)) scanFile(file);
 
 console.log('UI consistency guardrail report');
 printBucket('Raw color candidates', findings.rawColors);
+printBucket('Token definitions with literal colours (advisory)', findings.tokenDefinitions);
 printBucket('Generic global class selectors', findings.genericGlobals);
 printBucket('transition: all declarations', findings.transitionAll);
 printBucket('Images missing alt', findings.missingAlt);
@@ -188,7 +223,14 @@ const strictPaths = (process.env.UI_CONSISTENCY_STRICT_PATHS || '')
   .filter(Boolean);
 
 if (strictPaths.length > 0) {
-  const violations = Object.values(findings)
+  // tokenDefinitions is advisory by design: a file that defines its own palette
+  // (LandingPage.css and its --lp-* namespace, for instance) is doing the right
+  // thing, and must not be blocked for it. Every other bucket is enforced.
+  const enforcedBuckets = Object.entries(findings)
+    .filter(([name]) => name !== 'tokenDefinitions')
+    .map(([, list]) => list);
+
+  const violations = enforcedBuckets
     .flat()
     .filter((item) => strictPaths.some((prefix) => item.file === prefix || item.file.startsWith(prefix)));
 

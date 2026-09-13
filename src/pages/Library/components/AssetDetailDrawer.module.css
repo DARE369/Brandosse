@@ -26,6 +26,9 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
+  /* ui-consistency-allow: letterbox behind object-fit:contain media. Black is
+     the neutral for pillarboxing in both themes; a themed surface would tint
+     the bars against the image. */
   background: #000;
 }
 

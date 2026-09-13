@@ -21,7 +21,7 @@
   padding: 10px 16px;
   border-radius: 0 0 var(--uiv2-radius-md, 8px) 0;
   background: var(--uiv2-accent-solid);
-  color: var(--uiv2-accent-on-solid, #fff);
+  color: var(--uiv2-accent-on-solid);
   font-family: var(--uiv2-font-display), system-ui, sans-serif;
   font-size: var(--uiv2-text-sm);
   font-weight: 600;

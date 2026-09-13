@@ -51,6 +51,9 @@
   letter-spacing: 0.04em;
   padding: 3px 7px;
   border-radius: 5px;
+  /* ui-consistency-allow: fixed scrim over an arbitrary thumbnail. The image
+     behind this badge never re-themes, so the badge must not either or it
+     becomes unreadable on half the library. */
   background: rgba(14, 15, 17, 0.72);
   color: #F5F5F4;
   backdrop-filter: blur(3px);
@@ -97,11 +100,13 @@
   width: 22px;
   height: 22px;
   border-radius: 6px;
+  /* ui-consistency-allow: same fixed scrim, over arbitrary media. */
   border: 1.5px solid rgba(245, 245, 244, 0.55);
   background: rgba(14, 15, 17, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
+  /* ui-consistency-allow: sits on the fixed scrim above, not on a themed surface. */
   color: #fff;
   pointer-events: none;
 }
