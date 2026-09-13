@@ -1418,6 +1418,8 @@ const useSessionStore = create((set, get) => ({
     }
   },
 
+  // ui-consistency-allow: default swatch for a new project folder. This is the
+  // user's content colour, picked from PROJECT_COLORS, not app chrome.
   createProject: async (name, color = '#7C5CFC') => {
     try {
       const { data: { user } } = await supabase.auth.getUser();

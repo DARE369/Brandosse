@@ -217,8 +217,8 @@ function DashboardBody() {
                     aria-hidden="true"
                     style={{
                       width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                      border: `1.5px solid ${item.done ? "var(--uiv2-success, #2a9d5c)" : "var(--uiv2-border-strong)"}`,
-                      background: item.done ? "var(--uiv2-success, #2a9d5c)" : "transparent",
+                      border: `1.5px solid ${item.done ? "var(--uiv2-success)" : "var(--uiv2-border-strong)"}`,
+                      background: item.done ? "var(--uiv2-success)" : "transparent",
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}
                   >

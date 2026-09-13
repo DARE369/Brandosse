@@ -141,14 +141,19 @@ jobs:
         # panels, all with dark fallbacks that painted black on a light page.
         run: node scripts/check-uiv2-token-definitions.cjs
       - name: check-ui-consistency
-        # Ratchet, added 2026-09-13. Flipping the whole repo strict would mean
-        # clearing 149 findings before anything else could merge, so it would
-        # never happen and this check would stay advisory forever. These paths
-        # are clean TODAY and may never regress; everything else still reports
-        # without failing. Add a path here the moment it is cleared — that is
-        # the whole mechanism.
+        # The ratchet reached the top on 2026-09-13: the whole src/ tree is
+        # enforced. It started at 254 reported-but-ignored findings and six
+        # cleared paths; every enforceable bucket is now zero — no raw colours,
+        # no generic global selectors, no missing alt, no unlabelled icon
+        # buttons. Token DEFINITIONS stay advisory by design: defining a colour
+        # in a palette is the thing we want, and only using a literal at the
+        # point of use is the defect.
+        #
+        # If this fails, it found something real. Fix it rather than narrowing
+        # the path list — a check that reports and passes anyway is the failure
+        # mode this replaced.
         env:
-          UI_CONSISTENCY_STRICT_PATHS: src/ui-v2,src/components,src/calendar,src/org,src/admin,src/styles,src/next,src/services,src/hooks,src/utils,src/constants,src/Context,src/pages/Library,src/pages/Studio,src/pages/VideoEngine,src/pages/Legal,src/pages/ConnectAccount,src/pages/AnalyticsPage,src/pages/Onboarding,src/pages/Billing,src/pages/HelpPage
+          UI_CONSISTENCY_STRICT_PATHS: src
         run: node scripts/check-ui-consistency.cjs
       # The six published legal documents: no template placeholder or draft
       # banner reaches production, every incorporation by reference resolves,

@@ -610,6 +610,7 @@ export default function LandingPage() {
                 tagline and voice, and lets you accept or edit each one. Every generation reads from it afterwards.
               </p>
               <div className="lp-swatches">
+                {/* ui-consistency-allow: a picture of an extracted brand kit; these squares ARE the colours shown, not chrome. */}
                 <span style={{ background: "#FF5C38" }} />
                 <span style={{ background: "#17181B" }} />
                 <span style={{ background: "#2F8F5B" }} />

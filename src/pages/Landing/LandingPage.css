@@ -32,6 +32,39 @@
   --lp-warn: #8A5602;
   --lp-bad: #C42C31;
 
+
+  /* Promoted 2026-09-13 from literals scattered through this file. The
+     original --lp-* block covered the paper surfaces only; the dark bands and
+     the state washes were never tokenised, so the same colour was retyped in
+     up to nine places. */
+  --lp-on-dark: #FFF; /* text and marks on the dark bands */
+  --lp-on-dark-wash: rgba(255, 255, 255, 0.16);
+  --lp-dark-line: #2E3136; /* rules inside the dark bands */
+  --lp-dark-muted: #9A9DA3;
+  --lp-dark-muted-2: #B9BCC2;
+  --lp-dark-faint: #85888E;
+  --lp-accent-soft: #FF8A6B; /* accent lifted for dark grounds */
+  --lp-accent-softer: #FFB49B;
+  --lp-accent-deep: #B5300F;
+  --lp-accent-wash: rgba(255, 92, 56, 0.12);
+  --lp-accent-mark: rgba(255, 92, 56, 0.22);
+  --lp-accent-ring: rgba(255, 92, 56, 0.4);
+  --lp-accent-soft-ring: rgba(255, 138, 107, 0.45);
+  --lp-paper-3: #F7F5F2;
+  --lp-paper-4: #F5F3EF;
+  --lp-paper-5: #F1EEE9;
+  --lp-paper-6: #EDEBE6;
+  --lp-paper-veil: rgba(251, 250, 248, 0.88);
+  --lp-line-2: #DCD7CE;
+  --lp-good-2: #2F8F5B;
+  --lp-good-soft: #5BB98B;
+  --lp-good-wash: rgba(47, 143, 91, 0.1);
+  --lp-warn-2: #B87503;
+  --lp-warn-soft: #FFB224;
+  --lp-warn-wash: rgba(184, 117, 3, 0.1);
+  --lp-bad-ring: rgba(196, 44, 49, 0.35);
+  --lp-bad-wash: rgba(196, 44, 49, 0.05);
+
   --lp-display: "Space Grotesk", "Inter", system-ui, sans-serif;
   --lp-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --lp-mono: "JetBrains Mono", "Fira Code", monospace;
@@ -52,10 +85,10 @@
 .lp-root *::before,
 .lp-root *::after { box-sizing: border-box; }
 
-.lp-root ::selection { background: rgba(255, 92, 56, 0.22); }
+.lp-root ::selection { background: var(--lp-accent-mark); }
 
 .lp-root a { color: var(--lp-accent-ink); text-decoration: none; }
-.lp-root a:hover { color: #B5300F; }
+.lp-root a:hover { color: var(--lp-accent-deep); }
 
 .lp-root img { display: block; max-width: 100%; }
 
@@ -73,15 +106,15 @@
 
 .lp-root .lp-brand { color: var(--lp-ink); }
 .lp-root .lp-btn-accent { color: var(--lp-accent-on); }
-.lp-root .lp-btn-dark { color: #FFF; }
+.lp-root .lp-btn-dark { color: var(--lp-on-dark); }
 .lp-root .lp-btn-outline { color: var(--lp-ink); }
 
 .lp-dark h2,
 .lp-dark h3,
 .lp-dark .lp-h2,
-.lp-dark .lp-h3 { color: #F5F3EF; }
+.lp-dark .lp-h3 { color: var(--lp-paper-4); }
 
-.lp-float-credits strong { color: #FFF; }
+.lp-float-credits strong { color: var(--lp-on-dark); }
 
 /* Photography sits on a tinted block, so a slow or blocked remote image reads
    as part of the design rather than as a hole in the page. */
@@ -183,7 +216,7 @@
 .lp-pane-label,
 .lp-costs-label { color: var(--lp-faint); margin-bottom: 0; }
 
-.lp-eyebrow-light { color: #FF8A6B; }
+.lp-eyebrow-light { color: var(--lp-accent-soft); }
 
 .lp-quiet { color: var(--lp-muted); font-size: 13px; }
 
@@ -216,8 +249,8 @@
 }
 .lp-btn-accent:hover { background: var(--lp-accent-press); color: var(--lp-accent-on); }
 
-.lp-btn-dark { background: var(--lp-ink); color: #FFF; }
-.lp-btn-dark:hover { background: #2C2E33; color: #FFF; }
+.lp-btn-dark { background: var(--lp-ink); color: var(--lp-on-dark); }
+.lp-btn-dark:hover { background: var(--lp-ink-2); color: var(--lp-on-dark); }
 
 .lp-btn-outline {
   background: var(--lp-card);
@@ -231,7 +264,7 @@
   font-family: var(--lp-mono);
   font-size: 10.5px;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--lp-on-dark-wash);
   border-radius: 4px;
   padding: 1px 5px;
 }
@@ -253,21 +286,21 @@
   flex-wrap: wrap;
   padding: 9px 40px 9px 16px;
   background: var(--lp-ink);
-  color: #EDEBE6;
+  color: var(--lp-paper-6);
   font-size: 12.5px;
   text-align: center;
   position: relative;
 }
 
-.lp-banner a { color: #FF8A6B; font-weight: 600; }
-.lp-banner a:hover { color: #FFB49B; }
+.lp-banner a { color: var(--lp-accent-soft); font-weight: 600; }
+.lp-banner a:hover { color: var(--lp-accent-softer); }
 
 .lp-banner-tag {
   font-family: var(--lp-mono);
   font-size: 9.5px;
   letter-spacing: 0.1em;
-  color: #FF8A6B;
-  border: 1px solid rgba(255, 138, 107, 0.45);
+  color: var(--lp-accent-soft);
+  border: 1px solid var(--lp-accent-soft-ring);
   border-radius: 4px;
   padding: 2px 5px;
 }
@@ -279,12 +312,12 @@
   transform: translateY(-50%);
   background: transparent;
   border: none;
-  color: #9A9DA3;
+  color: var(--lp-dark-muted);
   font-size: 12px;
   cursor: pointer;
   padding: 4px 6px;
 }
-.lp-banner-close:hover { color: #FFF; }
+.lp-banner-close:hover { color: var(--lp-on-dark); }
 
 .lp-header {
   position: sticky;
@@ -295,7 +328,7 @@
   align-items: center;
   gap: clamp(12px, 2vw, 26px);
   padding: 0 var(--lp-pad);
-  background: rgba(251, 250, 248, 0.88);
+  background: var(--lp-paper-veil);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid transparent;
   transition: border-color 160ms ease;
@@ -334,7 +367,7 @@
   padding: 7px 12px;
   border-radius: 6px;
 }
-.lp-nav a:hover { color: var(--lp-ink); background: #F1EEE9; }
+.lp-nav a:hover { color: var(--lp-ink); background: var(--lp-paper-5); }
 
 .lp-header-cta {
   margin-left: auto;
@@ -349,7 +382,7 @@
   font-weight: 500;
   font-size: 13px;
 }
-.lp-header-cta .lp-quiet:hover { color: var(--lp-ink); background: #F1EEE9; }
+.lp-header-cta .lp-quiet:hover { color: var(--lp-ink); background: var(--lp-paper-5); }
 
 /* ── Hero ────────────────────────────────────────────────────────────────── */
 
@@ -398,7 +431,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #2F8F5B;
+  background: var(--lp-good-2);
   animation: lp-pulse 1.6s ease-in-out infinite;
   flex-shrink: 0;
 }
@@ -472,7 +505,7 @@
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  background: rgba(255, 92, 56, 0.12);
+  background: var(--lp-accent-wash);
   color: var(--lp-accent-ink);
   display: inline-flex;
   align-items: center;
@@ -488,7 +521,7 @@
   right: -6px;
   top: -16px;
   background: var(--lp-ink);
-  color: #FFF;
+  color: var(--lp-on-dark);
   padding: 11px 13px;
   border-color: var(--lp-ink);
   box-shadow: 0 16px 34px rgba(23, 24, 27, 0.22);
@@ -507,7 +540,7 @@
   font-family: var(--lp-mono);
   font-size: 9.5px;
   letter-spacing: 0.1em;
-  color: #9A9DA3;
+  color: var(--lp-dark-muted);
 }
 
 /* ── Product mock ────────────────────────────────────────────────────────── */
@@ -529,11 +562,11 @@
   gap: 10px;
   padding: 0 14px;
   border-bottom: 1px solid var(--lp-line-soft);
-  background: #F7F5F2;
+  background: var(--lp-paper-3);
 }
 
 .lp-dots { display: flex; gap: 6px; }
-.lp-dots i { width: 9px; height: 9px; border-radius: 50%; background: #DCD7CE; }
+.lp-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--lp-line-2); }
 
 .lp-mockup-path { font-size: 10.5px; color: var(--lp-muted-2); margin-left: 8px; }
 
@@ -612,7 +645,7 @@
 .lp-generate {
   margin-left: auto;
   background: var(--lp-accent);
-  color: #FFF;
+  color: var(--lp-on-dark);
   border-radius: 7px;
   padding: 7px 12px;
   font-size: 12.5px;
@@ -643,7 +676,7 @@
   bottom: 6px;
   left: 7px;
   font-size: 9px;
-  color: #FFF;
+  color: var(--lp-on-dark);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
@@ -660,8 +693,8 @@
 }
 
 .lp-queue-row.is-bad {
-  border-color: rgba(196, 44, 49, 0.35);
-  background: rgba(196, 44, 49, 0.05);
+  border-color: var(--lp-bad-ring);
+  background: var(--lp-bad-wash);
 }
 
 .lp-queue-row.is-draft { border-style: dashed; background: transparent; }
@@ -688,20 +721,20 @@
   font-size: 9px;
   letter-spacing: 0.06em;
   color: var(--lp-muted);
-  background: #F1EEE9;
+  background: var(--lp-paper-5);
   border-radius: 999px;
   padding: 3px 7px;
   flex-shrink: 0;
 }
 
-.lp-chip-good { color: var(--lp-good); background: rgba(47, 143, 91, 0.1); }
+.lp-chip-good { color: var(--lp-good); background: var(--lp-good-wash); }
 
 .lp-chip-work {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--lp-warn);
-  background: rgba(184, 117, 3, 0.1);
+  background: var(--lp-warn-wash);
 }
 
 .lp-queue-retry { font-size: 11.5px; font-weight: 600; color: var(--lp-accent-ink); flex-shrink: 0; }
@@ -807,7 +840,7 @@
 }
 
 .lp-loop-card.is-accent {
-  border-color: rgba(255, 92, 56, 0.4);
+  border-color: var(--lp-accent-ring);
   background: linear-gradient(165deg, rgba(255, 92, 56, 0.09), var(--lp-card) 62%);
 }
 
@@ -952,8 +985,8 @@
 
 .lp-meter { height: 5px; border-radius: 999px; background: var(--lp-line-soft); overflow: hidden; }
 .lp-meter i { display: block; height: 100%; }
-.lp-meter i.is-good { background: #2F8F5B; }
-.lp-meter i.is-warn { background: #B87503; }
+.lp-meter i.is-good { background: var(--lp-good-2); }
+.lp-meter i.is-warn { background: var(--lp-warn-2); }
 .lp-meter i.is-bad { background: var(--lp-bad); }
 
 .lp-review-note {
@@ -971,8 +1004,8 @@
 
 /* ── Dark band / roadmap ─────────────────────────────────────────────────── */
 
-.lp-dark { background: var(--lp-ink); color: #F5F3EF; }
-.lp-dark .lp-body { color: #B9BCC2; }
+.lp-dark { background: var(--lp-ink); color: var(--lp-paper-4); }
+.lp-dark .lp-body { color: var(--lp-dark-muted-2); }
 .lp-dark-head { max-width: 640px; margin-bottom: 34px; }
 
 .lp-roadmap { display: flex; flex-direction: column; }
@@ -982,10 +1015,10 @@
   grid-template-columns: 118px minmax(0, 1fr);
   gap: 24px;
   padding: 22px 0;
-  border-top: 1px solid #2E3136;
+  border-top: 1px solid var(--lp-dark-line);
 }
 
-.lp-roadmap-row:last-child { border-bottom: 1px solid #2E3136; }
+.lp-roadmap-row:last-child { border-bottom: 1px solid var(--lp-dark-line); }
 
 .lp-roadmap-row h3 {
   margin: 0 0 6px;
@@ -994,13 +1027,13 @@
   font-size: 19px;
 }
 
-.lp-roadmap-row p { margin: 0; font-size: 14.5px; color: #9A9DA3; max-width: 720px; }
+.lp-roadmap-row p { margin: 0; font-size: 14.5px; color: var(--lp-dark-muted); max-width: 720px; }
 
 .lp-roadmap-row > span { font-size: 10.5px; letter-spacing: 0.08em; }
 
-.lp-tone-good { color: #5BB98B; }
-.lp-tone-warn { color: #FFB224; }
-.lp-tone-muted { color: #85888E; }
+.lp-tone-good { color: var(--lp-good-soft); }
+.lp-tone-warn { color: var(--lp-warn-soft); }
+.lp-tone-muted { color: var(--lp-dark-faint); }
 
 /* ── Cards (brand kit + house rules) ─────────────────────────────────────── */
 
@@ -1061,7 +1094,7 @@
   font-family: var(--lp-mono);
   font-size: 9.5px;
   letter-spacing: 0.1em;
-  color: #FFF;
+  color: var(--lp-on-dark);
   background: var(--lp-accent);
   border-radius: 999px;
   padding: 3px 9px;

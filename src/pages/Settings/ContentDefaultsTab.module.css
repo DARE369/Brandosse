@@ -40,6 +40,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
+  /* ui-consistency-allow: switch knob reads white on the accent track in both themes. */
   background: #fff;
   transition: left 0.15s ease;
 }

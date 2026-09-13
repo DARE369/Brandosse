@@ -80,7 +80,7 @@
 .kbdChip {
   font-family: var(--uiv2-font-mono);
   font-size: 11px;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--uiv2-bg-inset);
   border-radius: 4px;
   padding: 1px 6px;
 }
