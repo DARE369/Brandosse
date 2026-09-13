@@ -12,7 +12,7 @@
   padding: var(--uiv2-space-4, 16px);
   border: 1px solid var(--uiv2-border, #26282C);
   border-radius: 10px;
-  background: var(--uiv2-surface, #17181B);
+  background: var(--uiv2-bg-surface);
   color: var(--uiv2-text-primary, #F5F5F4);
   font-size: 13.5px;
 }
@@ -25,7 +25,7 @@
   justify-content: space-between;
   gap: 10px;
   padding-bottom: var(--uiv2-space-3, 12px);
-  border-bottom: 1px solid var(--uiv2-border-subtle, #1E2023);
+  border-bottom: 1px solid var(--uiv2-border);
 }
 
 .title { font-weight: 600; font-size: 13.5px; }
@@ -80,7 +80,7 @@
   padding: 8px 10px;
   border-radius: 8px;
   color: var(--uiv2-text-secondary, #8B8D93);
-  background: var(--uiv2-surface-2, #1E2023);
+  background: var(--uiv2-bg-elevated);
 }
 
 /* This is the reason the schedule button is disabled. It must stay legible. */
@@ -111,7 +111,7 @@
   padding: 8px 10px;
   border: 1px solid var(--uiv2-border, #26282C);
   border-radius: 8px;
-  background: var(--uiv2-surface-2, #1E2023);
+  background: var(--uiv2-bg-elevated);
   cursor: pointer;
   line-height: 1.4;
 }
@@ -123,7 +123,7 @@
 .checkbox input {
   margin-top: 2px;
   flex-shrink: 0;
-  accent-color: var(--uiv2-accent, #FF6B2C);
+  accent-color: var(--uiv2-accent-solid);
   cursor: pointer;
 }
 
@@ -132,7 +132,7 @@
   padding: 9px 10px;
   border: 1px solid var(--uiv2-border, #26282C);
   border-radius: 8px;
-  background: var(--uiv2-surface-2, #1E2023);
+  background: var(--uiv2-bg-elevated);
   color: var(--uiv2-text-primary, #F5F5F4);
   font-size: 13px;
   cursor: pointer;
@@ -150,6 +150,6 @@
 .select:focus-visible,
 .radio input:focus-visible,
 .checkbox input:focus-visible {
-  outline: 2px solid var(--uiv2-accent, #FF6B2C);
+  outline: 2px solid var(--uiv2-accent-solid);
   outline-offset: 2px;
 }

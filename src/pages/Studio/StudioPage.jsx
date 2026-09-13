@@ -1264,7 +1264,7 @@ function StudioBody({ brandKit }) {
             position: "fixed", bottom: 20, right: 20, zIndex: 40,
             display: "flex", alignItems: "center", gap: 8,
             padding: "10px 16px", borderRadius: 999,
-            background: "var(--uiv2-surface-raised, #1c1c1e)", color: "var(--uiv2-text-primary)",
+            background: "var(--uiv2-bg-elevated)", color: "var(--uiv2-text-primary)",
             border: "1px solid var(--uiv2-border)", boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
             cursor: "pointer", fontSize: 12.5,
           }}
@@ -1486,7 +1486,7 @@ function StudioBody({ brandKit }) {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "56vh", overflowY: "auto" }}>
           {(pendingCarousel?.storyboard || []).map((slide) => (
-            <div key={slide.index} style={{ display: "flex", gap: 10, padding: "10px 12px", borderRadius: 8, background: "var(--uiv2-surface-sunken, rgba(255,255,255,0.03))", border: "1px solid var(--uiv2-border)" }}>
+            <div key={slide.index} style={{ display: "flex", gap: 10, padding: "10px 12px", borderRadius: 8, background: "var(--uiv2-bg-inset)", border: "1px solid var(--uiv2-border)" }}>
               <span style={{ fontFamily: "var(--uiv2-font-mono)", fontSize: 12, color: "var(--uiv2-text-tertiary)", flexShrink: 0, width: 20 }}>{slide.index}</span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
@@ -1538,7 +1538,7 @@ function StudioBody({ brandKit }) {
                 title={item.prompt || "Use this image"}
                 style={{
                   padding: 0, border: "1px solid var(--uiv2-border)", borderRadius: 8,
-                  overflow: "hidden", cursor: "pointer", aspectRatio: "1/1", background: "var(--uiv2-surface-sunken, #1a1a1c)",
+                  overflow: "hidden", cursor: "pointer", aspectRatio: "1/1", background: "var(--uiv2-bg-inset)",
                 }}
               >
                 <img src={item.storage_path} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={(e) => { e.currentTarget.style.opacity = "0.2"; }} />
@@ -1832,7 +1832,7 @@ function StudioBody({ brandKit }) {
                         type="button"
                         onClick={() => removeReferenceImage(url)}
                         aria-label="Remove reference"
-                        style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: 999, border: "none", cursor: "pointer", background: "var(--uiv2-surface-raised, #1c1c1e)", color: "var(--uiv2-text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)", fontSize: 12, lineHeight: "16px" }}
+                        style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: 999, border: "none", cursor: "pointer", background: "var(--uiv2-bg-elevated)", color: "var(--uiv2-text-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)", fontSize: 12, lineHeight: "16px" }}
                       >×</button>
                     </div>
                   ))}
