@@ -33,6 +33,8 @@ import {
   formatDate,
 } from "./libraryItemUtils";
 import AssetCard from "./components/AssetCard";
+import { derivePublishability } from "./publishability";
+import useConnectedPlatforms from "./useConnectedPlatforms";
 import BulkActionBar from "./components/BulkActionBar";
 import UploadModal from "./components/UploadModal";
 import AssetDetailDrawer from "./components/AssetDetailDrawer";
@@ -116,6 +118,10 @@ function LibraryBody() {
     restoreAsset,
     clearError,
   } = useLibraryStore();
+
+  // null while unknown — see publishability.js. "We could not check" and "you
+  // have none" are different statements and must not render the same.
+  const connectedPlatforms = useConnectedPlatforms();
 
   const [cachedPrefs] = useState(readStoredLibraryFilterPrefs);
   const [rememberFilters, setRememberFilters] = useState(Boolean(cachedPrefs?.remember));
@@ -568,6 +574,7 @@ function LibraryBody() {
                           isSelected={selectedIds.has(asset.id)}
                           onToggleSelect={toggleItemSelected}
                           onOpenDrawer={openDrawer}
+                          publishability={derivePublishability(asset, connectedPlatforms)}
                           onSchedule={handleSchedule}
                           onArchive={handleArchive}
                           onDelete={(a) => setDeleteTarget(a)}

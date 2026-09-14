@@ -134,6 +134,12 @@ jobs:
         run: node scripts/check-production-workflow.cjs
       - name: check-docs-canonical
         run: node scripts/check-docs-canonical.cjs
+      - name: publishability-gates
+        # The Library may not offer Publish on an asset the publisher cannot
+        # resolve media for. That is the 2026-09-11 defect: a YouTube post that
+        # failed fourteen seconds after creation with no media attached.
+        # 36 checks plus 432 generated cases holding the invariant.
+        run: node scripts/test/publishability.test.mjs
       - name: check-uiv2-token-definitions
         # A --uiv2-* token that is never defined does not error — the fallback
         # wins forever and the element stops following the theme. Six were live

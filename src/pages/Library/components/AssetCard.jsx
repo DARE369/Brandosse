@@ -18,15 +18,55 @@ import {
   getFormatLabel,
   isUnused,
 } from "../libraryItemUtils";
+import { PUBLISH_STATE, publishStateLabel } from "../publishability";
 import styles from "./AssetCard.module.css";
 
-function statusPillFor(asset) {
+// The publish gate outranks the usage pill. "Unused" is interesting; "the
+// publisher cannot reach this file" is actionable, and a card can only carry
+// one pill without becoming noise.
+const GATE_TONE = {
+  [PUBLISH_STATE.BLOCKED]: "danger",
+  [PUBLISH_STATE.NO_DESTINATION]: "warning",
+  [PUBLISH_STATE.TAGGING]: "info",
+};
+
+function statusPillFor(asset, publishability) {
+  const gateTone = publishability ? GATE_TONE[publishability.state] : null;
+  if (gateTone) {
+    // Badge takes no title prop, so the reason goes on a wrapper. Without this
+    // the card would show a state with no way to find out what it means.
+    return (
+      <span className={styles.statusPill} title={publishability.reason}>
+        <Badge tone={gateTone}>{publishStateLabel(publishability.state)}</Badge>
+      </span>
+    );
+  }
   if (asset.status === "archived") return <Badge tone="warning" className={styles.statusPill}>Archived</Badge>;
   if (isUnused(asset)) return <Badge tone="neutral" className={styles.statusPill}>Unused</Badge>;
   return <Badge tone="success" className={styles.statusPill}>In use</Badge>;
 }
 
-function AssetMedia({ asset, selectable, isSelected, onToggleSelect }) {
+// Which connected accounts would take this file. Shown only once we actually
+// know — an empty strip is better than a wrong one.
+function PlatformFitRow({ publishability }) {
+  const fits = publishability?.fits || [];
+  if (fits.length === 0) return null;
+  return (
+    <div className={styles.fitRow} aria-label="Which connected accounts accept this file">
+      {fits.map((fit) => (
+        <span
+          key={fit.key}
+          className={[styles.fitChip, fit.accepts ? styles.fitChipYes : styles.fitChipNo].join(" ")}
+          title={fit.reason}
+        >
+          {fit.label.slice(0, 2).toUpperCase()}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function AssetMedia({ asset, publishability, selectable, isSelected, onToggleSelect }) {
   const [failed, setFailed] = useState(false);
   const title = getItemTitle(asset);
   const hasPreview = Boolean(asset.thumbnail_url && !failed);
@@ -34,7 +74,7 @@ function AssetMedia({ asset, selectable, isSelected, onToggleSelect }) {
   return (
     <div className={styles.assetMedia}>
       <span className={styles.mediaBadge}>{getFormatLabel(asset)}</span>
-      {statusPillFor(asset)}
+      {statusPillFor(asset, publishability)}
 
       {hasPreview ? (
         asset.media_type === "video" ? (
@@ -103,6 +143,7 @@ function AssetTags({ asset }) {
 
 export default function AssetCard({
   asset,
+  publishability = null,
   selectable = false,
   isSelected = false,
   onToggleSelect,
@@ -131,7 +172,7 @@ export default function AssetCard({
         }
       }}
     >
-      <AssetMedia asset={asset} selectable={selectable} isSelected={isSelected} onToggleSelect={onToggleSelect} />
+      <AssetMedia asset={asset} publishability={publishability} selectable={selectable} isSelected={isSelected} onToggleSelect={onToggleSelect} />
 
       <div className={styles.assetBody}>
         <h4 className={styles.assetTitle} title={title}>{title}</h4>
@@ -141,11 +182,14 @@ export default function AssetCard({
           <span>{getMetaLeftLabel(asset)}</span>
           <span>{getMetaRightLabel(asset)}</span>
         </div>
+        <PlatformFitRow publishability={publishability} />
       </div>
 
       <div className={styles.assetActions}>
         <Button
           size="sm"
+          disabled={Boolean(publishability) && !publishability.canOpenComposer}
+          title={publishability?.reason || undefined}
           onClick={(event) => {
             event.stopPropagation();
             onSchedule?.(asset);

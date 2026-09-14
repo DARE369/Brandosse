@@ -44,16 +44,42 @@
 //                             valid, so this stays false.
 //               When an adapter's media rule changes, change it here in the
 //               same commit.
+// acceptsMedia — which media types the platform will actually take. Distinct
+//               from requiresMedia: that says "a text-only post is refused";
+//               this says "and of the media you have, only these work".
+//
+//               Without it the Library can only ask "does this asset have a
+//               file", not "can any connected account receive THIS file" — so a
+//               still image offers a Publish button against a video-only
+//               account and fails at send time.
+//
+//               MIRRORS THE ADAPTERS, which remain the enforcement point.
+//               Verified 2026-09-13 by reading them:
+//                 youtube   — _shared/youtube.service.ts:237 refuses without
+//                             media with "YouTube requires a video", and the
+//                             upload sends video/mp4 (:305). Video only.
+//                 tiktok    — the whole adapter is the VIDEO init endpoint
+//                             (/post/publish/video/init/, :37) with a video/mp4
+//                             body (:309). Photo posts are a different endpoint
+//                             needing a verified pull domain (:18-22).
+//                 linkedin  — only uploadImage() exists (:117). There is NO
+//                             video upload path in this adapter, so images
+//                             only — and text-only stays legal (:241).
+//                 instagram — DOCS-grade, adapter not built. Container-based;
+//                             image or video, JPEG only for stills.
+//                 facebook  — DOCS-grade, adapter not built.
+//               When an adapter gains or loses a media path, change it here in
+//               the same commit.
 const SPECS = {
-  instagram: { label: "Instagram", captionMax: 2200, hashtagMax: 30, requiresMedia: true },
-  tiktok:    { label: "TikTok",    captionMax: 2200, hashtagMax: 8, titleMax: 90, titleForMedia: ["image", "carousel"], requiresMedia: true },
-  youtube:   { label: "YouTube",   captionMax: 5000, hashtagMax: 15, titleField: true, titleMax: 100, requiresMedia: true },
-  facebook:  { label: "Facebook",  captionMax: 63206, hashtagMax: 6 },
-  linkedin:  { label: "LinkedIn",  captionMax: 3000, hashtagMax: 8 },
-  twitter:   { label: "X",         captionMax: 280,  hashtagMax: 4 },
-  x:         { label: "X",         captionMax: 280,  hashtagMax: 4 },
-  pinterest: { label: "Pinterest", captionMax: 500,  hashtagMax: 8, titleField: true, titleMax: 100, requiresMedia: true },
-  threads:   { label: "Threads",   captionMax: 500,  hashtagMax: 5 },
+  instagram: { label: "Instagram", captionMax: 2200, hashtagMax: 30, requiresMedia: true, acceptsMedia: ["image", "video"] },
+  tiktok:    { label: "TikTok",    captionMax: 2200, hashtagMax: 8, titleMax: 90, titleForMedia: ["image", "carousel"], requiresMedia: true, acceptsMedia: ["video"] },
+  youtube:   { label: "YouTube",   captionMax: 5000, hashtagMax: 15, titleField: true, titleMax: 100, requiresMedia: true, acceptsMedia: ["video"] },
+  facebook:  { label: "Facebook",  captionMax: 63206, hashtagMax: 6, acceptsMedia: ["image", "video"] },
+  linkedin:  { label: "LinkedIn",  captionMax: 3000, hashtagMax: 8, acceptsMedia: ["image"] },
+  twitter:   { label: "X",         captionMax: 280,  hashtagMax: 4, acceptsMedia: ["image", "video"] },
+  x:         { label: "X",         captionMax: 280,  hashtagMax: 4, acceptsMedia: ["image", "video"] },
+  pinterest: { label: "Pinterest", captionMax: 500,  hashtagMax: 8, titleField: true, titleMax: 100, requiresMedia: true, acceptsMedia: ["image", "video"] },
+  threads:   { label: "Threads",   captionMax: 500,  hashtagMax: 5, acceptsMedia: ["image", "video"] },
 };
 
 const DEFAULT_SPEC = { label: "Post", captionMax: 2200, hashtagMax: 30 };

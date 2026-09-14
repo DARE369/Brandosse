@@ -32,6 +32,7 @@
     "check:compose-wiring": "node scripts/check-compose-wiring.cjs",
     "check:token-contrast": "node scripts/check-token-contrast.cjs",
     "check:uiv2-tokens": "node scripts/check-uiv2-token-definitions.cjs",
+    "test:publishability": "node scripts/test/publishability.test.mjs",
     "check:landing-contrast": "node scripts/check-landing-contrast.cjs",
     "check:website-import-reachable": "node scripts/check-website-import-reachable.cjs",
     "check:kit-deletion": "node scripts/check-kit-deletion.cjs",
