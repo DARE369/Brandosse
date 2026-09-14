@@ -226,6 +226,31 @@ Total findings 254 → 189 **before** the deletion, entirely by removing false p
 **Guarded:** a CI check asserting no asset can render a Publish affordance while failing Gate 1 — the detector the original defect lacked.
 
 ### Phase 2 — Composer
+
+> **Finding, 2026-09-14 — there is no "publish now" path in this product.**
+>
+> `publish-post` has exactly one caller: the database cron worker
+> `process-scheduled-posts`, registered `* * * * *`, which selects
+> `status = 'scheduled' AND scheduled_at <= now()`, marks each row publishing to
+> prevent duplicate dispatch, and caps at 50 per run. Nothing client-side can
+> invoke the publisher. Every post that has ever gone out did so because a row
+> sat in `posts` with a past `scheduled_at`.
+>
+> The `library-v3` mockup's **Publish now** button and the published-receipt
+> screen both assume an on-demand path that does not exist.
+>
+> **Resolution: "Publish now" writes `scheduled_at = now()`.** The worker picks
+> it up inside a minute, through the dispatcher that is already proven in
+> production — no new endpoint, no second auth surface, no idempotency problem
+> to re-solve. `QuickPostComposer.onSubmit` gains a third mode alongside
+> `draft` and `schedule`.
+>
+> **What this changes in the UI, and it is not cosmetic:** the button may not
+> claim "Published". It claims *going out now*, and the receipt reports queued,
+> then confirmed when the post's status actually moves. Asserting success at
+> click time is precisely what failed on 2026-09-11, when a post reported
+> success and died fourteen seconds later.
+
 - Open `QuickPostComposer` from Library with the asset and its generation attached.
 - Media preview; per-destination captions with real limits; per-platform required fields; locked destinations with reasons.
 
