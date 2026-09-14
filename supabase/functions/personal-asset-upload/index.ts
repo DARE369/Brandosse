@@ -27,6 +27,50 @@ const ALLOWED_EXACT_MIME = new Set([
 ]);
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB — matches the dropzone hint in the approved mockup.
 
+/**
+ * Whitelist the client-supplied provenance blob.
+ *
+ * Returns null unless `kind` is recognised. Numbers are coerced and bounded,
+ * strings are trimmed and capped, and every other key is discarded. The result
+ * is written into personal_assets.metadata.origin, which the Library reads to
+ * label an asset as a clip and to show the timecode it came from.
+ */
+const ORIGIN_KINDS = new Set(["video_clip"]);
+
+function readOrigin(raw: unknown): Record<string, unknown> | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+
+  const o = parsed as Record<string, unknown>;
+  const kind = String(o.kind || "").trim();
+  if (!ORIGIN_KINDS.has(kind)) return null;
+
+  const str = (v: unknown, max: number) => {
+    const t = String(v ?? "").trim();
+    return t ? t.slice(0, max) : null;
+  };
+  const num = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n < 1e7 ? n : null;
+  };
+
+  return {
+    kind,
+    clip_id: str(o.clip_id, 64),
+    job_id: str(o.job_id, 64),
+    clip_index: num(o.clip_index),
+    start_time_secs: num(o.start_time_secs),
+    end_time_secs: num(o.end_time_secs),
+    source_title: str(o.source_title, 200),
+  };
+}
+
 function normalizeTags(value: FormDataEntryValue | null): string[] {
   const raw = String(value || "").trim();
   if (!raw) return [];
@@ -89,6 +133,19 @@ serve(async (req) => {
     const tags = normalizeTags(formData.get("tags"));
     const checksum = String(formData.get("checksum") || "").trim() || null;
     const perceptualHash = String(formData.get("perceptual_hash") || "").trim() || null;
+
+    // ── Provenance ─────────────────────────────────────────────────────────
+    // A video clip is saved through this same upload pipeline on purpose — it
+    // gets the same checksum, perceptual hash and validation as any other file.
+    // The cost is that a clip arrives indistinguishable from a phone photo, so
+    // the product's most distinctive capability is invisible in its own Library.
+    //
+    // `origin` carries where the file came from. It is WHITELISTED, not stored
+    // as given: this is user-controlled input that lands in a jsonb column the
+    // UI reads, so only known keys of known types survive, and `kind` must be
+    // one we recognise. Anything else is dropped rather than rejected — bad
+    // provenance must never fail an upload that is otherwise fine.
+    const origin = readOrigin(formData.get("origin"));
 
     if (!(file instanceof File)) {
       throw createHttpError("Missing file upload.", 400);
@@ -275,6 +332,7 @@ serve(async (req) => {
         used_in_post_ids: [],
         metadata: {
           original_file_name: file.name,
+          ...(origin ? { origin } : {}),
         },
       })
       .select("*")

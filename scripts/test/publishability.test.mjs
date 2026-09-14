@@ -21,6 +21,11 @@ import {
   platformAcceptsMedia,
   PUBLISH_STATE,
 } from '../../src/pages/Library/publishability.js';
+import {
+  getSourceLabel,
+  getProvenanceLabel,
+  isClip,
+} from '../../src/pages/Library/libraryItemUtils.js';
 
 let failures = 0;
 let checks = 0;
@@ -188,6 +193,44 @@ for (const c of EVERY_CASE) {
 }
 check(`no case among ${EVERY_CASE.length} offers Publish without resolvable media or a destination`,
   violations, 0);
+
+/* ── Clip provenance ───────────────────────────────────────────────────── */
+console.log('Clip provenance');
+
+const clip = (origin) => ({ source: 'upload', metadata: { origin } });
+
+check('a clip reads as a Clip, not an Upload',
+  getSourceLabel(clip({ kind: 'video_clip' })), 'Clip');
+
+check('a plain upload still reads as an Upload',
+  getSourceLabel({ source: 'upload' }), 'Upload');
+
+check('an asset saved before provenance existed is not mislabelled',
+  isClip({ source: 'upload', metadata: { original_file_name: 'x.mp4' } }), false);
+
+check('provenance names the video and the timecode',
+  getProvenanceLabel(clip({ kind: 'video_clip', source_title: 'Founder AMA', start_time_secs: 724, end_time_secs: 765 })),
+  'Clipped from “Founder AMA” · 12:04–12:45');
+
+check('it degrades to the title alone when times are missing',
+  getProvenanceLabel(clip({ kind: 'video_clip', source_title: 'Founder AMA' })),
+  'Clipped from “Founder AMA”');
+
+check('...and to the timecode alone when the title is missing',
+  getProvenanceLabel(clip({ kind: 'video_clip', start_time_secs: 0, end_time_secs: 41 })),
+  'Clipped at 0:00–0:41');
+
+check('...and says something true when it knows neither',
+  getProvenanceLabel(clip({ kind: 'video_clip' })), 'Clipped from a video');
+
+check('a non-clip has no provenance line rather than a placeholder',
+  getProvenanceLabel({ source: 'upload' }), null);
+
+check('an unrecognised origin kind is ignored',
+  isClip(clip({ kind: 'something_else' })), false);
+
+check('a malformed origin cannot crash the label',
+  getSourceLabel({ source: 'upload', metadata: { origin: 'not-an-object' } }), 'Upload');
 
 console.log('');
 if (failures > 0) {

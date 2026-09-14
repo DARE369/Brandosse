@@ -6,7 +6,17 @@
 // No separate/parallel storage path is invented for clips.
 import { uploadPersonalAsset, buildScheduleHandoffPath } from "../../services/assetLibraryService";
 
-export async function saveClipToLibrary(clip) {
+/**
+ * @param {object} clip   a video_clips row
+ * @param {object} [source]  the job it was cut from: { jobId, title }
+ *
+ * The clip goes through the SAME upload pipeline as a manual upload, on purpose
+ * — same checksum, same perceptual hash, same validation. The cost used to be
+ * that it then looked exactly like a phone photo in the Library. `origin`
+ * carries the provenance so the Library can say what it actually is, and which
+ * seconds of which video it came from.
+ */
+export async function saveClipToLibrary(clip, source = {}) {
   if (!clip?.public_url) throw new Error("This clip has no downloadable file yet.");
 
   const response = await fetch(clip.public_url);
@@ -20,6 +30,15 @@ export async function saveClipToLibrary(clip) {
     title: clip.ai_title || filename,
     description: clip.ai_caption || "",
     tags: clip.platform_target ? [clip.platform_target] : [],
+    origin: {
+      kind: "video_clip",
+      clip_id: clip.id ?? null,
+      job_id: source.jobId ?? clip.job_id ?? null,
+      clip_index: clip.clip_index ?? null,
+      start_time_secs: clip.start_time_secs ?? null,
+      end_time_secs: clip.end_time_secs ?? null,
+      source_title: source.title ?? null,
+    },
   });
 
   const assetId = result?.asset?.id || result?.id;

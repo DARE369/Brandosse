@@ -293,11 +293,17 @@ function JobView({ initialJob, initialClips, userId, ledger, setLedger, navigate
   const keepClip = useCallback(
     async (clip, overrides = {}) => {
       if (savedClips.has(clip.id)) return savedClips.get(clip.id);
-      const assetId = await saveClipToLibrary({ ...clip, ...overrides });
+      // Pass the job through so the Library can say which video, and which
+      // seconds of it, this clip came from — otherwise a saved clip is
+      // indistinguishable from any other upload.
+      const assetId = await saveClipToLibrary(
+        { ...clip, ...overrides },
+        { jobId: id, title: detail?.job ? jobTitle(detail.job) : null },
+      );
       markSaved(clip.id, assetId);
       return assetId;
     },
-    [savedClips, markSaved],
+    [savedClips, markSaved, id, detail],
   );
 
   const handleKeep = useCallback(

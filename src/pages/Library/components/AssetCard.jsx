@@ -16,6 +16,7 @@ import {
   getMetaLeftLabel,
   getMetaRightLabel,
   getFormatLabel,
+  getProvenanceLabel,
   isUnused,
 } from "../libraryItemUtils";
 import { PUBLISH_STATE, publishStateLabel } from "../publishability";
@@ -176,7 +177,9 @@ export default function AssetCard({
 
       <div className={styles.assetBody}>
         <h4 className={styles.assetTitle} title={title}>{title}</h4>
-        <div className={styles.sourceRow}>{getSourceLabel(asset)}</div>
+        <div className={styles.sourceRow} title={getProvenanceLabel(asset) || undefined}>
+          {getProvenanceLabel(asset) || getSourceLabel(asset)}
+        </div>
         <AssetTags asset={asset} />
         <div className={styles.metaRow}>
           <span>{getMetaLeftLabel(asset)}</span>

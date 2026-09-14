@@ -29,6 +29,7 @@ import {
   getMetaLeftLabel,
   getMetaRightLabel,
   getFormatLabel,
+  isClip,
   isUnused,
   formatDate,
 } from "./libraryItemUtils";
@@ -47,6 +48,7 @@ const LIBRARY_FILTER_PREFS_KEY = "socialai:library-filter-prefs-v2";
 const SOURCE_RAIL_ITEMS = [
   { value: "all", label: "All" },
   { value: "upload", label: "Uploads" },
+  { value: "clip", label: "Clips" },
   { value: "generation", label: "Generations" },
   { value: "post", label: "Post-linked" },
 ];
@@ -204,7 +206,15 @@ function LibraryBody() {
         if (statusRail === "unused") return isUnused(asset);
         return true;
       })
-      .filter((asset) => (sourceFilter === "all" ? true : asset.source === sourceFilter))
+      // A clip is stored as source='upload' (same pipeline, same checks) and
+      // carries its provenance in metadata.origin. So "Clips" and "Uploads" are
+      // two halves of one stored value, not two stored values.
+      .filter((asset) => {
+        if (sourceFilter === "all") return true;
+        if (sourceFilter === "clip") return isClip(asset);
+        if (sourceFilter === "upload") return asset.source === "upload" && !isClip(asset);
+        return asset.source === sourceFilter;
+      })
       .filter((asset) => (typeFilter === "all" ? true : asset.media_type === typeFilter))
       .filter((asset) => (tagFilter === "all" ? true : (asset.tags || []).includes(tagFilter)))
       .filter((asset) => (unusedChipActive ? isUnused(asset) : true))
@@ -221,14 +231,24 @@ function LibraryBody() {
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   }, [assets, search, sourceFilter, statusRail, typeFilter, tagFilter, unusedChipActive]);
 
-  const railCounts = useMemo(() => ({
-    all: counts.all,
-    upload: counts.upload,
-    generation: counts.generation,
-    post: counts.post,
-    unused: counts.unused,
-    archived: counts.archived,
-  }), [counts]);
+  // Clips and uploads share one stored source value, so their counts are split
+  // here rather than server-side: fetchPersonalAssetCounts groups by `source`
+  // and would report every clip as an upload. The store already holds the full
+  // asset list, so this costs one pass and keeps a single counting rule instead
+  // of two that could disagree.
+  const railCounts = useMemo(() => {
+    const active = assets.filter((a) => a.status === "active");
+    const clipCount = active.filter(isClip).length;
+    return {
+      all: counts.all,
+      upload: Math.max(0, (counts.upload ?? 0) - clipCount),
+      clip: clipCount,
+      generation: counts.generation,
+      post: counts.post,
+      unused: counts.unused,
+      archived: counts.archived,
+    };
+  }, [counts, assets]);
 
   const handleSchedule = (asset) => {
     navigate(buildScheduleHandoffPath(asset.id));

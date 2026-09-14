@@ -290,6 +290,9 @@ export async function uploadPersonalAsset({
   description = '',
   altText = '',
   tags = [],
+  // Where the file came from, when the caller knows. Whitelisted server-side
+  // (personal-asset-upload readOrigin) before it reaches metadata.origin.
+  origin = null,
   onProgress,
 } = {}) {
   if (!file) throw new Error('Choose a file first.');
@@ -307,6 +310,7 @@ export async function uploadPersonalAsset({
   formData.append('tags', JSON.stringify(safeArray(tags).filter(Boolean)));
   if (checksum) formData.append('checksum', checksum);
   if (perceptualHash) formData.append('perceptual_hash', perceptualHash);
+  if (origin) formData.append('origin', JSON.stringify(origin));
 
   const {
     data: { session },

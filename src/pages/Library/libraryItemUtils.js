@@ -12,8 +12,57 @@ const SOURCE_LABELS = {
   post: 'Post-linked',
 };
 
+// A clip is stored as source='upload' because it goes through the same upload
+// pipeline on purpose — same checksum, same perceptual hash, same validation.
+// Its provenance lives in metadata.origin instead, written by
+// personal-asset-upload after whitelisting. Deriving the label from there keeps
+// the distinction without a schema change, and without a second write path that
+// could disagree with the first.
+//
+// Assets saved before this shipped have no origin, so they keep reading as
+// 'Upload'. That is accurate rather than convenient: nothing links a stored
+// asset back to the clip it was cut from, so a backfill would be guesswork.
+export function getAssetOrigin(asset) {
+  const origin = asset?.metadata?.origin;
+  if (!origin || typeof origin !== 'object') return null;
+  return origin.kind ? origin : null;
+}
+
+export function isClip(asset) {
+  return getAssetOrigin(asset)?.kind === 'video_clip';
+}
+
 export function getSourceLabel(asset) {
+  if (isClip(asset)) return 'Clip';
   return SOURCE_LABELS[asset?.source] || 'Asset';
+}
+
+function formatTimecode(secs) {
+  if (typeof secs !== 'number' || !Number.isFinite(secs) || secs < 0) return null;
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * "Clipped from “Founder AMA” · 12:04–12:45", when we know that much.
+ * Degrades a piece at a time rather than all at once: without the source title
+ * it still reports the timecode, and without either it says nothing at all
+ * instead of inventing a placeholder.
+ */
+export function getProvenanceLabel(asset) {
+  const origin = getAssetOrigin(asset);
+  if (!origin || origin.kind !== 'video_clip') return null;
+
+  const from = String(origin.source_title || '').trim();
+  const start = formatTimecode(origin.start_time_secs);
+  const end = formatTimecode(origin.end_time_secs);
+  const span = start && end ? `${start}–${end}` : start;
+
+  if (from && span) return `Clipped from “${from}” · ${span}`;
+  if (from) return `Clipped from “${from}”`;
+  if (span) return `Clipped at ${span}`;
+  return 'Clipped from a video';
 }
 
 export function getItemTitle(asset) {
