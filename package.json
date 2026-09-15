@@ -53,7 +53,9 @@
     "check:zip-stream": "node tests/video-engine/zip-stream.roundtrip.mjs",
     "brand:icons": "node scripts/generate-brand-icons.mjs",
     "test:schedule-seed": "node scripts/test/schedule-seed.test.mjs",
-    "check:nonterminal-reapers": "node scripts/check-nonterminal-state-reapers.cjs"
+    "check:nonterminal-reapers": "node scripts/check-nonterminal-state-reapers.cjs",
+    "test:publish-outcome": "node scripts/test/publish-outcome.test.mjs",
+    "check:publish-receipt": "node scripts/check-publish-receipt.cjs"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.29.0",

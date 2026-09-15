@@ -34,6 +34,7 @@ import {
   formatDate,
 } from "./libraryItemUtils";
 import AssetCard from "./components/AssetCard";
+import PublishReceipt from "./components/PublishReceipt";
 import { derivePublishability } from "./publishability";
 import useConnectedPlatforms from "./useConnectedPlatforms";
 import QuickPostComposer from "../../calendar/components/QuickPostComposer";
@@ -149,6 +150,8 @@ function LibraryBody() {
   // The asset the publish composer is open over, already in the composer's
   // prop shape. Null = closed.
   const [composerAsset, setComposerAsset] = useState(null);
+  // { postIds, assetTitle } once a send is queued. Null = no receipt open.
+  const [receipt, setReceipt] = useState(null);
 
   // The composer renders times in the account timezone and says so in its own
   // banner, so an unresolved timezone would have it confidently label a time in
@@ -314,7 +317,7 @@ function LibraryBody() {
       return false;
     }
     try {
-      await createQuickPost({ workspaceType: "personal", userId: user.id }, {
+      const created = await createQuickPost({ workspaceType: "personal", userId: user.id }, {
         mode: payload.mode,
         platforms: payload.platforms,
         captions: payload.captions,
@@ -324,6 +327,26 @@ function LibraryBody() {
         titles: payload.titles || {},
         aiDisclosure: payload.aiDisclosure !== false,
       });
+
+      // ── A send ends in a receipt, never in a toast ──────────────────────
+      //
+      // A toast cannot report per destination, and a multi-destination send
+      // half-succeeds for real — one row per platform, each dispatched
+      // independently, so LinkedIn can publish while YouTube fails on media.
+      // Before this, those two outcomes looked identical and the user was left
+      // on the grid with a green message. The receipt polls the rows the
+      // publisher actually writes and reports each one as it settles.
+      //
+      // A DRAFT keeps the toast, correctly: nothing was sent, so there is no
+      // outcome to follow.
+      if (payload.mode !== "draft" && Array.isArray(created) && created.length > 0) {
+        setReceipt({
+          postIds: created.map((row) => row.id).filter(Boolean),
+          assetTitle: payload.asset?.name || "",
+        });
+        return true;
+      }
+
       // Same copy the Calendar uses, from the same module — so neither surface
       // can drift into claiming the post is published when all that is known is
       // that it is queued. See quickPostConfirmation.js.
@@ -816,6 +839,20 @@ function LibraryBody() {
           prefillAsset={composerAsset}
           onClose={() => setComposerAsset(null)}
           onSubmit={handleComposerSubmit}
+        />
+      )}
+
+      {/* The outcome of a send, per destination, polled from the rows the
+          publisher writes. Opened by handleComposerSubmit for every non-draft
+          send — see check-publish-receipt.cjs, which fails if a publish path
+          can return to the grid without one. */}
+      {receipt && (
+        <PublishReceipt
+          open
+          postIds={receipt.postIds}
+          assetTitle={receipt.assetTitle}
+          onClose={() => { setReceipt(null); fetchLibraryData(); }}
+          onOpenCalendar={() => { setReceipt(null); navigate("/app/calendar"); }}
         />
       )}
 

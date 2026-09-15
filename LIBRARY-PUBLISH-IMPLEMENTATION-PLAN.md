@@ -347,6 +347,34 @@ The rule *"every non-terminal state needs a reaper"* was **half-kept**: `publish
 **Proven:** an E2E asserting a partial failure renders as partial, never as blanket success.
 **Guarded:** a check that no publish path returns the user to the grid without a receipt.
 
+### Phase 4 — COMPLETE, 2026-09-15
+
+**The finding: the live post's URL was written by the publisher and read by nobody.** `workflow_state.publish.platform_post_url` appears exactly once in the entire repository — inside a comment. Every successful publish recorded a link to the real post, and the UI discarded it at the boundary.
+
+**The second finding is the reason the screen exists at all.** `createQuickPost` writes **one row per platform**, each dispatched independently, so a multi-destination send half-succeeds as a matter of course — LinkedIn publishes while YouTube fails on media. A publish used to end in a single green toast on the grid, where that outcome is indistinguishable from a clean one.
+
+| Change | Effect |
+|---|---|
+| New `src/calendar/publishOutcome.js` | Pure, no React. `deriveOutcome()` per row, `summarise()` across them. Every word on the receipt comes from here, so the honesty rules are testable without a browser. |
+| New `PublishReceipt.jsx`, **polling** | Publishing is asynchronous, so the screen reads the rows back as the worker moves them. Polling, not realtime: realtime needs `posts` in the database publication, which cannot be verified from here and **fails silently** — a screen that never updates looks exactly like a post that never sent. |
+| `RETRYING` is its own state | A retriable failure writes `status` back to `'scheduled'` with an incremented `retry_count`. Indistinguishable from "waiting its turn" to the schema; very different to a person, because something already went wrong. |
+| Restrictions stated **on** success | YouTube-forced-private and TikTok `SELF_ONLY` are derived from the post's own recorded settings, so each caveat disappears by itself when the audit passes. A hardcoded string would outlive the restriction and become a lie in the other direction. |
+| Bounded poll with an honest give-up | Five minutes, then it says what it does not know. A spinner that never resolves is its own kind of lie. |
+
+**The defect the generated test found, which I would not have written a case for.** Success was gated on `failed === 0`. A **draft** is terminal and is not a failure — so three drafts reported as *"Published to 0 accounts"*. A blanket success claim for zero publications. Success now requires `published === total`, and the exhaustive sweep over every combination of destination states is precisely why the hole surfaced rather than surviving into launch.
+
+**Proven:** `scripts/test/publish-outcome.test.mjs` — 162 checks, including **125 generated destination combinations** asserting one invariant: a blanket-success headline is permitted only when *every* destination actually published. Four deliberate breaks each exit 1 (success reverting to `failed === 0`, a queued row leaking a URL, retrying collapsing into queued, the adapter's failure reason replaced by a generic message).
+
+**Guarded:** `scripts/check-publish-receipt.cjs` — 11 links, in CI: every non-draft send opens a receipt, the receipt is actually rendered, it polls until each destination settles under a bounded ceiling, its headline is bound to the tested summariser, restrictions survive to the screen, and the URL appears only on a confirmed row.
+
+**Three holes in that guard, found by break-testing it and closed:**
+
+1. `["']Published["']` missed a claim written as **raw JSX text** — which is how one would really be written.
+2. `/restrictionFor/` matched `restrictionForDISABLED`. The same substring hole as Phase 2's panel-mount check.
+3. **A `\b` written through a shell layer became a literal backspace character**, so the regex was `/\x08Published\x08/` and matched nothing. The assertion was completely inert while reporting a pass — the exact "guard aimed at nothing" failure the standing rule exists to catch, and invisible without deliberately breaking the thing it guards.
+
+*Not render-verified:* the receipt itself. Confirming it on screen means creating posts against live connected accounts, which is outward-facing and not something to do unprompted. The component is covered by the build, the wiring guard, and 162 unit checks over its entire vocabulary — but nobody has watched it open.
+
 ### Phase 5 — Discovery score
 - Call `seo-score` per destination from the composer; add the drawer's Discovery tab.
 

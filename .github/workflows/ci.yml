@@ -148,6 +148,20 @@ jobs:
       - name: Non-terminal state reapers
         run: node scripts/check-nonterminal-state-reapers.cjs
 
+      # Phase 4 (receipt). The rule the 2026-09-11 defect broke, stated once and
+      # checked exhaustively: a headline may claim success ONLY when every
+      # destination actually published. The generated sweep caught a real hole —
+      # `failed === 0` reported three drafts as "Published to 0 accounts".
+      - name: Publish outcome honesty
+        run: node scripts/test/publish-outcome.test.mjs
+
+      # …and that a send always reaches that receipt. Before it, a publish ended
+      # in a toast on the grid, where a half-succeeded multi-destination send
+      # looked identical to a clean one, and the live post URL the adapter
+      # records was read by nothing at all.
+      - name: Publish receipt wiring
+        run: node scripts/check-publish-receipt.cjs
+
       # LOCK L0.7 — the eight guard scripts that existed and never ran.
       # Later locks append their own below; all of them are blocking.
       - name: check-env-security
