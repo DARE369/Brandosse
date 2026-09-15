@@ -46,3 +46,28 @@
 }
 
 .actions { display: flex; justify-content: flex-end; }
+
+/* ── AI disclosure ─────────────────────────────────────────────────────────
+   Shown only when the user turns the declaration OFF. Warning-toned rather
+   than danger: this is a legitimate choice with consequences they should see
+   before making it, not an error.                                           */
+.disclosureWarning {
+  margin-top: var(--uiv2-space-4);
+  padding: var(--uiv2-space-3) var(--uiv2-space-4);
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-warning-wash);
+  border: 1px solid var(--uiv2-warning-border);
+  font-size: var(--uiv2-text-sm);
+  line-height: var(--uiv2-leading-snug);
+  color: var(--uiv2-text-primary);
+}
+
+.disclosureWarning p {
+  margin: var(--uiv2-space-2) 0 0;
+  color: var(--uiv2-text-secondary);
+}
+
+.disclosureFinePrint {
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-tertiary);
+}

@@ -46,6 +46,7 @@ export default function ContentDefaultsTab({ userId, onToast }) {
     logo_position: 'bottom-right',
     logo_scale: 0.16,
     default_platforms: [],
+    ai_disclosure: true,
   });
 
   useEffect(() => {
@@ -149,6 +150,46 @@ export default function ContentDefaultsTab({ userId, onToast }) {
             <span className={styles.switchKnob} style={{ left: form.match_brand_kit ? "18px" : "2px" }} />
           </button>
         </div>
+      </Card>
+
+      <Card>
+        <div className={styles.toggleRow}>
+          <div>
+            <div className={styles.sectionTitle}>Label AI-generated content</div>
+            <div className={styles.sectionSub}>
+              YouTube and Instagram accept a declaration that a post contains AI-generated or
+              AI-edited media. With this on, every post made from a generated asset carries it,
+              on each platform that supports it.
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.ai_disclosure}
+            aria-label="Label AI-generated content"
+            className={styles.switch}
+            style={{ background: form.ai_disclosure ? "var(--uiv2-accent-solid)" : "var(--uiv2-border-strong, var(--uiv2-border))" }}
+            onClick={() => setForm((c) => ({ ...c, ai_disclosure: !c.ai_disclosure }))}
+          >
+            <span className={styles.switchKnob} style={{ left: form.ai_disclosure ? "18px" : "2px" }} />
+          </button>
+        </div>
+
+        {!form.ai_disclosure && (
+          <div className={styles.disclosureWarning} role="note">
+            <strong>Posts will go out without the AI declaration.</strong>
+            <p>
+              Platforms can restrict, demonetise or remove content — or action the account
+              itself — over synthetic media that was not disclosed, and their rules change
+              without notice. Turning this off is your decision and your responsibility:
+              Brandosse sends exactly what you tell it to send, and accepts no liability for
+              enforcement action that follows a post you chose not to label.
+            </p>
+            <p className={styles.disclosureFinePrint}>
+              You can still set this per post in the composer. This is not legal advice.
+            </p>
+          </div>
+        )}
       </Card>
 
       <Card>

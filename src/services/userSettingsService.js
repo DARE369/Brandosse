@@ -38,6 +38,20 @@ const DEFAULT_GENERATION_DEFAULTS = {
   style_lock: false,
   reference_images: [],
   default_platforms: [],
+  // Declare AI-generated or AI-edited media to platforms that accept the
+  // declaration — YouTube's status.containsSyntheticMedia and Instagram's
+  // is_ai_generated (see PLATFORM-PUBLISH-FIELDS.md).
+  //
+  // DEFAULTS ON, and deliberately so. This is the field most likely to get an
+  // account actioned if it is wrong, the platforms' rules tighten rather than
+  // relax, and a user who wants it off can say so in one click. Defaulting off
+  // would make silence the default answer to a compliance question.
+  //
+  // Lives with the generation defaults rather than a publishing setting because
+  // "was this made by AI" is a fact about the asset, decided once, and carried
+  // to every destination — asking per publish invites contradictory answers for
+  // the same file.
+  ai_disclosure: true,
 };
 
 const DEFAULT_CALENDAR_DEFAULTS = {
@@ -136,6 +150,7 @@ function normalizeGenerationDefaults(value) {
       ? Math.min(Math.max(Number(source.logo_scale), 0.04), 0.5)
       : DEFAULT_GENERATION_DEFAULTS.logo_scale,
     image_model: String(source.image_model || DEFAULT_GENERATION_DEFAULTS.image_model),
+    ai_disclosure: normalizeBoolean(source.ai_disclosure, DEFAULT_GENERATION_DEFAULTS.ai_disclosure),
     style_lock: normalizeBoolean(source.style_lock, DEFAULT_GENERATION_DEFAULTS.style_lock),
     reference_images: Array.isArray(source.reference_images)
       ? source.reference_images.filter((u) => typeof u === 'string' && u).slice(0, 6)
