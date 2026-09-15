@@ -127,8 +127,37 @@ export function zonedDateTimeToUTC(dateStr, timeStr, timeZone = DEFAULT_TIMEZONE
 
   if (timeZone === 'UTC') return new Date(naiveMs).toISOString();
 
-  const offsetMinutes = getOffsetMinutes(new Date(naiveMs), timeZone);
-  return new Date(naiveMs - offsetMinutes * 60000).toISOString();
+  // ── Two passes, because one pass is wrong across every DST transition ─────
+  //
+  // The first offset is sampled at the naive wall clock READ AS UTC, which is
+  // an instant up to a day away from the one we actually want — and on a
+  // transition day it routinely falls on the other side of the change.
+  // Concretely: America/New_York, 2026-03-08 03:00 local (the first hour of
+  // EDT). Pass one samples the offset at 03:00Z, which is still 22:00 EST on
+  // the 7th, gets -300, and returns 08:00Z — an hour late. Every DST-observing
+  // user's scheduled posts were an hour out, twice a year, in the direction
+  // nobody checks. Caught by schedule-seed.test.mjs, not by anyone noticing.
+  //
+  // Re-sampling at the candidate instant and re-applying converges, because the
+  // candidate now sits inside the correct offset's period.
+  //
+  // The two irreducible cases, handled deliberately rather than by accident:
+  //   * SPRING FORWARD — the wall clock never happens (02:30 on a US spring
+  //     day). There is no correct answer; this lands just after the gap, which
+  //     is what calendar applications conventionally do and the only choice
+  //     that keeps the post ordered sensibly against its neighbours.
+  //   * FALL BACK — the wall clock happens TWICE. This resolves to the first
+  //     (still-DST) occurrence. A round trip through that hour preserves the
+  //     wall clock the user sees, but need not preserve which of the two
+  //     instants they started from. That is inherent to the domain, not a
+  //     defect, and schedule-seed.test.mjs asserts it as such.
+  const firstOffset = getOffsetMinutes(new Date(naiveMs), timeZone);
+  const candidateMs = naiveMs - firstOffset * 60000;
+
+  const secondOffset = getOffsetMinutes(new Date(candidateMs), timeZone);
+  if (secondOffset === firstOffset) return new Date(candidateMs).toISOString();
+
+  return new Date(naiveMs - secondOffset * 60000).toISOString();
 }
 
 // Offset (minutes) such that zonedWallClock = utcInstant + offset, evaluated

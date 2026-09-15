@@ -132,6 +132,22 @@ jobs:
       - name: Composer field contract
         run: node scripts/check-composer-field-contract.cjs
 
+      # Phase 3 (schedule). The picker's rules — seeding, the floor, and DST —
+      # as a unit test, because they are arithmetic and a browser cannot show
+      # you that a post moved an hour. Found a real bug in zonedDateTimeToUTC:
+      # it sampled the UTC offset at the wrong instant, so every DST-observing
+      # user's scheduled posts were an hour out, twice a year.
+      - name: Schedule seeding and floor
+        run: node scripts/test/schedule-seed.test.mjs
+
+      # Phase 3's reaper coverage. "Every non-terminal state needs a reaper" was
+      # a rule that was half-kept: `publishing` had one, `scheduled` did not, so
+      # a post that was due and simply never sent sat pending forever. This also
+      # pins the decision that the overdue alarm REPORTS rather than auto-fails —
+      # auto-failing a stopped dispatcher would destroy recoverable content.
+      - name: Non-terminal state reapers
+        run: node scripts/check-nonterminal-state-reapers.cjs
+
       # LOCK L0.7 — the eight guard scripts that existed and never ran.
       # Later locks append their own below; all of them are blocking.
       - name: check-env-security

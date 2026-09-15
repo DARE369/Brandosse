@@ -156,6 +156,21 @@ assert(
 // so any "match the tag" regex either stops early on the arrow or runs past the
 // element entirely. This way each send path is checked as its own element and a
 // new one cannot hide behind an older sibling's guard.
+// A send button may be gated by `sendBlocked` itself, or by a constant that
+// DEMONSTRABLY CONTAINS it. Phase 3 gave the schedule buttons `scheduleBlocked`
+// — `sendBlocked || !scheduleFloor.ok` — which is strictly stronger, and a
+// guard that insisted on the literal name would have forced the weaker gate
+// back on. Each accepted alias is verified here to be composed from
+// sendBlocked, so this cannot become a hole: name a constant `scheduleBlocked`
+// without deriving it from sendBlocked and the media requirement stops
+// reaching that button, which is the whole defect.
+const GATE_ALIASES = ['sendBlocked'];
+for (const alias of ['scheduleBlocked']) {
+  const decl = new RegExp(`const\\s+${alias}\\s*=([\\s\\S]*?);`).exec(composer);
+  if (decl && /\bsendBlocked\b/.test(decl[1])) GATE_ALIASES.push(alias);
+}
+const gatePattern = new RegExp(`disabled=\\{\\s*(${GATE_ALIASES.join('|')})\\s*\\}`);
+
 const ungatedSend = [];
 let orphanHandlers = 0;
 for (const handler of sendHandlers) {
@@ -168,7 +183,7 @@ for (const handler of sendHandlers) {
   // look checked. Verified by deliberately doing exactly that and watching this
   // pass — which is why the bound is here.
   if (element === null || element.includes('</button>')) { orphanHandlers += 1; continue; }
-  if (!/disabled=\{\s*sendBlocked\s*\}/.test(element)) ungatedSend.push(handler[0]);
+  if (!gatePattern.test(element)) ungatedSend.push(handler[0]);
 }
 assert(
   orphanHandlers === 0,
@@ -179,7 +194,7 @@ assert(
 assert(
   ungatedSend.length === 0,
   `QuickPostComposer.jsx has ${ungatedSend.length} send button(s) not disabled by `
-  + `sendBlocked (${ungatedSend.join(', ')}), so the media requirement does not `
+  + `a gate derived from sendBlocked (${ungatedSend.join(', ')}), so the media requirement does not `
   + 'reach them. This is the 2026-09-11 failure with a different button on it.',
 );
 

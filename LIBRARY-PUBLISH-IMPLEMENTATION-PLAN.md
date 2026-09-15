@@ -304,6 +304,43 @@ Total findings 254 → 189 **before** the deletion, entirely by removing false p
 **Proven:** tests for seeding, the floor, and DST boundaries.
 **Guarded:** a reaper — any post stuck in `scheduled` past its time alerts. Every non-terminal state needs one.
 
+### Phase 3 — COMPLETE, 2026-09-15
+
+**The finding: rescheduling a post silently moved it, and moved it again every time you looked.**
+
+`ScheduleModal` seeded its picker from UTC parts — `new Date(post.scheduled_at).toISOString().slice(0,10)` and `getUTCHours()` — while its own banner promised *"All times below are in your account timezone"* and `CalendarPage.jsx:414` converted the result back with `zonedDateTimeToUTC(dateKey, timeStr, timezone)`, which reads those values as account-timezone wall clock. For any account not on UTC, opening **Reschedule…** and pressing Confirm *without touching anything* shifted the post by the zone's offset — cumulatively, on every reopen. At WAT (+1) a post at 10:00 displayed as 09:00 and saved as 08:00Z.
+
+Invisible on a UTC machine, which is why the test names real zones rather than trusting the runner's clock.
+
+**The second finding, found by the test rather than by reading: `zonedDateTimeToUTC` was wrong across every DST transition.** It sampled the UTC offset at *the naive wall clock read as UTC* — an instant that routinely falls on the other side of the change. America/New_York, 2026-03-08 03:00 local resolved to 08:00Z instead of 07:00Z. Every DST-observing user's scheduled posts were an hour out, twice a year, in the direction nobody checks. Fixed with a second offset pass; the two irreducible cases (the spring-forward gap, the fall-back repeat) are now handled deliberately and documented rather than landed on by accident.
+
+**The third finding: the composer's picker defaulted to a time in the past.** A hardcoded `'09:00'` — which, after nine in the morning, is behind the clock. The dispatcher selects `scheduled_at <= now()` every minute, so "scheduling" a post at three in the afternoon sent it immediately, under a confirmation that said it was scheduled.
+
+| Change | Effect |
+|---|---|
+| New `src/calendar/scheduleSeed.js` | One module decides what every picker opens on and what it refuses. Pure, no React, so the rules are testable directly. |
+| `seedFromPost()` uses zoned parts | Closes the round-trip drift. The displayed time now matches the banner's promise. |
+| `seedFromNow()` seeds from the clock, rounded up, past the floor | Replaces `'09:00'`. Steps past the fall-back's ambiguous hour so the picker never opens on a value it will then refuse. |
+| `checkScheduleFloor()` on the **instant**, not the wall clock | Ten minutes, grounded in Facebook's own minimum (§5). Gates scheduling only — "Publish now" is deliberately below it, because that is a send, not a scheduling choice. |
+| Two-pass `zonedDateTimeToUTC` | Fixes the DST hour-shift for all 11 importers, not just the picker. |
+| Corrected `ScheduleModal`'s header | It claimed to be invoked from the composer's date/time step. It was not, and had not been. Law 2. |
+
+**Proven:** `scripts/test/schedule-seed.test.mjs` — 255 checks across six timezones chosen for their offsets (WAT +1 no DST, Kolkata +5:30, Chatham +12:45/45-minute, New York twice-yearly DST), asserting the seeding round-trips to the same instant, that new seeds clear their own floor, and that the floor is measured on the instant so a spring-forward gap is not double-counted. **Verified to fail:** seven deliberate breaks — reverting the DST pass, reverting the UTC seeding, removing the ambiguity correction, zeroing the floor, ignoring the timezone, comparing wall clocks instead of instants, and dropping the "or use Publish now" alternative from the refusal copy — each exit 1, each restored.
+
+*One "break" that correctly did NOT fail:* rounding down instead of up. With the correction loop in place, round-down-plus-one-step **is** round-up — the two are mathematically identical, so the test was right to pass. A no-op refactor is not a regression.
+
+**Guarded:** `supabase/migrations/20260915120000_overdue_scheduled_posts_alarm.sql` plus `scripts/check-nonterminal-state-reapers.cjs` (15 checks, in CI).
+
+The rule *"every non-terminal state needs a reaper"* was **half-kept**: `publishing` was reaped (20260821160000), and `scheduled` posts that could *never* dispatch were failed by `process_scheduled_posts()` (20260716140000) — but a post that was due, dispatchable, and simply never sent, because the cron stopped or the function 500d, was covered by nothing at all. It sat in `scheduled` with a past time, pending in the calendar, forever.
+
+**The alarm reports; it does not auto-fail, and the guard pins that decision.** The likeliest cause of a mass overdue is that the *dispatcher* stopped — those posts are fine and will send the moment it returns. Auto-failing them would convert a recoverable outage into permanent, silent content loss for every affected user simultaneously. `draft` is exempt from reaping, explicitly and on record: it is where unfinished work rests, and the distinction that matters is not terminal vs non-terminal but whether a state *promises that time will pass*.
+
+**Rendered, not just built** — `errors: 0`, account tz UTC, now `13:01`, seeded `13:15` (floor + grid), Schedule disabled below the floor while Publish now stayed enabled.
+
+*One test bug worth recording, because it looked exactly like a product defect:* the seeded time first measured as 47 minutes **in the past**. `new Date("2026-09-15T13:10")` parses as browser-local, and this machine runs WAT while the account is on UTC — so a correct seed read as an overdue one, off by precisely the offset. The same class of mistake as Phase 2's theme-key: the test assumed its own frame was the app's.
+
+*Not render-verified:* the Calendar's **Reschedule…** path, where the round-trip bug actually lived. It is covered by 255 unit checks and the build, but nobody has watched that modal open on a non-UTC account. Worth ten minutes before launch.
+
 ### Phase 4 — Receipt
 - Post-publish screen, per-destination outcome, restrictions stated, links to the live posts.
 

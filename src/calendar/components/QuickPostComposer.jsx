@@ -26,6 +26,7 @@ import {
   platformNeedsTitle,
   platformsRequiringMedia,
 } from '../../services/platforms/platformCaptionSpecs';
+import { checkScheduleFloor, seedFromNow } from '../scheduleSeed';
 import TikTokOptionsPanel from '../../components/Publishing/TikTokOptionsPanel';
 import YouTubeOptionsPanel from '../../components/Publishing/YouTubeOptionsPanel';
 import { useAuth } from '../../Context/AuthContext';
@@ -354,8 +355,22 @@ export default function QuickPostComposer({
   }, [platformState, PLATFORMS, activePlatforms.length]);
   const [captions, setCaptions] = useState({});
   const [prefilling, setPrefilling] = useState({});
-  const [dateKey, setDateKey] = useState(() => getZonedTodayKey(timezone));
-  const [timeStr, setTimeStr] = useState('09:00');
+  // Seeded from the clock at open, through the same module ScheduleModal uses.
+  //
+  // This was `getZonedTodayKey(timezone)` plus a hardcoded '09:00' — which, for
+  // most of the working day, is a time that has already passed. The dispatcher
+  // selects `scheduled_at <= now()` every minute, so "scheduling" a post for
+  // 09:00 at three in the afternoon sent it immediately. The user chose a
+  // future-looking control and got an instant send, with a confirmation saying
+  // it was scheduled.
+  // ONE seed, read twice. Calling seedFromNow() in each initializer separately
+  // would sample the clock twice, and two samples either side of a minute
+  // boundary can disagree — 23:59 on one line and 00:00 on the next, giving a
+  // date and a time that belong to different days. Rare, and silent when it
+  // happens, which is the kind of thing worth spending one extra useState on.
+  const [initialSeed] = useState(() => seedFromNow(timezone));
+  const [dateKey, setDateKey] = useState(initialSeed.dateKey);
+  const [timeStr, setTimeStr] = useState(initialSeed.timeStr);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
@@ -373,6 +388,15 @@ export default function QuickPostComposer({
     || activePlatforms.length === 0
     || requiredFieldsMissing
     || needsMedia;
+
+  // The schedule floor, from the same module ScheduleModal uses, so a new post
+  // and a reschedule cannot disagree about when "too soon" begins.
+  //
+  // It gates SCHEDULING only. "Publish now" is deliberately below the floor —
+  // it writes scheduled_at = now(), which is a send rather than a scheduling
+  // choice — and "Save as draft" writes no time at all.
+  const scheduleFloor = checkScheduleFloor(dateKey, timeStr, timezone);
+  const scheduleBlocked = sendBlocked || !scheduleFloor.ok;
 
   // Phase 4 QA fix (schedule hand-off composer race — see
   // DECISIONS_LOG.md, PersonalCalendarPage.jsx's own note on the same
@@ -832,6 +856,13 @@ export default function QuickPostComposer({
           </div>
         )}
 
+        {/* Scheduling-only, and it says so — otherwise a user whose chosen time
+            is too soon sees a disabled button next to an enabled "Publish now"
+            with nothing connecting the two. */}
+        {!sendBlocked && !scheduleFloor.ok && scheduleFloor.reason && (
+          <div className="ui-field-error" role="alert">{scheduleFloor.reason}</div>
+        )}
+
         {missingTitles.length > 0 && (
           <div className="ui-field-error" role="alert">
             {missingTitles.join(' and ')} {missingTitles.length > 1 ? 'need' : 'needs'} a title,
@@ -855,7 +886,7 @@ export default function QuickPostComposer({
                 <button
                   type="button"
                   className="ui-button ui-button-secondary ui-button-md"
-                  disabled={sendBlocked}
+                  disabled={scheduleBlocked}
                   onClick={() => handleSubmit('schedule')}
                 >
                   Schedule…
@@ -873,7 +904,7 @@ export default function QuickPostComposer({
               <button
                 type="button"
                 className="ui-button ui-button-primary ui-button-md"
-                disabled={sendBlocked}
+                disabled={scheduleBlocked}
                 onClick={() => handleSubmit('schedule')}
               >
                 Schedule post

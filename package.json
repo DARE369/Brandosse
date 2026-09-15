@@ -51,7 +51,9 @@
     "check:ui-v2-isolation": "node scripts/check-ui-v2-isolation.cjs",
     "check:post-status-accounting": "node scripts/check-post-status-accounting.cjs",
     "check:zip-stream": "node tests/video-engine/zip-stream.roundtrip.mjs",
-    "brand:icons": "node scripts/generate-brand-icons.mjs"
+    "brand:icons": "node scripts/generate-brand-icons.mjs",
+    "test:schedule-seed": "node scripts/test/schedule-seed.test.mjs",
+    "check:nonterminal-reapers": "node scripts/check-nonterminal-state-reapers.cjs"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.29.0",

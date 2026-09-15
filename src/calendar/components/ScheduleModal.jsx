@@ -10,10 +10,17 @@
 //
 // Date/time picker (account timezone, explicit), target account
 // confirmation, and the conflict check from spec §5 (non-blocking — never a
-// hard block). Invoked from Calendar's own flows (drag/move-mode commit
-// surfaces its own inline confirmation, this modal is for the explicit
-// "Reschedule…" / "Schedule this post" entry points) and from
-// QuickPostComposer's "pick a date/time" step.
+// hard block). Invoked from Calendar's own flows: drag/move-mode commit
+// surfaces its own inline confirmation, and this modal serves the explicit
+// "Reschedule…" / "Schedule this post" entry points.
+//
+// This header used to claim it was also invoked "from QuickPostComposer's
+// 'pick a date/time' step". It was not, and had not been: the composer has its
+// own date and time inputs. Corrected 2026-09-15 per Law 2 — a doc that
+// disagrees with the code is a bug, not a note. What the two surfaces DO share,
+// as of Phase 3, is the thing that actually matters: scheduleSeed.js decides
+// what both open on and what both refuse, so a reschedule and a new post cannot
+// disagree about when "too soon" begins.
 import { useEffect, useMemo, useState } from 'react';
 import {
   addMonthsToDateKey,
@@ -22,6 +29,7 @@ import {
   monthStartKeyFor,
   zonedDateTimeToUTC,
 } from '../../utils/timezone';
+import { checkScheduleFloor, seedFromPost } from '../scheduleSeed';
 
 function buildMiniCalendarDays(monthStartKey) {
   const first = monthStartKeyFor(monthStartKey);
@@ -48,22 +56,31 @@ export default function ScheduleModal({
   onConfirm, // (dateKey, timeStr) => void
 }) {
   const todayKey = useMemo(() => getZonedTodayKey(timezone), [timezone]);
-  const initialDateKey = post?.scheduled_at
-    ? new Date(post.scheduled_at).toISOString().slice(0, 10)
-    : todayKey;
 
-  const [monthStartKey, setMonthStartKey] = useState(() => monthStartKeyFor(initialDateKey));
-  const [selectedDateKey, setSelectedDateKey] = useState(initialDateKey);
-  const [timeStr, setTimeStr] = useState(() => {
-    if (!post?.scheduled_at) return '09:00';
-    const d = new Date(post.scheduled_at);
-    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-  });
+  // Seeded through scheduleSeed.js, the ONE place that decides what a picker
+  // opens on.
+  //
+  // This used to take the date from `.toISOString().slice(0,10)` and the time
+  // from `getUTCHours()` — UTC parts — while the banner a few lines below
+  // promised the account timezone and CalendarPage read the values back with
+  // zonedDateTimeToUTC(..., timezone). For any account off UTC, opening
+  // "Reschedule…" and pressing Confirm WITHOUT TOUCHING ANYTHING moved the post
+  // by the zone's offset, and moved it again on every reopen.
+  const seeded = useMemo(
+    () => seedFromPost(post, timezone),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [post?.scheduled_at, post?.id, timezone],
+  );
+
+  const [monthStartKey, setMonthStartKey] = useState(() => monthStartKeyFor(seeded.dateKey));
+  const [selectedDateKey, setSelectedDateKey] = useState(seeded.dateKey);
+  const [timeStr, setTimeStr] = useState(seeded.timeStr);
 
   useEffect(() => {
     if (!open) return;
-    setMonthStartKey(monthStartKeyFor(initialDateKey));
-    setSelectedDateKey(initialDateKey);
+    setMonthStartKey(monthStartKeyFor(seeded.dateKey));
+    setSelectedDateKey(seeded.dateKey);
+    setTimeStr(seeded.timeStr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, post?.id]);
 
@@ -72,8 +89,14 @@ export default function ScheduleModal({
   const days = buildMiniCalendarDays(monthStartKey);
   const monthLabel = formatDateKey(monthStartKey, { month: 'long', year: 'numeric' });
 
+  // The floor, evaluated on the resolved INSTANT rather than the wall clock —
+  // see scheduleSeed.js. Recomputed each render so the message tracks the clock
+  // while the modal sits open: a time that was valid when it opened can fall
+  // below the floor while the user is still deciding.
+  const floor = checkScheduleFloor(selectedDateKey, timeStr, timezone);
+
   const handleConfirm = () => {
-    if (!selectedDateKey || !timeStr) return;
+    if (!floor.ok) return;
     onConfirm?.(selectedDateKey, timeStr);
   };
 
@@ -161,9 +184,16 @@ export default function ScheduleModal({
           )}
         </div>
 
+        {/* Says WHY, and names the alternative. A bare disabled button here
+            reads as the product being broken — the user picked a real time and
+            nothing explains the refusal. */}
+        {!floor.ok && floor.reason && (
+          <div className="ui-field-error" role="alert">{floor.reason}</div>
+        )}
+
         <div className="schedule-modal__footer">
           <button type="button" className="ui-button ui-button-secondary ui-button-md" onClick={onClose}>Cancel</button>
-          <button type="button" className="ui-button ui-button-primary ui-button-md" onClick={handleConfirm} disabled={isSubmitting || !selectedDateKey}>
+          <button type="button" className="ui-button ui-button-primary ui-button-md" onClick={handleConfirm} disabled={isSubmitting || !floor.ok}>
             {isSubmitting ? 'Scheduling…' : 'Confirm schedule'}
           </button>
         </div>

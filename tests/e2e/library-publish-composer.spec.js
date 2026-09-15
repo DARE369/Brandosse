@@ -82,6 +82,14 @@ function luminance(rgbString) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+// Records a soft finding into the report AND fails the test — so a broken
+// expectation is both visible in the JSON and fatal, rather than one or the
+// other.
+const softFailures = [];
+function ok2(label, condition, detail) {
+  if (!condition) softFailures.push(`${label}${detail ? ` — ${detail}` : ""}`);
+}
+
 for (const themeName of ["light", "dark"]) {
   test.describe(`Phase 2 composer (${themeName})`, () => {
     test.describe.configure({ timeout: 420_000 });
@@ -223,6 +231,65 @@ for (const themeName of ["light", "dark"]) {
         report.disabledAfterAnswer = await publishNow.isDisabled();
       }
 
+      // ── Phase 3: the schedule picker ──────────────────────────────────────
+      //
+      // The seeded date/time must be in the FUTURE. This was a hardcoded
+      // '09:00', which for most of the working day is a time that has already
+      // passed — and the dispatcher selects `scheduled_at <= now()` every
+      // minute, so "scheduling" it sent it immediately.
+      const dateInput = composer.getByLabel('Date');
+      const timeInput = composer.getByLabel('Time');
+      if ((await dateInput.count()) > 0 && (await timeInput.count()) > 0) {
+        const seededDate = await dateInput.inputValue();
+        const seededTime = await timeInput.inputValue();
+        report.seededDate = seededDate;
+        report.seededTime = seededTime;
+
+        // Compare in the ACCOUNT timezone, which is not the browser's.
+        //
+        // `new Date("2026-09-15T13:10")` parses as browser-local. This machine
+        // runs WAT (+1) while the account is on UTC, so that comparison
+        // reported a correct 13:10 UTC seed as 47 minutes in the PAST — a
+        // product defect that was not one. Reading the zone the composer itself
+        // names, and formatting "now" into it, compares the seeded wall clock
+        // against the wall clock the user is actually looking at.
+        const tzBanner = await composer.locator('.tz-banner').first().innerText().catch(() => '');
+        const accountTz = (/timezone:\s*([A-Za-z_/+\-0-9]+)/.exec(tzBanner) || [])[1] || 'UTC';
+        report.accountTimezone = accountTz;
+
+        const nowInAccountTz = await page.evaluate((tz) => {
+          const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: tz, hourCycle: 'h23',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit',
+          }).formatToParts(new Date()).reduce((a, p) => (a[p.type] = p.value, a), {});
+          return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+        }, accountTz);
+        report.nowInAccountTz = nowInAccountTz;
+
+        // "YYYY-MM-DD HH:MM" sorts lexicographically, so string comparison is
+        // exact here and needs no offset arithmetic of its own to get wrong.
+        const seededStamp = `${seededDate} ${seededTime}`;
+        ok2(
+          `the picker seeds a FUTURE time (seeded ${seededStamp}, now ${nowInAccountTz} ${accountTz})`,
+          seededStamp > nowInAccountTz,
+        );
+
+        // And a time below the floor must block Schedule while leaving
+        // "Publish now" alone — scheduling has a floor, sending does not.
+        await timeInput.fill('00:01');
+        await dateInput.fill(seededDate);
+        await page.waitForTimeout(400);
+        const scheduleBtn = composer.getByRole('button', { name: /^Schedule/ }).first();
+        report.scheduleDisabledBelowFloor = await scheduleBtn.isDisabled();
+        report.publishNowStillEnabledBelowFloor = !(await composer
+          .getByRole('button', { name: 'Publish now', exact: true }).isDisabled());
+
+        // Restore, so the screenshot shows the real default.
+        await dateInput.fill(seededDate);
+        await timeInput.fill(seededTime);
+      }
+
       await page.screenshot({
         path: path.join(SHOT_DIR, `composer-${testInfo.project.name}-${themeName}.png`),
         fullPage: true,
@@ -232,6 +299,7 @@ for (const themeName of ["light", "dark"]) {
         JSON.stringify(report, null, 2),
       );
 
+      expect(softFailures, "schedule-picker expectations").toEqual([]);
       expect(errors, "no uncaught page errors or React errors").toEqual([]);
     });
   });
