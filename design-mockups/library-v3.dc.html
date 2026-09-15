@@ -458,6 +458,11 @@
     }
     .receipt__t { font-family:var(--font-display); font-size:17px; font-weight:700; }
     .receipt__d { font-size:12.5px; color:var(--text-2); margin-top:3px; }
+    /* Queued, not sent. Declared after the base rules on purpose — same
+       specificity, so source order decides, and a green tick on something that
+       has not happened yet is the whole defect this screen was correcting. */
+    .receipt__hero--pending { background:var(--info-wash); border:1px solid var(--info-border); }
+    .receipt__tick--pending { background:var(--info); color:var(--bg-canvas); }
 
     /* =====================================================================
        Platform previews. The point of these is TRUNCATION, not decoration:
@@ -991,20 +996,27 @@
     <sc-if value="{{isReceipt}}">
       <div class="page">
         <div class="receipt">
-          <div class="receipt__hero">
-            <span class="receipt__tick">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <!-- CORRECTED 2026-09-15. This said "Published to N of your accounts"
+               at click time, which the product cannot know. publish-post has one
+               caller: the cron worker process-scheduled-posts, registered
+               '* * * * *', which picks up rows where scheduled_at <= now().
+               Publishing is asynchronous. Asserting success at click time is the
+               2026-09-11 failure exactly — a post that reported success and died
+               fourteen seconds later. -->
+          <div class="receipt__hero receipt__hero--pending">
+            <span class="receipt__tick receipt__tick--pending">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
             </span>
             <div style="min-width:0">
-              <div class="receipt__t">Published to {{receiptCount}} of your accounts</div>
-              <div class="receipt__d">{{selected.title}} · sent at {{receiptWhen}}</div>
+              <div class="receipt__t">Going out now — {{receiptCount}} {{receiptAccountWord}}</div>
+              <div class="receipt__d">{{selected.title}} · queued at {{receiptWhen}}. The publisher checks every minute, so this leaves within about sixty seconds.</div>
             </div>
           </div>
 
           <!-- Reported per destination, because a multi-destination publish can
                genuinely half-succeed, and because two of these are live with a
                platform restriction that "Published!" alone would hide. -->
-          <div class="kicker">Where it went</div>
+          <div class="kicker">Where it is going</div>
           <sc-for list="{{receiptRows}}" as="r" hint-placeholder-count="2">
             <div class="row">
               <span class="conn__dot" style="background:{{r.dot}}"></span>
@@ -1012,13 +1024,22 @@
                 <div class="row__t">{{r.label}} · {{r.handle}}</div>
                 <div class="row__d">{{r.caveat}}</div>
               </div>
-              <sc-if value="{{r.restricted}}"><span class="pill pill--scheduled">Restricted</span></sc-if>
+              <span class="pill pill--scheduled">Queued</span>
               <button class="btn btn--ghost btn--sm" onClick="{{r.onPreview}}">Preview</button>
-              <button class="btn btn--subtle btn--sm" onClick="{{r.onOpen}}">View post →</button>
             </div>
           </sc-for>
+          <!-- No "View post" link yet: there is no post to view until the worker
+               has run. It appears on each row as that platform confirms. -->
+          <div class="hint">Each row becomes a link the moment that platform confirms. If one fails, it says so here and stays retryable — a multi-destination send can genuinely half-succeed.</div>
 
           <div class="kicker" style="margin-top:6px">What happens next</div>
+          <div class="row">
+            <div class="row__main">
+              <div class="row__t">You do not have to stay on this screen</div>
+              <div class="row__d">The send is queued on the server, not in this tab. Close it and the post still goes; the outcome lands on your Calendar either way.</div>
+            </div>
+            <button class="btn btn--ghost btn--sm" onClick="{{noopNav}}">Open Calendar</button>
+          </div>
           <div class="row">
             <div class="row__main">
               <div class="row__t">Performance starts arriving in about an hour</div>
@@ -1278,6 +1299,23 @@
               <label for="p-caption">{{captionLabel}}</label>
               <textarea id="p-caption" rows="5" defaultValue="{{captionValue}}"></textarea>
               <span class="hint">{{captionHint}}</span>
+            </div>
+
+            <!-- Answered once at generation and carried here, because "was this
+                 made by AI" is a fact about the asset, not about one send.
+                 Overridable per post, which is what the Settings copy promises. -->
+            <div class="req">
+              <div class="req__h" style="justify-content:space-between">
+                <span>Declare AI-generated media</span>
+                <div class="seg">
+                  <div class="seg__o {{aiOnCls}}" onClick="{{setAiOn}}">On</div>
+                  <div class="seg__o {{aiOffCls}}" onClick="{{setAiOff}}">Off</div>
+                </div>
+              </div>
+              <div class="hint">{{aiDisclosureHint}}</div>
+              <sc-if value="{{aiDisclosureOff}}">
+                <div class="reqnote">Platforms can restrict, demonetise or remove content — or action the account — over synthetic media that was not disclosed. Turning this off for this post is your call and your responsibility.</div>
+              </sc-if>
             </div>
 
             <sc-for list="{{requirements}}" as="req" hint-placeholder-count="2">
@@ -1687,6 +1725,7 @@ class Component extends DCLogic {
     chosen: ['youtube'],
     captionTab: 'all',
     madeForKids: 'no',
+    aiDisclosure: true,   // mirrors user_settings.generation_defaults.ai_disclosure
     privacy: 'self',   // the only value TikTok accepts from an unaudited client
     toast: null,
   };
@@ -2256,13 +2295,15 @@ class Component extends DCLogic {
       // Reported per destination and truthfully: YouTube's forced-private lock
       // is a successful publish with a caveat, not a failure, and saying
       // "Published!" without it would be the fabricated-success case.
+      // These describe what WILL be true when it lands, not what is true now.
+      // Nothing is live at this point: the worker has not run yet.
       const caveat = key === 'youtube'
-        ? 'Live, but locked to private by YouTube until the compliance review passes.'
-        : (key === 'tiktok' ? 'Live, visible only to you until TikTok’s content audit passes.' : 'Live and public.');
+        ? 'When it lands, YouTube will lock it to private until the compliance review passes.'
+        : (key === 'tiktok' ? 'When it lands, it will be visible only to you until TikTok’s content audit passes.' : 'Will be public when it lands.');
       return {
         key, label: p.label, handle: p.handle, dot: p.dot, caveat,
         restricted: key === 'youtube' || key === 'tiktok',
-        onOpen: () => this.toast(`Opening the ${p.label} post`),
+        onOpen: () => this.toast(`No ${p.label} post exists yet — it appears once the publisher has run.`),
         // Useful here mainly because these two are restricted: what you can see
         // as the owner is not what a viewer would have seen.
         onPreview: () => this.openPreview(key),
@@ -2350,6 +2391,15 @@ class Component extends DCLogic {
 
       publishOpen, closePublish: this.closePublish,
       destinations, captionTabs,
+      aiOnCls: this.state.aiDisclosure ? 'seg__o--on' : '',
+      aiOffCls: this.state.aiDisclosure ? '' : 'seg__o--on',
+      setAiOn: () => this.setState({ aiDisclosure: true }),
+      setAiOff: () => this.setState({ aiDisclosure: false }),
+      aiDisclosureOff: !this.state.aiDisclosure,
+      aiDisclosureHint: this.state.aiDisclosure
+        ? 'Sent to every destination that accepts it — YouTube and Instagram both do. Your default, from Settings.'
+        : 'This post goes out undeclared. Your default is On; this changes it for this post only.',
+
       seoPerDest, seoOverall, hasSeo: seoPerDest.length > 0,
       seoOverallCls: seoOverall >= 75 ? 'score--good' : (seoOverall >= 50 ? 'score--ok' : 'score--bad'),
       onOptimise: () => this.toast('Rewriting title, description and tags for discovery…'),
@@ -2398,10 +2448,14 @@ class Component extends DCLogic {
       requirements,
       publishSummary,
       confirmLabel: n === 0 ? 'Publish' : (n === 1 ? 'Publish now' : `Publish to ${n}`),
+      // "Queued" is what actually happens. The worker runs every minute; saying
+      // "Publishing…" would claim more than the click can know.
+      receiptAccountWord: receiptRows.length === 1 ? 'account' : 'accounts',
       confirmCls: n === 0 ? 'btn--disabled' : '',
       onConfirmPublish: () => (n === 0
         ? this.toast('Pick a destination first.')
         : this.doPublish(chosenValid.map((d) => d.key))),
+      onConfirmToast: 'Queued — going out within a minute',
       onScheduleFromSheet: this.openSchedule,
 
       toast,
