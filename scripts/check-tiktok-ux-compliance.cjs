@@ -49,7 +49,17 @@ if (!fs.existsSync(PANEL)) {
 
 const src = fs.readFileSync(PANEL, 'utf8');
 // Strip comments so prose describing a rule is never mistaken for the rule.
+//
+// CRLF is normalised FIRST, and that is load-bearing rather than tidy. This repo
+// is checked out on Windows with mixed line endings — this panel is LF today,
+// but calendarService.js beside it is CRLF. Splitting on "\n" alone leaves a
+// trailing "\r", and JavaScript's `.` does not match "\r", so `//.*$` never
+// reaches end-of-line and strips NOTHING. The comments then survive into the
+// text being searched, and every presence assertion below starts passing on the
+// strength of its own documentation. Found 2026-09-15 while writing
+// check-composer-field-contract.cjs, where exactly that happened.
 const code = src
+  .replace(/\r\n?/g, '\n')
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .split('\n')
   .map((l) => l.replace(/(^|[^:])\/\/.*$/, '$1'))

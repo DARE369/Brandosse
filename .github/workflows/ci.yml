@@ -122,6 +122,16 @@ jobs:
       - name: Media-required composer guard
         run: node scripts/check-media-required-guard.cjs
 
+      # Phase 2 (composer). The sibling of the guard above: that one asserts a
+      # post cannot reach a media-mandatory platform with no media, this one
+      # asserts it cannot reach a platform that hard-refuses missing per-post
+      # settings without them. Both are the same defect class — a requirement
+      # enforced at one end and never collected at the other. Found live: every
+      # TikTok post the composer created was refused at publish because
+      # workflow_state was written for YouTube only.
+      - name: Composer field contract
+        run: node scripts/check-composer-field-contract.cjs
+
       # LOCK L0.7 — the eight guard scripts that existed and never ran.
       # Later locks append their own below; all of them are blocking.
       - name: check-env-security

@@ -56,6 +56,7 @@ import useCalendarUiStore from '../../calendar/stores/calendarUiStore';
 import { useCalendarDrafts, useCalendarPosts } from '../../calendar/hooks/useCalendarPosts';
 import { useScheduleAction } from '../../calendar/hooks/useScheduleAction';
 import { createPost, createQuickPost, deletePost, fetchPostById, updatePost } from '../../calendar/services/calendarService';
+import { quickPostConfirmation } from '../../calendar/quickPostConfirmation';
 import { useMutableSearchParams } from '../../next/useMutableSearchParams';
 import { fetchAssetForHandoff, toQuickPostAssetShape, fetchPersonalAssets } from '../../services/assetLibraryService';
 
@@ -540,16 +541,14 @@ function CalendarBody({ brandKit }) {
         captions: payload.captions,
         asset: payload.asset,
         scheduledAtISO: payload.scheduledAtISO,
-        youtubeOptions: payload.youtubeOptions || null,
+        platformOptions: payload.platformOptions || {},
+        titles: payload.titles || {},
+        aiDisclosure: payload.aiDisclosure !== false,
       });
       refetch();
       refetchDrafts();
-      toastStack.push({
-        tone: 'success',
-        icon: TOAST_ICONS.success,
-        title: payload.mode === 'draft' ? 'Saved as draft' : 'Post scheduled',
-        desc: 'Find it in the Drafts rail, the calendar, or the Library anytime.',
-      });
+      const confirmation = quickPostConfirmation(payload.mode);
+      toastStack.push({ ...confirmation, icon: TOAST_ICONS[confirmation.tone] || TOAST_ICONS.success });
       return true;
     } catch (err) {
       console.error('[CalendarPage] Quick Post submit failed:', err);

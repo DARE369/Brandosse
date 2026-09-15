@@ -23,6 +23,7 @@
     "check:brand-logo-chain": "node scripts/check-brand-logo-chain.cjs",
     "check:outbound-fetch-guard": "node scripts/check-outbound-fetch-guard.cjs",
     "check:media-required-guard": "node scripts/check-media-required-guard.cjs",
+    "check:composer-field-contract": "node scripts/check-composer-field-contract.cjs",
     "check:brand-version-hash": "node scripts/check-brand-version-hash.cjs",
     "check:ssrf-blocklist": "node scripts/check-ssrf-blocklist.cjs",
     "check:brand-design-writer": "node scripts/check-brand-design-writer.cjs",

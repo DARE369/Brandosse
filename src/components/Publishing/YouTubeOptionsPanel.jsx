@@ -35,6 +35,16 @@ import styles from './YouTubeOptionsPanel.module.css';
  * declaration is theirs, not ours. Leaving it absent instead would just put the
  * question back in Studio, which is the problem being fixed.
  *
+ * ── …unless the surface above already asks it, ONCE ──────────────────────────
+ * A composer that publishes one asset to several destinations answers "was this
+ * made by AI" for the asset, not for each send — it maps to YouTube's
+ * containsSyntheticMedia and Instagram's is_ai_generated, and asking twice
+ * invites two different answers for the same file (PLATFORM-PUBLISH-FIELDS.md
+ * §0.1, §6.2). So `syntheticMedia` may be passed to make this field CONTROLLED
+ * from above, in which case the checkbox here is not rendered at all — one fact,
+ * one control. Omit the prop and the panel owns the field exactly as before,
+ * which is what Studio's PostProductionPanel does; its behaviour is unchanged.
+ *
  * ── Visibility defaults to private, and says why ─────────────────────────────
  * Private is the only safe direction (a private video can be made public; an
  * unintended public one cannot be un-seen), and before the compliance audit
@@ -74,13 +84,26 @@ export default function YouTubeOptionsPanel({
   accountName,
   /** Flip to true once the app passes YouTube's compliance audit. */
   auditPassed = false,
+  /**
+   * Optional. When a boolean is passed, the altered/synthetic-content
+   * declaration is CONTROLLED by the caller and its checkbox is not rendered —
+   * see the header. `undefined` (the default) leaves the panel in charge, which
+   * is every existing call site.
+   */
+  syntheticMedia,
   onChange,
   onValidityChange,
 }) {
   const [madeForKids, setMadeForKids] = useState(UNANSWERED);
   const [privacyStatus, setPrivacyStatus] = useState('private');
   const [categoryId, setCategoryId] = useState('22');
-  const [containsSyntheticMedia, setContainsSyntheticMedia] = useState(false);
+  const [ownSyntheticMedia, setOwnSyntheticMedia] = useState(false);
+
+  // Controlled only when the caller actually supplies a boolean. A truthiness
+  // test would hand control over on `false`, which is a real declaration and the
+  // common one — the panel would then silently stop tracking its own checkbox.
+  const syntheticIsControlled = typeof syntheticMedia === 'boolean';
+  const containsSyntheticMedia = syntheticIsControlled ? syntheticMedia : ownSyntheticMedia;
 
   const isValid = madeForKids !== UNANSWERED;
 
@@ -200,24 +223,29 @@ export default function YouTubeOptionsPanel({
         </select>
       </fieldset>
 
-      {/* ── Altered or synthetic content ────────────────────────────────── */}
-      <fieldset className={styles.group}>
-        <legend className={styles.legend}>Altered or synthetic content</legend>
-        <label className={styles.checkbox}>
-          <input
-            type="checkbox"
-            checked={containsSyntheticMedia}
-            onChange={(e) => setContainsSyntheticMedia(e.target.checked)}
-          />
-          <span>This video contains realistic altered or AI-generated content</span>
-        </label>
-        <p className={styles.help}>
-          YouTube requires this only when the content is <em>realistic</em> — a real
-          person saying something they never said, a real place altered, an event that
-          did not happen. Clips cut from genuine footage are not that. Left unticked,
-          we tell YouTube this video contains none.
-        </p>
-      </fieldset>
+      {/* ── Altered or synthetic content ──────────────────────────────────
+          Hidden when controlled: the caller is already asking this once for the
+          whole asset, and a second checkbox saying the same thing is how the
+          same file gets disclosed to YouTube and not to Instagram. */}
+      {!syntheticIsControlled ? (
+        <fieldset className={styles.group}>
+          <legend className={styles.legend}>Altered or synthetic content</legend>
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={containsSyntheticMedia}
+              onChange={(e) => setOwnSyntheticMedia(e.target.checked)}
+            />
+            <span>This video contains realistic altered or AI-generated content</span>
+          </label>
+          <p className={styles.help}>
+            YouTube requires this only when the content is <em>realistic</em> — a real
+            person saying something they never said, a real place altered, an event that
+            did not happen. Clips cut from genuine footage are not that. Left unticked,
+            we tell YouTube this video contains none.
+          </p>
+        </fieldset>
+      ) : null}
     </div>
   );
 }

@@ -373,14 +373,30 @@ export async function fetchConnectedAccounts(scope, { platforms = null } = {}) {
  *
  * @param {object} scope - { workspaceType: 'personal', userId }
  * @param {object} params
- * @param {'draft'|'schedule'} params.mode
+ * @param {'draft'|'schedule'|'publish'} params.mode - 'publish' is 'schedule'
+ *        with scheduled_at already past; see the status derivation below.
  * @param {string[]} params.platforms - active platform keys (e.g. 'instagram')
  * @param {Record<string,string>} params.captions - platform key -> caption text
+ * @param {Record<string,object>} params.platformOptions - platform key -> the
+ *        per-post settings that platform's adapter requires, already in the
+ *        adapter's own key vocabulary. Written to workflow_state.<platform>.
+ * @param {Record<string,string>} params.titles - platform key -> a real title,
+ *        for platforms where the title is separate from the caption.
+ * @param {boolean} params.aiDisclosure - does this asset contain AI-generated media
  * @param {{ id?: string, generation_id?: string, thumbnail_url?: string, media_type?: string } | null} params.asset
  * @param {string|null} params.scheduledAtISO - already timezone-resolved UTC ISO, or null for draft
  * @returns {Promise<Array>} the created post rows
  */
-export async function createQuickPost(scope, { mode, platforms, captions, asset, scheduledAtISO, youtubeOptions = null }) {
+export async function createQuickPost(scope, {
+  mode,
+  platforms,
+  captions,
+  asset,
+  scheduledAtISO,
+  platformOptions = {},
+  titles = {},
+  aiDisclosure = true,
+}) {
   const userId = assertPersonalScope(scope, 'createQuickPost');
 
   const activePlatforms = Array.isArray(platforms) ? platforms.filter(Boolean) : [];
@@ -391,8 +407,34 @@ export async function createQuickPost(scope, { mode, platforms, captions, asset,
   const accounts = await fetchConnectedAccounts(scope, { platforms: activePlatforms });
   const accountByPlatform = new Map(accounts.map((a) => [a.platform, a]));
 
-  const status = mode === 'schedule' ? POST_STATUS.SCHEDULED : POST_STATUS.DRAFT;
+  // ── 'publish' is 'scheduled', at a time already past ──────────────────────
+  //
+  // There is no on-demand publish path in this product and Phase 2 deliberately
+  // did not build one. publish-post has exactly ONE caller: the database cron
+  // worker process-scheduled-posts, registered '* * * * *', which selects
+  // status='scheduled' AND scheduled_at <= now(), marks each row publishing to
+  // prevent duplicate dispatch, and caps at 50 per run
+  // (20260710140000_create_process_scheduled_posts.sql). Nothing client-side can
+  // invoke the publisher.
+  //
+  // So "publish now" writes a scheduled row whose time has passed, and the
+  // proven dispatcher picks it up within the minute — no second endpoint, no
+  // second auth surface, no re-solved idempotency. The caller supplies
+  // scheduledAtISO = now(); this function only has to agree that 'publish' is a
+  // sending mode. Any UI claiming the post IS published at this moment would be
+  // asserting something nothing here knows.
+  const isSending = mode === 'schedule' || mode === 'publish';
+  const status = isSending ? POST_STATUS.SCHEDULED : POST_STATUS.DRAFT;
   const generationId = asset?.generation_id || null;
+
+  if (isSending && !scheduledAtISO) {
+    // Fail loudly rather than inserting a scheduled row with a null time. Such a
+    // row can never satisfy `scheduled_at <= now()`, so it would sit in
+    // 'scheduled' forever — visible in the calendar, counted as pending, never
+    // sent, and never reported as failed. That is the silent non-terminal state
+    // the reaper exists to catch; better not to create one.
+    throw new Error('A post cannot be scheduled without a time.');
+  }
 
   // `posts` has no `media_type`/`thumbnail_url`/`media_url` columns — those
   // live on `generations` only (confirmed live against the real Supabase
@@ -403,8 +445,48 @@ export async function createQuickPost(scope, { mode, platforms, captions, asset,
   // real `posts` columns via a live schema probe: id, user_id, platform,
   // account_id, caption, hashtags, status, scheduled_at, generation_id,
   // title, plus org/lifecycle/moderation columns not relevant here.
+  const capturedAt = new Date().toISOString();
+
   const rows = activePlatforms.map((platformKey) => {
     const account = accountByPlatform.get(platformKey) || null;
+
+    // ── Per-post platform settings ────────────────────────────────────────
+    //
+    // Written for EVERY platform that supplied them, not only YouTube.
+    //
+    // This used to be `platformKey === 'youtube' && youtubeOptions`, and the
+    // consequence was not cosmetic: the composer offers every platform with a
+    // live credential, TikTok included, so a TikTok post was inserted with no
+    // workflow_state at all. optionsFor("tiktok") then returned null
+    // (publish-post/index.ts:256-259) and the adapter refused every one of them
+    // — "No TikTok privacy level was chosen for this post"
+    // (tiktok.service.ts:195-200), which is correct behaviour on its part,
+    // because privacy_level is deliberately undefaulted there. The post was lost
+    // between two components that were each behaving properly.
+    //
+    // The keys inside `settings` are the ADAPTER's vocabulary, produced by the
+    // same options panels the Studio uses, and are passed through untouched. A
+    // translation layer here would be a second place for them to drift;
+    // scripts/check-composer-field-contract.cjs asserts the two ends still agree.
+    const settings = platformOptions?.[platformKey]
+      ? { ...platformOptions[platformKey] }
+      : null;
+
+    // AI disclosure is a fact about the ASSET, answered once in the composer and
+    // carried to every destination that has somewhere to put it. YouTube's home
+    // for it is status.containsSyntheticMedia, which the adapter reads from
+    // contains_synthetic_media (youtube.service.ts:181-182). Instagram's
+    // is_ai_generated has no adapter yet, so there is nothing to carry it to
+    // there — when that adapter is built, this is where it joins.
+    if (settings && platformKey === 'youtube') {
+      settings.contains_synthetic_media = aiDisclosure === true;
+    }
+
+    // A real, user-supplied title wins over the asset's file name. YouTube shows
+    // this above the player and falls back to post.title, so with no field for
+    // it a clip published as "clip-3.mp4" (youtube.service.ts:263-266).
+    const title = String(titles?.[platformKey] || '').trim() || asset?.name || null;
+
     return {
       user_id: userId,
       platform: platformKey,
@@ -412,28 +494,14 @@ export async function createQuickPost(scope, { mode, platforms, captions, asset,
       caption: captions?.[platformKey] || '',
       hashtags: [],
       status,
-      scheduled_at: mode === 'schedule' ? scheduledAtISO : null,
+      scheduled_at: isSending ? scheduledAtISO : null,
       generation_id: generationId,
-      title: asset?.name || null,
-      // YouTube refuses to publish without a made-for-kids declaration — it is
-      // a COPPA statement, so the adapter will not invent one (see
-      // _shared/youtube.service.ts). Carried here so the answer the user gave
-      // in the composer reaches the publisher; without it the post fails at
-      // publish time with an instruction the user cannot act on.
-      //
+      title,
       // Written as a whole object because this row is new: there is no prior
       // workflow_state to merge with. Every LATER writer must read-modify-write
       // instead, since approval routing and publish accounting share the column.
-      ...(platformKey === 'youtube' && youtubeOptions
-        ? {
-            workflow_state: {
-              youtube: {
-                made_for_kids: youtubeOptions.madeForKids,
-                privacy_status: youtubeOptions.privacyStatus || 'private',
-                capturedAt: new Date().toISOString(),
-              },
-            },
-          }
+      ...(settings
+        ? { workflow_state: { [platformKey]: { ...settings, capturedAt } } }
         : {}),
     };
   });

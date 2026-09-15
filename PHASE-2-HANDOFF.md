@@ -1,5 +1,23 @@
 # Phase 2 — composer. Handoff for a fresh session.
 
+> ## ✅ PHASE 2 IS COMPLETE — 2026-09-15
+>
+> Everything below is the brief that was worked to, kept because its four
+> findings still constrain Phase 3. **The file-by-file plan in "What Phase 2 has
+> to do" is now history, not instructions** — it has been carried out. For what
+> was actually built, and the two defects found in the work itself, see
+> **Phase 2 — COMPLETE** in
+> [`LIBRARY-PUBLISH-IMPLEMENTATION-PLAN.md`](LIBRARY-PUBLISH-IMPLEMENTATION-PLAN.md).
+>
+> **One thing this brief did not know, and Phase 3 should:** every TikTok post
+> the composer created was already failing at publish, because `workflow_state`
+> was written for YouTube only. Guarded now by
+> `scripts/check-composer-field-contract.cjs` (27 links, in CI), which walks
+> *panel emits → composer collects → service persists → adapter reads* and fails
+> in both directions.
+>
+> **Open decisions #2 (AI disclosure) and #3 (post naming) are closed.**
+
 Written 2026-09-15, at the end of the session that completed Phase 0 and Phase 1.
 Read this with [`LIBRARY-PUBLISH-IMPLEMENTATION-PLAN.md`](LIBRARY-PUBLISH-IMPLEMENTATION-PLAN.md) and [`PLATFORM-PUBLISH-FIELDS.md`](PLATFORM-PUBLISH-FIELDS.md).
 

@@ -150,6 +150,7 @@ export default function AssetCard({
   onToggleSelect,
   onOpenDrawer,
   onSchedule,
+  onPublish,
   onArchive,
   onDelete,
 }) {
@@ -189,8 +190,30 @@ export default function AssetCard({
       </div>
 
       <div className={styles.assetActions}>
+        {/* Publish opens the composer HERE, over the Library, with this asset
+            attached. Schedule still hands off to the Calendar, which is where a
+            date is picked — Phase 3 unifies the two pickers.
+
+            Both are gated on canOpenComposer rather than canPublish, and that is
+            deliberate: an asset with nowhere to go still opens the composer,
+            because a disabled button can only say THAT it cannot be sent, while
+            the composer can say why, per platform. derivePublishability() is the
+            single source of that answer (publishability.js:100) — never
+            re-derived here. */}
         <Button
           size="sm"
+          disabled={Boolean(publishability) && !publishability.canOpenComposer}
+          title={publishability?.reason || undefined}
+          onClick={(event) => {
+            event.stopPropagation();
+            onPublish?.(asset);
+          }}
+        >
+          Publish
+        </Button>
+        <Button
+          size="sm"
+          variant="subtle"
           disabled={Boolean(publishability) && !publishability.canOpenComposer}
           title={publishability?.reason || undefined}
           onClick={(event) => {

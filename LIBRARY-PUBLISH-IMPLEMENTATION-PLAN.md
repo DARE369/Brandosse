@@ -257,6 +257,47 @@ Total findings 254 → 189 **before** the deletion, entirely by removing false p
 **Proven:** an E2E run per platform asserting the request body matches `PLATFORM-PUBLISH-FIELDS.md` — in particular that YouTube receives a title and TikTok receives `SELF_ONLY`, and that neither is silently defaulted.
 **Guarded:** a contract test that fails if a required field is dropped between composer and adapter.
 
+### Phase 2 — COMPLETE, 2026-09-15
+
+**The finding that reframed the phase: every TikTok post the composer created was already failing at publish.** Not hypothetically — traced end to end. `QuickPostComposer` offers every platform with a live credential (`QuickPostComposer.jsx:74-93`, reading `connected_accounts_health_summary`), TikTok included. `createQuickPost` wrote `workflow_state` only when `platformKey === 'youtube'` (`calendarService.js:428-441`). So `optionsFor("tiktok")` returned null (`publish-post/index.ts:256-259`) and the adapter refused with *"No TikTok privacy level was chosen for this post"* (`tiktok.service.ts:195-200`) — correctly, since `privacy_level` is deliberately undefaulted there. Three components each behaving exactly as documented, and the post died between them. Phase 2 was therefore less "build a composer" than "connect one that was already half-wired".
+
+**The second finding: the collection UI existed and was mounted nowhere users go.** `TikTokOptionsPanel` and `YouTubeOptionsPanel` both already emitted their adapter's exact key vocabulary — TikTok camelCase (`tiktok.service.ts:195,246-250`), YouTube snake_case (`youtube.service.ts:158,173-182`) — and both were mounted only in Studio's `PostProductionPanel`. The composer meanwhile hand-rolled two made-for-kids buttons and hardcoded `privacyStatus:'private'`, collecting neither `contains_synthetic_media` nor `category_id`, both of which the adapter reads. The fix was to mount the real panels, not to write better fields.
+
+| Change | Effect |
+|---|---|
+| Mounted the shared `TikTokOptionsPanel` / `YouTubeOptionsPanel` in the composer | The platforms it offers are now the platforms it can satisfy. TikTok's panel is a compliance artefact whose exact controls condition Direct Post approval — a local copy would drift. |
+| `workflow_state` written per platform, keyed by the row's own `platformKey` | Closes the TikTok failure above. |
+| `onSubmit` gained a third mode, `publish` | `status:'scheduled'` with `scheduled_at = now()`. No second endpoint: `publish-post` still has exactly one caller. |
+| Per-platform title field, gated on `platformNeedsTitle()` | YouTube no longer publishes videos named `clip-3.mp4`. Closes open decision #3. |
+| AI disclosure read from `generation_defaults.ai_disclosure` | The setting had a UI and **no reader** since it shipped. One control, not two: `YouTubeOptionsPanel` takes it as a controlled prop and hides its own checkbox. |
+| Caption limits sourced from `getPlatformSpec()` | Deleted a second hardcoded limit table that agreed with the first by luck and nothing else. |
+| Library mounts the composer in place | `derivePublishability()` decides the affordance; it is never re-derived. |
+| Confirmation copy moved to `quickPostConfirmation.js` | "Going out now", never "Published" — Calendar and Library cannot drift apart on the one claim the click cannot make. |
+
+**Four defects found in the work itself, and the last two were found only by RENDERING it:**
+
+1. **A temporal dead zone that `next build` compiled without complaint.** `sendBlocked` read `isSubmitting` seventeen lines before its `const` — a `ReferenceError` on the composer's first render. The build exits 0 because compiling a modal is not rendering one. Caught by checking declaration order, then confirmed by rendering. *A green build is not a rendered component.*
+2. **The new guard passed while reading its own documentation.** Two assertions fired against comments in the files they guarded. The comment stripper then failed too — this repo has mixed line endings, `split('\n')` leaves a trailing `\r`, and JavaScript's `.` does not match `\r`, so `//.*$` never reached end-of-line. The same latent bug sat in `check-tiktok-ux-compliance.cjs`, a *compliance* guard; fixed and re-verified there too.
+
+3. **An infinite render loop — "Maximum update depth exceeded".** `YouTubeOptionsPanel` emits from an effect that lists `onChange` in its dependencies. `useCallback((key) => (settings) => …)` memoises only the OUTER function, so each render still returned a fresh inner arrow: effect fires → parent `setState` → re-render → new callback → effect fires. The composer was unusable. **Only YouTube showed it** — TikTok's panel omits `onChange` from its deps — which is exactly how a defect hides in one of two otherwise identical integrations. Fixed with ref-cached per-platform handlers, now asserted by the contract guard.
+
+4. **A temporal dead zone `next build` compiled happily.** Recorded above.
+
+**Both 3 and 4 were invisible to every static guard and to the build.** They were found by opening the composer in a browser. The lesson is the standing one, earned again: a green build is not a rendered component.
+
+**Two false alarms worth recording, because each looked exactly like a real defect:**
+
+- **"The options panel renders near-black on a light page."** Measured `rgb(23,24,27)` on `rgb(250,250,247)` — the signature of the undefined-token defect. It was the *test*: `--uiv2-*` tokens are scoped to `[data-uiv2-theme]`, stamped by `UiV2ThemeProvider` from localStorage key **`uiv2-theme`** (`ThemeProvider.jsx:6`), and the spec set only the legacy `app-theme-preference`. That produced a light body with ui-v2 still dark — a state the real toggle cannot reach. Measured correctly afterwards: panel `#FFFFFF` on page `#FAFAF7` in light, `#17181B` on `#0E0F11` in dark. **Correct in both.**
+- **"No asset is publishable."** Zero enabled Publish buttons — because the Library had not finished loading and every rail read `All 0`. A fixed `waitForTimeout` raced the fetch. A timing artifact that renders as a product claim is worse than a crash, because it is quotable.
+
+**Guarded:** `scripts/check-composer-field-contract.cjs`, 27 links, in CI. It walks *panel emits → composer collects → service persists → adapter reads* and fails in **both** directions — a key an adapter demands that nothing sends, and a platform that refuses without settings the composer never collects. The refusing-platform list is derived from the adapters at runtime, not hardcoded, so the two cannot drift apart.
+
+**Verified to fail, per the standing rule.** Eleven deliberate breaks across all six assertion groups, each producing exit 1, each restored. `check-media-required-guard` was extended the same way and **a real weakness was found by that process**: moving a send handler from a `<button>` onto an `<a>` left the guard borrowing the previous sibling button's `disabled={sendBlocked}`, and it passed. Bounded on `</button>` and re-verified.
+
+**Proven by rendering:** `tests/e2e/library-publish-composer.spec.js`, both themes, measured rather than eyeballed — no page or React errors, composer opens without navigating, exactly one AI-disclosure control, YouTube's own synthetic-media checkbox absent (`count === 0`), a real YouTube title field, panel/page background luminance compared numerically, and "Publish now" disabled before the COPPA answer (`true`) and enabled after (`false`). It asserts the QA account has a publishable YouTube connection and **fails rather than skips** without one — a spec that quietly stops proving anything is the failure mode this repo keeps producing.
+
+*Known limitation:* against a local dev server that has just run it repeatedly, the spec is flaky on login and first-hit route compilation (this machine runs a 94%-full disk). The failures are timeouts, never assertion failures. Confirm it against a built server in CI.
+
 ### Phase 3 — Schedule, unified
 - One picker from card, drawer and composer. Seeded from the clock at open, rounded up, past the 10-minute floor. Timezone explicit.
 
@@ -296,8 +337,8 @@ These block design, not effort. Each needs an answer before the phase that depen
 | # | Question | Blocks | Why it can't be defaulted |
 |---|---|---|---|
 | 1 | **Studio versions vs Library versions.** Studio has five regenerate paths producing variants; the Library tracks supersession chains. Neither knows the other. Does regenerating create a new *version* of one asset, or a separate asset? | Phase 1 | Either answer is defensible; picking wrong either fills the Library with near-duplicates or hides work the user wants to compare. |
-| 2 | **Where AI disclosure is answered.** Maps to YouTube `containsSyntheticMedia` and Instagram `is_ai_generated`. Recommendation: once at generation, carried to every destination. | Phase 2 | Asking per-publish invites contradictory answers for the same file — the field most likely to get an account actioned. |
-| 3 | **Post naming.** Quick Post writes `title: asset?.name` (`calendarService.js:417`), but a post created without an asset gets `null` and falls back to caption → prompt → "Untitled". | Phase 2 | Needs the reported screenshot to identify which path produced an ID rather than a name. |
+| 2 | ~~**Where AI disclosure is answered.**~~ **CLOSED 2026-09-15.** Answered once in Settings (`generation_defaults.ai_disclosure`, default true), shown in the composer with a per-post override, carried to `workflow_state.youtube.contains_synthetic_media`. `YouTubeOptionsPanel` takes it as a controlled prop and hides its own checkbox, so there is exactly one control for one fact. Instagram's `is_ai_generated` has no adapter yet and is joined when one exists. | ~~Phase 2~~ | — |
+| 3 | ~~**Post naming.**~~ **CLOSED 2026-09-15.** The composer now collects a real title wherever `platformNeedsTitle()` is true, and `createQuickPost` prefers it over the asset's file name. The old fallback chain still applies when no title is given, so a post without an asset is unchanged. | ~~Phase 2~~ | — |
 | 4 | **TikTok domain verification.** Photo posts are pull-from-URL only and need a verified domain. Until then TikTok images are designed but locked. | Phase 7 | An ops task, not an engineering one. |
 
 ---

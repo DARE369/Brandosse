@@ -22,7 +22,7 @@ import { useAuth } from "../../Context/AuthContext";
 import usePersistentState from "../../hooks/usePersistentState";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import useLibraryStore from "../../stores/LibraryStore";
-import { buildScheduleHandoffPath } from "../../services/assetLibraryService";
+import { buildScheduleHandoffPath, toQuickPostAssetShape } from "../../services/assetLibraryService";
 import {
   getItemTitle,
   getSourceLabel,
@@ -36,6 +36,11 @@ import {
 import AssetCard from "./components/AssetCard";
 import { derivePublishability } from "./publishability";
 import useConnectedPlatforms from "./useConnectedPlatforms";
+import QuickPostComposer from "../../calendar/components/QuickPostComposer";
+import { createQuickPost } from "../../calendar/services/calendarService";
+import { quickPostConfirmation } from "../../calendar/quickPostConfirmation";
+import { DEFAULT_TIMEZONE } from "../../utils/timezone";
+import { fetchUserSettings } from "../../services/userSettingsService";
 import BulkActionBar from "./components/BulkActionBar";
 import UploadModal from "./components/UploadModal";
 import AssetDetailDrawer from "./components/AssetDetailDrawer";
@@ -141,6 +146,37 @@ function LibraryBody() {
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
 
   const [showUploadModal, setShowUploadModal] = useState(false);
+  // The asset the publish composer is open over, already in the composer's
+  // prop shape. Null = closed.
+  const [composerAsset, setComposerAsset] = useState(null);
+
+  // The composer renders times in the account timezone and says so in its own
+  // banner, so an unresolved timezone would have it confidently label a time in
+  // the wrong zone. Defaults to DEFAULT_TIMEZONE until settings load, exactly as
+  // CalendarPage does — one answer to "what time is it for this user".
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let mounted = true;
+    fetchUserSettings(user.id)
+      .then((settings) => { if (mounted) setTimezone(settings.timezone || DEFAULT_TIMEZONE); })
+      .catch((err) => {
+        // Non-fatal: the banner falls back to the default and still names the
+        // zone it is using, so the user is never shown an unlabelled time.
+        console.error("[LibraryPage] could not load timezone:", err?.message || err);
+      });
+    return () => { mounted = false; };
+  }, [user?.id]);
+
+  // The composer's asset picker, so a user who opened it on the wrong asset can
+  // switch without closing. The opened asset goes first and is deduped, so it
+  // stays visible even when the current filters would exclude it — arriving from
+  // a card and not finding that asset in the picker would be its own bug.
+  const composerLibraryAssets = useMemo(() => {
+    const shaped = (assets || []).map(toQuickPostAssetShape).filter(Boolean);
+    if (!composerAsset) return shaped;
+    return [composerAsset, ...shaped.filter((a) => a.id !== composerAsset.id)];
+  }, [assets, composerAsset]);
   const [drawerAsset, setDrawerAsset] = useState(null);
   const [drawerUsedIn, setDrawerUsedIn] = useState([]);
   const [versionChain, setVersionChain] = useState([]);
@@ -250,8 +286,57 @@ function LibraryBody() {
     };
   }, [counts, assets]);
 
+  // Schedule still hands off to the Calendar, where the date picker lives.
+  // Phase 3 unifies the two pickers; until then, moving this would mean building
+  // a second one here.
   const handleSchedule = (asset) => {
     navigate(buildScheduleHandoffPath(asset.id));
+  };
+
+  // ── Publish: open the composer over the Library ──────────────────────────
+  //
+  // The composer is MOUNTED here rather than navigated to. The whole point of
+  // the Library→publish join is that the user does not lose their place in the
+  // grid to send one asset; bouncing to the Calendar and back is the flow this
+  // replaces (LIBRARY-PUBLISH-IMPLEMENTATION-PLAN.md §1, join 1).
+  //
+  // Nothing about publishability is re-derived here. The card already computed
+  // it via derivePublishability(), which decided whether this handler was
+  // reachable at all; a second opinion on the same question is how two surfaces
+  // start disagreeing about whether an asset can be sent.
+  const handlePublish = (asset) => {
+    setComposerAsset(toQuickPostAssetShape(asset));
+  };
+
+  const handleComposerSubmit = async (payload) => {
+    if (!user?.id) {
+      toast.error("Sign in again to publish — your session could not be read.");
+      return false;
+    }
+    try {
+      await createQuickPost({ workspaceType: "personal", userId: user.id }, {
+        mode: payload.mode,
+        platforms: payload.platforms,
+        captions: payload.captions,
+        asset: payload.asset,
+        scheduledAtISO: payload.scheduledAtISO,
+        platformOptions: payload.platformOptions || {},
+        titles: payload.titles || {},
+        aiDisclosure: payload.aiDisclosure !== false,
+      });
+      // Same copy the Calendar uses, from the same module — so neither surface
+      // can drift into claiming the post is published when all that is known is
+      // that it is queued. See quickPostConfirmation.js.
+      const confirmation = quickPostConfirmation(payload.mode);
+      toast.success(`${confirmation.title} — ${confirmation.desc}`);
+      return true;
+    } catch (err) {
+      console.error("[LibraryPage] publish submit failed:", err);
+      toast.error(err?.message
+        ? `${err.message} — nothing was saved. Your captions are still in the form.`
+        : "Nothing was saved. Your captions are still in the form.");
+      return false;
+    }
   };
 
   const openDrawer = async (asset) => {
@@ -596,6 +681,7 @@ function LibraryBody() {
                           onOpenDrawer={openDrawer}
                           publishability={derivePublishability(asset, connectedPlatforms)}
                           onSchedule={handleSchedule}
+                          onPublish={handlePublish}
                           onArchive={handleArchive}
                           onDelete={(a) => setDeleteTarget(a)}
                         />
@@ -625,7 +711,9 @@ function LibraryBody() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredAssets.map((asset) => (
+                        {filteredAssets.map((asset) => {
+                          const publishability = derivePublishability(asset, connectedPlatforms);
+                          return (
                           <tr key={asset.id}>
                             <td className={styles.checkboxCell}>
                               <input
@@ -652,13 +740,26 @@ function LibraryBody() {
                             <td>
                               <div className={styles.tableActions}>
                                 <Button variant="subtle" size="sm" onClick={() => openDrawer(asset)}>View</Button>
+                                {/* Same two actions as the grid card, and gated
+                                    by the same derivation — a row and a card
+                                    showing different answers for one asset is
+                                    the drift this avoids. */}
+                                <Button
+                                  size="sm"
+                                  disabled={!publishability.canOpenComposer}
+                                  title={publishability.reason || undefined}
+                                  onClick={() => handlePublish(asset)}
+                                >
+                                  Publish
+                                </Button>
                                 <IconButton title="Schedule" onClick={() => handleSchedule(asset)}>
                                   <Calendar size={14} aria-hidden="true" />
                                 </IconButton>
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -696,6 +797,27 @@ function LibraryBody() {
         onUploadOne={handleUploadOne}
         onMarkAsVersion={handleMarkAsVersion}
       />
+
+      {/* The Calendar's composer, mounted over the Library — not a Library copy
+          of it. Two composers means one of them rots
+          (LIBRARY-PUBLISH-IMPLEMENTATION-PLAN.md §6), and the one that rots is
+          always the one fewer people open.
+
+          primaryAction="publish" is the only difference from the Calendar's
+          mount: this surface leads with "Publish now" because the user arrived
+          holding a finished asset, while the Calendar leads with "Schedule"
+          because the user arrived holding a date. Both write the same row. */}
+      {composerAsset && (
+        <QuickPostComposer
+          open
+          timezone={timezone}
+          primaryAction="publish"
+          libraryAssets={composerLibraryAssets}
+          prefillAsset={composerAsset}
+          onClose={() => setComposerAsset(null)}
+          onSubmit={handleComposerSubmit}
+        />
+      )}
 
       <AssetDetailDrawer
         asset={drawerAsset}

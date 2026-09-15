@@ -125,10 +125,62 @@ assert(
   + 'selected" while carrying nothing the publisher can resolve.',
 );
 
+// The media requirement must reach EVERY button that writes a sendable row.
+//
+// This was originally a single `disabled={...needsMedia...}` match. Phase 2 gave
+// the composer a second send button ("Publish now" beside "Schedule…"), and a
+// per-button regex would have gone on passing while the new button was entirely
+// ungated — a guard aimed at the button that happened to exist when it was
+// written, which is the check-video-prefs-contract failure in miniature. So the
+// chain is asserted in two links instead: needsMedia feeds the shared
+// `sendBlocked` constant, and every send button is disabled by that constant.
+// A third send button that skips it fails here.
+const sendBlockedDecl = /const\s+sendBlocked\s*=([\s\S]*?);/.exec(composer);
 assert(
-  /disabled=\{[^}]*needsMedia/.test(composer),
-  'QuickPostComposer.jsx computes a media requirement but its submit button is '
-  + 'not disabled by it. A guard that does not block is decoration.',
+  Boolean(sendBlockedDecl) && /needsMedia/.test(sendBlockedDecl[1]),
+  'QuickPostComposer.jsx computes a media requirement but it does not feed the '
+  + 'shared sendBlocked constant. A guard that does not block is decoration.',
+);
+
+const sendHandlers = [...composer.matchAll(/handleSubmit\(\s*'(schedule|publish)'\s*\)/g)];
+assert(
+  sendHandlers.length > 0,
+  'QuickPostComposer.jsx has no schedule/publish submit handler at all. Either '
+  + 'the composer can no longer send, or this check is looking at the wrong thing.',
+);
+
+// For each send handler, take the element that carries it — the text from the
+// nearest preceding `<button` up to the handler — and require that slice to
+// carry disabled={sendBlocked}. Walking backwards from the handler, rather than
+// matching a whole tag, is deliberate: a JSX attribute contains `=>` and `}`,
+// so any "match the tag" regex either stops early on the arrow or runs past the
+// element entirely. This way each send path is checked as its own element and a
+// new one cannot hide behind an older sibling's guard.
+const ungatedSend = [];
+let orphanHandlers = 0;
+for (const handler of sendHandlers) {
+  const openIdx = composer.lastIndexOf('<button', handler.index);
+  const element = openIdx === -1 ? null : composer.slice(openIdx, handler.index);
+  // The nearest preceding `<button` is only the OWNER if no `</button>` closed
+  // in between. Without that bound the walk happily borrows a previous sibling's
+  // guard: moving a send handler onto an <a> left the Schedule button as the
+  // nearest `<button`, and its disabled={sendBlocked} made the ungated anchor
+  // look checked. Verified by deliberately doing exactly that and watching this
+  // pass — which is why the bound is here.
+  if (element === null || element.includes('</button>')) { orphanHandlers += 1; continue; }
+  if (!/disabled=\{\s*sendBlocked\s*\}/.test(element)) ungatedSend.push(handler[0]);
+}
+assert(
+  orphanHandlers === 0,
+  `QuickPostComposer.jsx has ${orphanHandlers} send handler(s) not attached to a `
+  + '<button> element. A send path that is not a guarded button is a send path '
+  + 'nothing checked.',
+);
+assert(
+  ungatedSend.length === 0,
+  `QuickPostComposer.jsx has ${ungatedSend.length} send button(s) not disabled by `
+  + `sendBlocked (${ungatedSend.join(', ')}), so the media requirement does not `
+  + 'reach them. This is the 2026-09-11 failure with a different button on it.',
 );
 
 // The picker must actually contain something. Blocking submit while the picker
