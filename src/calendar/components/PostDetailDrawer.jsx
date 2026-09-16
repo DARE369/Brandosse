@@ -47,6 +47,7 @@ import {
 const WEEKDAY_OFFSET = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
 import StatusPill from './StatusPill';
 import CopyReviewReport from './CopyReviewReport';
+import { savePostCopyReview } from '../../services/copyReviewPersistence';
 
 const PLATFORM_LABELS = {
   instagram: 'Instagram', tiktok: 'TikTok', linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', facebook: 'Facebook', pinterest: 'Pinterest',
@@ -253,6 +254,38 @@ export default function PostDetailDrawer({
       });
       setDiscoveryScore(score);
       setDiscoveryStatus('scored');
+
+      // Keep it: saved as this post's copy review snapshot, so if it publishes
+      // with this text the review at publish reuses it instead of paying again.
+      // savePostCopyReview refuses when the reviewed text is not the text that
+      // is SAVED on the post — the fields here may hold unsaved edits, and a
+      // review must never be attached to words the post does not carry.
+      if (score?.seoHasOverall !== false && Number.isFinite(Number(score?.seoScore))) {
+        try {
+          const saved = await savePostCopyReview(
+            activePost.id,
+            {
+              state: 'scored',
+              score: Number(score.seoScore),
+              category: score.seoCategory || null,
+              breakdown: score.seoBreakdown || {},
+              measured: Array.isArray(score.seoMeasured) ? score.seoMeasured : null,
+              suggestions: score.seoSuggestions || [],
+              benchmarkReport: score.seoBenchmarkReport || [],
+              provider: score.seoProvider || null,
+              model: score.seoModel || null,
+            },
+            { platform: editedPlatform, caption: editedCaption, title: editedTitle, hashtags: editedHashtags },
+          );
+          setDiscoveryError(saved.saved ? null : (
+            saved.reason.includes('changed while')
+              ? 'Reviewed. Save the post to keep this review with it.'
+              : saved.reason
+          ));
+        } catch (saveErr) {
+          setDiscoveryError(`Reviewed, but it could not be saved: ${saveErr?.message || 'unknown error'}.`);
+        }
+      }
     } catch (err) {
       setDiscoveryStatus('failed');
       setDiscoveryError(err?.message || 'Scoring unavailable.');

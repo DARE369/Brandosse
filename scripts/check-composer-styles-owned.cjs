@@ -55,17 +55,51 @@ const importsStylesheet = (src) => new RegExp(`import\\s+['"][^'"]*${STYLESHEET.
 // them — CopyReviewReport is styled entirely inline with tokens — does not need
 // the sheet, and demanding it would teach people to import 69 KB of CSS to
 // silence a check.
+const classesIn = (css) => new Set([...css.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]));
+
+function walkCss(dir, out = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkCss(full, out);
+    else if (/\.css$/.test(entry.name) && !/\.module\.css$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
+
+// Only classes this sheet defines EXCLUSIVELY. Generic ones — ui-button,
+// active, media-preview — are also defined in global stylesheets every page
+// loads, so a file using them does not depend on this sheet. Without this
+// narrowing the rule flagged nine files for classes they already get elsewhere,
+// which would teach people to silence it rather than read it.
+const sheetPath = path.join(SRC, 'calendar', STYLESHEET);
+const elsewhere = new Set(
+  walkCss(SRC)
+    .filter((f) => path.resolve(f) !== path.resolve(sheetPath))
+    .flatMap((f) => [...classesIn(fs.readFileSync(f, 'utf8'))]),
+);
+// Hyphenated names only. The sheet also defines bare words like `.pass` and
+// `.fail`, and those words appear near `className=` all over the codebase as
+// CSS-module keys (`styles.fail`) that have nothing to do with this sheet. The
+// sheet's own component classes are all namespaced — quickpost-*, schedule-*,
+// asset-picker-* — so that is what is checked.
 const sheetClasses = new Set(
-  [...fs.readFileSync(path.join(SRC, 'calendar', STYLESHEET), 'utf8').matchAll(/\.([a-zA-Z][\w-]*)/g)]
-    .map((m) => m[1]),
+  [...classesIn(fs.readFileSync(sheetPath, 'utf8'))].filter((c) => !elsewhere.has(c) && /[-_]/.test(c)),
 );
 
+// Reads the text following each `className=` and picks out whole-word tokens
+// that are exclusive classes of the sheet. A quoted-string pattern missed
+// class names built in template literals — `quickpost-copy-review__btn${…}` —
+// which is how conditional classes are usually written, so it passed files it
+// could not see.
 function usesSheetClasses(src) {
-  const used = [...src.matchAll(/className=\{?[`'"]([^`'"]+)[`'"]/g)]
-    .flatMap((m) => m[1].split(/\s+/))
-    .map((c) => c.replace(/\$\{[^}]*\}/g, '').trim())
-    .filter(Boolean);
-  return used.filter((c) => sheetClasses.has(c));
+  const used = [];
+  for (const m of src.matchAll(/className=/g)) {
+    const region = src.slice(m.index, m.index + 240);
+    for (const token of region.matchAll(/[a-zA-Z][\w-]*/g)) {
+      if (sheetClasses.has(token[0])) used.push(token[0]);
+    }
+  }
+  return used;
 }
 
 const failures = [];
@@ -97,6 +131,26 @@ for (const file of walk(SRC)) {
         + 'form below the page instead of a dialog. Import the stylesheet in the component.',
       );
     }
+  }
+}
+
+// Any file outside the Calendar that USES a class this stylesheet defines must
+// import the stylesheet itself — not only files that import a calendar
+// component. The Library's asset copy review reuses the composer's stale-pulse
+// class; relying on the composer being elsewhere in the page graph is the same
+// accidental dependency that left the composer unstyled.
+for (const file of walk(SRC)) {
+  if (CALENDAR_SURFACE.some((dir) => file.startsWith(dir + path.sep))) continue;
+  const src = fs.readFileSync(file, 'utf8');
+  const used = usesSheetClasses(src);
+  if (used.length === 0) continue;
+  const rel = path.relative(ROOT, file).split(path.sep).join('/');
+  checked.push(`${rel} (uses ${[...new Set(used)].join(', ')})`);
+  if (!importsStylesheet(src)) {
+    failures.push(
+      `${rel} uses ${[...new Set(used)].join(', ')} from ${STYLESHEET} but does not import it. It only `
+      + 'looks right when something else on the page happens to load that sheet.',
+    );
   }
 }
 

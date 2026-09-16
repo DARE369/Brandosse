@@ -61,6 +61,9 @@ export default function AssetDetailDrawer({
   versionChain = [],
   onOpenVersion,
   onNavigateToPost,
+  // Called with the saved row when a copy review is stored on the asset, so the
+  // drawer shows the review without refetching the Library.
+  onAssetUpdated,
 }) {
   const [form, setForm] = useState({ title: "", description: "", altText: "", tagsText: "" });
   const [saving, setSaving] = useState(false);
@@ -196,6 +199,7 @@ export default function AssetDetailDrawer({
           asset={asset}
           usedInPosts={usedInPosts}
           reviewPlatforms={reviewPlatforms}
+          onAssetUpdated={onAssetUpdated}
         />
       </div>
 

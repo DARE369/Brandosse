@@ -227,6 +227,45 @@ assert(
   'the details panel shows the frozen report',
 );
 
+// ── 6b. REVIEWS TAKEN OUTSIDE THE COMPOSER ARE SAVED ────────────────────────
+//
+// Founder direction 2026-09-16: "they need to be saved". A review that vanishes
+// when the drawer closes gets paid for again next time, and a caption review
+// that is not kept as the post's snapshot is paid for AGAIN at publish.
+{
+  const assetReview = stripComments(read('src/pages/Library/components/AssetCopyReview.jsx'));
+  const core = stripComments(read('src/calendar/copyReviewPersistenceCore.js'));
+
+  assert(
+    /await\s+saveAssetCopyReview\(/.test(assetReview) && /readAssetCopyReview\(/.test(assetReview),
+    "AssetCopyReview no longer saves the asset's title-and-tags review, or no longer shows the saved one. "
+    + 'Closing the drawer would throw away a paid review.',
+    'asset reviews are saved and shown again',
+  );
+  assert(
+    /await\s+savePostCopyReview\(/.test(assetReview) && /await\s+savePostCopyReview\(/.test(drawer),
+    "A post caption review in the Library drawer or the Calendar drawer is not saved as the post's "
+    + 'snapshot, so publishing it unchanged would pay to review the same words again.',
+    'post caption reviews from both drawers are saved as snapshots',
+  );
+  assert(
+    // Counted, not merely present: the Library drawer has TWO save paths (asset
+    // and post) and each must report its own failure. A presence test passed
+    // with one of them deleted.
+    (assetReview.match(/could not be saved/g) || []).length >= 2 && /could not be saved/.test(drawer),
+    'A failed save is not reported. "Reviewed" and "reviewed and kept" are different outcomes; showing '
+    + 'the score as if it were saved when it was not is a silent loss.',
+    'a failed save is said, not swallowed',
+  );
+  assert(
+    (core.match(/\.eq\(\s*'updated_at'\s*,\s*row\.updated_at\s*\)/g) || []).length >= 2,
+    'A copy review save no longer writes conditionally on updated_at. Both target columns are shared — '
+    + 'clip provenance, publish settings, the live post URL — and an unconditional write of a copied '
+    + 'object deletes whatever another writer added in between.',
+    'both saves are conditional on the row being unchanged since the read',
+  );
+}
+
 // ── 7. LOCK L5.11 — NEVER A REACH PREDICTION ────────────────────────────────
 
 for (const [name, src] of [['QuickPostComposer.jsx', composer], ['CopyReviewReport.jsx', report], ['PublishReceipt.jsx', receipt]]) {

@@ -862,6 +862,7 @@ function LibraryBody() {
         open={Boolean(drawerAsset)}
         onClose={() => setDrawerAsset(null)}
         onSaveMetadata={handleSaveMetadata}
+        onAssetUpdated={(updated) => setDrawerAsset(updated)}
         onSchedule={handleSchedule}
         onDelete={(asset) => setDeleteTarget(asset)}
         onDuplicate={handleDuplicate}

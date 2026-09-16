@@ -263,7 +263,7 @@ export async function fetchAssetUsedInPosts(assetId) {
     // hashtags + workflow_state so the asset drawer can show each post's frozen
     // copy review, and review an unpublished caption against exactly what the
     // post carries, without a second round-trip per post.
-    .select('id, title, caption, hashtags, status, scheduled_at, published_at, platform, workflow_state')
+    .select('id, title, caption, hashtags, status, scheduled_at, published_at, platform, workflow_state, updated_at')
     .eq('user_id', userId)
     .in('id', postIds);
 

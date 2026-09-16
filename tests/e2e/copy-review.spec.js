@@ -145,21 +145,80 @@ test.describe("Copy review", () => {
     expect(errors, "no uncaught page errors").toEqual([]);
   });
 
-  test("library drawer offers the asset's own copy review", async ({ page }) => {
+  test("library drawer reviews the asset's title and tags and SAVES it without losing metadata", async ({ page }) => {
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.route("**/functions/v1/seo-score", (route) => route.fulfill({
       status: 200, contentType: "application/json", body: JSON.stringify(MOCK_SCORE),
     }));
+
+    // The save is INTERCEPTED, not let through: this proves exactly what would
+    // be written — that the asset's existing metadata travels with the review —
+    // without storing a fake score on a real QA asset every run. That the write
+    // is permitted under RLS was proven separately against the live database.
+    let patchBody = null;
+    let rowBeforeSave = null;
+    await page.route("**/rest/v1/personal_assets?**", async (route) => {
+      const req = route.request();
+      if (req.method() === "GET" && req.url().includes("select=id%2Ctitle%2Ctags%2Cai_tags%2Cmetadata%2Cupdated_at")) {
+        const res = await route.fetch();
+        rowBeforeSave = await res.json();
+        await route.fulfill({ response: res });
+        return;
+      }
+      if (req.method() !== "PATCH") { await route.continue(); return; }
+      patchBody = req.postDataJSON();
+      // Reply with the COMPLETE row, as the real `.select('*')` would. The first
+      // version echoed only the columns the save reads, and the drawer re-rendered
+      // from that partial row as a mediafile-less "FILE" with no destinations —
+      // a test artifact, but one that looked exactly like a product bug.
+      const full = await (await fetch(
+        `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/personal_assets?select=*&id=eq.${rowBeforeSave.id}`,
+        { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } },
+      )).json();
+      const echoed = { ...(full[0] || rowBeforeSave || {}), ...patchBody, updated_at: new Date().toISOString() };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([echoed]) });
+    });
+
     await signIn(page);
     await page.goto("/app/library", { waitUntil: "load" });
     await dismissBrandKit(page);
 
-    const card = page.locator("article[aria-label^='Open ']").first();
+    // A video asset with a title and existing metadata; YouTube and TikTok
+    // connected accounts both take video, so the review is offered.
+    // Filtered to the MP4 card: a Post-linked FILE record shares this title, and
+    // it correctly offers no destination — the first run clicked that one.
+    const card = page.locator("article[aria-label^='Open A child asking how girls get pregnant']")
+      .filter({ hasText: "MP4" }).first();
     await expect(card).toBeVisible({ timeout: 45_000 });
-    await card.click();
+    // The grid re-renders once connected accounts and tagging state load, which
+    // moves cards; a click aimed while it settles lands on a neighbour.
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForTimeout(3_000);
+    await card.locator("h4").click();
 
-    await expect(page.getByText("Title and tags").first()).toBeVisible({ timeout: 20_000 });
+    // Prove the drawer holds the video, not a same-titled file record.
+    // Grid cards render an icon, never a <video>; only the drawer's preview does.
+    await expect(page.locator("video").first()).toBeAttached({ timeout: 20_000 });
+
+    const section = page.locator("[data-asset-copy-review]");
+    await expect(section).toBeVisible({ timeout: 20_000 });
+    await section.getByRole("button", { name: /^Review( again)?$/ }).click();
+
+    await expect(section.getByText(/Copy review\s*71/).first()).toBeVisible({ timeout: 20_000 });
+    await expect(section.getByText(/^Saved /).first()).toBeVisible();
+
+    expect(patchBody, "a save was attempted").not.toBeNull();
+    const meta = patchBody.metadata || {};
+    const beforeKeys = Object.keys(rowBeforeSave?.metadata || {}).filter((k) => k !== "copy_review");
+    for (const key of beforeKeys) {
+      expect(meta[key], `existing metadata "${key}" is carried into the save, not dropped`).toEqual(rowBeforeSave.metadata[key]);
+    }
+    expect(beforeKeys.length, "the asset under test really had other metadata to lose").toBeGreaterThan(0);
+    const saved = Object.values(meta.copy_review?.by_platform || {})[0];
+    expect(saved?.result?.overall, "the review is what gets saved").toBe(71);
+    expect(saved?.fingerprint, "the saved review is fingerprinted").toMatch(/^[0-9a-f]{64}$/);
+
     expect(errors, "no uncaught page errors").toEqual([]);
   });
 });

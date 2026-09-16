@@ -61,7 +61,8 @@
     "test:copy-review": "node scripts/test/copy-review.test.mjs",
     "check:copy-review": "node scripts/check-copy-review-contract.cjs",
     "check:composer-styles": "node scripts/check-composer-styles-owned.cjs",
-    "measure:caption-fold": "node scripts/measure/measure-caption-fold.mjs"
+    "measure:caption-fold": "node scripts/measure/measure-caption-fold.mjs",
+    "test:copy-review-persistence": "node scripts/test/copy-review-persistence.test.mjs"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.29.0",

@@ -180,6 +180,11 @@ jobs:
       # that only the worker freezes a report, conditionally, on a schedule.
       - name: Copy review report
         run: node scripts/test/copy-review.test.mjs
+      # Saving a review into SHARED columns (asset metadata, post workflow_state):
+      # run against an in-memory table with a concurrent writer, proving nothing
+      # else in the column is lost and a published post is never written.
+      - name: Copy review persistence
+        run: node scripts/test/copy-review-persistence.test.mjs
       - name: Copy review contract
         run: node scripts/check-copy-review-contract.cjs
 
