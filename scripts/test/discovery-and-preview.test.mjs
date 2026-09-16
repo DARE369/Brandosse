@@ -28,6 +28,7 @@ import {
 } from '../../src/calendar/discoveryScore.js';
 import {
   PLATFORM_FOLD,
+  foldCapacity,
   foldFor,
   previewFor,
   splitAtFold,
@@ -130,7 +131,11 @@ ok('no band is labelled as a failure', !['fail', 'blocked', 'error'].includes(ba
 // Every fold carries its provenance. An unsourced number would be presented to
 // the user as fact while being a guess.
 for (const [platform, entry] of Object.entries(PLATFORM_FOLD)) {
-  ok(`${platform} fold has a positive char count`, Number.isFinite(entry.chars) && entry.chars > 0, String(entry.chars));
+  ok(
+    `${platform} fold has a positive size (chars, or lines × charsPerLine)`,
+    Number.isFinite(foldCapacity(entry)) && foldCapacity(entry) > 0,
+    JSON.stringify({ chars: entry.chars, lines: entry.lines, charsPerLine: entry.charsPerLine }),
+  );
   ok(`${platform} fold is graded`, ['MEASURED', 'DOCS', 'UNVERIFIED'].includes(entry.grade), entry.grade);
   ok(`${platform} fold cites a source`, typeof entry.source === 'string' && entry.source.length > 20, entry.source);
 }
@@ -141,9 +146,62 @@ for (const platform of Object.keys(PLATFORM_FOLD)) {
   const spec = getPlatformSpec(platform);
   ok(
     `${platform}'s fold does not exceed its hard caption limit`,
-    PLATFORM_FOLD[platform].chars <= spec.captionMax,
-    `fold ${PLATFORM_FOLD[platform].chars} > captionMax ${spec.captionMax}`,
+    foldCapacity(PLATFORM_FOLD[platform]) <= spec.captionMax,
+    `fold ${foldCapacity(PLATFORM_FOLD[platform])} > captionMax ${spec.captionMax}`,
   );
+}
+
+// ── LINE-BASED FOLDS — measured on real YouTube videos, 2026-09-16 ─────────
+//
+// YouTube collapses a description to 3 RENDERED LINES and a line break uses a
+// line. A flat character count got both cases below wrong: it said 157 for all.
+{
+  const yt = PLATFORM_FOLD.youtube;
+  check('YouTube is modelled in lines', Number.isFinite(yt.lines), true);
+  check('YouTube folds at 3 lines, as measured', yt.lines, 3);
+  check('YouTube is graded MEASURED', yt.grade, 'MEASURED');
+
+  // The real description that exposed it: "line ⏎ ⏎ line ⏎ ⏎ more…". Three
+  // lines are used by line one, the blank line, and line two — so only those
+  // two lines show, however short they are.
+  const rick = 'The official video for “Never Gonna Give You Up” by Rick Astley.\n\n'
+    + 'Never: The Autobiography 📚 OUT NOW!\n\nFollow Rick Astley everywhere';
+  const r = splitAtFold(rick, 'youtube');
+  check('a blank line consumes a line: it folds', r.folds, true);
+  ok('…after exactly the first two text lines', r.visible.trimEnd().endsWith('OUT NOW!'), JSON.stringify(r.visible.slice(-20)));
+  ok('…with the rest hidden', r.hidden.includes('Follow Rick Astley'), r.hidden);
+  check('…and reports the model it used', r.model, 'lines');
+  check('nothing is lost across the split', r.visible + r.hidden, rick);
+
+  // One unbroken paragraph fills all 3 lines.
+  const para = 'w'.repeat(yt.lines * yt.charsPerLine + 25);
+  const p = splitAtFold(para, 'youtube');
+  check('an unbroken paragraph folds', p.folds, true);
+  check('…at lines × charsPerLine', [...p.visible].length, yt.lines * yt.charsPerLine);
+
+  // Short enough, with breaks, still fits.
+  const fits = splitAtFold('one\ntwo\nthree', 'youtube');
+  check('three short lines fit in three lines', fits.folds, false);
+  const fourth = splitAtFold('one\ntwo\nthree\nfour', 'youtube');
+  check('a fourth line folds, however short', fourth.folds, true);
+  check('…and the fourth line is what is hidden', fourth.hidden, 'four');
+
+  // Trailing blank lines past the fold are not hidden content. (A single
+  // trailing "\n" ends exactly at the cut and never reached this branch — the
+  // first version of this case passed with the rule deleted, so it used two.)
+  const trailing = splitAtFold('one\ntwo\nthree\n\n\n', 'youtube');
+  check('trailing blank lines alone do not count as folding', trailing.folds, false);
+  check('…and nothing is reported hidden', trailing.hidden, '');
+
+  // Emoji still count as one character inside the line model.
+  const emojiLine = splitAtFold('🎉'.repeat(yt.lines * yt.charsPerLine + 3), 'youtube');
+  check('the line model counts code points too', [...emojiLine.visible].length, yt.lines * yt.charsPerLine);
+  ok('…without splitting a surrogate pair', !/[\uD800-\uDBFF]$/.test(emojiLine.visible), 'trailing high surrogate');
+
+  // A MEASURED fold must carry its evidence, and the tool must exist.
+  ok('the measurement is dated', /^\d{4}-\d{2}-\d{2}$/.test(yt.measured?.date || ''), yt.measured?.date);
+  ok('the measurement names its viewport', Boolean(yt.measured?.viewport), yt.measured?.viewport);
+  ok('the measurement counts its samples', Number(yt.measured?.samples) > 0, String(yt.measured?.samples));
 }
 
 check('an unknown platform has no fold', foldFor('myspace'), null);

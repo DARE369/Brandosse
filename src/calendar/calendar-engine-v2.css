@@ -702,7 +702,12 @@
   animation: uiv2-modal-in .16s ease;
 }
 .schedule-modal__header { display: flex; align-items: center; justify-content: space-between; padding: var(--uiv2-space-5); border-bottom: 1px solid var(--uiv2-border); }
-.schedule-modal__title { font-family: var(--uiv2-font-display); font-size: var(--uiv2-text-lg); font-weight: var(--uiv2-weight-bold); margin: 0; }
+/* Colour set explicitly, from the same theme as the surface it sits on. It used
+   to inherit: with the legacy theme preference and the ui-v2 theme disagreeing,
+   the title resolved to the light theme near-black text colour on the dark
+   dialog surface — a contrast ratio of about 1.05:1, effectively invisible.
+   Measured in a real browser 2026-09-16. */
+.schedule-modal__title { font-family: var(--uiv2-font-display); font-size: var(--uiv2-text-lg); font-weight: var(--uiv2-weight-bold); margin: 0; color: var(--uiv2-text-primary); }
 .schedule-modal__body { padding: var(--uiv2-space-5); display: flex; flex-direction: column; gap: var(--uiv2-space-5); }
 .schedule-modal__footer { padding: var(--uiv2-space-4) var(--uiv2-space-5); border-top: 1px solid var(--uiv2-border); display: flex; justify-content: flex-end; gap: var(--uiv2-space-2); }
 
@@ -982,4 +987,43 @@
    their own caption, but visibly demoted so the cut point is unmistakable. */
 .quickpost-preview__hidden {
   color: var(--uiv2-text-tertiary);
+}
+
+/* ── Copy review (composer) ───────────────────────────────────────────────────
+   The review button PULSES when the text on screen is no longer the text that
+   was reviewed. Motion is a hint, never the only signal: the status line beside
+   it says the same thing in words, and under prefers-reduced-motion the pulse
+   is replaced by a static accent border. Tokens only, no fallbacks — see the
+   note above .quickpost-preview. */
+.quickpost-copy-review {
+  margin: 6px 0 10px;
+}
+
+.quickpost-copy-review__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.quickpost-copy-review__row .quickpost-hint {
+  margin: 0;
+}
+
+.quickpost-copy-review__btn.is-stale {
+  border-color: var(--uiv2-accent-border);
+  color: var(--uiv2-accent-text);
+  animation: quickpost-copy-review-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes quickpost-copy-review-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--uiv2-accent-wash-strong); }
+  50%      { box-shadow: 0 0 0 6px var(--uiv2-accent-wash); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quickpost-copy-review__btn.is-stale {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--uiv2-accent-wash-strong);
+  }
 }

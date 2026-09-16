@@ -326,6 +326,7 @@ function LibraryBody() {
         platformOptions: payload.platformOptions || {},
         titles: payload.titles || {},
         aiDisclosure: payload.aiDisclosure !== false,
+        copyReview: payload.copyReview || {},
       });
 
       // ── A send ends in a receipt, never in a toast ──────────────────────
@@ -866,6 +867,13 @@ function LibraryBody() {
         onDuplicate={handleDuplicate}
         onArchive={handleArchive}
         usedInPosts={drawerUsedIn}
+        // Copy review destinations: only those a connected account can actually
+        // send THIS file to — from the same derivation the card uses.
+        reviewPlatforms={drawerAsset
+          ? derivePublishability(drawerAsset, connectedPlatforms).fits
+            .filter((fit) => fit.accepts)
+            .map((fit) => ({ key: fit.key, label: fit.label }))
+          : []}
         versionChain={versionChain}
         onOpenVersion={handleOpenVersion}
         onNavigateToPost={handleNavigateToPost}

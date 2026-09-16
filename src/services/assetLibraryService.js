@@ -260,7 +260,10 @@ export async function fetchAssetUsedInPosts(assetId) {
 
   const { data, error } = await supabase
     .from('posts')
-    .select('id, title, caption, status, scheduled_at, platform')
+    // hashtags + workflow_state so the asset drawer can show each post's frozen
+    // copy review, and review an unpublished caption against exactly what the
+    // post carries, without a second round-trip per post.
+    .select('id, title, caption, hashtags, status, scheduled_at, published_at, platform, workflow_state')
     .eq('user_id', userId)
     .in('id', postIds);
 

@@ -25,6 +25,8 @@ import { AlertTriangle, CheckCircle2, Clock, ExternalLink, RefreshCw, XCircle } 
 import { Button, Modal } from "../../../ui-v2";
 import { supabase } from "../../../services/supabaseClient";
 import { OUTCOME, summarise } from "../../../calendar/publishOutcome";
+import { finalReportState } from "../../../calendar/copyReview";
+import CopyReviewReport from "../../../calendar/components/CopyReviewReport";
 
 /**
  * Stop polling after this long. The worker runs each minute, and three retries a
@@ -75,7 +77,15 @@ export default function PublishReceipt({ open, postIds = [], assetTitle = "", on
 
     setLoadError(null);
     setRows(data || []);
-    return { done: summarise(data || []).allSettled };
+    // Done only when every destination has settled AND every one that published
+    // has its copy review frozen — the report lands a minute or two after the
+    // post does, and stopping at "published" would leave it saying "being taken"
+    // until the user reopened the post. The poll ceiling still bounds this.
+    const rowsNow = data || [];
+    // Only `pending` is worth waiting for; overdue and not_recorded will not
+    // resolve on the receipt's timescale, and each already says so in words.
+    const reportsSettled = rowsNow.every((row) => finalReportState(row) !== "pending");
+    return { done: summarise(rowsNow).allSettled && reportsSettled };
   }, [postIds]);
 
   useEffect(() => {
@@ -189,6 +199,14 @@ export default function PublishReceipt({ open, postIds = [], assetTitle = "", on
                     the platform imposes, and "Published" alone conceals them —
                     which is how someone believes they posted publicly and did
                     not. */}
+                {/* The copy review as it stood at publish — shown once this
+                    destination has actually published, never before, since
+                    there is no "at publish" for a post still queued. */}
+                {o.state === OUTCOME.PUBLISHED && (
+                  <div style={{ marginTop: 8 }}>
+                    <CopyReviewReport post={row} />
+                  </div>
+                )}
                 {o.restriction && (
                   <div style={{
                     fontSize: 12, color: "var(--uiv2-text-secondary)", marginTop: 6,

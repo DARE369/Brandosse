@@ -24,6 +24,9 @@ export type SeoScoreInput = {
 export type NormalizedSeoPayload = {
   overall: number;
   breakdown: Record<string, number>;
+  /** Metrics the model actually returned. Every other key in `breakdown` is 0
+   *  for back-compat and must be presented as NOT MEASURED, never as zero. */
+  measured: string[];
   suggestions: string[];
   benchmarkReport: string[];
   hashtagSuggestions: Array<{ tag: string; relevance: number; reason: string }>;
@@ -69,6 +72,12 @@ function clampScore(value: unknown) {
 }
 
 function parseScore(value: unknown) {
+  // Absence is checked BEFORE coercion. `Number(null)` is 0 and `Number("")` is
+  // 0 — neither is NaN — so the previous NaN-only test turned a metric the model
+  // simply did not return into a genuine-looking score of zero, which was then
+  // weighted into the overall. Scores are now frozen onto posts at publish, so
+  // a fabricated "Hook readiness: 0" would have been permanent.
+  if (value === null || value === undefined || value === "") return null;
   const score = Number(value);
   if (Number.isNaN(score)) return null;
   return score;
@@ -290,11 +299,27 @@ export async function scoreContent(input: SeoScoreInput): Promise<NormalizedSeoP
     Object.entries(rawBreakdown).map(([key, value]) => [key, normalizeScaleScore(value, useTenPointScaleForBreakdown)]),
   );
 
-  const computedOverall = Math.round(
-    Object.entries(BREAKDOWN_WEIGHTS).reduce((sum, [key, weight]) => (
-      sum + (Number(normalizedBreakdown[key] || 0) * weight)
-    ), 0),
-  );
+  // Which metrics the model ACTUALLY returned. Unreturned metrics still appear in
+  // `breakdown` as 0 for backward compatibility — four existing screens read
+  // those values directly (Studio, Calendar drawer, org draft modal) — but they
+  // are excluded from the overall and listed here so a consumer can say "not
+  // measured" instead of showing a zero nobody measured.
+  const measured = Object.entries(rawBreakdown)
+    .filter(([, value]) => value !== null)
+    .map(([key]) => key);
+
+  // Weighted average over MEASURED metrics only, renormalised by their weights.
+  // Previously every missing metric contributed 0 × its weight, so an answer
+  // that skipped hookStrength (12%) lost up to 12 points for something that
+  // was never assessed.
+  const measuredWeight = measured.reduce((sum, key) => sum + (BREAKDOWN_WEIGHTS[key] || 0), 0);
+  const computedOverall = measuredWeight > 0
+    ? Math.round(
+      measured.reduce((sum, key) => (
+        sum + (Number(normalizedBreakdown[key]) * (BREAKDOWN_WEIGHTS[key] || 0))
+      ), 0) / measuredWeight,
+    )
+    : 0;
 
   const hasBreakdownSignal = Object.values(normalizedBreakdown).some((score) => score > 0);
   const rawOverall = parseScore(parsed.discoveryScore ?? parsed.discovery_score ?? parsed.overall);
@@ -315,6 +340,7 @@ export async function scoreContent(input: SeoScoreInput): Promise<NormalizedSeoP
   return {
     overall,
     breakdown: normalizedBreakdown,
+    measured,
     suggestions: recommendations,
     benchmarkReport,
     hashtagSuggestions,

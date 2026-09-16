@@ -19,6 +19,7 @@ import {
   formatDate,
 } from "../libraryItemUtils";
 import pageStyles from "../LibraryPage.module.css";
+import AssetCopyReview from "./AssetCopyReview";
 import styles from "./AssetDetailDrawer.module.css";
 
 function AssetPreview({ asset }) {
@@ -54,6 +55,9 @@ export default function AssetDetailDrawer({
   onDuplicate,
   onArchive,
   usedInPosts = [],
+  // Destinations a connected account could actually send this file to, for the
+  // copy review. Derived by the page from derivePublishability — never here.
+  reviewPlatforms = [],
   versionChain = [],
   onOpenVersion,
   onNavigateToPost,
@@ -181,6 +185,18 @@ export default function AssetDetailDrawer({
             ))}
           </div>
         )}
+      </div>
+
+      <div className={styles.drawerSection}>
+        <span className={styles.sectionKicker}>Copy review</span>
+        {/* Keyed by asset so a review taken of one asset can never be shown
+            against the next one opened in the same drawer. */}
+        <AssetCopyReview
+          key={asset.id}
+          asset={asset}
+          usedInPosts={usedInPosts}
+          reviewPlatforms={reviewPlatforms}
+        />
       </div>
 
       <div className={styles.drawerSection}>

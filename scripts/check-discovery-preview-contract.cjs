@@ -127,44 +127,69 @@ assert(
 
 // ── 3. EVERY FOLD IS SOURCED ────────────────────────────────────────────────
 
-const table = /PLATFORM_FOLD\s*=\s*\{([\s\S]*?)\n\};/.exec(preview);
-assert(
-  Boolean(table),
-  'platformPreview.js no longer exports a readable PLATFORM_FOLD table. The fold figures must '
-  + 'live in one place with their provenance beside them.',
-  'the fold table is readable',
-);
-
-if (table) {
-  const entries = [...table[1].matchAll(/(\w+):\s*\{([\s\S]*?)\}/g)];
+// Validated against the REAL table, imported — not pattern-matched out of the
+// source. The regex version broke the first time an entry grew a nested
+// `measured: { … }` block: it stopped at the inner brace, missed the source
+// line, and reported YouTube's measured fold as unsourced. A guard that cannot
+// read the data it guards fails on the wrong things.
+async function checkFoldTable() {
+  const { pathToFileURL } = require('url');
+  let mod;
+  try {
+    mod = await import(pathToFileURL(path.join(ROOT, 'src/calendar/platformPreview.js')).href);
+  } catch (err) {
+    failures.push(`platformPreview.js could not be imported (${err.message}); the fold table cannot be checked.`);
+    return;
+  }
+  const table = mod.PLATFORM_FOLD;
+  const entries = table && typeof table === 'object' ? Object.entries(table) : [];
   assert(
     entries.length > 0,
-    'PLATFORM_FOLD is empty, so no platform has a fold and every preview would silently show '
-    + 'nothing.',
+    'PLATFORM_FOLD is missing or empty, so every preview would silently show nothing.',
     `the fold table has ${entries.length} platforms`,
   );
 
-  for (const [, platform, body] of entries) {
-    // chars, grade and source travel TOGETHER. Editing a number without
-    // touching the line beside it that says where it came from is the drift
-    // this pairing exists to make awkward.
+  for (const [platform, e] of entries) {
+    // Either model, with real numbers: a flat `chars` budget, or lines ×
+    // charsPerLine, where a line break consumes a line.
+    const flat = Number.isFinite(e.chars) && e.chars > 0;
+    const lined = Number.isFinite(e.lines) && e.lines > 0
+      && Number.isFinite(e.charsPerLine) && e.charsPerLine > 0;
     assert(
-      /chars:\s*\d+/.test(body),
-      `PLATFORM_FOLD.${platform} has no numeric \`chars\`.`,
-      `${platform} has a fold length`,
+      flat || lined,
+      `PLATFORM_FOLD.${platform} has neither a positive chars nor positive lines + charsPerLine.`,
+      `${platform} has a fold size (${lined ? 'lines' : 'chars'})`,
     );
     assert(
-      /grade:\s*'(MEASURED|DOCS|UNVERIFIED)'/.test(body),
+      ['MEASURED', 'DOCS', 'UNVERIFIED'].includes(e.grade),
       `PLATFORM_FOLD.${platform} is not graded MEASURED / DOCS / UNVERIFIED. An ungraded figure `
       + 'gets presented to the user as fact while being a guess.',
       `${platform} is graded`,
     );
     assert(
-      /source:\s*['"`]/.test(body),
+      typeof e.source === 'string' && e.source.trim().length > 20,
       `PLATFORM_FOLD.${platform} cites no source. No platform publishes where it truncates a `
       + 'caption, so every figure here is observed behaviour and must say whose observation.',
       `${platform} cites its source`,
     );
+    // MEASURED is the strongest claim the UI makes ("Measured on real posts"),
+    // so it must carry its evidence: when, where, how many, with what tool.
+    if (e.grade === 'MEASURED') {
+      const m = e.measured || {};
+      assert(
+        /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')) && Boolean(m.viewport)
+          && Number(m.samples) > 0 && Boolean(m.tool),
+        `PLATFORM_FOLD.${platform} is graded MEASURED without its evidence (date, viewport, samples, `
+        + 'tool). The composer tells the user this figure was measured on real posts; without the '
+        + 'record, that is an unsupported claim.',
+        `${platform}'s MEASURED grade carries its evidence`,
+      );
+      assert(
+        !m.tool || fs.existsSync(path.join(ROOT, m.tool)),
+        `PLATFORM_FOLD.${platform} cites a measurement tool that does not exist (${m.tool}).`,
+        `${platform}'s measurement tool exists`,
+      );
+    }
   }
 }
 
@@ -204,15 +229,17 @@ assert(
 
 // ── Report ──────────────────────────────────────────────────────────────────
 
-if (failures.length > 0) {
-  console.error('\n\x1b[31m✖ check-discovery-preview-contract FAILED\x1b[0m\n');
-  for (const f of failures) console.error(`  • ${f}\n`);
-  process.exit(1);
-}
+checkFoldTable().then(() => {
+  if (failures.length > 0) {
+    console.error('\n\x1b[31m✖ check-discovery-preview-contract FAILED\x1b[0m\n');
+    for (const f of failures) console.error(`  • ${f}\n`);
+    process.exit(1);
+  }
 
-console.log(
-  '\x1b[32m✔ check-discovery-preview-contract\x1b[0m  '
-  + `${passes.length} checks: the discovery score cannot throw and cannot gate a send, an absent `
-  + 'score bands as "Not scored" rather than weak, every fold carries a grade and a source in one '
-  + 'table, and truncation counts code points.',
-);
+  console.log(
+    '\x1b[32m✔ check-discovery-preview-contract\x1b[0m  '
+    + `${passes.length} checks: the score cannot throw and cannot gate a send, an absent score bands `
+    + 'as "Not scored" rather than weak, every fold carries a grade and a source in one table '
+    + '(and a MEASURED one carries its evidence), and truncation counts code points.',
+  );
+});

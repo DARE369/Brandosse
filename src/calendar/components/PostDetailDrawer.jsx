@@ -46,6 +46,7 @@ import {
 
 const WEEKDAY_OFFSET = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
 import StatusPill from './StatusPill';
+import CopyReviewReport from './CopyReviewReport';
 
 const PLATFORM_LABELS = {
   instagram: 'Instagram', tiktok: 'TikTok', linkedin: 'LinkedIn', x: 'X', youtube: 'YouTube', facebook: 'Facebook', pinterest: 'Pinterest',
@@ -419,6 +420,17 @@ export default function PostDetailDrawer({
                 mediaType={mediaType}
                 onAutoFit={(_platformKey, trimmed) => patchEdited({ caption: trimmed })}
               />
+            )}
+
+            {/* Published: the copy review as it stood at publish, read from the
+                record frozen onto THIS platform's post. Deliberately no re-score
+                here — the live "Copy review" controls below are for posts that
+                can still change, and a report editable after the fact would not
+                be a record of the point of publishing. */}
+            {isPublished && (
+              <div style={{ marginTop: 10 }}>
+                <CopyReviewReport post={activePost} />
+              </div>
             )}
 
             {!isPublished && (

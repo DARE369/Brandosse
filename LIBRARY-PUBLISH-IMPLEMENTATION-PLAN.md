@@ -407,6 +407,39 @@ Built in one pass. Phase 3's overdue alarm was verified live first: both functio
 - **The drawer's Discovery tab.** `seo-score` scores a *caption*, and a Library asset has none — so a per-asset score has no input. What it should score is a product decision, not an implementation one (see open questions).
 - **Which score state rendered live** was not captured. The test accepts scored, scoring and unavailable by design; whether `seo-score` returns real scores from the composer today is unconfirmed.
 
+### Copy review, frozen at publish — 2026-09-16
+
+Founder direction: score on request, pulse the button once the text changes, take a final score when the post publishes, and keep that report with the post permanently — shown on the receipt and in its details panel. Also: review an asset's title and tags plus the captions of posts made from it, and count the "… more" on real posts.
+
+**Named "Copy review", not "discovery".** LOCK L5.11 already governed this: the score reads only the post's own text, has no external signal and cannot learn, so it must not be labelled a reach prediction. `PostDetailDrawer` said "Copy review"; the Phase 5 composer said "Discoverability". The composer was wrong and now matches; the contract fails on the old wording.
+
+**Correction to the Phases 5 & 6 record above.** It says "Rendered, both themes". On a **direct load of `/app/library`** the composer was not styled at all: `calendar-engine-v2.css` was imported only by `CalendarPage.jsx`, so `.quickpost-modal` computed `position: static` with a transparent background and its rule was in no loaded sheet — "Publish" appended an unstyled form below the grid. It looked right only after visiting the Calendar, because Next keeps a visited route's CSS, and the E2E's `toBeVisible` is true for an unstyled element. Measured in a real browser; the composer now imports its own stylesheet; guarded by `check-composer-styles-owned.cjs` and a computed-style assertion in `copy-review.spec.js`.
+
+| Piece | What it does |
+|---|---|
+| Composer | No automatic scoring. A per-destination **Review copy** button; it **pulses** once the reviewed text (caption *or* title) has changed, and says so in words — the pulse is replaced by a static border under `prefers-reduced-motion`. "Re-review" only once something was reviewed. |
+| `workflow_state.copy_review.snapshot` | Written by `createQuickPost` only when the review describes the **exact** text the row carries — fingerprinted (SHA-256 of platform, caption, title, hashtags). A stale review is dropped, never attached to words it did not read. |
+| `finalize-copy-reviews` worker + cron (`*/2`) | For posts published in the last 7 days with no report: **promotes** the snapshot if its fingerprint matches the published text (no paid call), otherwise **scores** it; after 3 failed attempts freezes `unavailable`. At most 2 paid scores per run (each can take ~120 s against a ~150 s limit). Every write is conditional on `final` still being absent, so nothing can overwrite a report. |
+| `CopyReviewReport` | One component for the receipt and the details panel: overall, **hook strength** first, every metric — unreturned ones shown as **"Not measured"**, never a 0 bar. |
+| States | `pending` (published < 30 min), `overdue` (inside the window, no report — says the job is not running), `not_recorded` (older than the worker's window — says none will be added), `unavailable`, `frozen`. |
+| Library drawer | **Title and tags** reviewed for a destination a connected account can actually send the file to; posts made from the asset show their frozen report, or offer "Review caption" if unpublished. |
+
+**Why a separate worker, not publish-post.** The dispatcher is the one path that must work; scoring is a paid call that can take two minutes and fail for unrelated reasons. A scoring outage now costs a delayed report and nothing else.
+
+**Defects found while building it:**
+1. **The scorer turned unreturned metrics into zeros and averaged them in.** `_shared/seo.ts` `parseScore` checked only `NaN`, and `Number(null)` is `0` — so a metric the model skipped became a genuine-looking 0 weighted into the overall (skipping hook strength cost up to 12 points). Absent is now null, the overall is averaged over **measured** metrics only, and `seo-score` returns which ones were measured. *This changes every future overall score, in Studio and the Calendar drawer too — upward where metrics were previously missing.*
+2. **"Being taken now" on a post published five days earlier** — before the worker existed — and it would have said so forever once past the window. Caught on screen; fixed with the `overdue` / `not_recorded` states and a lookback constant shared with the worker and asserted equal.
+3. **The dialog title was near-black on a near-black surface** (~1.05:1) when the legacy and ui-v2 theme preferences disagreed, because the title inherited its colour. It now takes `--uiv2-text-primary` like its surface.
+4. **A guard that could not read its data.** The fold-source check pattern-matched `PLATFORM_FOLD` out of the source and stopped at the first nested brace, reporting YouTube's measured fold as unsourced. It now imports the real table.
+
+**The fold, measured — and the model was wrong.** `scripts/measure/measure-caption-fold.mjs` loads a real public post and counts the characters actually *visible* before "more", by layout box rather than DOM text (platforms both remove and CSS-clip). Our own published posts could not be used: the two with live URLs are YouTube uploads forced private. Across 14 public YouTube videos (desktop, 1366 px), YouTube shows **3 rendered lines**, and **a line break consumes a line**: a description opening "line ⏎ ⏎ line" showed 103 characters, single paragraphs showed 299–421. The flat "157 characters" was wrong in both directions. YouTube is now modelled in lines (3 × 100, the conservative end) and graded **MEASURED** with its evidence. Mobile web was blocked by a consent sheet; what rendered suggests phones show no description before the tap — recorded as a note, not asserted. The measurement tool's first run itself reported 0 visible characters, because YouTube's `<body>` is a 0-px scroll container — only `overflow: hidden|clip` truncates, and it now counts only those.
+
+**Proven:** `copy-review.test.mjs` — 64 checks, importing the client module **and** the Deno module and failing if their fingerprints diverge; `discovery-and-preview.test.mjs` — 86 checks including the line model and the exact YouTube description shape. `copy-review.spec.js` — 3 browser tests with `seo-score` intercepted: styled on a direct Library load, **zero review requests on open or while typing**, exactly one on click, pulse on change, report renders on a real published post, asset review offered.
+
+**Guarded:** `check-copy-review-contract.cjs` (21 links), `check-composer-styles-owned.cjs`, and the rewritten fold check — all in CI. Breaks verified to exit 1: unconditional worker write, missing invoke secret, timer scoring reintroduced, reduced-motion fallback removed, stale state carried by motion alone, unmeasured metrics drawn as values, client writing `final`, `parseScore` back to NaN-only, "Discoverability" relabel, drawer report removed, client/server canonical drift, frozen report replaced, stale snapshot attached, lookback drift, old posts promised a report, MEASURED without evidence, blank lines no longer consuming a line, and the composer stylesheet import removed.
+
+**Needs deploying before any report is frozen:** `seo-score`, `optimize-seo` and `finalize-copy-reviews` (all import `_shared/seo.ts`), then migration `20260916100000_finalize_copy_reviews_cron.sql`. Deploy first — the migration's job calls the function every two minutes, and a 404 is recorded by pg_cron as success.
+
 ### Phase 7 — Meta adapters
 - Instagram, then Facebook. Independent of everything above; ships when ready.
 

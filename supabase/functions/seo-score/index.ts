@@ -107,6 +107,9 @@ serve(async (req) => {
       discoveryScore: normalized.overall,
       discovery_score: normalized.overall,
       breakdown: normalized.breakdown,
+      // Additive. Lets a client say "not measured" instead of showing a zero
+      // nobody measured — see parseScore in _shared/seo.ts.
+      measured: normalized.measured,
       suggestions: normalized.suggestions,
       recommendations: normalized.suggestions,
       benchmarkReport: normalized.benchmarkReport,

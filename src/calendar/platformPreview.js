@@ -56,10 +56,32 @@ export const PLATFORM_FOLD = {
     grade: 'UNVERIFIED',
     source: 'Observed overlay truncation on the video player. TikTok publishes no figure.',
   },
+  // LINE-based, and measured. The previous flat 157-character figure was wrong
+  // in both directions: YouTube collapses the description to THREE RENDERED
+  // LINES, and a line break consumes a line — so a description opening
+  // "line ⏎ ⏎ line" folds after ~100 characters, while one unbroken paragraph
+  // shows 300–420. A character count cannot express either.
   youtube: {
-    chars: 157,
-    grade: 'UNVERIFIED',
-    source: 'Description collapses at roughly three lines above "Show more"; varies with viewport.',
+    lines: 3,
+    // Conservative: the LOWEST full three-line capacity observed for a single
+    // paragraph (299) rather than the highest (421). Wrap is by pixel width, so
+    // a caption of wide glyphs folds sooner; erring early means a hook the
+    // preview calls safe really is above the line.
+    charsPerLine: 100,
+    grade: 'MEASURED',
+    measured: {
+      date: '2026-09-16',
+      viewport: 'desktop 1366×900, youtube.com watch page, logged out',
+      samples: 5,
+      tool: 'scripts/measure/measure-caption-fold.mjs',
+    },
+    source: 'Measured on real public videos: 3 rendered lines before "…more"; blank lines count; '
+      + 'single paragraphs showed 299–421 visible characters. Desktop only.',
+    // Mobile web was blocked by a consent sheet during measurement. The page
+    // it rendered placed the description in a hidden element with a "more"
+    // control beside the title — which suggests phones show NO description
+    // before the tap. Recorded, not asserted.
+    note: 'On phones YouTube may show only the title until "more" is tapped (not yet measured).',
   },
   facebook: {
     chars: 250,
@@ -93,6 +115,42 @@ export function foldFor(platform) {
 }
 
 /**
+ * The most characters a fold can ever show, for either model — a flat `chars`
+ * budget, or `lines × charsPerLine` for a single unbroken paragraph. Used to
+ * check a fold never exceeds the platform's hard caption limit.
+ */
+export function foldCapacity(fold) {
+  if (!fold) return null;
+  if (Number.isFinite(fold.lines) && Number.isFinite(fold.charsPerLine)) return fold.lines * fold.charsPerLine;
+  return Number.isFinite(fold.chars) ? fold.chars : null;
+}
+
+/**
+ * Where a LINE-based fold cuts this particular caption, as a code-point index.
+ *
+ * Each paragraph (text between line breaks) takes ceil(length / charsPerLine)
+ * rendered lines, and an empty paragraph still takes one — a blank line is a
+ * line. The cut falls inside the first paragraph that does not fit.
+ */
+function lineFoldIndex(chars, { lines, charsPerLine }) {
+  let linesLeft = lines;
+  let index = 0;
+  const total = chars.length;
+  while (index < total && linesLeft > 0) {
+    let end = index;
+    while (end < total && chars[end] !== '\n') end += 1;
+    const paragraphLength = end - index;
+    const needed = Math.max(1, Math.ceil(paragraphLength / charsPerLine));
+    if (needed > linesLeft) {
+      return index + linesLeft * charsPerLine;
+    }
+    linesLeft -= needed;
+    index = end < total ? end + 1 : end; // step past the line break itself
+  }
+  return index;
+}
+
+/**
  * Split a caption at the fold.
  *
  * Counts by CODE POINT, not by UTF-16 unit, so an emoji counts as one character
@@ -115,17 +173,25 @@ export function splitAtFold(caption, platform) {
     return { visible: text, hidden: '', folds: false, foldAt: null, grade: null, total };
   }
 
-  if (total <= fold.chars) {
-    return { visible: text, hidden: '', folds: false, foldAt: fold.chars, grade: fold.grade, total };
+  const model = Number.isFinite(fold.lines) ? 'lines' : 'chars';
+  const cut = model === 'lines' ? lineFoldIndex(chars, fold) : fold.chars;
+  const extra = { model, lines: fold.lines ?? null, note: fold.note ?? null };
+
+  // A trailing line break at the cut is not "hidden content" — only fold when
+  // something a reader would see is actually below the line.
+  const remainder = chars.slice(cut).join('');
+  if (total <= cut || !remainder.trim()) {
+    return { visible: text, hidden: '', folds: false, foldAt: model === 'lines' ? foldCapacity(fold) : fold.chars, grade: fold.grade, total, ...extra };
   }
 
   return {
-    visible: chars.slice(0, fold.chars).join(''),
-    hidden: chars.slice(fold.chars).join(''),
+    visible: chars.slice(0, cut).join(''),
+    hidden: remainder,
     folds: true,
-    foldAt: fold.chars,
+    foldAt: cut,
     grade: fold.grade,
     total,
+    ...extra,
   };
 }
 

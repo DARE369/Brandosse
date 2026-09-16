@@ -57,7 +57,11 @@
     "test:publish-outcome": "node scripts/test/publish-outcome.test.mjs",
     "check:publish-receipt": "node scripts/check-publish-receipt.cjs",
     "test:discovery-preview": "node scripts/test/discovery-and-preview.test.mjs",
-    "check:discovery-preview": "node scripts/check-discovery-preview-contract.cjs"
+    "check:discovery-preview": "node scripts/check-discovery-preview-contract.cjs",
+    "test:copy-review": "node scripts/test/copy-review.test.mjs",
+    "check:copy-review": "node scripts/check-copy-review-contract.cjs",
+    "check:composer-styles": "node scripts/check-composer-styles-owned.cjs",
+    "measure:caption-fold": "node scripts/measure/measure-caption-fold.mjs"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.29.0",

@@ -72,7 +72,12 @@ export async function scoreDestination(scoreFn, { platform, caption, title, hash
     });
 
     const score = Number(result?.seoScore);
-    if (!Number.isFinite(score)) {
+    // `seoHasOverall === false` is checked explicitly because the service layer
+    // coerces a MISSING overall to 0 for Studio's sake — so without this, a
+    // response carrying no score at all would arrive here as a finite, genuine-
+    // looking 0 and be frozen onto the post at publish. `undefined` (an older
+    // service build) falls through to the numeric check as before.
+    if (result?.seoHasOverall === false || !Number.isFinite(score)) {
       // A response carrying no number is UNAVAILABLE, not zero. Rendering a
       // missing score as 0 would tell the user their caption is terrible when
       // nothing was actually measured — a fabricated reading, which Law 3
@@ -92,6 +97,15 @@ export async function scoreDestination(scoreFn, { platform, caption, title, hash
       category: result?.seoCategory || null,
       suggestions: Array.isArray(result?.seoSuggestions) ? result.seoSuggestions.filter(Boolean) : [],
       reason: '',
+      // Carried whole so the frozen publish report can show every metric —
+      // hook strength included — rather than only the headline number.
+      breakdown: (result?.seoBreakdown && typeof result.seoBreakdown === 'object') ? result.seoBreakdown : {},
+      // null = the scorer predates the field, so coverage is UNKNOWN. Never
+      // treated as "all measured", which would present its zeros as readings.
+      measured: Array.isArray(result?.seoMeasured) ? result.seoMeasured : null,
+      benchmarkReport: Array.isArray(result?.seoBenchmarkReport) ? result.seoBenchmarkReport : [],
+      provider: result?.seoProvider || null,
+      model: result?.seoModel || null,
     };
   } catch (err) {
     // Swallowed HERE and only here, and never silently: the message is carried

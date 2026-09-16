@@ -267,7 +267,11 @@ assert(
 );
 
 assert(
-  /workflow_state:\s*\{\s*\[platformKey\]/.test(service),
+  // The settings object is keyed by the row's OWN platform. Matched on the key
+  // itself rather than on `workflow_state: {` directly, because the block is now
+  // built as `workflowState` so the copy review snapshot can join it.
+  /\[platformKey\]:\s*\{\s*\.\.\.settings/.test(service)
+    && /workflow_state:\s*workflowState/.test(service),
   "calendarService.js does not key workflow_state by the row's own platform. "
   + 'Settings collected for one destination could be written onto another.',
   "workflow_state is keyed by the row's own platform",
@@ -290,7 +294,11 @@ assert(
 );
 
 assert(
-  /const\s+title\s*=\s*String\(\s*titles\?\.\[platformKey\]/.test(service),
+  // Two links: the title function reads the composer's per-platform title, and
+  // the row actually uses it. titleFor is shared with the copy review check so
+  // the scored title and the saved title cannot disagree.
+  /const\s+titleFor\s*=\s*\(platformKey\)\s*=>\s*String\(\s*titles\?\.\[platformKey\]/.test(service)
+    && /const\s+title\s*=\s*titleFor\(platformKey\)/.test(service),
   "calendarService.js does not carry the composer's title onto the row. YouTube falls "
   + 'back to post.title, so the video publishes named after the file — "clip-3.mp4".',
   'a user-supplied title reaches the posts row',

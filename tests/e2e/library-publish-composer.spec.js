@@ -303,17 +303,18 @@ for (const themeName of ["light", "dark"]) {
             + 'the dye lot, the autumn restock is finally live — five pieces, one warm palette, '
             + 'built for the season ahead and nothing else.';
           await captionBox.fill(longCaption);
-          await page.waitForTimeout(3500); // past the 2s scoring debounce
+          // Copy review is scored on request only (copy-review.spec.js proves
+          // no request fires while typing); this wait is for the fold preview.
+          await page.waitForTimeout(1500);
 
           report.foldPreviewShown = (await composer.locator('.quickpost-preview').count()) > 0;
           if (report.foldPreviewShown) {
             report.foldMarkerShown = (await composer.locator('.quickpost-preview__fold').count()) > 0;
           }
 
-          // The score may legitimately be scoring, scored, or unavailable — all
-          // three are acceptable. What is NOT acceptable is a blocked send.
-          const bodyText = await composer.innerText();
-          report.scoreLineShown = /Discoverability:|Checking discoverability|Not scored/.test(bodyText);
+          // The copy review offers a button once there is a caption; whatever
+          // its state, it must never block the send.
+          report.scoreLineShown = (await composer.locator('button.quickpost-copy-review__btn').count()) > 0;
 
           const publishNow = composer.getByRole('button', { name: 'Publish now', exact: true });
           report.publishEnabledWhileScoring = (await publishNow.count()) > 0

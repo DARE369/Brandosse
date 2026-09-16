@@ -544,6 +544,7 @@ function CalendarBody({ brandKit }) {
         platformOptions: payload.platformOptions || {},
         titles: payload.titles || {},
         aiDisclosure: payload.aiDisclosure !== false,
+        copyReview: payload.copyReview || {},
       });
       refetch();
       refetchDrafts();

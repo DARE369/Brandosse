@@ -67,6 +67,15 @@ function readSeoResponseFields(raw = {}) {
     category: String(raw?.scoreCategory || raw?.score_category || "Poor"),
     provider: raw?.provider || null,
     model: raw?.model || null,
+    // `overall` above coerces a MISSING score to 0 (`?? 0` then `|| 0`), which
+    // existing Studio screens rely on. These two flags let a caller that must
+    // not fabricate — the frozen publish report — tell "scored zero" from "no
+    // score came back". Additive: nothing that reads `overall` changes.
+    hasOverall: [raw?.overall, raw?.discoveryScore, raw?.discovery_score]
+      .some((v) => v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v))),
+    // null when talking to a seo-score deployment that predates the field, so a
+    // caller can say "coverage unknown" rather than assume every metric counted.
+    measured: Array.isArray(raw?.measured) ? raw.measured.map(String) : null,
   };
 }
 
@@ -79,6 +88,9 @@ function toDiscoveryScoreShape(normalized) {
     seoBenchmarkReport: normalized.benchmarkReport,
     seoHashtagSuggestions: normalized.hashtagSuggestions,
     seoProvider: normalized.provider,
+    seoModel: normalized.model,
+    seoHasOverall: normalized.hasOverall,
+    seoMeasured: normalized.measured,
   };
 }
 

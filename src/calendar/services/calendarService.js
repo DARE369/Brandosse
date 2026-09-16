@@ -15,6 +15,7 @@
 import { supabase } from '../../services/supabaseClient';
 import { POST_STATUS } from '../../constants/statuses';
 import { assertPostStatusTransition } from '../../utils/postStatusMachine';
+import { buildSnapshot } from '../copyReview';
 import {
   buildUnavailableEdgeFunctionMessage,
   clearEdgeFunctionUnavailable,
@@ -396,6 +397,8 @@ export async function createQuickPost(scope, {
   platformOptions = {},
   titles = {},
   aiDisclosure = true,
+  // { [platform]: { scored, scoredInputs } } from the composer. See copyReview.js.
+  copyReview = {},
 }) {
   const userId = assertPersonalScope(scope, 'createQuickPost');
 
@@ -447,6 +450,38 @@ export async function createQuickPost(scope, {
   // title, plus org/lifecycle/moderation columns not relevant here.
   const capturedAt = new Date().toISOString();
 
+  // A real, user-supplied title wins over the asset's file name. YouTube shows
+  // this above the player and falls back to post.title, so with no field for it
+  // a clip published as "clip-3.mp4" (youtube.service.ts:263-266). One function
+  // for both the row and the copy review check below, so they cannot disagree.
+  const titleFor = (platformKey) => String(titles?.[platformKey] || '').trim() || asset?.name || null;
+
+  // ── Copy review snapshots ─────────────────────────────────────────────────
+  //
+  // Kept ONLY where the composer's review describes exactly what this row will
+  // carry. buildSnapshot compares the inputs that were scored against the row's
+  // final platform/caption/title/hashtags and returns null on any difference —
+  // a score attached to text it never read would be frozen onto the post at
+  // publish as a fabricated reading. A dropped snapshot costs nothing: the
+  // finalize-copy-reviews worker reviews the published text instead.
+  const snapshots = {};
+  for (const platformKey of activePlatforms) {
+    const entry = copyReview?.[platformKey];
+    if (!entry) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const snapshot = await buildSnapshot({
+      scored: entry.scored,
+      scoredInputs: entry.scoredInputs,
+      rowInputs: {
+        platform: platformKey,
+        caption: captions?.[platformKey] || '',
+        title: titleFor(platformKey) || '',
+        hashtags: [],
+      },
+    });
+    if (snapshot) snapshots[platformKey] = snapshot;
+  }
+
   const rows = activePlatforms.map((platformKey) => {
     const account = accountByPlatform.get(platformKey) || null;
 
@@ -485,7 +520,12 @@ export async function createQuickPost(scope, {
     // A real, user-supplied title wins over the asset's file name. YouTube shows
     // this above the player and falls back to post.title, so with no field for
     // it a clip published as "clip-3.mp4" (youtube.service.ts:263-266).
-    const title = String(titles?.[platformKey] || '').trim() || asset?.name || null;
+    const title = titleFor(platformKey);
+
+    const workflowState = {
+      ...(settings ? { [platformKey]: { ...settings, capturedAt } } : {}),
+      ...(snapshots[platformKey] ? { copy_review: { snapshot: snapshots[platformKey] } } : {}),
+    };
 
     return {
       user_id: userId,
@@ -500,9 +540,7 @@ export async function createQuickPost(scope, {
       // Written as a whole object because this row is new: there is no prior
       // workflow_state to merge with. Every LATER writer must read-modify-write
       // instead, since approval routing and publish accounting share the column.
-      ...(settings
-        ? { workflow_state: { [platformKey]: { ...settings, capturedAt } } }
-        : {}),
+      ...(Object.keys(workflowState).length > 0 ? { workflow_state: workflowState } : {}),
     };
   });
 

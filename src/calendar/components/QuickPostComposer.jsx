@@ -18,6 +18,15 @@
 //      generation_id so they fan out into the platform-icon-stack group.)
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, FileImage, Sparkles } from 'lucide-react';
+// The composer imports its OWN stylesheet. It used to rely on CalendarPage
+// having imported it — true on the Calendar, false everywhere else. Mounted
+// from the Library on a direct page load, `.quickpost-modal` resolved to
+// position:static with a transparent background and the rule was not in any
+// loaded sheet: "Publish" appended an unstyled form below the grid instead of
+// opening a dialog. It only looked right after visiting the Calendar first,
+// because Next keeps a visited route's CSS. Measured 2026-09-16; guarded by
+// check-composer-styles-owned.cjs and the Library E2E's computed-style check.
+import '../calendar-engine-v2.css';
 import { generateQuickPostCaption } from '../services/calendarService';
 import { supabase } from '../../services/supabaseClient';
 import { getZonedTodayKey, zonedDateTimeToUTC } from '../../utils/timezone';
@@ -28,6 +37,7 @@ import {
 } from '../../services/platforms/platformCaptionSpecs';
 import { checkScheduleFloor, seedFromNow } from '../scheduleSeed';
 import { SCORE_STATE, bandFor, scoreDestinations } from '../discoveryScore';
+import { canonicalCopyInputs } from '../copyReview';
 import { previewFor } from '../platformPreview';
 import { scorePostSeo } from '../../services/postProduction.service';
 import TikTokOptionsPanel from '../../components/Publishing/TikTokOptionsPanel';
@@ -377,53 +387,79 @@ export default function QuickPostComposer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  // ── Discovery score, per destination ─────────────────────────────────────
+  // ── Copy review, per destination — scored on request, not on every pause ──
   //
-  // Debounced hard, because this is a paid LLM call behind a rate limit and the
-  // input is a textarea someone is typing into. Two seconds of quiet is the
-  // difference between one call per caption and one per keystroke — and the
-  // rate limit, once hit, would make the whole feature read as broken.
+  // "Copy review", not "discoverability" — LOCK L5.11: the score reads only the
+  // post's own text and cannot predict reach. See src/calendar/copyReview.js.
   //
-  // Nothing here is awaited by the submit path and nothing here can reject:
-  // scoreDestinations() resolves to a state object on every path, so a scoring
-  // outage degrades to "not scored" and the composer sends exactly as before.
+  // This used to score automatically two seconds after typing stopped. It is a
+  // paid model call behind a rate limit, so that spent money on every pause in
+  // someone's thinking and could exhaust the limit mid-draft. It is now the
+  // user's call: a per-destination button, which PULSES once the text it scored
+  // has changed — the score on screen then describes words that are no longer
+  // there, and saying so is the honest alternative to silently re-scoring.
+  //
+  // Whatever is on screen at send time travels with the post as a SNAPSHOT, but
+  // only if it still describes the exact text being saved. If it does not — or
+  // nothing was scored — the final report is taken after the post publishes, by
+  // the finalize-copy-reviews worker. Nothing here is awaited by the submit
+  // path, and scoreDestinations() cannot reject, so scoring never gates a send.
   const [scores, setScores] = useState({});
+  // The exact inputs each score was taken of, so staleness is a comparison of
+  // canonical strings rather than a guess.
+  const [scoredInputs, setScoredInputs] = useState({});
+  // Set by the USER typing, never by the AI caption pre-fill: a pre-filled
+  // caption nobody has touched offers a calm "Review copy", not a pulse.
+  const [editedSinceScore, setEditedSinceScore] = useState({});
 
-  useEffect(() => {
-    if (!open || activePlatforms.length === 0) return undefined;
+  // The title the ROW will carry, mirroring createQuickPost exactly — a user
+  // title, else the asset name. Scoring anything else would produce a snapshot
+  // that never matches the saved row.
+  const effectiveTitle = (key) => String(titles[key] || '').trim() || selectedAsset?.name || '';
 
-    const targets = activePlatforms
-      .filter((key) => String(captions[key] || '').trim())
-      .map((key) => ({
-        platform: key,
-        caption: captions[key],
-        title: titles[key] || '',
-        hashtags: [],
-        mediaType: selectedAsset?.media_type || null,
-      }));
+  const copyInputsFor = (key) => ({
+    platform: key,
+    caption: captions[key] || '',
+    title: effectiveTitle(key),
+    hashtags: [],
+  });
 
-    if (targets.length === 0) return undefined;
+  async function reviewCopy(key) {
+    const inputs = copyInputsFor(key);
+    if (!String(inputs.caption).trim()) return;
+    setScores((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), state: SCORE_STATE.SCORING },
+    }));
+    const result = await scoreDestinations(scorePostSeo, [{
+      ...inputs,
+      mediaType: selectedAsset?.media_type || null,
+    }]);
+    setScores((prev) => ({ ...prev, ...result }));
+    if (result[key]?.state === SCORE_STATE.SCORED) {
+      setScoredInputs((prev) => ({ ...prev, [key]: inputs }));
+      setEditedSinceScore((prev) => ({ ...prev, [key]: false }));
+    }
+  }
 
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      setScores((prev) => {
-        const next = { ...prev };
-        for (const t of targets) {
-          if (next[t.platform]?.state !== SCORE_STATE.SCORED) {
-            next[t.platform] = { state: SCORE_STATE.SCORING, score: null, category: null, suggestions: [], reason: '' };
-          }
-        }
-        return next;
-      });
-
-      const result = await scoreDestinations(scorePostSeo, targets);
-      if (cancelled) return;
-      setScores((prev) => ({ ...prev, ...result }));
-    }, 2000);
-
-    return () => { cancelled = true; clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, activePlatforms, captions, titles, selectedAsset?.media_type]);
+  /**
+   * idle   — nothing to review yet (no caption).
+   * ready  — a caption exists and has never been reviewed; calm button.
+   * stale  — reviewed, then the text changed; or never reviewed and the user
+   *          has since typed. The button pulses.
+   * fresh  — the score on screen describes exactly the text on screen.
+   */
+  const copyReviewStatus = (key) => {
+    const caption = String(captions[key] || '').trim();
+    if (!caption) return 'idle';
+    const s = scores[key];
+    if (s?.state === SCORE_STATE.SCORED && scoredInputs[key]) {
+      return canonicalCopyInputs(scoredInputs[key]) === canonicalCopyInputs(copyInputsFor(key))
+        ? 'fresh'
+        : 'stale';
+    }
+    return editedSinceScore[key] ? 'stale' : 'ready';
+  };
 
   // Everything that must hold before a row may be written with a non-null
   // scheduled_at, in one place so "Schedule" and "Publish now" cannot drift
@@ -584,6 +620,15 @@ export default function QuickPostComposer({
             .map((key) => [key, String(titles[key]).trim()]),
         ),
         aiDisclosure,
+        // Each destination's on-screen review AND the exact inputs it scored.
+        // createQuickPost keeps it as a snapshot only if those inputs still
+        // equal the row it writes; a stale score is dropped, never attached to
+        // text it did not read.
+        copyReview: Object.fromEntries(
+          activePlatforms
+            .filter((key) => scores[key]?.state === SCORE_STATE.SCORED && scoredInputs[key])
+            .map((key) => [key, { scored: scores[key], scoredInputs: scoredInputs[key] }]),
+        ),
         captions,
         asset: selectedAsset,
         dateKey: mode === 'schedule' ? dateKey : null,
@@ -820,7 +865,11 @@ export default function QuickPostComposer({
                     className="ui-input"
                     type="text"
                     value={value}
-                    onChange={(e) => setTitles((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                    onChange={(e) => {
+                      setTitles((prev) => ({ ...prev, [p.key]: e.target.value }));
+                      // The title is scored too, so changing it stales the review.
+                      setEditedSinceScore((prev) => ({ ...prev, [p.key]: true }));
+                    }}
                     aria-label={`${p.label} title`}
                     placeholder={`Title for ${p.label}…`}
                   />
@@ -851,7 +900,12 @@ export default function QuickPostComposer({
                     <textarea
                       className="ui-textarea"
                       value={caption}
-                      onChange={(e) => setCaptions((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                      onChange={(e) => {
+                        setCaptions((prev) => ({ ...prev, [p.key]: e.target.value }));
+                        // Only the user's own typing marks the review stale; the
+                        // AI pre-fill writes captions through prefillCaption().
+                        setEditedSinceScore((prev) => ({ ...prev, [p.key]: true }));
+                      }}
                       placeholder={`Write a caption for ${p.label}…`}
                     />
                     <div className={`caption-counter${caption.length > limit ? ' is-over' : ''}`}>{caption.length} / {limit}</div>
@@ -869,9 +923,18 @@ export default function QuickPostComposer({
                       return (
                         <div className="quickpost-preview">
                           <p className="quickpost-hint">
-                            {pv.folds
-                              ? `${p.label} shows about the first ${pv.foldAt} characters before “more”. Your hook needs to land above the line.`
-                              : `Fits inside ${p.label}’s visible area (about ${pv.foldAt} characters).`}
+                            {/* A line-based fold is described in lines, because
+                                that is what was measured: line breaks use lines
+                                up, so a character count would mislead. */}
+                            {pv.model === 'lines'
+                              ? (pv.folds
+                                ? `${p.label} shows the first ${pv.lines} lines before “more” — line breaks count, so here that is ${pv.foldAt} characters. Your hook needs to land above the line.`
+                                : `Fits inside ${p.label}’s first ${pv.lines} lines.`)
+                              : (pv.folds
+                                ? `${p.label} shows about the first ${pv.foldAt} characters before “more”. Your hook needs to land above the line.`
+                                : `Fits inside ${p.label}’s visible area (about ${pv.foldAt} characters).`)}
+                            {pv.grade === 'MEASURED' ? ' Measured on real posts.' : ' An estimate — not yet measured.'}
+                            {pv.note ? ` ${pv.note}` : ''}
                           </p>
                           <div className="quickpost-preview__body">
                             <span>{pv.visible}</span>
@@ -886,29 +949,61 @@ export default function QuickPostComposer({
                       );
                     })()}
 
-                    {/* ── Discovery score ──────────────────────────────────
-                        Advisory, always. discoveryScore.js cannot reject, so
-                        nothing here can make the send depend on it — and a
-                        failure renders as "not scored", never as a low score. */}
+                    {/* ── Copy review ──────────────────────────────────────
+                        Advisory, always, and scored only when asked. The
+                        button pulses when the text on screen is no longer the
+                        text that was scored. A failure reads "not scored",
+                        never a low score. Neither state gates the send. */}
                     {(() => {
+                      const status = copyReviewStatus(p.key);
+                      if (status === 'idle') return null;
                       const s = scores[p.key];
-                      if (!s || s.state === SCORE_STATE.IDLE) return null;
-                      if (s.state === SCORE_STATE.SCORING) {
-                        return <p className="quickpost-hint">Checking discoverability…</p>;
-                      }
-                      if (s.state === SCORE_STATE.UNAVAILABLE) {
-                        return (
-                          <p className="quickpost-hint">
-                            Not scored — {s.reason} This does not affect publishing.
-                          </p>
-                        );
-                      }
-                      const band = bandFor(s.score);
+                      const busy = s?.state === SCORE_STATE.SCORING;
+                      const hook = s?.breakdown && Array.isArray(s.measured) && s.measured.includes('hookStrength')
+                        ? s.breakdown.hookStrength
+                        : null;
+
                       return (
-                        <p className="quickpost-hint">
-                          Discoverability: <strong>{s.score}</strong> · {band.label}
-                          {s.suggestions.length > 0 ? ` — ${s.suggestions[0]}` : ''}
-                        </p>
+                        <div className="quickpost-copy-review">
+                          <div className="quickpost-copy-review__row">
+                            <button
+                              type="button"
+                              className={`ui-button ui-button-secondary ui-button-sm quickpost-copy-review__btn${status === 'stale' && !busy ? ' is-stale' : ''}`}
+                              onClick={() => reviewCopy(p.key)}
+                              disabled={busy}
+                              aria-describedby={`copy-review-${p.key}`}
+                            >
+                              {/* "Re-review" only once something WAS reviewed.
+                                  Typing before any review is stale too, but
+                                  "Re-review" there claimed a review that never
+                                  happened. */}
+                              {busy ? 'Reviewing…' : s?.state === SCORE_STATE.SCORED ? 'Re-review copy' : 'Review copy'}
+                            </button>
+                            {s?.state === SCORE_STATE.SCORED && s.score !== null && (
+                              <span className="quickpost-hint" style={{ margin: 0 }}>
+                                Copy review <strong>{s.score}</strong> · {bandFor(s.score).label}
+                                {hook !== null && hook !== undefined ? <> · Hook {hook}</> : null}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Said in words too, so the state is not carried by
+                              motion alone — reduced-motion users get no pulse. */}
+                          <p id={`copy-review-${p.key}`} className="quickpost-hint" role="status" aria-live="polite">
+                            {busy ? 'Reviewing this caption…'
+                              : s?.state === SCORE_STATE.UNAVAILABLE
+                                ? `Not scored — ${s.reason} This does not affect publishing.`
+                                : status === 'stale' && s?.state === SCORE_STATE.SCORED
+                                  ? 'Changed since the last review. Re-review, or send as-is — the final review is taken when it publishes.'
+                                  : status === 'stale'
+                                    ? 'Edited. Review it now, or it is reviewed automatically when it publishes.'
+                                    : status === 'fresh' && s?.suggestions?.length > 0
+                                      ? s.suggestions[0]
+                                      : status === 'ready'
+                                        ? 'Optional. Not reviewed yet — it will be when it publishes.'
+                                        : ''}
+                          </p>
+                        </div>
                       );
                     })()}
                   </div>

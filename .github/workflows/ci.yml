@@ -173,6 +173,23 @@ jobs:
       - name: Discovery and preview contract
         run: node scripts/check-discovery-preview-contract.cjs
 
+      # The copy review report, frozen at publish. The test imports the client
+      # AND the Deno fingerprint modules and fails if they diverge — drift would
+      # make every composer review look stale and the worker pay to re-score
+      # every published post while reporting nothing wrong. The contract checks
+      # that only the worker freezes a report, conditionally, on a schedule.
+      - name: Copy review report
+        run: node scripts/test/copy-review.test.mjs
+      - name: Copy review contract
+        run: node scripts/check-copy-review-contract.cjs
+
+      # A calendar component mounted outside the Calendar must bring its own
+      # stylesheet. The composer did not: opened from a fresh Library load it
+      # rendered as an unstyled form below the grid, invisible to `next build`
+      # and to an E2E whose toBeVisible is true for unstyled elements.
+      - name: Calendar components own their styles
+        run: node scripts/check-composer-styles-owned.cjs
+
       # LOCK L0.7 — the eight guard scripts that existed and never ran.
       # Later locks append their own below; all of them are blocking.
       - name: check-env-security
