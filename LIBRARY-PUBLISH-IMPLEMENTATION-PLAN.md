@@ -387,6 +387,26 @@ The rule *"every non-terminal state needs a reaper"* was **half-kept**: `publish
 **Proven:** snapshot tests on the truncation maths per platform, not on the visuals.
 **Guarded:** fold constants live in one table with a comment pointing at their source; a test fails if a limit is edited without updating that reference.
 
+### Phases 5 & 6 — COMPLETE (composer), 2026-09-16
+
+Built in one pass. Phase 3's overdue alarm was verified live first: both functions answer over RPC (`overdue_scheduled_posts` → `[]`, `raise_overdue_scheduled_alarm` → `0`), and `get_cron_job_status()` shows `alarm-overdue-scheduled-posts` active and already run at 15:30Z with `last_status: succeeded`.
+
+**Phase 5 — the score is advisory by construction, not by convention.** `scorePostSeo()` already existed, platform-aware, and **throws** on a rate limit or provider outage. Awaiting it naively surfaces an exception from an optional number, and the reasonable-looking fix — disable Send "until scoring finishes" — makes the composer stop working exactly when the scoring provider does. So `src/calendar/discoveryScore.js` cannot reject: every path resolves to a state whose worst value is `unavailable`, `scoreDestinations` settles each platform independently, and `blocksPublishing()` answers `false` as a function so it is assertable. The composer debounces 2 s — this is a paid LLM call behind a rate limit, and the input is a textarea.
+
+**A fabricated reading the test caught.** `bandFor()` guarded with `Number.isFinite(Number(score))`. `Number(null)` is `0` and finite, so a *missing* score banded as **"Could be stronger"** — telling the user their caption was weak when nothing had been measured. The exact defect the module was written to prevent, and it got in anyway. Absence is now checked before coercion, and a numberless response is `unavailable`, never `0`.
+
+**Phase 6 — generic chrome, exact truncation.** `src/calendar/platformPreview.js` owns only the *soft* limit (the fold); the *hard* limit still comes from `platformCaptionSpecs.js`, which mirrors the adapters. Truncation counts code points — `"🎉".length` is 2, and counting UTF-16 units folds an emoji-heavy caption early and can split a surrogate pair. Every fold carries a grade and a source beside its number, and **6 of the 8 are graded UNVERIFIED**, because no platform publishes where it truncates.
+
+**Proven:** `scripts/test/discovery-and-preview.test.mjs` — 67 checks: throwing, numberless and non-numeric scorers all degrade to `unavailable`; one platform's failure leaves another's score intact; the batch never rejects; every fold is graded, sourced, and inside its platform's hard limit; exact-at-fold does not fold, one-past does; emoji fold on whole characters with no broken surrogate; hashtags count toward the fold.
+
+**Guarded:** `scripts/check-discovery-preview-contract.cjs` — 38 checks, in CI. Nine deliberate breaks each exit 1: scoring added to `sendBlocked`, scoring added to `scheduleBlocked`, the module starting to throw, the absent-score check removed, a fold losing its source, a fold losing its grade, the preview defining its own `captionMax`, truncation switched to `.length`, and a fold exceeding its hard limit.
+
+**Rendered, both themes:** no page or React errors; fold preview and marker shown; score line shown; **"Publish now" enabled while a score state was on screen**; the schedule floor still blocks Schedule.
+
+**Not done, and why:**
+- **The drawer's Discovery tab.** `seo-score` scores a *caption*, and a Library asset has none — so a per-asset score has no input. What it should score is a product decision, not an implementation one (see open questions).
+- **Which score state rendered live** was not captured. The test accepts scored, scoring and unavailable by design; whether `seo-score` returns real scores from the composer today is unconfirmed.
+
 ### Phase 7 — Meta adapters
 - Instagram, then Facebook. Independent of everything above; ships when ready.
 

@@ -290,6 +290,44 @@ for (const themeName of ["light", "dark"]) {
         await timeInput.fill(seededTime);
       }
 
+      // ── Phases 5 & 6: the fold preview and the discovery score ───────────
+      //
+      // Both are ADVISORY. The property that matters is not that they appear,
+      // but that neither can stop a send — so this types a caption, waits past
+      // the 2s scoring debounce, and records the send buttons' state.
+      {
+        const captionBox = composer.locator('textarea.ui-textarea').first();
+        if ((await captionBox.count()) > 0) {
+          // Long enough to cross every platform's fold (the shortest is 50).
+          const longCaption = 'After three months of sampling and one very expensive mistake with '
+            + 'the dye lot, the autumn restock is finally live — five pieces, one warm palette, '
+            + 'built for the season ahead and nothing else.';
+          await captionBox.fill(longCaption);
+          await page.waitForTimeout(3500); // past the 2s scoring debounce
+
+          report.foldPreviewShown = (await composer.locator('.quickpost-preview').count()) > 0;
+          if (report.foldPreviewShown) {
+            report.foldMarkerShown = (await composer.locator('.quickpost-preview__fold').count()) > 0;
+          }
+
+          // The score may legitimately be scoring, scored, or unavailable — all
+          // three are acceptable. What is NOT acceptable is a blocked send.
+          const bodyText = await composer.innerText();
+          report.scoreLineShown = /Discoverability:|Checking discoverability|Not scored/.test(bodyText);
+
+          const publishNow = composer.getByRole('button', { name: 'Publish now', exact: true });
+          report.publishEnabledWhileScoring = (await publishNow.count()) > 0
+            ? !(await publishNow.isDisabled())
+            : null;
+
+          ok2(
+            'the discovery score never disables Publish now',
+            report.publishEnabledWhileScoring !== false,
+            'Publish now was disabled while a score state was on screen',
+          );
+        }
+      }
+
       await page.screenshot({
         path: path.join(SHOT_DIR, `composer-${testInfo.project.name}-${themeName}.png`),
         fullPage: true,

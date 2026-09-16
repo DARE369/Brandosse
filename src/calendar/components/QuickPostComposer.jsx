@@ -27,6 +27,9 @@ import {
   platformsRequiringMedia,
 } from '../../services/platforms/platformCaptionSpecs';
 import { checkScheduleFloor, seedFromNow } from '../scheduleSeed';
+import { SCORE_STATE, bandFor, scoreDestinations } from '../discoveryScore';
+import { previewFor } from '../platformPreview';
+import { scorePostSeo } from '../../services/postProduction.service';
 import TikTokOptionsPanel from '../../components/Publishing/TikTokOptionsPanel';
 import YouTubeOptionsPanel from '../../components/Publishing/YouTubeOptionsPanel';
 import { useAuth } from '../../Context/AuthContext';
@@ -373,6 +376,54 @@ export default function QuickPostComposer({
   const [timeStr, setTimeStr] = useState(initialSeed.timeStr);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+
+  // ── Discovery score, per destination ─────────────────────────────────────
+  //
+  // Debounced hard, because this is a paid LLM call behind a rate limit and the
+  // input is a textarea someone is typing into. Two seconds of quiet is the
+  // difference between one call per caption and one per keystroke — and the
+  // rate limit, once hit, would make the whole feature read as broken.
+  //
+  // Nothing here is awaited by the submit path and nothing here can reject:
+  // scoreDestinations() resolves to a state object on every path, so a scoring
+  // outage degrades to "not scored" and the composer sends exactly as before.
+  const [scores, setScores] = useState({});
+
+  useEffect(() => {
+    if (!open || activePlatforms.length === 0) return undefined;
+
+    const targets = activePlatforms
+      .filter((key) => String(captions[key] || '').trim())
+      .map((key) => ({
+        platform: key,
+        caption: captions[key],
+        title: titles[key] || '',
+        hashtags: [],
+        mediaType: selectedAsset?.media_type || null,
+      }));
+
+    if (targets.length === 0) return undefined;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setScores((prev) => {
+        const next = { ...prev };
+        for (const t of targets) {
+          if (next[t.platform]?.state !== SCORE_STATE.SCORED) {
+            next[t.platform] = { state: SCORE_STATE.SCORING, score: null, category: null, suggestions: [], reason: '' };
+          }
+        }
+        return next;
+      });
+
+      const result = await scoreDestinations(scorePostSeo, targets);
+      if (cancelled) return;
+      setScores((prev) => ({ ...prev, ...result }));
+    }, 2000);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activePlatforms, captions, titles, selectedAsset?.media_type]);
 
   // Everything that must hold before a row may be written with a non-null
   // scheduled_at, in one place so "Schedule" and "Publish now" cannot drift
@@ -804,6 +855,62 @@ export default function QuickPostComposer({
                       placeholder={`Write a caption for ${p.label}…`}
                     />
                     <div className={`caption-counter${caption.length > limit ? ' is-over' : ''}`}>{caption.length} / {limit}</div>
+
+                    {/* ── Where this caption gets cut ──────────────────────
+                        Generic layout, exact truncation. The value is showing
+                        WHERE the fold falls, not imitating anyone's app — a
+                        preview subtly wrong about spacing is tolerable, one
+                        wrong about the fold is worse than none. Described as
+                        approximate because real clients wrap by pixel width,
+                        not by character count. */}
+                    {(() => {
+                      const pv = previewFor({ platform: p.key, caption, hashtags: [] });
+                      if (!caption || pv.foldAt === null) return null;
+                      return (
+                        <div className="quickpost-preview">
+                          <p className="quickpost-hint">
+                            {pv.folds
+                              ? `${p.label} shows about the first ${pv.foldAt} characters before “more”. Your hook needs to land above the line.`
+                              : `Fits inside ${p.label}’s visible area (about ${pv.foldAt} characters).`}
+                          </p>
+                          <div className="quickpost-preview__body">
+                            <span>{pv.visible}</span>
+                            {pv.folds && (
+                              <>
+                                <span className="quickpost-preview__fold" aria-hidden="true"> … more</span>
+                                <span className="quickpost-preview__hidden">{pv.hidden}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── Discovery score ──────────────────────────────────
+                        Advisory, always. discoveryScore.js cannot reject, so
+                        nothing here can make the send depend on it — and a
+                        failure renders as "not scored", never as a low score. */}
+                    {(() => {
+                      const s = scores[p.key];
+                      if (!s || s.state === SCORE_STATE.IDLE) return null;
+                      if (s.state === SCORE_STATE.SCORING) {
+                        return <p className="quickpost-hint">Checking discoverability…</p>;
+                      }
+                      if (s.state === SCORE_STATE.UNAVAILABLE) {
+                        return (
+                          <p className="quickpost-hint">
+                            Not scored — {s.reason} This does not affect publishing.
+                          </p>
+                        );
+                      }
+                      const band = bandFor(s.score);
+                      return (
+                        <p className="quickpost-hint">
+                          Discoverability: <strong>{s.score}</strong> · {band.label}
+                          {s.suggestions.length > 0 ? ` — ${s.suggestions[0]}` : ''}
+                        </p>
+                      );
+                    })()}
                   </div>
                 );
               })}

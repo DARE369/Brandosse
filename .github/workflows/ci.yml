@@ -162,6 +162,17 @@ jobs:
       - name: Publish receipt wiring
         run: node scripts/check-publish-receipt.cjs
 
+      # Phases 5 and 6. The score is a paid LLM call behind a rate limit, so the
+      # failure to prevent is not a wrong number but a composer that cannot send
+      # because an OPTIONAL one did not arrive — it would block hardest exactly
+      # when the provider is down. And every caption-fold figure is observed
+      # behaviour, not a published API value, so each must carry its grade and
+      # source in one table rather than drifting across two.
+      - name: Discovery score and fold maths
+        run: node scripts/test/discovery-and-preview.test.mjs
+      - name: Discovery and preview contract
+        run: node scripts/check-discovery-preview-contract.cjs
+
       # LOCK L0.7 — the eight guard scripts that existed and never ran.
       # Later locks append their own below; all of them are blocking.
       - name: check-env-security

@@ -944,3 +944,42 @@
 .quickpost-hint--error {
   color: var(--uiv2-danger);
 }
+
+/* ── Caption fold preview ──────────────────────────────────────────────────
+   Deliberately GENERIC chrome. The value of this block is showing where the
+   caption is cut, not imitating any platform's app — platform chrome changes
+   constantly and a pixel-copy rots into a lie about someone else's product,
+   while the fold moves far less often. Being subtly wrong about spacing is
+   tolerable; being wrong about the fold is worse than showing nothing.
+
+   Every colour is a token, with NO fallbacks. The six undefined --uiv2-*
+   tokens found in Phase 0 painted the publishing panels near-black on a light
+   page precisely because a custom property with a fallback never errors — it
+   silently renders the fallback forever. check:uiv2-tokens fails if one of
+   these is undefined, which is the behaviour we want instead. */
+.quickpost-preview {
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--uiv2-border);
+  border-radius: 8px;
+  background: var(--uiv2-bg-inset);
+}
+
+.quickpost-preview__body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--uiv2-text-primary);
+  word-break: break-word;
+}
+
+/* The fold marker — the one thing here that must read clearly at a glance. */
+.quickpost-preview__fold {
+  color: var(--uiv2-accent-solid);
+  font-weight: 600;
+}
+
+/* Below the fold: still shown, because hiding it would make the user guess at
+   their own caption, but visibly demoted so the cut point is unmistakable. */
+.quickpost-preview__hidden {
+  color: var(--uiv2-text-tertiary);
+}
