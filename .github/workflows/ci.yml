@@ -338,6 +338,14 @@ jobs:
       # body over the fix.
       - name: check-expiry-warning-honesty
         run: node scripts/check-expiry-warning-honesty.cjs
+      # posts.error_message is the only explanation a user gets for a post that
+      # did not go out, and one sentence covered four different causes — telling
+      # a user whose connection expired to "reselect a target platform", which
+      # cannot work. process_scheduled_posts has been redefined by copy-paste in
+      # three migrations; a fourth pasting the old body would regress only the
+      # wording, which no behavioural test would notice.
+      - name: check-scheduled-failure-messages
+        run: node scripts/check-scheduled-failure-messages.cjs
       # The website import used to hand marketing prose to an LLM and ask for a
       # colour palette; shown no colours, it produced colours anyway. The harvester
       # reads the site's own CSS instead. This asserts exact measured hexes against
