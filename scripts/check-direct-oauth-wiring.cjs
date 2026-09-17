@@ -52,6 +52,7 @@ const ROOT = path.resolve(__dirname, "..");
 
 const CONNECTION_SERVICE = path.join(ROOT, "src", "services", "platforms", "connectionService.js");
 const CALLBACK_ROUTE = path.join(ROOT, "app", "api", "auth", "social", "[provider]", "callback", "route.js");
+const DISCONNECT_ROUTE = path.join(ROOT, "app", "api", "auth", "social", "[provider]", "disconnect", "route.js");
 const PUBLISH_POST = path.join(ROOT, "supabase", "functions", "publish-post", "index.ts");
 const SHARED_DIR = path.join(ROOT, "supabase", "functions", "_shared");
 
@@ -116,6 +117,39 @@ if (callbackSrc === null) {
 const publishSrc = read(PUBLISH_POST);
 if (publishSrc === null) missing(PUBLISH_POST);
 
+// ── Source 5: withdrawing the grant ─────────────────────────────────────────
+//
+// Connecting is half a promise. A user who disconnects believes they have taken
+// the permission back, and if we only delete our own row the authorization sits
+// live in their Google or TikTok settings indefinitely — a privacy claim we
+// would be breaking invisibly. LinkedIn's API terms §4.4 and Google's OAuth
+// policies both require it, so this is a compliance link in the chain, not a
+// nicety.
+//
+// YouTube had no revoke endpoint from the day it shipped until 2026-09-17.
+// Nothing noticed, because a missing revocation looks exactly like a successful
+// one from inside the app.
+
+const disconnectSrc = read(DISCONNECT_ROUTE);
+let revocable = [];
+
+if (disconnectSrc === null) {
+  missing(DISCONNECT_ROUTE);
+} else {
+  const m = disconnectSrc.match(/const REVOKE_ENDPOINTS\s*=\s*\{([\s\S]*?)\n\};/);
+  if (!m) {
+    failures.push(
+      "Could not find REVOKE_ENDPOINTS in the disconnect route, or its shape changed.\n"
+      + "    This guard has stopped checking whether disconnecting actually withdraws the\n"
+      + "    grant, which is indistinguishable from passing.",
+    );
+  } else {
+    // Top-level keys only: each entry is an object, so nested keys like `url`
+    // and `prefers` must not be mistaken for platforms.
+    revocable = [...m[1].matchAll(/^\s{2}([a-z0-9_]+)\s*:/gim)].map((x) => x[1]);
+  }
+}
+
 // ── The chain, per promised platform ────────────────────────────────────────
 
 for (const platform of promised) {
@@ -136,6 +170,17 @@ for (const platform of promised) {
       + `    supabase/functions/_shared/${platform}.service.ts.\n`
       + "    Connecting would succeed and publishing would then fail — the exact sequence the\n"
       + "    comment above DIRECT_OAUTH_PLATFORMS warns against.",
+    );
+  }
+
+  if (disconnectSrc !== null && revocable.length > 0 && !revocable.includes(platform)) {
+    failures.push(
+      `"${platform}" is offered as a real connection but has NO entry in REVOKE_ENDPOINTS\n`
+      + `    (${path.relative(ROOT, DISCONNECT_ROUTE)}).\n`
+      + "    Disconnecting would delete our row and leave the grant live in the user's account\n"
+      + "    settings. They would believe they had revoked access; they would be wrong, and\n"
+      + "    nothing in the product would ever tell them. If the platform genuinely has no\n"
+      + "    revoke endpoint, add the entry with a comment saying so rather than omitting it.",
     );
   }
 

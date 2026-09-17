@@ -37,11 +37,57 @@ import { decryptToken } from '../../../../_lib/tokenCrypto';
 
 const REVOKE_TIMEOUT_MS = 10_000;
 
+/**
+ * How each platform withdraws a grant. They do not agree on any of it — the
+ * endpoint, the credentials, or even WHICH token to send — so the differences
+ * live here rather than in branches inside the caller.
+ *
+ * `prefers` says which token actually ends the grant:
+ *   'refresh' — Google. Revoking a refresh token kills the whole grant. The
+ *               access token would work too, but it lives one hour, so on any
+ *               account not used in the last hour it is already expired and
+ *               revocation returns 400 invalid_token — a silent no-op that
+ *               would leave the user's Google account still authorized while
+ *               our UI said "disconnected".
+ *   'access'  — LinkedIn, whose revoke endpoint takes the access token and the
+ *               client credentials.
+ *
+ * Meta is a DELETE on /{user-id}/permissions rather than a token endpoint, and
+ * is added with its adapter. An unlisted provider degrades to local-delete-only
+ * rather than pretending it revoked anything.
+ */
 const REVOKE_ENDPOINTS = {
-  linkedin: 'https://www.linkedin.com/oauth/v2/revoke',
-  // Meta revocation is a DELETE on /{user-id}/permissions rather than a token
-  // endpoint, and Google's is /o/oauth2/revoke. Added with their adapters, so
-  // an unlisted provider degrades to local-delete-only rather than pretending.
+  linkedin: {
+    url: 'https://www.linkedin.com/oauth/v2/revoke',
+    prefers: 'access',
+    body: (token, config) => ({
+      token,
+      client_id: config.clientId(),
+      client_secret: config.clientSecret(),
+    }),
+  },
+  youtube: {
+    url: 'https://oauth2.googleapis.com/revoke',
+    prefers: 'refresh',
+    // Google identifies the grant from the token alone. Sending client
+    // credentials it does not ask for is a secret transmitted for no reason.
+    body: (token) => ({ token }),
+  },
+  tiktok: {
+    // UNVERIFIED: taken from TikTok's documented revoke endpoint and never yet
+    // exercised against a live account. It is wired anyway because the
+    // alternative — no revocation at all — is the outcome we know is wrong, and
+    // a rejected call is now logged with its status rather than swallowed.
+    url: 'https://open.tiktokapis.com/v2/oauth/revoke/',
+    prefers: 'access',
+    // client_key, not client_id. Same parameter-name difference that broke
+    // every TikTok token exchange before it was found (registry: clientIdParam).
+    body: (token, config) => ({
+      client_key: config.clientId(),
+      client_secret: config.clientSecret(),
+      token,
+    }),
+  },
 };
 
 function createServiceClient() {
@@ -77,26 +123,41 @@ async function getRequestUser(request) {
   return user || null;
 }
 
-async function revokeAtPlatform(providerId, accessToken) {
-  const endpoint = REVOKE_ENDPOINTS[providerId];
-  if (!endpoint) return { attempted: false, revoked: false };
+/**
+ * @param {{ access: string|null, refresh: string|null }} tokens
+ */
+async function revokeAtPlatform(providerId, tokens) {
+  const spec = REVOKE_ENDPOINTS[providerId];
+  if (!spec) return { attempted: false, revoked: false };
+
+  // Fall back to the other token rather than skipping: a grant half-withdrawn
+  // is the outcome this whole function exists to prevent.
+  const token = spec.prefers === 'refresh'
+    ? (tokens.refresh || tokens.access)
+    : (tokens.access || tokens.refresh);
+
+  if (!token) return { attempted: false, revoked: false };
 
   const config = PROVIDERS[providerId];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REVOKE_TIMEOUT_MS);
   try {
-    const res = await fetch(endpoint, {
+    const res = await fetch(spec.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        token: accessToken,
-        client_id: config.clientId(),
-        client_secret: config.clientSecret(),
-      }).toString(),
+      body: new URLSearchParams(spec.body(token, config)).toString(),
       signal: controller.signal,
     });
+    if (!res.ok) {
+      // The status alone is the difference between "the platform refused" and
+      // "we sent the wrong token", and without it a failed revoke is
+      // indistinguishable from a network blip in the logs.
+      const detail = await res.text().catch(() => '');
+      console.error('[social/disconnect] revoke rejected:', providerId, res.status, detail.slice(0, 200));
+    }
     return { attempted: true, revoked: res.ok };
-  } catch {
+  } catch (err) {
+    console.error('[social/disconnect] revoke failed:', providerId, err?.message);
     return { attempted: true, revoked: false };
   } finally {
     clearTimeout(timer);
@@ -142,18 +203,24 @@ export async function POST(request, context) {
     let revocation = { attempted: false, revoked: false };
     const { data: secret } = await supabase
       .from('connected_account_secrets')
-      .select('access_token_ciphertext')
+      .select('access_token_ciphertext, refresh_token_ciphertext')
       .eq('connected_account_id', accountId)
       .maybeSingle();
 
-    if (secret?.access_token_ciphertext && resolved) {
-      try {
-        const token = await decryptToken(secret.access_token_ciphertext);
-        revocation = await revokeAtPlatform(resolved.id, token);
-      } catch (err) {
-        // An undecryptable token cannot be revoked, but must still be deleted.
-        console.error('[social/disconnect] could not decrypt for revoke:', err.message);
+    if (resolved && (secret?.access_token_ciphertext || secret?.refresh_token_ciphertext)) {
+      // Each token is decrypted independently: one being unreadable must not
+      // cost us the other, which may be the one that actually ends the grant.
+      const tokens = { access: null, refresh: null };
+      for (const [field, column] of [['access', 'access_token_ciphertext'], ['refresh', 'refresh_token_ciphertext']]) {
+        if (!secret[column]) continue;
+        try {
+          tokens[field] = await decryptToken(secret[column]);
+        } catch (err) {
+          // An undecryptable token cannot be revoked, but must still be deleted.
+          console.error(`[social/disconnect] could not decrypt ${field} token for revoke:`, err.message);
+        }
       }
+      revocation = await revokeAtPlatform(resolved.id, tokens);
     }
 
     // ── 2. Delete the secret ────────────────────────────────────────────────
@@ -187,8 +254,10 @@ export async function POST(request, context) {
       success: true,
       platform: account.platform,
       revokedAtPlatform: revocation.revoked,
-      // Surfaced honestly: local deletion is complete either way, but the user
-      // may still see a stale authorization in their LinkedIn settings.
+      // Surfaced honestly, and it has to name the two cases separately:
+      // "we tried and it refused" leaves a live grant the user should go and
+      // remove themselves, while "we never tried" (no revoke endpoint for this
+      // provider yet) is our gap, not theirs.
       note: revocation.attempted && !revocation.revoked
         ? 'Disconnected here. We could not confirm revocation with the platform — '
           + 'you can remove the app in your platform settings to be certain.'
