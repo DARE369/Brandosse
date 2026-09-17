@@ -209,7 +209,12 @@ const profileDir = profileIndex >= 0 ? flags[profileIndex + 1] : null;
 if (profileDir && flags.includes('--login')) {
   const ctx = await chromium.launchPersistentContext(profileDir, { headless: false, viewport: { width: 1366, height: 900 } });
   const page = ctx.pages()[0] || await ctx.newPage();
-  await page.goto(url);
+  // A slow page must NOT close the window: a person is signing in by hand.
+  // TikTok's login page kept loading past the default 30s 'load' timeout, the
+  // goto threw, and the window vanished before anyone could type.
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch((err) => {
+    console.log(`Page was slow to load (${err.message.split('\n')[0]}). The window stays open — continue signing in.`);
+  });
   console.log('Sign in in the opened window, then close it. The session is saved to', profileDir);
   await new Promise((resolve) => ctx.on('close', resolve));
   process.exit(0);

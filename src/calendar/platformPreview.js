@@ -56,12 +56,26 @@ export const PLATFORM_FOLD = {
     // 40–53 characters. The rule behind that was not clean enough to encode.
     note: 'Line breaks near the start can cut an Instagram caption sooner.',
   },
+  // LINE-based, like YouTube. The documented "~140 characters" described one
+  // screen size and one caption shape; measured, LinkedIn shows 3 lines and a
+  // line break uses a line — unbroken paragraphs showed 248–260 characters on
+  // desktop, while captions opening with short lines were cut far sooner.
   linkedin: {
-    chars: 140,
-    grade: 'DOCS',
-    // The SMALLER of the two figures is used deliberately: a hook that clears
-    // the mobile fold clears both, and most reading is mobile.
-    source: 'PLATFORM-PUBLISH-FIELDS.md §3 — ~140 mobile, ~210 desktop; mobile taken.',
+    lines: 3,
+    // Conservative end of the desktop measurements (248 over 3 lines).
+    charsPerLine: 82,
+    grade: 'MEASURED',
+    measured: {
+      date: '2026-09-17',
+      viewport: 'desktop 1366×900 linkedin.com feed, signed in (37 posts); phone 390×844 (6 posts, within 3 lines)',
+      samples: 43,
+      tool: 'scripts/measure/measure-feed-folds.mjs',
+    },
+    source: 'Measured on 37 real posts in a signed-in desktop feed: at most 3 rendered lines before '
+      + '"…more", with line breaks consuming lines; unbroken paragraphs showed 248–260 characters.',
+    // A phone column is narrower, so the same 3 lines hold fewer characters.
+    // Too few phone samples to set a phone figure; said rather than guessed.
+    note: 'On phones the same 3 lines hold fewer characters, so the cut comes sooner.',
   },
   tiktok: {
     chars: 100,
