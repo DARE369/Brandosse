@@ -77,10 +77,24 @@ export const PLATFORM_FOLD = {
     // Too few phone samples to set a phone figure; said rather than guessed.
     note: 'On phones the same 3 lines hold fewer characters, so the cut comes sooner.',
   },
+  // ONE line on TikTok's website, cut by width: 54 characters in the desktop
+  // column (418px), 43–44 on a phone (324px). The old flat 100 would have told a
+  // user their hook was safe when less than half of it showed.
   tiktok: {
-    chars: 100,
-    grade: 'UNVERIFIED',
-    source: 'Observed overlay truncation on the video player. TikTok publishes no figure.',
+    lines: 1,
+    // The phone figure, not the desktop one — the narrower cut is the one a hook
+    // has to survive.
+    charsPerLine: 43,
+    grade: 'MEASURED',
+    measured: {
+      date: '2026-09-17',
+      viewport: 'tiktok.com For You feed, signed out, visible browser: desktop column 418px and phone 324px',
+      samples: 3,
+      tool: 'scripts/measure/measure-feed-folds.mjs',
+    },
+    source: 'Measured on TikTok\'s website: captions collapse to a single line, 54 characters at '
+      + '418px and 43–44 at 324px. Website only — the TikTok phone app was not measured.',
+    note: 'Measured on TikTok\'s website; the TikTok app may show a little more.',
   },
   // LINE-based, and measured. The previous flat 157-character figure was wrong
   // in both directions: YouTube collapses the description to THREE RENDERED

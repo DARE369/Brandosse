@@ -129,7 +129,13 @@ function measureInPage(captionSelector) {
         range.setStart(node, offset);
         range.setEnd(node, offset + ch.length);
         const rects = [...range.getClientRects()].filter((r) => r.width > 0 || r.height > 0);
-        const inside = rects.find((r) => r.top >= clip.top - 1 && r.bottom <= clip.bottom + 1);
+        // All four sides. Checking only top/bottom counted text clipped off the
+        // RIGHT as visible — a single-line, overflow-x-hidden caption on TikTok
+        // read as 133 characters on one 324px line, which cannot fit. Vertical
+        // folds (LinkedIn) and DOM-truncated ones (Facebook, Instagram, where
+        // visible equalled total) were unaffected.
+        const inside = rects.find((r) => r.top >= clip.top - 1 && r.bottom <= clip.bottom + 1
+          && r.left >= clip.left - 1 && r.right <= clip.right + 1);
         if (inside) {
           visible += 1;
           lineTops.add(Math.round(inside.top));
@@ -179,6 +185,9 @@ try {
       await page.mouse.move(Math.round(vp.width / 2), Math.round(vp.height * 0.6));
       // First-visit tips cover the first post (TikTok: "Got it").
       await page.getByRole('button', { name: /^got it$/i }).first().click({ timeout: 3_000 }).catch(() => {});
+      // Key navigation needs page focus; click a blank strip near the bottom
+      // left, clear of the player, arrows and nav links.
+      if (ADVANCE_BY_KEY[platform]) await page.mouse.click(12, vp.height - 12).catch(() => {});
       const results = [];
       for (let i = 0; i <= scrolls; i += 1) {
         // eslint-disable-next-line no-await-in-loop
