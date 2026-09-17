@@ -322,6 +322,15 @@ jobs:
       # because it would roll the migration back.
       - name: check-analytics-migration
         run: node scripts/check-analytics-migration.cjs
+      # A user disconnected their YouTube account on 2026-09-16 and two PUBLISHED
+      # posts were deleted, because posts <- connected_accounts was CASCADE live
+      # while the migration that "added" it declared SET NULL and skipped itself:
+      # it guarded on the constraint NAME, and that name already existed. This
+      # catches the pattern (three more instances were already in the tree) and
+      # holds 20260917120000's assertions against delete-rule-probe.mjs, which
+      # checks the live catalog on the scheduled job.
+      - name: check-fk-delete-rule-guard
+        run: node scripts/check-fk-delete-rule-guard.cjs
       # The website import used to hand marketing prose to an LLM and ask for a
       # colour palette; shown no colours, it produced colours anyway. The harvester
       # reads the site's own CSS instead. This asserts exact measured hexes against
@@ -687,6 +696,14 @@ jobs:
       # 20 posts were frozen for up to 139 days before the reaper existed.
       - name: Stuck records
         run: node scripts/security/stuck-records-probe.mjs
+
+      # The live half of the delete-rule guard. Reads ON DELETE rules from the
+      # real catalog and holds them against the reviewed manifest. Migrations
+      # record what was INTENDED; only the catalog records what HAPPENS, and the
+      # gap between them deleted two published posts on 2026-09-16 while every
+      # static check in this file passed.
+      - name: Delete rules
+        run: node scripts/security/delete-rule-probe.mjs
 
       - name: Remove probe environment
         if: always()
