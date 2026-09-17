@@ -41,8 +41,20 @@ import { getPlatformSpec } from '../services/platforms/platformCaptionSpecs.js';
 export const PLATFORM_FOLD = {
   instagram: {
     chars: 125,
-    grade: 'UNVERIFIED',
-    source: 'Widely-cited community figure for the feed "… more" cut. Not published by Meta.',
+    // Cut after a whole word, never mid-word: every measured cut ended "…a word...".
+    wordBoundary: true,
+    grade: 'MEASURED',
+    measured: {
+      date: '2026-09-16',
+      viewport: 'desktop 1366×900 and phone 390×844, instagram.com feed, signed in',
+      samples: 16,
+      tool: 'scripts/measure/measure-feed-folds.mjs',
+    },
+    source: 'Measured on 16 real posts in a signed-in feed: cut with "..." at a word boundary and '
+      + 'never past 124 characters, on desktop and phone alike — the widely-cited 125 holds.',
+    // Observed, not modelled: captions with early line breaks were cut at
+    // 40–53 characters. The rule behind that was not clean enough to encode.
+    note: 'Line breaks near the start can cut an Instagram caption sooner.',
   },
   linkedin: {
     chars: 140,
@@ -84,9 +96,20 @@ export const PLATFORM_FOLD = {
     note: 'On phones YouTube may show only the title until "more" is tapped (not yet measured).',
   },
   facebook: {
-    chars: 250,
-    grade: 'UNVERIFIED',
-    source: 'Feed "See more" cut. Meta publishes no figure and it varies by post type.',
+    // The old 250 was a guess, and a generous one: a hook at character 200
+    // looked safe in the preview and was hidden on every real feed.
+    chars: 170,
+    grade: 'MEASURED',
+    measured: {
+      date: '2026-09-16',
+      viewport: 'desktop 1366×900 and phone 390×844, facebook.com feed, signed in',
+      samples: 42,
+      tool: 'scripts/measure/measure-feed-folds.mjs',
+    },
+    source: 'Measured on 42 real "See more" posts in a signed-in feed: a hard cut at exactly 170 '
+      + 'characters, mid-word, on desktop (2 lines) and phone (4 lines) alike — a character limit, '
+      + 'not a line limit.',
+    note: 'Line breaks near the start can cut a Facebook caption sooner.',
   },
   pinterest: {
     chars: 50,
@@ -174,7 +197,17 @@ export function splitAtFold(caption, platform) {
   }
 
   const model = Number.isFinite(fold.lines) ? 'lines' : 'chars';
-  const cut = model === 'lines' ? lineFoldIndex(chars, fold) : fold.chars;
+  let cut = model === 'lines' ? lineFoldIndex(chars, fold) : fold.chars;
+
+  // Some platforms never cut mid-word — Instagram ends its "..." after a whole
+  // word, measured 2026-09-16 — so the visible part stops at the last space at
+  // or before the limit. A caption with no space before the limit is still cut
+  // hard, as the platform must do.
+  if (model === 'chars' && fold.wordBoundary && total > cut) {
+    let i = cut;
+    while (i > 0 && !/\s/.test(chars[i])) i -= 1;
+    if (i > 0) cut = i;
+  }
   const extra = { model, lines: fold.lines ?? null, note: fold.note ?? null };
 
   // A trailing line break at the cut is not "hidden content" — only fold when

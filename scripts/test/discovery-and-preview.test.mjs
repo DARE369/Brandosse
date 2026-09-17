@@ -250,6 +250,29 @@ check('an unknown platform has no fold', foldFor('myspace'), null);
   ok('…without producing a broken surrogate', !/[\uD800-\uDBFF]$/.test(res2.visible), 'trailing high surrogate');
 }
 
+// ── MEASURED 2026-09-16 on signed-in feeds ─────────────────────────────────
+{
+  const fb = PLATFORM_FOLD.facebook;
+  check('Facebook is measured', fb.grade, 'MEASURED');
+  check('Facebook cuts at 170 characters', fb.chars, 170);
+  // A hard, mid-word cut — the measured tails ended "could hea…".
+  const r = splitAtFold('x'.repeat(165) + ' heading onwards', 'facebook');
+  check('Facebook cuts mid-word, as measured', [...r.visible].length, 170);
+
+  const ig = PLATFORM_FOLD.instagram;
+  check('Instagram is measured', ig.grade, 'MEASURED');
+  check('Instagram cuts on a word boundary', ig.wordBoundary, true);
+  const caption = `${'word '.repeat(24)}alphabetical ending`; // 120 chars, then a word crossing 125
+  const s = splitAtFold(caption, 'instagram');
+  check('Instagram folds', s.folds, true);
+  ok('…never mid-word', !/alph$/.test(s.visible) && s.visible.endsWith('word'), JSON.stringify(s.visible.slice(-12)));
+  ok('…and not past the limit', [...s.visible].length <= ig.chars, String([...s.visible].length));
+  check('nothing is lost across a word-boundary split', s.visible + s.hidden, caption);
+
+  const unbroken = splitAtFold('y'.repeat(200), 'instagram');
+  check('a caption with no space before the limit is still cut hard', [...unbroken.visible].length, 125);
+}
+
 // previewFor joins hashtags the way the publisher does, because hashtags are
 // exactly what pushes a hook past the fold.
 {

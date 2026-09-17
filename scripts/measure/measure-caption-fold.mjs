@@ -124,12 +124,14 @@ async function measureOne(browser, platform, url, vp, headed) {
       clip = { top: clip.top, bottom: clip.bottom, left: clip.left, right: clip.right };
       for (let el = container; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
         const cs = getComputedStyle(el);
-        if (/(hidden|clip)/.test(`${cs.overflow} ${cs.overflowY} ${cs.overflowX}`)) {
-          const r = el.getBoundingClientRect();
-          clip = {
-            top: Math.max(clip.top, r.top), bottom: Math.min(clip.bottom, r.bottom),
-            left: Math.max(clip.left, r.left), right: Math.min(clip.right, r.right),
-          };
+        // Each axis on its own — see measure-feed-folds.mjs: a scroller that is
+        // overflow-x:hidden but overflow-y:scroll must not clip lines.
+        const r = el.getBoundingClientRect();
+        if (/(hidden|clip)/.test(cs.overflowY)) {
+          clip = { ...clip, top: Math.max(clip.top, r.top), bottom: Math.min(clip.bottom, r.bottom) };
+        }
+        if (/(hidden|clip)/.test(cs.overflowX)) {
+          clip = { ...clip, left: Math.max(clip.left, r.left), right: Math.min(clip.right, r.right) };
         }
       }
 
