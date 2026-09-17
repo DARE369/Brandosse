@@ -62,39 +62,40 @@ export const PLATFORM_FOLD = {
   // desktop, while captions opening with short lines were cut far sooner.
   linkedin: {
     lines: 3,
-    // Conservative end of the desktop measurements (248 over 3 lines).
-    charsPerLine: 82,
+    // The PHONE app figure, not desktop's ~82: the narrower cut is the one a hook
+    // has to survive. App lines held 55–58 characters and the last line gives up
+    // room to "… more", so 50 (3 × 50 = 150, observed 153).
+    charsPerLine: 50,
     grade: 'MEASURED',
     measured: {
       date: '2026-09-17',
-      viewport: 'desktop 1366×900 linkedin.com feed, signed in (37 posts); phone 390×844 (6 posts, within 3 lines)',
-      samples: 43,
-      tool: 'scripts/measure/measure-feed-folds.mjs',
+      viewport: 'desktop linkedin.com feed signed in (37 posts, 3 lines × ~85); LinkedIn phone app (2 organic, 3 promoted posts, founder screenshots)',
+      samples: 42,
+      tool: 'scripts/measure/fold-evidence-2026-09-17-phone-apps.md',
     },
-    source: 'Measured on 37 real posts in a signed-in desktop feed: at most 3 rendered lines before '
-      + '"…more", with line breaks consuming lines; unbroken paragraphs showed 248–260 characters.',
-    // A phone column is narrower, so the same 3 lines hold fewer characters.
-    // Too few phone samples to set a phone figure; said rather than guessed.
-    note: 'On phones the same 3 lines hold fewer characters, so the cut comes sooner.',
+    source: 'Measured on desktop (37 posts) and in the LinkedIn phone app: posts show 3 lines before '
+      + '"… more", line breaks consume lines; about 85 characters a line on desktop, 55–58 on a phone. '
+      + 'Promoted posts show only 2 lines.',
+    note: 'On desktop the same 3 lines hold more — about 250 characters.',
   },
-  // ONE line on TikTok's website, cut by width: 54 characters in the desktop
-  // column (418px), 43–44 on a phone (324px). The old flat 100 would have told a
-  // user their hook was safe when less than half of it showed.
+  // Modelled on the TikTok APP, where the audience is: video captions show TWO
+  // lines, a line break uses a line, and the narrowest full line held 33
+  // characters. The website collapses to ONE line (43 characters at 324px,
+  // measured separately) — stated in the note rather than modelled, because the
+  // app is what nearly every viewer sees.
   tiktok: {
-    lines: 1,
-    // The phone figure, not the desktop one — the narrower cut is the one a hook
-    // has to survive.
-    charsPerLine: 43,
+    lines: 2,
+    charsPerLine: 33,
     grade: 'MEASURED',
     measured: {
       date: '2026-09-17',
-      viewport: 'tiktok.com For You feed, signed out, visible browser: desktop column 418px and phone 324px',
-      samples: 3,
-      tool: 'scripts/measure/measure-feed-folds.mjs',
+      viewport: 'TikTok phone app (4 video posts, founder screenshots); tiktok.com website 324–418px (3 captions)',
+      samples: 7,
+      tool: 'scripts/measure/fold-evidence-2026-09-17-phone-apps.md',
     },
-    source: 'Measured on TikTok\'s website: captions collapse to a single line, 54 characters at '
-      + '418px and 43–44 at 324px. Website only — the TikTok phone app was not measured.',
-    note: 'Measured on TikTok\'s website; the TikTok app may show a little more.',
+    source: 'Measured in the TikTok phone app: video captions show 2 lines before "…more", a line '
+      + 'break consumes a line, narrowest full line 33 characters. TikTok\'s website shows only 1 line.',
+    note: 'On TikTok\'s website only the first line shows.',
   },
   // LINE-based, and measured. The previous flat 157-character figure was wrong
   // in both directions: YouTube collapses the description to THREE RENDERED
@@ -117,11 +118,11 @@ export const PLATFORM_FOLD = {
     },
     source: 'Measured on real public videos: 3 rendered lines before "…more"; blank lines count; '
       + 'single paragraphs showed 299–421 visible characters. Desktop only.',
-    // Mobile web was blocked by a consent sheet during measurement. The page
-    // it rendered placed the description in a hidden element with a "more"
-    // control beside the title — which suggests phones show NO description
-    // before the tap. Recorded, not asserted.
-    note: 'On phones YouTube may show only the title until "more" is tapped (not yet measured).',
+    // Confirmed in the YouTube phone app 2026-09-17 (founder screenshots,
+    // scripts/measure/fold-evidence-2026-09-17-phone-apps.md): a regular video's
+    // watch page shows the title and "…more" with NO description visible, and a
+    // Short shows only its title on one line. The 3-line figure is desktop's.
+    note: 'In the YouTube phone app no description shows until "more" is tapped — the title is what people see.',
   },
   facebook: {
     // The old 250 was a guess, and a generous one: a hook at character 200
