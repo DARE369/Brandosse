@@ -47,23 +47,46 @@ if (!FEEDS[platform] || !profileDir) {
   process.exit(2);
 }
 
-function measureInPage() {
+// Platforms whose captions are best found DIRECTLY rather than via a "more"
+// control. TikTok shows "more" only once a caption overflows, and renders it
+// after layout — searching for the control found nothing on a real feed, while
+// every caption sits in [data-e2e="video-desc"]. A caption counts as folded
+// when fewer characters are visible than it holds.
+const CAPTION_SELECTORS = {
+  tiktok: '[data-e2e="video-desc"]',
+};
+
+// How to move to the next post. TikTok's feed pages by video on the arrow keys;
+// a wheel over the player did not advance it.
+const ADVANCE_BY_KEY = { tiktok: 'ArrowDown' };
+
+function measureInPage(captionSelector) {
   const MORE = /^\s*(…|\.\.\.)?\s*(see\s+)?more\s*$/i;
-  const controls = [...document.querySelectorAll('button, span, div[role="button"], a')]
+  const controls = captionSelector ? [] : [...document.querySelectorAll('button, span, div[role="button"], a')]
     .filter((el) => MORE.test(el.textContent || '') && el.getClientRects().length > 0)
     .filter((el) => ![...el.children].some((c) => MORE.test(c.textContent || '')));
 
+  // Direct mode: each caption element is its own container, with no control.
+  const targets = captionSelector
+    ? [...document.querySelectorAll(captionSelector)].map((container) => ({ container, more: null }))
+    : controls.map((more) => ({ more, container: null }));
+
   const out = [];
   const seen = new Set();
-  for (const more of controls) {
-    // Nearest ancestor with real text beyond the control itself.
-    let container = more.parentElement;
-    for (let depth = 0; container && depth < 6; depth += 1) {
-      const own = (container.textContent || '').replace(more.textContent || '', '').trim();
-      if (own.length >= 40) break;
-      container = container.parentElement;
+  for (const target of targets) {
+    const { more } = target;
+    let { container } = target;
+    if (!container) {
+      // Nearest ancestor with real text beyond the control itself.
+      container = more.parentElement;
+      for (let depth = 0; container && depth < 6; depth += 1) {
+        const own = (container.textContent || '').replace(more.textContent || '', '').trim();
+        if (own.length >= 40) break;
+        container = container.parentElement;
+      }
     }
     if (!container || seen.has(container)) continue;
+    if (container.getClientRects().length === 0) continue;
     // A container holding MORE THAN ONE "more" control is a feed section, not a
     // caption. Without this, the climb on LinkedIn stopped at an element
     // spanning many posts, measured it as one, and marked it seen — so 24
@@ -97,7 +120,7 @@ function measureInPage() {
     const lineTops = new Set();
     let text = '';
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (more.contains(node)) continue;
+      if (more && more.contains(node)) continue;
       const p = node.parentElement;
       if (p) { const pcs = getComputedStyle(p); if (pcs.visibility === 'hidden' || pcs.display === 'none') continue; }
       let offset = 0;
@@ -123,10 +146,13 @@ function measureInPage() {
     }).length;
 
     if (visible < 20) continue; // a stray "more" link, not a caption
+    // Direct mode has no control to prove a fold: only a caption with hidden
+    // characters is a fold measurement. One that fits entirely measured nothing.
+    if (!more && visible >= total) continue;
     out.push({
       // What the control actually said, and where the caption lives, so noise
       // (an ads footer, a link-preview headline) can be told apart from captions.
-      moreText: (more.textContent || "").trim(),
+      moreText: more ? (more.textContent || "").trim() : "(direct: caption element)",
       containerHint: `${container.tagName.toLowerCase()}${container.getAttribute("data-ad-preview") ? `[data-ad-preview=${container.getAttribute("data-ad-preview")}]` : ""}${container.getAttribute("dir") ? `[dir=${container.getAttribute("dir")}]` : ""}`,
       visibleChars: visible,
       totalChars: total,
@@ -151,15 +177,23 @@ try {
       // over the header — so on LinkedIn, whose feed scrolls inside <main>,
       // nothing moved and only the first screen was ever measured.
       await page.mouse.move(Math.round(vp.width / 2), Math.round(vp.height * 0.6));
+      // First-visit tips cover the first post (TikTok: "Got it").
+      await page.getByRole('button', { name: /^got it$/i }).first().click({ timeout: 3_000 }).catch(() => {});
       const results = [];
       for (let i = 0; i <= scrolls; i += 1) {
         // eslint-disable-next-line no-await-in-loop
-        const batch = await page.evaluate(measureInPage);
+        const batch = await page.evaluate(measureInPage, CAPTION_SELECTORS[platform] || null);
         for (const r of batch) {
           if (!results.some((x) => x.tail === r.tail && x.visibleChars === r.visibleChars)) results.push(r);
         }
         // eslint-disable-next-line no-await-in-loop
-        await page.mouse.wheel(0, vp.height * 0.9);
+        if (ADVANCE_BY_KEY[platform]) {
+          // eslint-disable-next-line no-await-in-loop
+          await page.keyboard.press(ADVANCE_BY_KEY[platform]);
+        } else {
+          // eslint-disable-next-line no-await-in-loop
+          await page.mouse.wheel(0, vp.height * 0.9);
+        }
         // eslint-disable-next-line no-await-in-loop
         await page.waitForTimeout(2_500);
       }
