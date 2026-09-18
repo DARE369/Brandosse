@@ -346,6 +346,12 @@ jobs:
       # wording, which no behavioural test would notice.
       - name: check-scheduled-failure-messages
         run: node scripts/check-scheduled-failure-messages.cjs
+      # The analytics surface renders figures users act on, and both ways it can
+      # be wrong look normal on screen: summing a non-additive metric (48.6%
+      # three times becomes "134.7%"), and an empty result that does not say
+      # WHICH of its four causes applies. Runs the real arithmetic.
+      - name: check-metric-aggregation
+        run: node scripts/check-metric-aggregation.mjs
       # The website import used to hand marketing prose to an LLM and ask for a
       # colour palette; shown no colours, it produced colours anyway. The harvester
       # reads the site's own CSS instead. This asserts exact measured hexes against

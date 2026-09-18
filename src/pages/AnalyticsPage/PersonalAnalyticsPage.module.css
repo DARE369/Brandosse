@@ -110,6 +110,112 @@
   gap: 10px;
   margin-bottom: 12px;
 }
+
+/* ── Platform performance (PlatformPerformance.jsx) ──────────────────────────
+   Real platform figures, or the reason there are none. Tokens only: the tree
+   ratchets on raw colour values. */
+.perfAccountName { font-weight: 500; color: var(--uiv2-text-secondary); }
+
+.perfChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-pill);
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+.perfChipOk { color: var(--uiv2-success); }
+.perfChipDanger { color: var(--uiv2-danger); }
+
+/* The reason a card is empty is content, not an error: same weight as the
+   numbers it stands in for, never styled as a warning. */
+.perfReason {
+  font-size: var(--uiv2-text-sm);
+  color: var(--uiv2-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.metricRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 10px;
+}
+.metricTile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--uiv2-bg-inset);
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  padding: 12px 14px;
+}
+.metricLabel {
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.metricValue {
+  font-family: var(--uiv2-font-display);
+  font-size: var(--uiv2-text-xl);
+  font-weight: 700;
+}
+.metricNote { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); }
+
+.perfPostList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+.perfPostRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--uiv2-border);
+  border-radius: var(--uiv2-radius-md);
+  background: var(--uiv2-bg-surface);
+}
+@media (max-width: 720px) {
+  .perfPostRow { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+.perfPostMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.perfPostTitle {
+  font-size: var(--uiv2-text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.perfPostMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+}
+.perfPostMetrics { display: flex; flex-wrap: wrap; gap: 12px; }
+.perfPostMetric { font-size: var(--uiv2-text-sm); color: var(--uiv2-text-secondary); }
+.perfPostEmpty {
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+  max-width: 46ch;
+  line-height: 1.45;
+}
+
+.perfFootnote {
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+  margin: 0;
+}
 .sectionLabel { font-weight: 700; font-size: var(--uiv2-text-base); }
 .rangeLabel { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); }
 

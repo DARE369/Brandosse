@@ -27,6 +27,8 @@ import { useAuth } from "../../Context/AuthContext";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { POST_STATUS } from "../../constants/statuses";
 import { AppShell, Card, Badge, Skeleton, EmptyState, Button } from "../../ui-v2";
+import { fetchSocialPerformance } from "../../services/socialAnalyticsService";
+import PlatformPerformance from "./PlatformPerformance";
 import styles from "./PersonalAnalyticsPage.module.css";
 
 const KNOWN_OPTIONAL_ERROR_CODES = new Set(["42P01", "42703", "PGRST200"]);
@@ -138,12 +140,19 @@ function buildPlatformRows(posts, accounts) {
  * table-stakes gap, not a nice-to-have (audit D2 §2).
  *
  * HONESTY NOTE: this exports what the product actually knows — post lifecycle
- * (status, scheduled/published time, platform, account, failure reason). It
- * deliberately does NOT include engagement columns, because no engagement data
- * exists anywhere in the system: `platform_analytics` has 0 rows and no code
- * calls a platform insights API (audit P8-001/006). Emitting empty "likes" and
- * "reach" columns would imply a capability the product does not have, which is
- * the class of defect Wave 2 removed.
+ * (status, scheduled/published time, platform, account, failure reason).
+ *
+ * It does NOT yet include engagement columns. Until 2026-09-18 that was because
+ * no engagement data existed anywhere in the system; that is no longer true —
+ * `ingest-social-analytics` writes real figures into social_post_metrics_daily,
+ * and PlatformPerformance.jsx renders them. The export has simply not been
+ * extended yet.
+ *
+ * The original reasoning still governs what NOT to do: emitting empty "likes"
+ * and "reach" columns for platforms that report nothing would imply a
+ * capability the product does not have. When these columns are added they must
+ * be per-platform and omitted where the platform reports nothing, rather than
+ * zero-filled.
  */
 function escapeCsvCell(value) {
   const text = value === null || value === undefined ? "" : String(value);
@@ -302,7 +311,7 @@ function AnalyticsBody() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [data, setData] = useState({ posts: [], accounts: [] });
+  const [data, setData] = useState({ posts: [], accounts: [], performance: null });
 
   const fetchAnalytics = useCallback(async ({ silent = false } = {}) => {
     if (!userId) { setLoading(false); return; }
@@ -310,11 +319,19 @@ function AnalyticsBody() {
     setError("");
     try {
       const sinceISO = new Date(Date.now() - range * 86_400_000).toISOString();
-      const [posts, accounts] = await Promise.all([
+      // Platform figures come from the social_* fact tables, which RLS scopes to
+      // this user. It is fetched in parallel and allowed to fail on its own: a
+      // collector that has never run must not blank the post counts, which are
+      // true regardless.
+      const [posts, accounts, performance] = await Promise.all([
         fetchPersonalPosts(userId, sinceISO),
         fetchPersonalAccounts(userId),
+        fetchSocialPerformance({ userId, rangeDays: range }).catch((err) => {
+          console.error("[PersonalAnalyticsPage] platform performance failed:", err);
+          return null;
+        }),
       ]);
-      setData({ posts, accounts });
+      setData({ posts, accounts, performance });
     } catch (err) {
       console.error("[PersonalAnalyticsPage] fetch failed:", err);
       setError(err?.message || "Analytics could not be loaded.");
@@ -452,6 +469,12 @@ function AnalyticsBody() {
                 <div className={styles.statSub}>{model.connectedAccounts} connected account{model.connectedAccounts === 1 ? "" : "s"}</div>
               </div>
             </div>
+
+            {/* What the PLATFORMS report, above what Brandosse counted: a
+                person opens this page asking how their posts did, not how many
+                they made. Renders the reason rather than a zero when the
+                figures are not knowable. */}
+            <PlatformPerformance performance={data.performance} accounts={data.accounts} />
 
             <Card>
               <div className={styles.panelHead}>
