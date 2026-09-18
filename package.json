@@ -19,6 +19,7 @@
     "check:docs-canonical": "node scripts/check-docs-canonical.cjs",
     "check:fk-delete-rules": "node scripts/check-fk-delete-rule-guard.cjs",
     "check:metric-aggregation": "node scripts/check-metric-aggregation.mjs",
+    "check:pgnet-body": "node scripts/check-pgnet-body-type.cjs",
     "check:expiry-warning": "node scripts/check-expiry-warning-honesty.cjs",
     "check:scheduled-failure-messages": "node scripts/check-scheduled-failure-messages.cjs",
     "check:env-security": "node scripts/check-env-security.cjs",
