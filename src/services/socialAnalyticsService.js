@@ -71,7 +71,7 @@ async function selectOptional(builder, label) {
  * @returns {Promise<{accounts: Array, definitions: Array, windowStart: string|null}>}
  */
 export async function fetchSocialPerformance({ userId, rangeDays = 30 }) {
-  if (!userId) return { accounts: [], definitions: [], windowStart: null };
+  if (!userId) return { accounts: [], definitions: [], windowStart: null, freshnessAvailable: true };
 
   // Dates, not timestamps: the fact tables are keyed by the PLATFORM's calendar
   // day in its own reporting timezone, so comparing them against an instant
@@ -101,13 +101,31 @@ export async function fetchSocialPerformance({ userId, rangeDays = 30 }) {
         .gte("metric_date", windowStart),
       "social_post_metrics_daily",
     ),
-    selectOptional(
-      supabase
-        .from("social_analytics_freshness")
-        .select("connected_account_id, platform, source, last_success_at, last_attempt_at, last_status, last_error_code, failures_24h"),
-      "social_analytics_freshness",
-    ),
+    // Freshness is CONTEXT, not content. It answers "when was this last
+    // checked", and losing it must never cost the figures themselves.
+    //
+    // It did exactly that on 2026-09-18: the view returned 403 to every
+    // signed-in user (a security_invoker view over a table users cannot read —
+    // repaired by 20260918130000), the whole fetch rejected, and the page told
+    // a user with a connected YouTube channel to "connect a social account".
+    // Wrong, and pointing at the wrong thing to fix.
+    supabase
+      .from("social_analytics_freshness")
+      .select("connected_account_id, platform, source, last_success_at, last_attempt_at, last_status, last_error_code, failures_24h")
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("[socialAnalytics] freshness unavailable:", error.code, error.message);
+          return null; // null means "unknown", which the UI says out loud
+        }
+        return data || [];
+      }),
   ]);
+
+  // Distinguished deliberately: [] means "collected nothing", null means "we
+  // could not find out". The UI must not render the first when it means the
+  // second.
+  const freshnessAvailable = freshnessRows !== null;
+  const freshness = freshnessRows || [];
 
   const definitionsByKey = new Map(definitions.map((d) => [d.metric_key, d]));
 
@@ -129,7 +147,7 @@ export async function fetchSocialPerformance({ userId, rangeDays = 30 }) {
 
   // Freshness has one row per (account, source); keep the most recent attempt.
   const freshnessByAccount = new Map();
-  for (const row of freshnessRows) {
+  for (const row of freshness) {
     const existing = freshnessByAccount.get(row.connected_account_id);
     if (!existing || (row.last_attempt_at || "") > (existing.last_attempt_at || "")) {
       freshnessByAccount.set(row.connected_account_id, row);
@@ -139,16 +157,16 @@ export async function fetchSocialPerformance({ userId, rangeDays = 30 }) {
   const accountIds = new Set([
     ...accountRows.map((r) => r.connected_account_id),
     ...postRows.map((r) => r.connected_account_id),
-    ...freshnessRows.map((r) => r.connected_account_id),
+    ...freshness.map((r) => r.connected_account_id),
   ]);
 
   const accounts = [...accountIds].map((accountId) => {
     const ownAccountRows = accountRows.filter((r) => r.connected_account_id === accountId);
     const ownPostRows = postRows.filter((r) => r.connected_account_id === accountId);
-    const freshness = freshnessByAccount.get(accountId) || null;
+    const accountFreshness = freshnessByAccount.get(accountId) || null;
 
     const platform =
-      ownAccountRows[0]?.platform || ownPostRows[0]?.platform || freshness?.platform || null;
+      ownAccountRows[0]?.platform || ownPostRows[0]?.platform || accountFreshness?.platform || null;
 
     const byPost = new Map();
     for (const row of ownPostRows) {
@@ -177,7 +195,7 @@ export async function fetchSocialPerformance({ userId, rangeDays = 30 }) {
     return {
       accountId,
       platform,
-      freshness,
+      freshness: accountFreshness,
       metrics: aggregateMetrics(ownAccountRows, definitionsByKey),
       posts: posts.sort((a, b) =>
         String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")),
@@ -185,7 +203,7 @@ export async function fetchSocialPerformance({ userId, rangeDays = 30 }) {
     };
   });
 
-  return { accounts, definitions, windowStart };
+  return { accounts, definitions, windowStart, freshnessAvailable };
 }
 
 export default { fetchSocialPerformance, describeEmptiness, formatMetricValue };

@@ -232,7 +232,7 @@ async function fetchPersonalPosts(userId, sinceISO) {
 async function fetchPersonalAccounts(userId) {
   const healthSummary = await supabase
     .from("connected_accounts_health_summary")
-    .select("id, platform, platform_display_name, display_name, account_name, username, connection_status, health_score, scope, user_id")
+    .select("id, platform, platform_display_name, display_name, account_name, username, connection_status, health_score, scope, user_id, is_mock")
     .eq("scope", "personal")
     .eq("user_id", userId)
     .order("display_name", { ascending: true });
@@ -241,7 +241,7 @@ async function fetchPersonalAccounts(userId) {
 
   const fallback = await supabase
     .from("connected_accounts")
-    .select("id, platform, account_name, username, status, user_id")
+    .select("id, platform, account_name, username, status, user_id, is_mock")
     .eq("user_id", userId)
     .order("platform", { ascending: true });
   if (fallback.error) throw fallback.error;
@@ -371,6 +371,10 @@ function AnalyticsBody() {
       failed: statusCounts[POST_STATUS.FAILED] || 0,
       averageHealth,
       connectedAccounts: accounts.length,
+      // Split so the page can say which figures are real rather than
+      // disclaiming all of them.
+      mockAccounts: accounts.filter((a) => a?.is_mock).length,
+      liveAccounts: accounts.filter((a) => !a?.is_mock).length,
       platformRows: buildPlatformRows(posts, accounts),
       weeklySeries: buildWeeklySeries(posts, range),
       failedPosts,
@@ -409,7 +413,20 @@ function AnalyticsBody() {
         <div className={styles.headRow}>
           <div>
             <div className={styles.title}>Analytics</div>
-            <div className={styles.sub}>Publishing here is simulated, so engagement figures are illustrative — counts and statuses are real.</div>
+            {/* This line said "publishing here is simulated, so engagement
+                figures are illustrative" until 2026-09-18. It is no longer
+                true: YouTube publishes for real and reports real figures, and
+                a blanket disclaimer over real numbers is its own kind of lie —
+                it teaches people to discount data that is accurate. It now
+                names which accounts are which, from the data. */}
+            <div className={styles.sub}>
+              {model.mockAccounts > 0 && model.liveAccounts > 0
+                ? `Figures are real for your ${model.liveAccounts} live account${model.liveAccounts === 1 ? "" : "s"}. `
+                  + `${model.mockAccounts} demo account${model.mockAccounts === 1 ? " is" : "s are"} simulated and never published anything.`
+                : model.mockAccounts > 0
+                  ? "Every account here is a demo account: counts and statuses are real, but nothing was published."
+                  : "Counts and statuses come from this workspace; platform figures come from each platform's own reporting."}
+            </div>
           </div>
           <div className={styles.rangeToggle}>
             <button type="button" className={[styles.rangeBtn, range === 30 ? styles.rangeBtnActive : ""].join(" ")} onClick={() => setRange(30)}>Last 30 days</button>

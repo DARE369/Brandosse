@@ -66,7 +66,18 @@ function relativeTime(iso) {
  * provenance is a number nobody can act on: "12 views" means something
  * different if it was last checked an hour ago or last week.
  */
-function FreshnessChip({ freshness }) {
+function FreshnessChip({ freshness, freshnessKnown = true }) {
+  // "We could not read the collection status" is its own state. Rendering it as
+  // "Not collected yet" would be a guess presented as a fact — and on
+  // 2026-09-18 that guess was wrong: collection had run four times.
+  if (!freshnessKnown) {
+    return (
+      <span className={styles.perfChip}>
+        <AlertTriangle size={12} aria-hidden="true" /> Collection status unavailable
+      </span>
+    );
+  }
+
   if (!freshness || !freshness.last_attempt_at) {
     return (
       <span className={styles.perfChip}>
@@ -148,11 +159,18 @@ function PostPerformance({ post, freshness }) {
   );
 }
 
-function AccountPerformance({ account, displayName }) {
-  const channelEmpty = describeEmptiness({
-    freshness: account.freshness,
-    hasRows: account.metrics.length > 0,
-  });
+function AccountPerformance({ account, displayName, freshnessKnown = true }) {
+  const channelEmpty = !freshnessKnown && account.metrics.length === 0
+    ? {
+        reason: "status_unknown",
+        message:
+          "No figures for this account, and the collection status could not be read, "
+          + "so we cannot tell you whether that means nothing happened or nothing ran.",
+      }
+    : describeEmptiness({
+        freshness: account.freshness,
+        hasRows: account.metrics.length > 0,
+      });
 
   return (
     <Card>
@@ -161,7 +179,7 @@ function AccountPerformance({ account, displayName }) {
           {platformLabel(account.platform)}
           {displayName ? <span className={styles.perfAccountName}> · {displayName}</span> : null}
         </span>
-        <FreshnessChip freshness={account.freshness} />
+        <FreshnessChip freshness={account.freshness} freshnessKnown={freshnessKnown} />
       </div>
 
       {channelEmpty ? (
@@ -187,21 +205,22 @@ function AccountPerformance({ account, displayName }) {
 }
 
 export default function PlatformPerformance({ performance, accounts }) {
-  const accountNameById = new Map(
-    (accounts || []).map((a) => [a.id, a.display_name || a.account_name || a.username]),
-  );
+  // Driven by the user's CONNECTED ACCOUNTS, not by whatever rows the analytics
+  // queries happened to return.
+  //
+  // It was the other way round until 2026-09-18, and the failure mode was
+  // instructive: the freshness view 403'd, the fetch returned nothing, and the
+  // section told a user with a live YouTube channel to "connect a social
+  // account". Deriving the list from what the user HAS means a query failure
+  // can cost detail, never the account itself.
+  const connected = (accounts || []).filter((a) => !a.is_mock);
+  const perfById = new Map((performance?.accounts || []).map((a) => [a.accountId, a]));
 
-  const all = performance?.accounts || [];
+  // false means the check could not run at all, which is not the same as "not
+  // collected yet" and must not be reported as it.
+  const freshnessKnown = performance ? performance.freshnessAvailable !== false : false;
 
-  // An account the collector has never attempted is not a broken account, it is
-  // a platform we have not built collection for. Those are named once, quietly,
-  // instead of getting an alarming empty card each.
-  const attempted = all.filter(
-    (a) => a.metrics.length > 0 || a.posts.length > 0 || a.freshness?.last_attempt_at,
-  );
-  const notAttempted = all.filter((a) => !attempted.includes(a));
-
-  if (attempted.length === 0) {
+  if (connected.length === 0) {
     return (
       <Card>
         <div className={styles.panelHead}>
@@ -211,11 +230,8 @@ export default function PlatformPerformance({ performance, accounts }) {
           dashed
           title="No platform figures yet"
           description={
-            notAttempted.length > 0
-              ? "Collection is not switched on for the platforms connected here yet. "
-                + "Connect a YouTube channel to see views, watch time and subscribers."
-              : "Connect a social account and publish something; the collector reads each "
-                + "platform's own figures every six hours."
+            "Connect a social account and publish something; the collector reads each "
+            + "platform's own figures every six hours."
           }
         />
       </Card>
@@ -224,21 +240,23 @@ export default function PlatformPerformance({ performance, accounts }) {
 
   return (
     <>
-      {attempted.map((account) => (
-        <AccountPerformance
-          key={account.accountId}
-          account={account}
-          displayName={accountNameById.get(account.accountId)}
-        />
-      ))}
-
-      {notAttempted.length > 0 ? (
-        <p className={styles.perfFootnote}>
-          No collection yet for{" "}
-          {[...new Set(notAttempted.map((a) => platformLabel(a.platform)))].join(", ")} — those
-          platforms publish from Brandosse but do not report figures back yet.
-        </p>
-      ) : null}
+      {connected.map((account) => {
+        const perf = perfById.get(account.id) || null;
+        return (
+          <AccountPerformance
+            key={account.id}
+            account={{
+              accountId: account.id,
+              platform: account.platform,
+              freshness: perf?.freshness || null,
+              metrics: perf?.metrics || [],
+              posts: perf?.posts || [],
+            }}
+            displayName={account.display_name || account.account_name || account.username}
+            freshnessKnown={freshnessKnown}
+          />
+        );
+      })}
     </>
   );
 }
