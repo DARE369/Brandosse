@@ -350,6 +350,7 @@ DECLARE
   gen_id      uuid;
   survived    boolean;
   cleared     boolean;
+  probe_media text;
 BEGIN
   SELECT id INTO probe_user FROM auth.users ORDER BY created_at LIMIT 1;
 
@@ -392,8 +393,20 @@ BEGIN
     VALUES (probe_user, '__delete_rule_probe__')
     RETURNING id INTO sess_id;
 
-    INSERT INTO public.generations (user_id, session_id, prompt, status)
-    VALUES (probe_user, sess_id, '__delete_rule_probe__', 'completed')
+    -- generations.media_type is NOT NULL in the live database, although
+    -- 20260710090000:66 records it as nullable — more of the same drift this
+    -- migration exists to correct, found by this probe on 2026-09-17. The value
+    -- is taken from an existing row rather than guessed, because a CHECK
+    -- constraint on it would be invisible here and would abort the migration
+    -- over a detail that has nothing to do with delete rules.
+    SELECT coalesce(
+             (SELECT g.media_type FROM public.generations g
+              WHERE g.media_type IS NOT NULL LIMIT 1),
+             'image')
+      INTO probe_media;
+
+    INSERT INTO public.generations (user_id, session_id, prompt, status, media_type)
+    VALUES (probe_user, sess_id, '__delete_rule_probe__', 'completed', probe_media)
     RETURNING id INTO gen_id;
 
     DELETE FROM public.sessions WHERE id = sess_id;
