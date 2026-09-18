@@ -126,6 +126,34 @@ export default function ConnectedAccountCard({ account, platform, onViewHealth, 
         {status.detail ? (
           <p className={styles.statusDetail}>{status.detail}</p>
         ) : null}
+
+        {/* YouTube API Services disclosure, on the card rather than buried in
+            the policy. Two of these three links are required of any app using
+            those APIs; the third — revoking at Google — is the one that matters
+            to a person, because it works even if this app stops responding.
+            Rendered only for YouTube: a disclosure attached to platforms it does
+            not describe is noise, and noise is how real notices get ignored. */}
+        {account.platform === 'youtube' ? (
+          <p className={styles.statusDetail}>
+            Uses YouTube API Services —{' '}
+            <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">
+              YouTube Terms
+            </a>
+            ,{' '}
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
+              Google Privacy Policy
+            </a>
+            , and you can{' '}
+            <a
+              href="https://myaccount.google.com/permissions"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              revoke access at Google
+            </a>
+            .
+          </p>
+        ) : null}
       </div>
 
       {/*

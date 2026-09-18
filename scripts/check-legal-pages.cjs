@@ -557,6 +557,67 @@ return SITE_ORIGIN;`);
   }
 }
 
+/* ── 11. YouTube API Services disclosures ────────────────────────────────── */
+
+/**
+ * An app using YouTube API Services must disclose that it does, link YouTube's
+ * Terms of Service and Google's Privacy Policy, and tell users how to revoke
+ * its access. Google checks for these at verification, and an app that loses
+ * them can lose its API access — so this is not a documentation nicety, it is
+ * the difference between YouTube publishing working and not working.
+ *
+ * Verified absent on 2026-09-18, months after YouTube publishing shipped:
+ * nothing in app/ or src/ mentioned any of the four. Nobody noticed, because
+ * their absence breaks nothing until a reviewer looks.
+ *
+ * The revocation link is checked in the PRODUCT, not only in the policy: a
+ * person who wants their access back should find it where the connection
+ * lives, not by reading a legal page to the end.
+ */
+const YOUTUBE_DISCLOSURES = [
+  {
+    file: path.join(ROOT, "src", "pages", "Legal", "PrivacyPolicy.jsx"),
+    label: "the privacy policy",
+    required: [
+      { needle: "YouTube API Services", what: "the statement that the app uses YouTube API Services" },
+      { needle: "youtube.com/t/terms", what: "a link to the YouTube Terms of Service" },
+      { needle: "policies.google.com/privacy", what: "a link to the Google Privacy Policy" },
+      { needle: "myaccount.google.com/permissions", what: "the link users revoke access with" },
+    ],
+  },
+  {
+    file: path.join(ROOT, "src", "pages", "Settings", "components", "ConnectedAccountCard.jsx"),
+    label: "the connected-account card",
+    required: [
+      { needle: "YouTube API Services", what: "the in-product disclosure" },
+      { needle: "myaccount.google.com/permissions", what: "the in-product revocation link" },
+    ],
+  },
+];
+
+function checkYouTubeDisclosures() {
+  for (const { file, label, required } of YOUTUBE_DISCLOSURES) {
+    if (!fs.existsSync(file)) {
+      fail(
+        `${rel(file)} is missing, so ${label} cannot carry the YouTube API Services ` +
+          `disclosures. Repoint this check rather than deleting it.`,
+      );
+      continue;
+    }
+
+    const body = read(file);
+    for (const { needle, what } of required) {
+      if (!body.includes(needle)) {
+        fail(
+          `${rel(file)}: ${label} no longer contains ${what} (${needle}). ` +
+            `YouTube API Services requires it; losing it risks the app's API access, ` +
+            `and publishing to YouTube then stops working for every user.`,
+        );
+      }
+    }
+  }
+}
+
 /* ── Run ──────────────────────────────────────────────────────────────────── */
 
 checkRoutesExist();
@@ -569,6 +630,7 @@ checkLegalHub();
 checkNotFoundStatus();
 checkInAppReachability();
 checkCanonicalOrigin();
+checkYouTubeDisclosures();
 
 const requireBuild = process.argv.includes("--require-build");
 const rendered = checkRenderedPages(requireBuild);

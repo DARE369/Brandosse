@@ -226,6 +226,51 @@ export default function PrivacyPolicy() {
           of your own clients, a Data Processing Agreement is available on request from{" "}
           <a href="mailto:privacy@brandosse.com">privacy@brandosse.com</a>.
         </p>
+
+        {/* Required by the YouTube API Services Terms of Service and the
+            Developer Policies: an app using those APIs must disclose it, link
+            YouTube's terms and Google's privacy policy, and tell users how to
+            revoke its access. Google checks for these at verification — but
+            they are here because someone who connected a channel should be able
+            to find out what we hold and how to take it back, which is not a
+            thing to learn from a review checklist. */}
+        <h3 className={styles.h3}>2.8 YouTube, and Google data</h3>
+        <p>
+          Brandosse uses <strong>YouTube API Services</strong>. When you connect a YouTube
+          channel we use them to upload the videos you ask us to publish, read the
+          channel&rsquo;s own identity so we can show you which channel is connected, and read{" "}
+          <strong>your own</strong> channel and video statistics so the Service can report how
+          your posts performed. We do not read anyone else&rsquo;s private channel data, and we do
+          not use YouTube data to build advertising profiles.
+        </p>
+        <p>
+          By connecting a channel you also agree to the{" "}
+          <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">
+            YouTube Terms of Service
+          </a>
+          . Google&rsquo;s own handling of your data is covered by the{" "}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
+            Google Privacy Policy
+          </a>
+          .
+        </p>
+        <p>
+          <strong>You can revoke our access at any time</strong>, in either place, and neither
+          needs our permission: disconnect the account in Brandosse under Settings &rsaquo;
+          Connected accounts, or remove Brandosse from{" "}
+          <a
+            href="https://myaccount.google.com/permissions"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            your Google account&rsquo;s third-party access page
+          </a>
+          . Disconnecting in Brandosse deletes the stored tokens and asks Google to revoke the
+          grant in the same action. Revoking at Google stops our access immediately; the
+          connection then shows as expired here until you remove or reconnect it. Videos already
+          published to YouTube remain on YouTube either way — they are yours, on your channel,
+          and were never ours to withdraw.
+        </p>
       </section>
 
       {/* ── 3 ─────────────────────────────────────────────────────────────── */}
