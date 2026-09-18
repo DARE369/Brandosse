@@ -221,3 +221,41 @@ read** — that is the failure mode the three laws exist to prevent.
 ## Full inventory
 
 `/ecc:ecc-guide`, or `COMMANDS-QUICK-REF.md` in the install path.
+
+---
+
+# 🗂️ Session journal — required, every session
+
+**Founder instruction, 2026-09-18.** Context windows run out mid-task, and when
+they do, everything not written down is gone: what was tried, what broke, why a
+decision went the way it did. A summary written afterwards is a reconstruction.
+This file is written *as the work happens*, so the next session — or the next
+person — starts from a record rather than an archaeology exercise.
+
+**The rule.**
+
+1. Session journals live in **`.claude/sessions/`**. One file per session, named
+   `YYYY-MM-DD-<first 8 chars of the session id>.md`.
+2. **Create the file on the first instruction of the session**, before the work
+   starts — not at the end, not when it looks like it will be needed.
+3. **Append a pass entry after every meaningful pass**, meaning any run that
+   changed something, proved something, or hit something unexpected. Not once
+   per session, and not once per hour: once per pass.
+
+**Every pass entry carries, at minimum:**
+
+- **What was done** — concretely, with `file:line` or commit hashes. Not "fixed
+  the analytics"; "repointed `posts.account_id` to SET NULL, commit 21803b4".
+- **What went wrong** — the errors hit, verbatim where short. A failure that
+  cost twenty minutes and is not written down will cost twenty minutes again.
+- **What was resolved, and what was not** — including anything still broken,
+  still unverified, or deliberately deferred. `UNVERIFIED` is a valid entry and
+  a more useful one than silence.
+- **Next steps** — what the next pass should pick up, in order.
+
+**It follows the same honesty rules as everything else here:** a journal that
+claims a thing works when it was never run is worse than no journal, because the
+next session will trust it. If a step was skipped, the entry says so.
+
+The journal is committed. It is history, and history that lives only on one
+laptop is not history.
