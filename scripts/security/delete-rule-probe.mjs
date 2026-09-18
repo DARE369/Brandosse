@@ -138,9 +138,32 @@ const APPROVED_CASCADES = [
     child: 'public.personal_assets', parent: 'public.posts',
     why: 'Same CHECK constraint, for post-sourced assets (20260712170000).',
   },
+  // The three referents of content_library_items. Reviewed together on
+  // 2026-09-18 after this probe flagged two of them on its first live run.
+  //
+  // 20260227090000:117-122 constrains the table with
+  // content_library_items_one_reference_only: exactly ONE of post_id,
+  // media_asset_id, template_id may be set. A row is therefore a pointer at one
+  // thing and nothing else, so SET NULL would leave a row violating its own
+  // CHECK — a rule that could only fail at delete time. Same situation as
+  // personal_assets above, and the same resolution.
+  //
+  // Losing a pointer row is not losing content: the post, asset or template is
+  // what the user made, and each of those deletions is user-initiated.
   {
     child: 'public.content_library_items', parent: 'public.posts',
-    why: 'A library item derived from a post has no meaning without it.',
+    why: 'A library item derived from a post has no meaning without it, and the '
+       + 'one_reference_only CHECK makes SET NULL impossible (20260227090000:117).',
+  },
+  {
+    child: 'public.content_library_items', parent: 'public.media_assets',
+    why: 'Same one_reference_only CHECK. The asset is the content; the library row '
+       + 'is a pointer at it (20260227090000:98-101, deliberate and declared).',
+  },
+  {
+    child: 'public.content_library_items', parent: 'public.content_templates',
+    why: 'Same one_reference_only CHECK. A template-type library row exists only to '
+       + 'surface that template (20260227090000:104-107).',
   },
   {
     child: 'public.video_clips', parent: 'public.video_jobs',
