@@ -1,7 +1,7 @@
 import Settings from "@/pages/Settings";
 
 export const metadata = {
-  title: "Settings | Brandosse Command Center",
+  title: "Settings | Brandosse",
 };
 
 export default function SettingsPage() {

@@ -1,7 +1,7 @@
 import GeneratePageV2 from "@/pages/GeneratePage/GeneratePageV2";
 
 export const metadata = {
-  title: "Generate Session | Brandosse Command Center",
+  title: "Generate Session | Brandosse",
 };
 
 export default async function GenerateSessionPage({ params }) {

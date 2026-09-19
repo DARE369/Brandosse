@@ -60,7 +60,7 @@ export default function AdminSidebar({
           <div className="admin-sidebar-brand">
             <span className="admin-sidebar-brand-mark">SA</span>
             <div className="admin-sidebar-brand-copy">
-              <span className="admin-sidebar-brand-name">SocialAI</span>
+              <span className="admin-sidebar-brand-name">Brandosse</span>
               <span className="admin-sidebar-brand-badge">Admin Workspace</span>
             </div>
           </div>

@@ -138,7 +138,7 @@ export default function OrgSidebar({
         <div className="org-sidebar-brand">
           <span className="org-sidebar-brand-mark">SA</span>
           <div className="org-sidebar-brand-copy">
-            <span className="org-sidebar-brand-name">SocialAI</span>
+            <span className="org-sidebar-brand-name">Brandosse</span>
             <span className="org-sidebar-brand-badge">Org Workspace</span>
           </div>
         </div>

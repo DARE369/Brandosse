@@ -61,7 +61,7 @@ export default function ClientReviewPage({ clientReviewToken }) {
     <main className="client-review-page">
       <div className="client-review-shell">
         <div className="client-review-header">
-          <span>SocialAI</span>
+          <span>Brandosse</span>
           <h1>Content Review</h1>
         </div>
 

@@ -8,7 +8,7 @@ export const FAQ_SECTIONS = [
         a: "Open Generate, describe the content you want, then start a generation. Your results appear in the current session and you can review each variation before scheduling or publishing anything.",
       },
       {
-        q: "Do I need to connect a platform before using SocialAI?",
+        q: "Do I need to connect a platform before using Brandosse?",
         a: "No. You can generate content before connecting any accounts. You only need a connected account when you want to schedule or publish to a specific platform.",
       },
       {

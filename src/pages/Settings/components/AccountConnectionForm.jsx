@@ -39,7 +39,7 @@ export default function AccountConnectionForm({
     <form className="connected-account-form" onSubmit={onSubmit}>
       <div className="connected-account-form-copy">
         <h4>{submitLabel === 'Save Changes' ? 'Update account details' : 'Tell us about your account'}</h4>
-        <p>This mock setup is used to simulate a real connected social account inside SocialAI.</p>
+        <p>This mock setup is used to simulate a real connected social account inside Brandosse.</p>
       </div>
 
       <label className="connected-account-field">

@@ -1,7 +1,7 @@
 import BrandKitPage from "@/pages/Settings/BrandKitPage";
 
 export const metadata = {
-  title: "Brand Kit | Brandosse Command Center",
+  title: "Brand Kit | Brandosse",
 };
 
 export default function BrandKitRoute() {

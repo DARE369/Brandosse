@@ -1,7 +1,7 @@
 import VideosPage from "@/pages/VideoEngine/VideosPage";
 
 export const metadata = {
-  title: "Videos | Brandosse Command Center",
+  title: "Videos | Brandosse",
 };
 
 export default function VideoJobsRoute() {

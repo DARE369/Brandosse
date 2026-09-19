@@ -1,7 +1,7 @@
 import LibraryPage from "@/pages/Library/LibraryPage";
 
 export const metadata = {
-  title: "Library | Brandosse Command Center",
+  title: "Library | Brandosse",
 };
 
 export default function LibraryRoute() {

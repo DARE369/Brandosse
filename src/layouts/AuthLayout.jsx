@@ -17,7 +17,7 @@ export default function AuthLayout({ children, title, subtitle }) {
             <span className="auth-panel-logo-mark">
 <StudioMark size={20} decorative />
             </span>
-            SocialAI
+            Brandosse
           </Link>
 
           <div className="auth-panel-copy">
@@ -50,7 +50,7 @@ export default function AuthLayout({ children, title, subtitle }) {
           </ul>
 
           <div className="auth-panel-testimonial">
-            <p>"We cut content production time by 70%. SocialAI just gets our brand."</p>
+            <p>"We cut content production time by 70%. Brandosse just gets our brand."</p>
             <div className="auth-panel-tauthor">
               <div className="auth-panel-tavatar">AO</div>
               <div>
@@ -79,7 +79,7 @@ export default function AuthLayout({ children, title, subtitle }) {
             <span className="auth-panel-logo-mark">
 <StudioMark size={18} tone="light" decorative />
             </span>
-            SocialAI
+            Brandosse
           </Link>
 
           <header className="auth-form-header">

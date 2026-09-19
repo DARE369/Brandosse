@@ -159,7 +159,7 @@ export default function Login() {
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Sign in to your SocialAI workspace."
+      subtitle="Sign in to your Brandosse workspace."
     >
       <button
         type="button"

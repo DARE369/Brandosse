@@ -1,7 +1,7 @@
 import BillingPage from "@/pages/Billing/BillingPage";
 
 export const metadata = {
-  title: "Billing | Brandosse Command Center",
+  title: "Billing | Brandosse",
 };
 
 export default function BillingRoute() {

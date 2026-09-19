@@ -1,5 +1,5 @@
 // ============================================================================
-// ZUSTAND SESSION STORE - SocialAI
+// ZUSTAND SESSION STORE - Brandosse
 // Edge-backed image/video/edit flows + async video polling state
 // ============================================================================
 

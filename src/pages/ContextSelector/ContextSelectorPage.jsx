@@ -65,7 +65,7 @@ export default function ContextSelectorPage() {
   return (
     <main className="context-selector-page">
       <div className="context-selector-shell">
-        <div className="context-selector-brand">SocialAI</div>
+        <div className="context-selector-brand">Brandosse</div>
         <h1>Where are you working today?</h1>
         <p>Choose a workspace to continue.</p>
 

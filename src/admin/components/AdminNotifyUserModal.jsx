@@ -4,7 +4,7 @@ const CHANNEL_OPTIONS = [
   {
     value: "in_app",
     label: "In-app notification",
-    description: "Shows in the user's notification bell inside SocialAI.",
+    description: "Shows in the user's notification bell inside Brandosse.",
   },
   {
     value: "email",

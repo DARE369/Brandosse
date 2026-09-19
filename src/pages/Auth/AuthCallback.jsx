@@ -156,7 +156,7 @@ export default function AuthCallback() {
               </linearGradient>
             </defs>
           </svg>
-          <span>SocialAI</span>
+          <span>Brandosse</span>
         </div>
 
         {error ? (

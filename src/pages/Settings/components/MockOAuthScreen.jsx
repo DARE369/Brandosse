@@ -134,11 +134,11 @@ export default function MockOAuthScreen({
               <PlatformIcon platform={platform.platform_key} size="lg" />
             </span>
             <h3>{title}</h3>
-            <p>{platform.mock_login_description || `Connect your ${platform.display_name} account to SocialAI.`}</p>
+            <p>{platform.mock_login_description || `Connect your ${platform.display_name} account to Brandosse.`}</p>
             <button type="button" className="connected-account-primary" onClick={handleContinue} disabled={submitting}>
               {submitting ? 'Checking connection...' : `Continue with ${platform.display_name}`}
             </button>
-            <small>If live OAuth is not configured, SocialAI will continue in demo mode.</small>
+            <small>If live OAuth is not configured, Brandosse will continue in demo mode.</small>
           </div>
         ) : null}
 
@@ -159,7 +159,7 @@ export default function MockOAuthScreen({
             <CheckCircle2 size={48} />
             <h3>{platform.display_name} connected successfully</h3>
             <p>
-              @{savedAccount.username} is now available inside SocialAI.
+              @{savedAccount.username} is now available inside Brandosse.
             </p>
             <button type="button" className="connected-account-secondary" onClick={onClose}>
               Go to Connected Accounts

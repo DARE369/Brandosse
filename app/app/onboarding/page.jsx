@@ -1,7 +1,7 @@
 import OnboardingWizard from "@/pages/Onboarding/OnboardingWizard";
 
 export const metadata = {
-  title: "Welcome | Brandosse Command Center",
+  title: "Welcome | Brandosse",
 };
 
 export default function OnboardingRoute() {

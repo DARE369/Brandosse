@@ -20,7 +20,7 @@ function renderMedia(attempt) {
 
 export default function PostPreviewCard({ attempt }) {
   const platform = String(attempt?.platform || '').trim().toLowerCase() || 'instagram';
-  const displayName = attempt?.accountDisplayName || attempt?.accountUsername || 'SocialAI';
+  const displayName = attempt?.accountDisplayName || attempt?.accountUsername || 'Brandosse';
   const username = attempt?.accountUsername ? `@${String(attempt.accountUsername).replace(/^@+/, '')}` : '@socialai';
   const caption = String(attempt?.caption || '').trim() || 'No caption provided.';
 

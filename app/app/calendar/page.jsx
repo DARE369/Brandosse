@@ -1,7 +1,7 @@
 import CalendarPage from "@/pages/Calendar/CalendarPage";
 
 export const metadata = {
-  title: "Calendar | Brandosse Command Center",
+  title: "Calendar | Brandosse",
 };
 
 export default function CalendarRoute() {

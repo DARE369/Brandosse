@@ -23,7 +23,9 @@
 //     its own honest name. It reviews the writing; it does not predict reach,
 //     and L5.11 exists because it once claimed to.
 //   · Publishing — supabase/functions/mock-publish + services/platforms/
-//     mockPublishService.js. It is simulated, and the page says so three times.
+//     mockPublishService.js. Simulated for the platforms still in review;
+//     YouTube publishes for real (proven 2026-09-18, including a scheduled
+//     post dispatched by cron), and the page now says which is which.
 //
 // The design record's testimonial band was dropped outright. Three named
 // strangers praising a product nobody has used yet is a fabricated record, and
@@ -110,7 +112,7 @@ const HOUSE_RULES = [
   "Credits are a ledger, not a vibe. Every purchase, spend and refund is a line you can read.",
   "No modal ambushes. Running low blocks inline, with the exact numbers and a way out.",
   "Errors say what happened and how to fix it. Never “something went wrong”.",
-  "Publishing runs on simulated connections during the beta, and every screen that could mislead you says so.",
+  "Publishing is real on YouTube today. The platforms still awaiting review publish against simulated connections, and every screen that could mislead you says which is which.",
 ];
 
 const ROADMAP = [
@@ -118,13 +120,13 @@ const ROADMAP = [
     tag: "SHIPPED",
     tone: "good",
     title: "The full loop, end to end",
-    body: "Generation, library, calendar, analytics, video clipping, brand kit, credit ledger. Publishing simulated, everything else real.",
+    body: "Generation, library, calendar, analytics, video clipping, brand kit, credit ledger — and real publishing to YouTube, including scheduled posts that go out on their own.",
   },
   {
     tag: "NEXT",
     tone: "warn",
-    title: "Real publishing",
-    body: "Live connections, token lifecycle handled out loud, and a post that fails at send time telling you why before you notice yourself.",
+    title: "The rest of the platforms",
+    body: "TikTok and LinkedIn are built and waiting on each platform's app review. YouTube already publishes for real, on a schedule, with the token lifecycle handled out loud.",
   },
   {
     tag: "AFTER",
@@ -147,7 +149,7 @@ const FAQS = [
   ],
   [
     "Is publishing real yet?",
-    "Not during the beta. Connections are simulated end to end, and every screen where you could be misled says so plainly. Real publishing is the next thing we ship, which is also why the roadmap above is on the page rather than in a blog post.",
+    "On YouTube, yes — really published, including posts scheduled to go out while you are asleep. The other platforms are built but waiting on their own app reviews, so they still run against simulated connections, and every screen says which kind of account you are looking at.",
   ],
   [
     "What happens if a job fails?",
@@ -234,7 +236,7 @@ export default function LandingPage() {
       <header className={`lp-header ${scrolled ? "is-raised" : ""}`}>
         <Link href="/" className="lp-brand">
           <StudioMark size={26} tone="light" decorative className="lp-brand-mark" />
-          <span className="lp-brand-word">Studio</span>
+          <span className="lp-brand-word">Brandosse</span>
         </Link>
 
         <nav className="lp-nav">
@@ -267,7 +269,7 @@ export default function LandingPage() {
             </span>
             <h1 className="lp-h1">Post every day without the daily scramble.</h1>
             <p className="lp-lead">
-              Studio generates the content, ranks the clips, writes the caption, picks the slot and files the receipt —
+              Brandosse generates the content, ranks the clips, writes the caption, picks the slot and files the receipt —
               one credit-based workspace instead of six open tabs and a Sunday night of dread.
             </p>
             <div className="lp-hero-actions">
@@ -428,7 +430,7 @@ export default function LandingPage() {
           <div className="lp-split lp-split-head" data-reveal>
             <h2 className="lp-h2">Five steps, one workspace, nothing falls out the bottom.</h2>
             <p className="lp-body">
-              Most tools own one step and hand you back a file. Studio owns the whole circuit — so the thing you
+              Most tools own one step and hand you back a file. Brandosse owns the whole circuit — so the thing you
               generated on Tuesday is already scheduled, measured and paid for by Friday, and you can see exactly where
               every credit went.
             </p>
@@ -458,7 +460,7 @@ export default function LandingPage() {
             <span className="lp-eyebrow">WHO IT’S FOR</span>
             <h2 className="lp-h2">Built for the person who is also everything else.</h2>
             <p className="lp-body">
-              You are the founder, the barista, the editor and the social team. Studio is not trying to replace your
+              You are the founder, the barista, the editor and the social team. Brandosse is not trying to replace your
               taste — it is trying to give you back the two hours a day that go into the mechanics.
             </p>
             <ul className="lp-ticks">
@@ -480,7 +482,7 @@ export default function LandingPage() {
             <span className="lp-eyebrow">VIDEOS · CLIPPING</span>
             <h2 className="lp-h2">Hand over one long video. Get back a week of shorts.</h2>
             <p className="lp-body">
-              Upload a file or paste a YouTube or X link. Studio transcribes it, finds the moments people stop for, cuts
+              Upload a file or paste a YouTube or X link. Brandosse transcribes it, finds the moments people stop for, cuts
               them to your ratio, burns in captions, and hands them back ranked by hook score — with the transcript and
               the source timecode attached to every clip, so you can judge one by reading four lines instead of watching
               forty seconds.
@@ -606,7 +608,7 @@ export default function LandingPage() {
               <span className="lp-eyebrow">BRAND KIT</span>
               <h3 className="lp-h3">Teach it your brand once.</h3>
               <p className="lp-body">
-                Upload a deck, point us at your website, or answer six questions. Studio pulls out your palette, fonts,
+                Upload a deck, point us at your website, or answer six questions. Brandosse pulls out your palette, fonts,
                 tagline and voice, and lets you accept or edit each one. Every generation reads from it afterwards.
               </p>
               <div className="lp-swatches">
@@ -729,8 +731,8 @@ export default function LandingPage() {
             <Link href="/login" className="lp-btn lp-btn-outline lp-btn-lg">I already have one</Link>
           </div>
           <p className="lp-hero-meta">
-            2 MIN SETUP · {creatorPack ? `${creatorPack.credits} CR IS ${creatorPack.price_display}` : ""} · PUBLISHING IS
-            SIMULATED DURING BETA
+            2 MIN SETUP · {creatorPack ? `${creatorPack.credits} CR IS ${creatorPack.price_display}` : ""} · YOUTUBE
+            PUBLISHING IS LIVE
           </p>
         </div>
       </section>
@@ -742,7 +744,7 @@ export default function LandingPage() {
           <div>
             <Link href="/" className="lp-brand">
               <StudioMark size={22} tone="light" decorative className="lp-brand-mark" />
-              <span className="lp-brand-word">Studio</span>
+              <span className="lp-brand-word">Brandosse</span>
             </Link>
             <p className="lp-foot-blurb">
               A credit-based content workspace for people who post more than they have time for.
@@ -777,7 +779,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="lp-wrap lp-foot-base">
-          <span className="lp-mono">© {new Date().getFullYear()} STUDIO · PUBLISHING IS SIMULATED DURING BETA</span>
+          <span className="lp-mono">© {new Date().getFullYear()} BRANDOSSE · YOUTUBE PUBLISHING IS LIVE</span>
           <span className="lp-mono">BUILT SOLO, IN PUBLIC</span>
         </div>
       </footer>

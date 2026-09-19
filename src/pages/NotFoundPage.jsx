@@ -7,7 +7,7 @@ export default function NotFoundPage() {
     <div className="notfound-page">
       <div className="notfound-page__glow" />
       <div className="notfound-content">
-        <span className="notfound-kicker">SocialAI</span>
+        <span className="notfound-kicker">Brandosse</span>
         <h1 className="notfound-title">Page not found</h1>
         <p className="notfound-message">
           The page you're looking for doesn't exist, or the route has moved to a different workspace.

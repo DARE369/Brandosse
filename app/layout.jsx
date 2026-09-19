@@ -1,7 +1,7 @@
 import "../src/styles/app-entry.css";
 
 export const metadata = {
-  title: "Brandosse Command Center",
+  title: "Brandosse",
   description: "Social media command center and content generation platform.",
   // The tab icon, the install icon, and the header logo are the same drawing:
   // all of these files come from scripts/generate-brand-icons.mjs, which reads
