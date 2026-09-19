@@ -23,6 +23,12 @@ const allowedClientEnvNames = new Set([
   "NEXT_PUBLIC_STRIPE_PUBLIC_KEY",
   "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
   "NEXT_PUBLIC_ENABLE_PROMPT_SUGGESTIONS_EDGE_IN_DEV",
+  // A Google OAuth CLIENT ID, not a secret: Google prints it in plain text in
+  // every authorize URL, and Google Identity Services requires it in the
+  // browser. The client SECRET stays server-only as GOOGLE_OAUTH_CLIENT_SECRET.
+  // Added 2026-09-19 for Google sign-in that names Brandosse rather than the
+  // Supabase host (src/pages/Auth/googleIdentity.js).
+  "NEXT_PUBLIC_GOOGLE_CLIENT_ID",
   "NODE_ENV",
 ]);
 

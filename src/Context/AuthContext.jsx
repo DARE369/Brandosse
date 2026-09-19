@@ -986,6 +986,26 @@ export const AuthProvider = ({ children }) => {
     if (error) throw error;
   }, []);
 
+  // Google sign-in WITHOUT the redirect through Supabase. See
+  // src/pages/Auth/googleIdentity.js for why: the redirect flow makes Google's
+  // chooser read "to continue to <project>.supabase.co", and only this path (or
+  // a paid custom domain) makes it name Brandosse.
+  //
+  // `rawNonce` is the UNHASHED value; Google was given its SHA-256. Supabase
+  // hashes this one and compares it to the claim inside the token.
+  //
+  // loginWithGoogle above stays as the fallback, for when Google's script is
+  // blocked or this client ID has not been authorised in Supabase yet.
+  const signInWithGoogleIdToken = useCallback(async (idToken, rawNonce) => {
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: idToken,
+      nonce: rawNonce,
+    });
+    if (error) throw error;
+    return data;
+  }, []);
+
   const isAdminUser = isAdminRole(adminRole || resolvedRole);
 
   const availableWorkspaces = useMemo(
@@ -1072,6 +1092,7 @@ export const AuthProvider = ({ children }) => {
     signOut: logout,
     register,
     loginWithGoogle,
+    signInWithGoogleIdToken,
     refreshAccess,
     syncWorkspacePath,
     switchWorkspace,
@@ -1093,6 +1114,7 @@ export const AuthProvider = ({ children }) => {
     register,
     refreshAccess,
     resolvedRole,
+    signInWithGoogleIdToken,
     session,
     switchWorkspace,
     syncWorkspacePath,

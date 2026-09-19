@@ -8,6 +8,7 @@ import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { SIGNUP_CREDIT_GRANT } from "../../constants/credits";
 import AuthLayout from "../../layouts/AuthLayout";
+import GoogleSignInButton from "./GoogleSignInButton";
 import { APP_ROOT_PATH } from "../../utils/authRouting";
 import {
   buildPendingSignupIntent,
@@ -185,21 +186,33 @@ export default function Register() {
     }
   };
 
-  const handleGoogle = async () => {
+  // Everything that must be true, and stored, BEFORE a Google session exists.
+  // Shared by both Google paths: the ID-token flow calls it when the credential
+  // arrives (Google's picker opens first, so it cannot run on click), and the
+  // redirect fallback calls it before leaving the page. Returning false aborts
+  // either one before an account is created.
+  const prepareGoogleSignIn = () => {
     setError("");
     if (!validateOrganizationFields()) {
-      return;
+      return false;
     }
+    if (orgSignup) {
+      const pendingIntent = getPendingIntent();
+      savePendingSignupIntent(pendingIntent);
+      sessionStorage.setItem("socialai-redirect-after-login", SIGNUP_COMPLETION_PATH);
+    } else {
+      clearPendingSignupIntent();
+      sessionStorage.removeItem("socialai-redirect-after-login");
+    }
+    return true;
+  };
+
+  // The redirect flow through Supabase — now only the fallback, rendered when
+  // Google Identity Services is unavailable. See GoogleSignInButton.jsx.
+  const handleGoogle = async () => {
+    if (!prepareGoogleSignIn()) return;
     setLoading("google");
     try {
-      if (orgSignup) {
-        const pendingIntent = getPendingIntent();
-        savePendingSignupIntent(pendingIntent);
-        sessionStorage.setItem("socialai-redirect-after-login", SIGNUP_COMPLETION_PATH);
-      } else {
-        clearPendingSignupIntent();
-        sessionStorage.removeItem("socialai-redirect-after-login");
-      }
       await loginWithGoogle();
       // For Google OAuth, navigation happens after auth callback.
     } catch (err) {
@@ -311,21 +324,31 @@ export default function Register() {
         </>
       ) : null}
 
-      <button
-        type="button"
-        className="auth-oauth-btn auth-oauth-btn--spaced"
-        onClick={handleGoogle}
+      {/* Google's own button (the chooser names Brandosse); the button inside
+          is the redirect fallback. See GoogleSignInButton.jsx. */}
+      <GoogleSignInButton
+        mode="signup"
         disabled={busy}
+        onBeforeSignIn={prepareGoogleSignIn}
+        onError={setError}
+        onBusyChange={(isBusy) => setLoading(isBusy ? "google" : "")}
       >
-        {loading === "google" ? (
-          <svg className="auth-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeDasharray="28 56" strokeLinecap="round" />
-          </svg>
-        ) : (
-          <GoogleIcon />
-        )}
-        {loading === "google" ? "Connecting..." : "Sign up with Google"}
-      </button>
+        <button
+          type="button"
+          className="auth-oauth-btn auth-oauth-btn--spaced"
+          onClick={handleGoogle}
+          disabled={busy}
+        >
+          {loading === "google" ? (
+            <svg className="auth-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeDasharray="28 56" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <GoogleIcon />
+          )}
+          {loading === "google" ? "Connecting..." : "Sign up with Google"}
+        </button>
+      </GoogleSignInButton>
 
       <div className="auth-divider"><span>or register with email</span></div>
 

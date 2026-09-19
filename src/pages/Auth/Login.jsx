@@ -7,6 +7,7 @@ import { useAuth } from "../../Context/AuthContext";
 import useAuthenticatedRedirect from "../../hooks/useAuthenticatedRedirect";
 import { useAppNavigation } from "../../Context/AppNavigationContext";
 import AuthLayout from "../../layouts/AuthLayout";
+import GoogleSignInButton from "./GoogleSignInButton";
 import { APP_ROOT_PATH, USER_HOME_PATH, resolvePostAuthPath } from "../../utils/authRouting";
 import { getPendingSignupIntent, SIGNUP_COMPLETION_PATH } from "../../services/signupIntentService";
 import { fetchOnboardingCompleted } from "../../services/userSettingsService";
@@ -161,21 +162,32 @@ export default function Login() {
       title="Welcome back"
       subtitle="Sign in to your Brandosse workspace."
     >
-      <button
-        type="button"
-        className="auth-oauth-btn"
-        onClick={handleGoogle}
+      {/* Google's own button via Google Identity Services, so the account
+          chooser names Brandosse instead of the Supabase project host. The
+          button inside is the redirect flow, rendered whenever that path is
+          unavailable — see GoogleSignInButton.jsx for the three cases. */}
+      <GoogleSignInButton
+        mode="signin"
         disabled={busy}
+        onError={setError}
+        onBusyChange={(isBusy) => setLoading(isBusy ? "google" : "")}
       >
-        {loading === "google" ? (
-          <svg className="auth-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeDasharray="28 56" strokeLinecap="round"/>
-          </svg>
-        ) : (
-          <GoogleIcon />
-        )}
-        {loading === "google" ? "Connecting..." : "Sign in with Google"}
-      </button>
+        <button
+          type="button"
+          className="auth-oauth-btn"
+          onClick={handleGoogle}
+          disabled={busy}
+        >
+          {loading === "google" ? (
+            <svg className="auth-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeDasharray="28 56" strokeLinecap="round"/>
+            </svg>
+          ) : (
+            <GoogleIcon />
+          )}
+          {loading === "google" ? "Connecting..." : "Sign in with Google"}
+        </button>
+      </GoogleSignInButton>
 
       <div className="auth-divider"><span>or continue with email</span></div>
 
