@@ -75,3 +75,6 @@ qa-tmp/
 test-results/
 playwright-report/
 *.log
+
+# foglamp scan data (scan.lock.json holds a secret edit token)
+.foglamp/
