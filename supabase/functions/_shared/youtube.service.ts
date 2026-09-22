@@ -59,6 +59,15 @@ const UPLOAD_TIMEOUT_MS = 120_000;
  */
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 
+/**
+ * YouTube's own limit on a custom thumbnail is 2MB. This mirrors it exactly
+ * rather than picking a headroom value — a larger cap here would let a
+ * caller-influenced fetch (opts.thumbnailUrl, ultimately user data) pull down
+ * more bytes than YouTube will ever accept, for no benefit.
+ */
+const MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024;
+const THUMBNAIL_API = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set";
+
 // ~2 minutes, matching the TikTok adapter. Long enough for a short clip to
 // transcode; short enough that a stuck post does not sit in `publishing`.
 const POLL_ATTEMPTS = 20;
@@ -151,6 +160,14 @@ type YouTubeOptions = {
   tags: string[];
   madeForKids: boolean | null;
   containsSyntheticMedia: boolean | null;
+  /**
+   * A durable public URL — a generation's own output_url, or a Library
+   * asset's — set by YouTubeThumbnailPicker.jsx. Not the video file: a
+   * SEPARATE image, applied via thumbnails.set after the video is live.
+   * Absent means "no custom thumbnail", not an error; YouTube's own
+   * auto-generated thumbnail applies exactly as it always has.
+   */
+  thumbnailUrl: string | null;
 };
 
 export function readOptions(raw: Record<string, unknown> | null): YouTubeOptions {
@@ -180,6 +197,8 @@ export function readOptions(raw: Record<string, unknown> | null): YouTubeOptions
     madeForKids: typeof o.made_for_kids === "boolean" ? o.made_for_kids : null,
     containsSyntheticMedia:
       typeof o.contains_synthetic_media === "boolean" ? o.contains_synthetic_media : null,
+    thumbnailUrl:
+      typeof o.thumbnail_url === "string" && o.thumbnail_url.trim() ? o.thumbnail_url.trim() : null,
   };
 }
 
@@ -509,6 +528,56 @@ export async function publishToYouTube({
     );
   }
 
+  // ── Optional: custom thumbnail ──────────────────────────────────────────
+  //
+  // Best-effort, and NEVER fatal — see classifyThumbnailError for why a
+  // channel can be refused this regardless of scope. The video above is
+  // already live; a thumbnail failure is reported as a note, not a failure.
+  if (opts.thumbnailUrl) {
+    try {
+      // Same reasoning as the video fetch above: thumbnailUrl traces back to
+      // row data a user controls, and a bare fetch would be SSRF with the
+      // reply going out under a real YouTube channel. safeFetch revalidates
+      // every redirect hop.
+      const image = await safeFetch(opts.thumbnailUrl, {
+        timeoutMs: TIMEOUT_MS,
+        maxBytes: MAX_THUMBNAIL_BYTES,
+        expectContentType: /^image\/(jpeg|png|gif|bmp)/i,
+        context: "youtube:thumbnail-upload",
+      });
+
+      const thumbRes = await fetchWithTimeout(
+        `${THUMBNAIL_API}?videoId=${encodeURIComponent(videoId)}&uploadType=media`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": image.contentType || "image/jpeg",
+          },
+          // Same cast as the video upload above: Deno's lib.dom types this
+          // release do not accept Uint8Array<ArrayBufferLike> as BodyInit,
+          // though it is a perfectly valid fetch body at runtime.
+          body: image.bytes as unknown as BodyInit,
+        },
+        UPLOAD_TIMEOUT_MS,
+      );
+
+      if (!thumbRes.ok) {
+        const body = await thumbRes.text().catch(() => "");
+        notes.push(classifyThumbnailError(thumbRes.status, body));
+      }
+    } catch (err) {
+      // Could not even read the image — SSRF check failed, host unreachable,
+      // too large, wrong content type. Same non-fatal treatment: the video
+      // already published successfully.
+      notes.push(
+        "The video published, but its custom thumbnail could not be read for upload "
+        + `(${(err as Error).message}). It is using YouTube's auto-generated thumbnail `
+        + "instead.",
+      );
+    }
+  }
+
   return {
     success: true,
     platformPostId: videoId,
@@ -527,6 +596,54 @@ export async function publishToYouTube({
  * buried in the JSON. Collapsing them into "YouTube rejected the upload" sends
  * every one of those users to the wrong place.
  */
+/**
+ * Turn a failed thumbnails.set call into ONE sentence — never into a failed
+ * publish. The video is already live by the time this runs; treating a
+ * thumbnail problem as fatal would turn a cosmetic miss into a lost post.
+ *
+ * ── The cause that is not the user's fault and not fixable by retrying ──────
+ * YouTube gates custom thumbnails behind CHANNEL-LEVEL phone verification,
+ * entirely separate from any OAuth scope — youtube.upload is the correct and
+ * sufficient scope for this call, and the channel can still be refused it.
+ * Confirmed live 2026-09-22 against a real connected channel and a real video:
+ *
+ *   HTTP 403, domain "youtube.thumbnail", reason "forbidden":
+ *   "The authenticated user doesn't have permissions to upload and set
+ *   custom video thumbnails."
+ *
+ * That `domain` is specific to thumbnails.set and does not appear on
+ * video-upload failures — classifyGoogleError's own "forbidden" branch means
+ * something different (account suspended, etc.) for that endpoint. The same
+ * reason string means two different things depending which call returned it,
+ * which is exactly why this is a SEPARATE classifier rather than a shared one.
+ */
+export function classifyThumbnailError(httpStatus: number, rawBody: string): string {
+  let domain = "";
+  let reason = "";
+  let message = "";
+  try {
+    const parsed = JSON.parse(rawBody);
+    domain = parsed?.error?.errors?.[0]?.domain ?? "";
+    reason = parsed?.error?.errors?.[0]?.reason ?? parsed?.error?.status ?? "";
+    message = parsed?.error?.message ?? "";
+  } catch {
+    // Non-JSON error body; the HTTP status is all we have.
+  }
+
+  console.error(`[youtube] thumbnail rejected: http_${httpStatus} domain=${domain || "none"} reason=${reason || "none"}`);
+
+  if (domain === "youtube.thumbnail" && (reason === "forbidden" || httpStatus === 403)) {
+    return "The video published, but the custom thumbnail could not be set: this YouTube "
+      + "channel is not yet eligible for custom thumbnails. Verify your phone number at "
+      + "youtube.com (Settings → Channel → Feature eligibility), then set the "
+      + "thumbnail there directly, or try again on a future upload.";
+  }
+
+  return "The video published, but its custom thumbnail could not be set "
+    + `(${reason || `http_${httpStatus}`}${message ? `: ${message.slice(0, 120)}` : ""}). `
+    + "It is using YouTube's auto-generated thumbnail instead.";
+}
+
 export function classifyGoogleError(
   httpStatus: number,
   rawBody: string,

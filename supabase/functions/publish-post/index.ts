@@ -360,7 +360,23 @@ serve(async (req) => {
             account_id: connectedAccountId,
             workflow_state: {
               ...existingWorkflowState,
-              publish: { ...existingPublish, platform_post_url: result.platformPostUrl },
+              publish: {
+                ...existingPublish,
+                platform_post_url: result.platformPostUrl,
+                // Persisted so a caveat survives regardless of HOW this ran.
+                // Before this, `note` only reached the synchronous HTTP
+                // response body: QuickPostComposer.jsx:937 reads it for an
+                // immediate "Publish now", but dispatch_scheduled_post's cron
+                // path calls this function with PERFORM net.http_post(...),
+                // which discards the response outright. Every note this
+                // adapter has ever returned — "published as private because
+                // no visibility was chosen", "no synthetic-media disclosure
+                // set" — was silently lost for every SCHEDULED YouTube post.
+                // Found 2026-09-22 while wiring the custom-thumbnail note
+                // through this same path; the gap predates thumbnails
+                // entirely and applied to every existing note.
+                note: result.note ?? null,
+              },
             },
             updated_at: new Date().toISOString(),
           })

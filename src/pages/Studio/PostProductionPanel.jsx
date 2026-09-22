@@ -7,6 +7,7 @@ import { platformNeedsTitle, getPlatformSpec } from "../../services/platforms/pl
 import PlatformFitStrip from "../../components/PostProduction/PlatformFitStrip";
 import TikTokOptionsPanel from "../../components/Publishing/TikTokOptionsPanel";
 import YouTubeOptionsPanel from "../../components/Publishing/YouTubeOptionsPanel";
+import YouTubeThumbnailPicker from "../../components/Publishing/YouTubeThumbnailPicker";
 import styles from "./PostProductionPanel.module.css";
 
 const SCORE_DIMS = [
@@ -246,13 +247,33 @@ export default function PostProductionPanel({
       ))}
 
       {youtubeAccounts.map((acc) => (
-        <YouTubeOptionsPanel
-          key={`yt-${acc.id}`}
-          accountId={acc.id}
-          accountName={acc.display_name || acc.account_name || "YouTube"}
-          onChange={(settings) => mergeSettings("youtubeSettings", acc.id, settings)}
-          onValidityChange={(ok) => setValidity(acc.id, ok)}
-        />
+        <div key={`yt-${acc.id}`}>
+          <YouTubeOptionsPanel
+            accountId={acc.id}
+            accountName={acc.display_name || acc.account_name || "YouTube"}
+            onChange={(settings) => mergeSettings("youtubeSettings", acc.id, settings)}
+            onValidityChange={(ok) => setValidity(acc.id, ok)}
+          />
+          {/* mergeSettings replaces youtubeSettings[acc.id] WHOLESALE (see its
+              own comment two-account-per-platform reasoning above) — calling
+              it directly here would erase whatever YouTubeOptionsPanel just
+              wrote for this account. Spreading the existing entry first keeps
+              both panels' fields in the same object regardless of which one
+              changes last.
+
+              libraryAssets is [] for the same reason as
+              Generate/PostProductionPanel.jsx: this surface has no existing
+              query for the user's Library images. "Generate with AI" works
+              fully here; "Pick from Library" correctly shows as unavailable. */}
+          <YouTubeThumbnailPicker
+            accountId={acc.id}
+            libraryAssets={[]}
+            onChange={(thumbnailUrl) => mergeSettings("youtubeSettings", acc.id, {
+              ...(postProduction.youtubeSettings?.[acc.id] || {}),
+              thumbnail_url: thumbnailUrl,
+            })}
+          />
+        </div>
       ))}
 
       {/* WEEK 2 FIX 3 (+ ADDENDUM UPGRADE 2): manual recovery control —

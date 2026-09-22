@@ -42,6 +42,7 @@ import { previewFor } from '../platformPreview';
 import { scorePostSeo } from '../../services/postProduction.service';
 import TikTokOptionsPanel from '../../components/Publishing/TikTokOptionsPanel';
 import YouTubeOptionsPanel from '../../components/Publishing/YouTubeOptionsPanel';
+import YouTubeThumbnailPicker from '../../components/Publishing/YouTubeThumbnailPicker';
 import { useAuth } from '../../Context/AuthContext';
 import { fetchUserSettings } from '../../services/userSettingsService';
 
@@ -308,6 +309,25 @@ export default function QuickPostComposer({
       });
     }
     return optionHandlers.current.get(key);
+  }, []);
+
+  // ── The thumbnail picker is a SEPARATE emitter into the SAME platformOptions
+  //    slot, and it must MERGE rather than replace ──────────────────────────
+  //
+  // handlersFor('youtube').onChange above does
+  //   setPlatformOptions((prev) => ({ ...prev, youtube: persisted }))
+  // — a wholesale REPLACE of platformOptions.youtube, which is correct for a
+  // single panel owning that whole object. Reusing it for a second emitter
+  // (YouTubeThumbnailPicker) would make whichever one fires last erase the
+  // other's fields — the video would silently publish with no privacy_status
+  // or no thumbnail_url depending on render order, and nothing would say so.
+  // This callback instead spreads the EXISTING youtube object and only touches
+  // thumbnail_url, so it composes safely regardless of which panel changes.
+  const handleThumbnailChange = useCallback((thumbnailUrl) => {
+    setPlatformOptions((prev) => ({
+      ...prev,
+      youtube: { ...prev.youtube, thumbnail_url: thumbnailUrl },
+    }));
   }, []);
 
   // Which active platforms have a required-field panel that is not yet satisfied.
@@ -837,6 +857,20 @@ export default function QuickPostComposer({
                 syntheticMedia={aiDisclosure}
                 onChange={handlersFor(p.key).onChange}
                 onValidityChange={handlersFor(p.key).onValidityChange}
+              />
+            ))}
+
+            {/* A separate emitter into the same platformOptions.youtube slot —
+                see handleThumbnailChange above for why it merges rather than
+                replaces. Not a required field: unlike YouTubeOptionsPanel it
+                has no onValidityChange, because nothing here can block
+                scheduling. */}
+            {PLATFORMS.filter((p) => activePlatforms.includes(p.key) && p.key === 'youtube').map((p) => (
+              <YouTubeThumbnailPicker
+                key={`thumb-${p.key}`}
+                accountId={p.accountId}
+                libraryAssets={libraryAssets}
+                onChange={handleThumbnailChange}
               />
             ))}
 

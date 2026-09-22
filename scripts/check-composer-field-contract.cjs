@@ -99,6 +99,12 @@ const composer = stripComments(read('src/calendar/components/QuickPostComposer.j
 const service = stripComments(read('src/calendar/services/calendarService.js'));
 const confirmation = stripComments(read('src/calendar/quickPostConfirmation.js'));
 const ytPanel = stripComments(read('src/components/Publishing/YouTubeOptionsPanel.jsx'));
+// thumbnail_url is emitted by a SEPARATE component (not a legal requirement
+// like the fields YouTubeOptionsPanel owns — see that component's own header
+// for why they are split), so the key-contract check below must see BOTH
+// panels' text, not just the first one, or a real emitter looks like a
+// missing one.
+const ytThumbPanel = stripComments(read('src/components/Publishing/YouTubeThumbnailPicker.jsx'));
 const ttPanel = stripComments(read('src/components/Publishing/TikTokOptionsPanel.jsx'));
 const ytSvc = stripComments(read('supabase/functions/_shared/youtube.service.ts'));
 const ttSvc = stripComments(read('supabase/functions/_shared/tiktok.service.ts'));
@@ -231,10 +237,30 @@ const ytReads = [...new Set(readKeys(ytSvc, /\bo\.([a-z_]+)\b/g))]
 const ttReads = [...new Set(readKeys(ttSvc, /options\?\.([a-zA-Z]+)/g))];
 
 for (const key of ytReads) {
+  // Most keys are emitted BY the panel, in its own text (privacy_status,
+  // made_for_kids, ...). thumbnail_url is different: YouTubeThumbnailPicker
+  // deliberately emits a bare URL, not an object naming the field, so the key
+  // is only spelled out where each composer collects it into
+  // platformOptions.youtube (see handleThumbnailChange in
+  // QuickPostComposer.jsx). Checking the union of both panels' text plus the
+  // composer's is what makes this still a real check rather than a search
+  // scoped to the one file that happens to not use this field's name.
+  //
+  // The match itself must require `key:` — an object-key ASSIGNMENT — not a
+  // bare `\bkey\b`. QuickPostComposer already contains the literal string
+  // "thumbnail_url" for a wholly unrelated, pre-existing reason (a Library
+  // asset's own PREVIEW image field, e.g. `asset.thumbnail_url`), so a plain
+  // word-boundary search on that key was never a real check: it would have
+  // passed even if the wiring below were deleted entirely, because the
+  // unrelated occurrence alone satisfies it. Verified 2026-09-22 by
+  // deliberately breaking the real assignment in a copy — the bare-word
+  // version stayed green; requiring the colon catches it.
+  const emittedSomewhere = ytPanel + ytThumbPanel + composer;
   assert(
-    new RegExp(`\\b${key}\\b`).test(ytPanel),
-    `youtube.service.ts reads options.${key} but YouTubeOptionsPanel never emits it. `
-    + 'The video publishes with that setting silently absent.',
+    new RegExp(`\\b${key}\\s*:`).test(emittedSomewhere),
+    `youtube.service.ts reads options.${key} but nothing in YouTubeOptionsPanel, `
+    + 'YouTubeThumbnailPicker or QuickPostComposer assigns that key. The video '
+    + 'publishes with that setting silently absent.',
     `YouTube's ${key} is both emitted and read`,
   );
 }

@@ -30,6 +30,7 @@
 
 import {
   classifyGoogleError,
+  classifyThumbnailError,
   fitTags,
   readOptions,
   sanitiseText,
@@ -162,6 +163,19 @@ Deno.test("readOptions defaults the category and coerces tags to strings", () =>
   assertEquals(readOptions({ tags: "not-an-array" }).tags, [], "non-array yields no tags");
 });
 
+Deno.test("readOptions leaves thumbnailUrl absent when nothing was chosen", () => {
+  // Absent must mean "no custom thumbnail" — never an empty-string URL that a
+  // later fetch would try and fail on.
+  assertEquals(readOptions({}).thumbnailUrl, null, "no thumbnail chosen");
+  assertEquals(readOptions({ thumbnail_url: "" }).thumbnailUrl, null, "empty string is not a URL");
+  assertEquals(readOptions({ thumbnail_url: "   " }).thumbnailUrl, null, "whitespace is not a URL");
+});
+
+Deno.test("readOptions passes a chosen thumbnailUrl through, trimmed", () => {
+  const o = readOptions({ thumbnail_url: "  https://example.com/thumb.jpg  " });
+  assertEquals(o.thumbnailUrl, "https://example.com/thumb.jpg", "trimmed, not rejected");
+});
+
 // ── fitTags ─────────────────────────────────────────────────────────────────
 
 Deno.test("fitTags passes a small set through untouched", () => {
@@ -261,4 +275,65 @@ Deno.test("classifyGoogleError truncates the platform message it echoes", () => 
     (r.failureReason ?? "").length < 300,
     `echoed message must be bounded, got ${(r.failureReason ?? "").length} chars`,
   );
+});
+
+// ── classifyThumbnailError ───────────────────────────────────────────────────
+//
+// The eligibility-gate test uses the EXACT body captured live 2026-09-22 from
+// a real thumbnails.set call against a real connected channel — not a guessed
+// shape. That call is reproduced in full in the migration/session history; the
+// body below is copied verbatim from it.
+
+const REAL_THUMBNAIL_FORBIDDEN_BODY = JSON.stringify({
+  error: {
+    code: 403,
+    message: "The authenticated user doesn't have permissions to upload and set custom video thumbnails.",
+    errors: [
+      {
+        message: "The authenticated user doesn't have permissions to upload and set custom video thumbnails.",
+        domain: "youtube.thumbnail",
+        reason: "forbidden",
+        location: "Authorization",
+        locationType: "header",
+      },
+    ],
+  },
+});
+
+Deno.test("classifyThumbnailError names the real, unfixable-by-us cause: channel not eligible", () => {
+  const note = classifyThumbnailError(403, REAL_THUMBNAIL_FORBIDDEN_BODY);
+  assert(
+    /not yet eligible for custom thumbnails/i.test(note),
+    `must name the eligibility gate specifically, got: ${note}`,
+  );
+  assert(/phone number/i.test(note), "must say HOW to fix it — phone verification");
+  assert(/published/i.test(note), "must say the video itself still published");
+});
+
+Deno.test("classifyThumbnailError does not confuse this with a video-upload 403", () => {
+  // The SAME reason string ("forbidden") on a DIFFERENT domain means something
+  // else entirely (see classifyGoogleError's own "forbidden" branch, which is
+  // about account suspension). Domain is what disambiguates it, so a 403 with
+  // no youtube.thumbnail domain must not be misclassified as the eligibility gate.
+  const body = JSON.stringify({ error: { errors: [{ domain: "youtube", reason: "forbidden" }] } });
+  const note = classifyThumbnailError(403, body);
+  assert(
+    !/not yet eligible for custom thumbnails/i.test(note),
+    "a bare 'forbidden' on the wrong domain must not claim it is the eligibility gate",
+  );
+  assert(/published/i.test(note), "still must not read as a publish failure");
+});
+
+Deno.test("classifyThumbnailError survives a non-JSON body and still says the video published", () => {
+  const note = classifyThumbnailError(500, "<html>Internal Server Error</html>");
+  assert(/published/i.test(note), "must not read as if the whole publish failed");
+  assert(note.length > 0, "must still say something");
+});
+
+Deno.test("classifyThumbnailError never returns a failure-shaped result — it is always just a string", () => {
+  // Regression guard for the mistake this function exists to prevent: reusing
+  // classifyGoogleError's fail()-based shape here would make a thumbnail
+  // problem look like a failed publish to any caller that checks .success.
+  const note = classifyThumbnailError(403, REAL_THUMBNAIL_FORBIDDEN_BODY);
+  assertEquals(typeof note, "string", "classifyThumbnailError returns a note, never a PublishResult");
 });

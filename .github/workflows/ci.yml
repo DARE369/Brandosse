@@ -365,6 +365,15 @@ jobs:
       # on every failure path, and first-login provisioning via /auth/callback.
       - name: check-google-signin-brand
         run: node scripts/check-google-signin-brand.cjs
+      # thumbnail_url is emitted by a SECOND panel (YouTubeThumbnailPicker) into
+      # the same per-account slot YouTubeOptionsPanel already owns, across three
+      # compose surfaces with three different state shapes. Each already had a
+      # REPLACE-shaped setter before this feature existed; wiring a second
+      # emitter into it without a spread means whichever panel fires last
+      # silently erases the other's fields. Verified failing for each of the
+      # three sites independently before being trusted.
+      - name: check-youtube-thumbnail-merge
+        run: node scripts/check-youtube-thumbnail-merge.cjs
       # The website import used to hand marketing prose to an LLM and ask for a
       # colour palette; shown no colours, it produced colours anyway. The harvester
       # reads the site's own CSS instead. This asserts exact measured hexes against

@@ -611,6 +611,27 @@ export default function PostDetailDrawer({
               <p style={{ color: 'var(--color-danger-text)', fontSize: 'var(--text-sm)', margin: 0 }}>{primary.failure_reason}</p>
             </div>
           )}
+
+          {/* A published post can still carry a caveat — e.g. its custom
+              thumbnail could not be set because the channel isn't eligible.
+              Read straight from workflow_state.publish.note rather than
+              whatever normalization produces failure_reason above: this is a
+              standalone, minimal addition, not a hook into that layer.
+
+              Until 2026-09-22 this note was silently lost for every SCHEDULED
+              post — dispatch_scheduled_post's cron path discards the HTTP
+              response entirely, so it only ever reached a synchronous
+              "Publish now" via the composer. Fixed in publish-post/index.ts;
+              this is the other half — a note that reaches the drawer but
+              nothing reads is the same silence with extra steps. */}
+          {isPublished && primary.workflow_state?.publish?.note && (
+            <div className="post-drawer__section">
+              <span className="post-drawer__section-label">Note</span>
+              <p style={{ fontSize: 'var(--text-sm)', margin: 0, color: 'var(--uiv2-text-secondary)' }}>
+                {primary.workflow_state.publish.note}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="post-drawer__footer">

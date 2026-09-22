@@ -153,3 +153,91 @@
   outline: 2px solid var(--uiv2-accent-solid);
   outline-offset: 2px;
 }
+
+/* ── Custom thumbnail (YouTubeThumbnailPicker.jsx) ───────────────────────── */
+
+.thumbnailPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.thumbnailPreviewImage {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--uiv2-border, #26282C);
+  background: var(--uiv2-bg-elevated);
+}
+
+.thumbnailPreviewMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--uiv2-text-secondary, #8B8D93);
+}
+
+.thumbnailRemove {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--uiv2-border, #26282C);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--uiv2-text-primary, #F5F5F4);
+  font-size: 12px;
+  cursor: pointer;
+}
+.thumbnailRemove:hover { border-color: var(--uiv2-border-strong, #3A3D42); }
+
+.thumbnailGenerate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.thumbnailGenerateBtn {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border: 1px solid var(--uiv2-accent-solid);
+  border-radius: 8px;
+  background: var(--uiv2-bg-elevated);
+  color: var(--uiv2-accent-text, var(--uiv2-accent-solid));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.thumbnailGenerateBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* A small grid so several Library images fit without turning the composer
+   into a full-page picker — this control is one option among three, not a
+   destination of its own. */
+.thumbnailLibraryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.thumbnailLibraryItem {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--uiv2-border, #26282C);
+  border-radius: 6px;
+  background: var(--uiv2-bg-elevated);
+  overflow: hidden;
+  cursor: pointer;
+}
+.thumbnailLibraryItem:hover { border-color: var(--uiv2-accent-solid); }
+.thumbnailLibraryItem img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

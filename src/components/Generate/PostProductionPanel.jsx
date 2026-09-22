@@ -18,6 +18,7 @@ import {
 import { POST_STATUS } from '../../constants/statuses';
 import TikTokOptionsPanel from '../Publishing/TikTokOptionsPanel';
 import YouTubeOptionsPanel from '../Publishing/YouTubeOptionsPanel';
+import YouTubeThumbnailPicker from '../Publishing/YouTubeThumbnailPicker';
 const FALLBACK_VIDEO_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
 function resolveVideoSource(url) {
@@ -1294,6 +1295,29 @@ export default function PostProductionPanel({
                             ))}
                             onValidityChange={(ok) => setYouTubeValidity((prev) => (
                               prev[acc.id] === ok ? prev : { ...prev, [acc.id]: ok }
+                            ))}
+                          />
+                          {/* Merges into this SAME account's settings object —
+                              same reasoning as QuickPostComposer's
+                              handleThumbnailChange: a wholesale-replace
+                              onChange here would erase whatever
+                              YouTubeOptionsPanel just wrote for this account.
+
+                              libraryAssets is deliberately [] here: this
+                              surface has no existing query for the user's
+                              Library images (QuickPostComposer's does,
+                              passed down from Calendar/Library pages), and
+                              building one is a separate task from wiring the
+                              picker itself. "Generate with AI" is fully
+                              functional; "Pick from Library" correctly
+                              disables itself here rather than silently doing
+                              nothing — see YouTubeThumbnailPicker's own
+                              disabled-when-empty handling. */}
+                          <YouTubeThumbnailPicker
+                            accountId={acc.id}
+                            libraryAssets={[]}
+                            onChange={(thumbnailUrl) => setYouTubeSettings((prev) => (
+                              { ...prev, [acc.id]: { ...prev[acc.id], thumbnail_url: thumbnailUrl } }
                             ))}
                           />
                         </div>
