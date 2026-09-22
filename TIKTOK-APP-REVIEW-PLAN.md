@@ -22,22 +22,60 @@ Guidelines. Everything follows from that:
 So the order is fixed and cannot be shortcut:
 
 ```
-1. Freeze the scope list          (§1)
-2. Build the compose panel        (§2 — the real work)
-3. Set up the sandbox             (§3)
-4. Record, following the shot list (§4)
-5. Self-review against the checklist (§5)
-6. Submit
+1. Freeze the scope list          (§1)  — OPEN decision, see §1
+2. Build the compose panel        (§2)  — DONE, all ten rows met and guarded
+3. Set up the sandbox             (§3)  — founder-side, not started
+4. First real connect + one private post — never done; do it BEFORE filming
+5. Record, following the shot list (§4)
+6. Self-review against the checklist (§5)
+7. Submit
 ```
 
-Recording before step 2 is wasted effort: the footage would show a panel that
-does not satisfy the guidelines, which is the single most common rejection.
+Step 4 was not in the original list. It is the first time the adapter, chunked
+upload, token refresh and revoke touch TikTok at all, and discovering a defect
+on camera costs a full recording.
 
 ---
 
 ## 1. Freeze the scope list
 
-### Current state — will be rejected
+> **Corrected 2026-09-22 (Law 2).** This section was written 2026-09-05 and the
+> code moved after it. What follows the next subsection describes the **TikTok
+> developer portal** as it stood on 2026-09-05 — it has not been re-checked
+> since and is `UNVERIFIED` today.
+
+### What the code requests today — verified 2026-09-22
+
+`app/api/_lib/socialProviders.js` (`scopes` array, TikTok entry) requests
+**five** scopes at connect, comma-separated:
+
+`user.info.basic`, `user.info.profile`, `user.info.stats`, `video.publish`, `video.list`
+
+Commit `e6dbf7d` (2026-09-11) added the three read scopes back, deliberately:
+TikTok fixes the scope set at authorization, so a scope added later forces every
+connected user to reconnect, and no real TikTok account had ever connected — the
+one moment widening was free.
+
+**That decision and this plan's target state below now disagree, and the
+disagreement is an open founder decision, not a typo.** Two facts bear on it:
+
+1. **The authorize request is all-or-nothing.** If any requested scope is not
+   enabled on the TikTok app in the portal, authorization fails for *every*
+   scope — including `video.publish`. The code's list and the portal's list
+   must match exactly, or connecting TikTok breaks outright, publishing with it.
+2. **Every requested scope must be demonstrated in the review video.**
+   `user.info.profile`, `user.info.stats` and `video.list` have no visible use in
+   the product yet — TikTok analytics ingestion does not exist
+   (`ingest-social-analytics/index.ts` hardcodes `PLATFORM = "youtube"`). Whether
+   `video.list` returns anything from a **private** account before audit is
+   `UNVERIFIED`; unaudited clients may only post to private accounts, so the demo
+   account must be private.
+
+No real TikTok account has ever been connected — every `connected_accounts` row
+for TikTok is `is_mock` (verified 2026-09-19). None of the above has run against
+TikTok yet.
+
+### Portal state as of 2026-09-05 — would have been rejected
 
 Selected: `user.info.basic`, `user.info.profile`, `user.info.stats`,
 `video.list`, `video.upload`
@@ -73,14 +111,27 @@ The written explanation describes `user.info.basic` and `video.publish`. So:
 
 ### Also required before submission
 
-- **Redirect URI** (currently empty, flagged required):
-  `https://brandosse.com/api/auth/social/tiktok/callback`
-  Web platform must be ticked. TikTok rejects `localhost`.
+- **Redirect URI** — must equal what the code sends, byte for byte. The connect
+  route builds it as `NEXT_PUBLIC_APP_URL` (falling back to the request origin)
+  + `/api/auth/social/tiktok/callback`. The canonical production host is
+  **`https://www.brandosse.com`** — the earlier `https://brandosse.com/...` value
+  here omitted `www` and would not have matched. Register **both**, since the
+  portal accepts several and it removes the dependency on which host a user
+  arrived on:
+  - `https://www.brandosse.com/api/auth/social/tiktok/callback`
+  - `https://brandosse.com/api/auth/social/tiktok/callback`
+
+  Confirm Vercel's production `NEXT_PUBLIC_APP_URL` is `https://www.brandosse.com`
+  (`UNVERIFIED` from here). Web platform must be ticked. TikTok rejects `localhost`.
 - **App icon**, 1024×1024, JPEG/PNG, under 5MB.
 - **Terms of Service URL** and **Privacy Policy URL** — must return a real page,
   not a 404. Both live on `brandosse.com`.
-- **Domain verification** (DNS TXT) — only strictly required for `PULL_FROM_URL`.
-  Video posting via `FILE_UPLOAD` works without it; **photo posting does not**.
+- **Domain verification** (DNS TXT) — **live on `brandosse.com`**, verified
+  2026-09-22 (`tiktok-developers-site-verification=…`). Only strictly required
+  for `PULL_FROM_URL`: video posting via `FILE_UPLOAD` works without it. Photo
+  posting is pull-from-URL only, and our media lives in Supabase storage, not on
+  the verified domain — so photos also need a proxy route on `brandosse.com`
+  before they can work. Not built.
 
 ---
 
@@ -100,7 +151,7 @@ status from a dropdown and there should be no default value."*
 | 5 | **Declaration text PERSISTENTLY visible** above the publish button — never revealed only on a toggle. Default: *"By posting, you agree to TikTok's Music Usage Confirmation."* With branded content: *"…Branded Content Policy and Music Usage Confirmation."* Both linked. **Verbatim** | "Music disclosure shown conditionally, not persistently". Paraphrasing also fails |
 | 6 | **`max_video_post_duration_sec` enforced in the UI.** Over-length video blocked at compose time with the real number shown | "Max duration not enforced in UI" |
 | 7 | **Content preview** of what will be posted | Missing preview |
-| 8 | **Explicit confirmation** before upload | Missing consent |
+| 8 | **Express consent before upload.** TikTok defines the mechanism: §5c *"API Clients must only start sending content materials to TikTok after the user has expressly consent to the upload"*, and §2 *"there should be a declaration asking for a user's consent before the publish button."* So: declaration first, then the user presses Publish. No separate dialog is required | Missing consent |
 | 9 | **No promotional watermarks** on the media | Prohibited outright |
 | 10 | **Processing notice** — "TikTok can take a few minutes to process your video." | Missing notice |
 
@@ -259,17 +310,26 @@ rejection.
 
 ## 6. Honest status
 
-| | |
-|---|---|
-| Scope list | **Wrong** — see §1 |
-| Redirect URI | Missing |
-| Compose panel | **Not built** — §2 is the work |
-| App icon | Not supplied |
-| ToS / Privacy pages live on the domain | Unverified |
-| Domain TXT verification | Pending a third party |
-| Sandbox | Not created |
-| Video | Cannot be recorded until §2 exists |
+**Re-verified 2026-09-22.** The 2026-09-05 version of this table said the compose
+panel was not built and named it the critical path. That was already false on
+2026-09-19 and is corrected here.
 
-The critical path is **§2**. Everything else is configuration or waiting; the
-panel is the only part that is engineering, and nothing downstream can start
-without it.
+| | Status | Evidence |
+|---|---|---|
+| Compose panel | **Built — all ten §2 rows met and guarded** | `src/components/Publishing/TikTokOptionsPanel.jsx`, mounted at `QuickPostComposer.jsx:820` and `components/Generate/PostProductionPanel.jsx:1259`. `node scripts/check-tiktok-ux-compliance.cjs` → PASS, **26** requirements (was 17: five rows were met in code but asserted by nothing, and the check read the panel alone, so it would have passed with the panel unmounted). Every new assertion mutation-tested 2026-09-22 |
+| Scope list | **Open decision** — code requests 5, this plan recommends 2 | §1. Portal and code must match or every connect fails |
+| Redirect URI | Portal value `UNVERIFIED` | Must be the `www` host (§1); register both |
+| ToS / Privacy pages | **Live** | `https://www.brandosse.com/terms` and `/privacy` → 200 |
+| Domain TXT | **Live** on `brandosse.com` | DNS TXT present |
+| App icon | `UNVERIFIED` | Founder-side |
+| Sandbox credentials | Present locally | Client key prefix `sbaw` in `.env.local` = sandbox |
+| Sandbox target user (private account) | Not configured | Founder-side |
+| Vercel `TIKTOK_CLIENT_KEY` / `SECRET` | `UNVERIFIED` | Connect route 401s before reading env |
+| First real connect + one private post | **Never done** | All TikTok `connected_accounts` rows are `is_mock` |
+| Video | Blocked on the row above | |
+
+**The critical path is no longer engineering.** It is: settle the scope list →
+make the portal match it → configure a private sandbox target user → the first
+real connect and one private post. That first live run is the first time the
+adapter, chunked upload, token refresh and revoke will ever touch TikTok, so it
+should happen before filming, not during it.

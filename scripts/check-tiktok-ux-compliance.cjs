@@ -231,6 +231,98 @@ check(
   + 'may use it — anywhere else defeats the mandatory live creator_info fetch.',
 );
 
+// ── 8. Requirements that were MET but UNGUARDED ─────────────────────────────
+//
+// Added 2026-09-22. Until now this check passed "17 requirements" while
+// TIKTOK-APP-REVIEW-PLAN.md §2 lists ten rows, and five of those rows had no
+// assertion at all. They were satisfied in the code, but only by luck of nobody
+// having changed them — a green run said nothing about them. Each is a
+// documented rejection cause, so each gets the same treatment as the rest.
+
+check(
+  'creator avatar is displayed',                                     // §2 row 1
+  /src=\{\s*creator\??\.creatorAvatarUrl\s*\}/.test(code),
+  'The creator avatar must be shown alongside the nickname. §2 row 1 asks for both.',
+);
+
+for (const [label, lockVar, apiFlag] of [
+  ['Comment', 'commentLocked', 'commentDisabled'],
+  ['Duet', 'duetLocked', 'duetDisabled'],
+  ['Stitch', 'stitchLocked', 'stitchDisabled'],
+]) {
+  check(
+    `${label} toggle is greyed out when the creator disabled it`,     // §2 row 3
+    // String.raw, not a plain template literal: in a template literal `\s` is an
+    // unknown escape and evaluates to plain `s`, which silently breaks the regex.
+    new RegExp(String.raw`${lockVar}\s*=\s*Boolean\(\s*creator\??\.${apiFlag}\s*\)`).test(code)
+      && new RegExp(String.raw`disabled=\{\s*${lockVar}\s*\}`).test(code),
+    `${lockVar} must come from creator_info's ${apiFlag} and be bound to the toggle's disabled prop. `
+    + 'Offering a setting the creator has switched off is a guideline breach.',
+  );
+}
+
+check(
+  'Duet and Stitch are omitted for photo posts',                     // §2 row 3
+  /\{\s*!isPhoto\s*\?/.test(code) && /allowDuet/.test(code) && /allowStitch/.test(code),
+  'Duet and Stitch do not exist for photo posts and must not be rendered for them.',
+);
+
+check(
+  'processing notice is shown',                                      // §2 row 10
+  /can take a few minutes to process/.test(code),
+  'The panel must tell the user TikTok can take a few minutes to process the post.',
+);
+
+// §2 row 7 (content preview) and the reachability of this whole panel are
+// properties of the COMPOSER, not the panel. Checking only the panel file is
+// how a guard ends up verifying something no user can reach: on 2026-09-13 this
+// repo held a contract check that passed for weeks against a form no route
+// rendered. So the composer is read too, and the panel must be mounted in it.
+
+const COMPOSER_REL = 'src/calendar/components/QuickPostComposer.jsx';
+const COMPOSER = path.join(ROOT, COMPOSER_REL);
+const composerCode = fs.existsSync(COMPOSER)
+  ? fs.readFileSync(COMPOSER, 'utf8')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((l) => l.replace(/(^|[^:])\/\/.*$/, '$1'))
+    .join('\n')
+  : '';
+
+check(
+  'the TikTok panel is mounted in the live composer',
+  /import\s+TikTokOptionsPanel\s+from/.test(composerCode) && /<TikTokOptionsPanel\b/.test(composerCode),
+  `${COMPOSER_REL} must import and render TikTokOptionsPanel. Every assertion above reads the panel `
+  + 'file alone, so without this they would keep passing after the panel stopped reaching users.',
+);
+
+check(
+  'the composer previews the media being posted',                    // §2 row 7
+  /<img\s+src=\{\s*selectedAsset\.thumbnail_url\s*\}/.test(composerCode),
+  `${COMPOSER_REL} must show the asset that will be posted. A content preview is a guideline requirement.`,
+);
+
+// §2 row 8 — consent. TikTok defines the mechanism itself, so there is no
+// separate confirmation dialog to require. Content Sharing Guidelines, verbatim
+// (fetched 2026-09-22):
+//   §5c "API Clients must only start sending content materials to TikTok after
+//        the user has expressly consent to the upload."
+//   §2  "there should be a declaration asking for a user's consent before the
+//        publish button."
+// The declaration lives in the panel and the publish control in the composer,
+// so what has to hold is ORDER: the panel must render before the button. Moving
+// the button above the panel would satisfy every other assertion here and fail
+// the guideline.
+const panelAt = composerCode.search(/<TikTokOptionsPanel\b/);
+const publishAt = composerCode.search(/handleSubmit\(\s*'publish'\s*\)/);
+check(
+  'the consent declaration renders before the publish button',
+  panelAt !== -1 && publishAt !== -1 && panelAt < publishAt,
+  `In ${COMPOSER_REL} the TikTok panel (which carries the declaration) must appear before the `
+  + "handleSubmit('publish') control. Guidelines §2: a declaration asking for consent before the publish button.",
+);
+
 // ── Report ──────────────────────────────────────────────────────────────────
 
 console.log('TikTok Direct Post UX compliance\n');
