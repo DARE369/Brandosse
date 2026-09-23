@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { videoEngineFetch } from "../../services/videoEngineApi";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -12,6 +13,16 @@ const POLL_INTERVAL_MS = 30_000;
  * or not. The route exists now (app/api/video/health/route.ts), but the two-state
  * model was the deeper bug: it could not tell "the worker is asleep" from "I
  * could not find out."
+ *
+ * ── Why this goes through videoEngineFetch ─────────────────────────────────
+ * The session lives in localStorage, not a cookie, so a bare fetch() sends no
+ * credentials and /api/video/health answered 401 to every poll. The hook did
+ * exactly what it promises — reported "unknown" — so nothing broke loudly and
+ * the advisory simply never appeared again, including the times the worker
+ * really was asleep. A permanently-silent warning is the same defect as the
+ * permanently-on one this file was written to fix, wearing the other mask.
+ * videoEngineFetch attaches the bearer token every other video route already
+ * relies on (src/services/videoEngineApi.js:3).
  *
  * Callers must show the wake-up advisory ONLY on "asleep". "unknown" means say
  * nothing — an unverified warning is worse than silence, because it trains
@@ -28,7 +39,7 @@ export function useWorkerHealth() {
 
     async function check() {
       try {
-        const res = await fetch("/api/video/health", { signal: controller.signal });
+        const res = await videoEngineFetch("/api/video/health", { signal: controller.signal });
         if (!active) return;
 
         if (!res.ok) {

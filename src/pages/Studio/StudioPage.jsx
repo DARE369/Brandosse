@@ -14,6 +14,7 @@ import {
   Sparkles, Sliders, Clock, History as HistoryIcon, Video as VideoIcon,
   Settings, X,
 } from "lucide-react";
+import { supabase } from "../../services/supabaseClient";
 import useSessionStore from "../../stores/SessionStore";
 import useBrandKitStore from "../../stores/BrandKitStore";
 import { useAuth } from "../../Context/AuthContext";
@@ -957,6 +958,11 @@ function StudioBody({ brandKit }) {
       if (error) throw error;
       setSourcePickerItems(data || []);
     } catch (err) {
+      // This read referenced `supabase` with no import for the life of the
+      // file, so it threw ReferenceError on every open and the catch turned
+      // that into the same advice-shaped toast a real outage would produce.
+      // The picker never once worked, and nothing said so.
+      console.error("[Studio] source picker query failed", err);
       toast.error("Couldn't load your images — you can still paste a URL.");
       setSourcePickerItems([]);
     } finally {

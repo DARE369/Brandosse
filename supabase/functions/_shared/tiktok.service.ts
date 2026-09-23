@@ -31,6 +31,7 @@
 
 import { decryptToken } from "./tokenCrypto.ts";
 import { safeFetch } from "./safeFetch.ts";
+import { createMediaToken, mediaProxyUrl } from "./mediaToken.ts";
 
 const API = "https://open.tiktokapis.com/v2";
 
@@ -147,12 +148,152 @@ function planChunks(videoSize: number): { chunkSize: number; totalChunks: number
   return { chunkSize, totalChunks };
 }
 
+/**
+ * Photo posts — a different TikTok API from video.
+ *
+ * ── The constraint that shapes this ─────────────────────────────────────────
+ * TikTok's photo endpoint accepts PULL_FROM_URL ONLY ("PULL_FROM_URL is the
+ * exclusive source type for photo posts"), and requires that the developer
+ * "verify the ownership of the URL prefix or domain". TikTok's servers fetch
+ * the image themselves, with no credential of ours.
+ *
+ * Our media lives on <project>.supabase.co, which we cannot verify — so the URL
+ * handed to TikTok is a short-lived signed URL on OUR verified domain, served
+ * by app/api/media/tiktok/[token]/route.js.
+ *
+ * ── Field limits differ from video ─────────────────────────────────────────
+ * title 90 runes, description 4000 (video has one 2200-char title). The
+ * composer collects a title for photo posts already — platformCaptionSpecs
+ * lists titleForMedia: ["image", "carousel"].
+ *
+ * ── Interaction settings differ too ────────────────────────────────────────
+ * TikTok: "Duet and Stitch features are not applicable to photo posts. So, for
+ * Photo Posts, only 'Allow Comment' can be displayed in the UX." The panel
+ * already hides them; this sends only disable_comment, and sending the other
+ * two would contradict the guideline the panel follows.
+ */
+const PHOTO_INIT_URL = `${API}/post/publish/content/init/`;
+const PHOTO_TITLE_MAX = 90;
+const PHOTO_DESCRIPTION_MAX = 4000;
+
+async function publishPhotoToTikTok({
+  post,
+  token,
+  options,
+  generationId,
+  fail,
+}: {
+  post: Record<string, unknown>;
+  token: string;
+  options?: Record<string, unknown> | null;
+  generationId?: string | null;
+  fail: (reason: string, retriable?: boolean) => PublishResult;
+}): Promise<PublishResult> {
+  const privacyLevel = String(options?.privacyLevel ?? "").trim();
+  if (!privacyLevel) {
+    return fail(
+      "No TikTok privacy level was chosen for this post. Open the post's TikTok options and pick one.",
+    );
+  }
+
+  if (!generationId) {
+    // Without the generation id there is nothing to mint a URL for. Saying so
+    // beats letting TikTok fail to fetch a URL we never built.
+    return fail("This post has no stored image to publish. Re-attach the photo and try again.");
+  }
+
+  const title = String(post.title ?? "").trim();
+  const description = String(post.caption ?? "").trim();
+  if (title.length > PHOTO_TITLE_MAX) {
+    return fail(`Title is ${title.length} characters; TikTok's photo limit is ${PHOTO_TITLE_MAX}.`);
+  }
+  if (description.length > PHOTO_DESCRIPTION_MAX) {
+    return fail(
+      `Caption is ${description.length} characters; TikTok's photo limit is ${PHOTO_DESCRIPTION_MAX}.`,
+    );
+  }
+
+  let photoUrl: string;
+  try {
+    const mediaToken = await createMediaToken({ generationId, postId: String(post.id ?? "") });
+    photoUrl = mediaProxyUrl(Deno.env.get("APP_URL") ?? "", mediaToken);
+  } catch (err) {
+    // Configuration, not content: name the variable so it is fixable.
+    console.error("[tiktok] could not build the photo URL:", (err as Error).message);
+    return fail(`TikTok photo posting is not configured on the server: ${(err as Error).message}`);
+  }
+
+  const initBody = {
+    media_type: "PHOTO",
+    post_mode: "DIRECT_POST",
+    post_info: {
+      title,
+      description,
+      privacy_level: privacyLevel,
+      // The panel reports what the user ALLOWED; TikTok wants what is DISABLED.
+      disable_comment: options?.disableComment !== false,
+      // Duet and stitch are deliberately ABSENT: TikTok does not apply them to
+      // photo posts, and the panel does not offer them.
+      brand_content_toggle: Boolean(options?.brandContentToggle),
+      brand_organic_toggle: Boolean(options?.brandOrganicToggle),
+    },
+    source_info: {
+      source: "PULL_FROM_URL",
+      // One image today: a post carries one generation. TikTok accepts up to
+      // 35, so carousels need multi-asset posts first — a composer change, not
+      // an adapter one.
+      photo_images: [photoUrl],
+      photo_cover_index: 0,
+    },
+  };
+
+  let initRes: Response;
+  try {
+    initRes = await fetchWithTimeout(PHOTO_INIT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify(initBody),
+    });
+  } catch (err) {
+    const msg = (err as Error).message;
+    return fail(`Could not reach TikTok (${msg}).`, msg === "tiktok_timeout");
+  }
+
+  const initRaw = await initRes.text();
+  let initJson: Record<string, unknown> | null = null;
+  try { initJson = JSON.parse(initRaw); } catch { /* handled below */ }
+
+  const initErrCode = String((initJson?.error as Record<string, unknown> | undefined)?.code ?? "");
+  if (!initRes.ok || (initErrCode && initErrCode !== "ok")) {
+    // url_ownership_unverified is the one failure unique to this path, and its
+    // remedy is in TikTok's portal, not in the post.
+    if (/url_ownership_unverified|url_verification/i.test(initRaw)) {
+      return fail(
+        "TikTok will not fetch images from this domain: the URL prefix is not verified in the "
+        + "TikTok developer portal. Verify https://www.brandosse.com/api/media/ under URL properties.",
+      );
+    }
+    const { message, retriable } = describeError(initErrCode, initRes.status, initRaw);
+    return fail(message, retriable);
+  }
+
+  const publishId = ((initJson?.data ?? {}) as Record<string, unknown>).publish_id as string | undefined;
+  if (!publishId) return fail("TikTok accepted the photo post but returned no publish id.");
+
+  return await pollPublishStatus(token, publishId, fail, "photos");
+}
+
 export async function publishToTikTok({
   post,
   account,
   secret,
   mediaUrl,
   options,
+  mediaType,
+  generationId,
 }: {
   post: Record<string, unknown>;
   account: Record<string, unknown>;
@@ -161,6 +302,10 @@ export async function publishToTikTok({
   // Collected by TikTokOptionsPanel. Absent means the compose UI did not run,
   // which must never publish — see the guard below.
   options?: Record<string, unknown> | null;
+  /** 'image' | 'video' from the generation row. Decides which API is used. */
+  mediaType?: string | null;
+  /** Needed to mint the public proxy URL a photo post is pulled from. */
+  generationId?: string | null;
 }): Promise<PublishResult> {
   const fail = (reason: string, retriable = false): PublishResult => ({
     success: false, platformPostId: null, platformPostUrl: null,
@@ -179,6 +324,18 @@ export async function publishToTikTok({
   } catch (err) {
     console.error("[tiktok] token decrypt failed:", (err as Error).message);
     return fail("Stored TikTok credentials could not be read. Reconnect the account.");
+  }
+
+  // ── Photo posts are a DIFFERENT API, not a variant of this one ─────────────
+  //
+  // Video: /v2/post/publish/video/init/ with FILE_UPLOAD — we push the bytes.
+  // Photo: /v2/post/publish/content/init/ with PULL_FROM_URL — TikTok fetches
+  // them, and only from a URL prefix TikTok has verified as ours. Different
+  // endpoint, different body, different media contract, so it branches here
+  // rather than threading conditionals through the upload path below.
+  const isPhoto = ["image", "photo", "carousel"].includes(String(mediaType || "").toLowerCase());
+  if (isPhoto) {
+    return await publishPhotoToTikTok({ post, token, options, generationId, fail });
   }
 
   if (!mediaUrl) {
@@ -343,10 +500,27 @@ export async function publishToTikTok({
   }
 
   // ── 4. Poll until TikTok says it is actually published ─────────────────────
-  //
-  // A successful upload is NOT a published post. TikTok processes
-  // asynchronously and can still reject the content. Reporting success here
-  // would mark posts published that never appeared.
+  return await pollPublishStatus(token, publishId, fail, "video");
+}
+
+/**
+ * Wait for TikTok to say the post is really live.
+ *
+ * A successful upload (or a successful photo init) is NOT a published post:
+ * TikTok processes asynchronously and can still reject the content. Reporting
+ * success at upload time would mark posts published that never appeared.
+ *
+ * Shared by the video and photo paths so they cannot drift — the photo path
+ * polls the same endpoint with the same publish_id.
+ *
+ * @param noun what to call the media in messages a user reads
+ */
+async function pollPublishStatus(
+  token: string,
+  publishId: string,
+  fail: (reason: string, retriable?: boolean) => PublishResult,
+  noun: "video" | "photos",
+): Promise<PublishResult> {
   for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
     await new Promise((r) => setTimeout(r, POLL_DELAY_MS));
 
@@ -386,20 +560,20 @@ export async function publishToTikTok({
 
     if (status === "FAILED") {
       const reason = String(sd.fail_reason ?? "unknown");
-      return fail(`TikTok rejected the video after processing: ${reason}`, false);
+      return fail(`TikTok rejected the ${noun} after processing: ${reason}`, false);
     }
     // PROCESSING_UPLOAD / PROCESSING_DOWNLOAD / anything else -> keep waiting.
   }
 
   // Bounded, so a stuck job surfaces as ambiguity rather than holding the
-  // publish open forever. Deliberately NOT reported as a failure: the upload
-  // succeeded and TikTok may still publish it, so a retry could duplicate.
+  // publish open forever. Deliberately NOT reported as a failure: TikTok
+  // accepted it and may still publish, so a retry could duplicate the post.
   return {
     success: false,
     platformPostId: publishId,
     platformPostUrl: null,
     failureReason:
-      "TikTok accepted the video but is still processing it after two minutes. "
+      `TikTok accepted the ${noun} but is still processing after two minutes. `
       + "Check your TikTok profile before retrying — retrying may post it twice.",
     retriable: false,
   };

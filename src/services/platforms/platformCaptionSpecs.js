@@ -72,7 +72,11 @@
 //               the same commit.
 const SPECS = {
   instagram: { label: "Instagram", captionMax: 2200, hashtagMax: 30, requiresMedia: true, acceptsMedia: ["image", "video"] },
-  tiktok:    { label: "TikTok",    captionMax: 2200, hashtagMax: 8, titleMax: 90, titleForMedia: ["image", "carousel"], requiresMedia: true, acceptsMedia: ["video"] },
+  // acceptsMedia gained "image" on 2026-09-23 with the photo-posting path.
+  // TikTok photos use a DIFFERENT API from video — /post/publish/content/init/
+  // with PULL_FROM_URL — and TikTok fetches the file itself from a URL prefix
+  // it has verified as ours, which is why the media proxy exists.
+  tiktok:    { label: "TikTok",    captionMax: 2200, hashtagMax: 8, titleMax: 90, titleForMedia: ["image", "carousel"], requiresMedia: true, acceptsMedia: ["video", "image"] },
   youtube:   { label: "YouTube",   captionMax: 5000, hashtagMax: 15, titleField: true, titleMax: 100, requiresMedia: true, acceptsMedia: ["video"] },
   facebook:  { label: "Facebook",  captionMax: 63206, hashtagMax: 6, acceptsMedia: ["image", "video"] },
   linkedin:  { label: "LinkedIn",  captionMax: 3000, hashtagMax: 8, acceptsMedia: ["image"] },

@@ -111,22 +111,45 @@ assert(
 // 2026-09-23: an image reached TikTok from the Library and the adapter refused
 // it with "supabase.co returned image/jpeg, which is not what was expected".
 // acceptsMedia already said video-only; nothing on the send path asked.
-const ACCEPTS = [
-  ['tiktok', 'video', tiktokSvc, 'tiktok.service.ts'],
-  ['youtube', 'video', youtubeSvc, 'youtube.service.ts'],
-];
-for (const [key, type, source, file] of ACCEPTS) {
-  const spec = new RegExp(`${key}:\\s*\\{[^}]*acceptsMedia:\\s*\\[([^\\]]*)\\]`).exec(specs);
+// YouTube is video-only and its adapter enforces that on the bytes it fetches.
+{
+  const spec = /youtube:\s*\{[^}]*acceptsMedia:\s*\[([^\]]*)\]/.exec(specs);
   assert(
-    Boolean(spec) && spec[1].includes(`"${type}"`) && !spec[1].includes('"image"'),
-    `platformCaptionSpecs.js no longer declares ${key} as ${type}-only. Its adapter `
-    + 'still refuses anything else, so the composer would offer a send that cannot work.',
+    Boolean(spec) && spec[1].includes('"video"') && !spec[1].includes('"image"'),
+    'platformCaptionSpecs.js no longer declares youtube as video-only. Its adapter still '
+    + 'refuses anything else, so the composer would offer a send that cannot work.',
   );
   assert(
-    /expectContentType:\s*\/\^video\\\//.test(source),
-    `${file} no longer asserts a video content type on the media it fetches, while `
-    + `platformCaptionSpecs still says ${key} takes ${type} only. One of the two is wrong.`,
+    /expectContentType:\s*\/\^video\\\//.test(youtubeSvc),
+    'youtube.service.ts no longer asserts a video content type on the media it fetches, '
+    + 'while platformCaptionSpecs still says YouTube takes video only.',
   );
+}
+
+// TikTok takes BOTH, through two different TikTok APIs. The spec may only claim
+// "image" while the adapter actually implements the photo endpoint — otherwise
+// the composer offers a send that dies at TikTok.
+{
+  const spec = /tiktok:\s*\{[^}]*acceptsMedia:\s*\[([^\]]*)\]/.exec(specs);
+  const claimsImage = Boolean(spec) && spec[1].includes('"image"');
+  assert(
+    Boolean(spec) && spec[1].includes('"video"'),
+    'platformCaptionSpecs.js no longer lists video for TikTok, but the adapter still uploads video.',
+  );
+  if (claimsImage) {
+    assert(
+      /post\/publish\/content\/init\//.test(tiktokSvc) && /PULL_FROM_URL/.test(tiktokSvc),
+      'platformCaptionSpecs.js says TikTok accepts images, but tiktok.service.ts has no photo '
+      + 'path (content/init + PULL_FROM_URL). The composer would offer a photo post that cannot work.',
+    );
+    // Photos are pulled BY TikTok from our domain. Minting that URL anywhere but
+    // the shared, parity-checked helper is how the two sides drift apart.
+    assert(
+      /mediaProxyUrl\(/.test(tiktokSvc),
+      'tiktok.service.ts builds a photo URL without mediaProxyUrl(). TikTok only fetches from a '
+      + 'verified URL prefix, and the Next.js route must be able to verify what was minted.',
+    );
+  }
 }
 
 // ── 2 & 3. GUARD + LINKAGE ──────────────────────────────────────────────────

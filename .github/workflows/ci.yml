@@ -122,6 +122,13 @@ jobs:
       - name: Media-required composer guard
         run: node scripts/check-media-required-guard.cjs
 
+      # TikTok photo posts are PULL_FROM_URL only: TikTok fetches the image from
+      # our domain, carrying an HMAC token MINTED in Deno and VERIFIED in Node.
+      # If those two files drift, our own proxy answers 403 and TikTok reports
+      # that it could not download the image — every clue pointing at TikTok.
+      - name: Media token parity (Node mints, Deno verifies)
+        run: node scripts/check-media-token-parity.cjs
+
       # Phase 2 (composer). The sibling of the guard above: that one asserts a
       # post cannot reach a media-mandatory platform with no media, this one
       # asserts it cannot reach a platform that hard-refuses missing per-post
@@ -393,6 +400,17 @@ jobs:
       # proves it is USED. This asserts the whole chain, every registration site.
       - name: check-compose-wiring
         run: node scripts/check-compose-wiring.cjs
+      # `id` and `detail` were edited into JobView, a component where neither
+      # had ever been in scope. A useCallback dep array is evaluated during
+      # render, so every video job detail page threw ReferenceError before it
+      # painted — for nine days, in production, on the product's most
+      # distinctive feature. The repo has no ESLint, SWC does not resolve
+      # identifiers, and `next build` typechecks only .ts/.tsx, so a free
+      # variable passed every stage of the build and failed on the user's
+      # screen. The same scan found a second one in Studio, swallowed by a
+      # catch that read like a transient outage.
+      - name: check-undefined-identifiers
+        run: node scripts/check-undefined-identifiers.cjs
       # --uiv2-accent-text was 3.94:1 on white in light theme, used 62 times as a
       # text colour. Nobody noticed for as long as the token existed, because
       # contrast is invisible to everyone who can already read it. It is

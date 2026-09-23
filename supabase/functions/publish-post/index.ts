@@ -85,7 +85,7 @@ serve(async (req) => {
       .select(`
         id, user_id, organization_id, title, caption, platform, status,
         scheduled_at, hashtags, workflow_state,
-        generations ( storage_path, media_type, output_url, metadata )
+        generations ( id, storage_path, media_type, output_url, metadata )
       `)
       .eq("id", postId)
       .maybeSingle();
@@ -275,8 +275,17 @@ serve(async (req) => {
           // guidelines require the user to choose the privacy level, and the
           // adapter refuses to publish without one rather than invent a
           // visibility the user never agreed to.
+          // mediaType and the generation id decide which TikTok API is used:
+          // video uploads bytes, photo hands TikTok a URL on our verified
+          // domain to pull from (see tiktok.service.ts).
           result = await publishToTikTok({
-            post, account, secret, mediaUrl, options: optionsFor("tiktok"),
+            post,
+            account,
+            secret,
+            mediaUrl,
+            options: optionsFor("tiktok"),
+            mediaType: (gen?.media_type as string | undefined) ?? null,
+            generationId: (gen?.id as string | undefined) ?? null,
           });
         }
 

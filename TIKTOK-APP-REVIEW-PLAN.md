@@ -85,6 +85,48 @@ still to be added** via "+ Add scopes".
 - Analytics page (`PlatformPerformance.jsx`) and account card
   (`ConnectedAccountCard.jsx`) render it.
 
+
+### Photo posts — built 2026-09-23, and what they require
+
+Founder decision: photo posting ships and goes into this submission.
+
+TikTok photos are a DIFFERENT API from video, not a variant:
+`/v2/post/publish/content/init/` with `media_type: PHOTO` and
+**`PULL_FROM_URL` as the exclusive source** — TikTok fetches the image itself,
+and the docs require that the developer "verify the ownership of the URL prefix
+or domain". Our media lives on `<project>.supabase.co`, which we can never
+verify, so photos are served from OUR domain:
+
+  `https://www.brandosse.com/api/media/tiktok/<signed-token>`
+
+That route (`app/api/media/tiktok/[token]/route.js`) is the product's only
+PUBLIC media endpoint — TikTok presents no credential — so it is contained by an
+HMAC token naming ONE generation, expiring in 30 minutes, minted by the publish
+adapter and verified by the route. Images only, size-capped, no redirects, and
+it resolves media through the generation row rather than fetching any URL it is
+handed.
+
+**Founder steps before a photo post can work:**
+
+1. Generate a secret:
+   `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
+2. Set `MEDIA_PROXY_SECRET` to that value in **Vercel** and in **Supabase**
+   (`npx supabase secrets set MEDIA_PROXY_SECRET=…`). The SAME value in both, or
+   every photo post 403s against our own proxy.
+3. Redeploy `publish-post`.
+4. TikTok portal → **URL properties** → verify the prefix
+   `https://www.brandosse.com/api/media/`. Without it TikTok refuses to fetch,
+   and the adapter reports exactly that.
+
+**Interaction settings differ, and the panel already matches:** TikTok states
+"Duet and Stitch features are not applicable to photo posts. So, for Photo
+Posts, only 'Allow Comment' can be displayed in the UX." The panel hides both
+for photos; the adapter sends only `disable_comment`.
+
+**Limits differ too:** title 90 runes, description 4000 (video has one 2200
+field). One image per post today — TikTok accepts up to 35, so carousels need
+multi-asset posts, which is a composer change, not an adapter one.
+
 ### The constraint that shapes the demo: `video.list` is public videos only
 
 TikTok's docs: video.list returns *"the given user's **public** TikTok video
@@ -355,6 +397,7 @@ panel was not built and named it the critical path. That was already false on
 | Vercel `TIKTOK_CLIENT_KEY` / `SECRET` | `UNVERIFIED` | Connect route 401s before reading env |
 | First real connect + one private post | **Never done** | All TikTok `connected_accounts` rows are `is_mock` |
 | Video | Blocked on the row above | |
+| TikTok photo posting | **Built 2026-09-23, not yet configured** | Needs MEDIA_PROXY_SECRET in Vercel + Supabase, publish-post redeployed, and the URL prefix verified in the portal. Never run against TikTok |
 
 **The critical path is:** apply the migration and deploy analytics → add
 `video.list` in the portal → configure a private sandbox target user → the

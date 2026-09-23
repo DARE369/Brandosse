@@ -209,6 +209,47 @@ test.describe("authenticated personal user flows", () => {
     await gotoRoute(page, "/app/video/jobs", /\/app\/video\/jobs/);
   });
 
+  // ── The nine-day blind spot ───────────────────────────────────────────────
+  // The step above loads /app/video/jobs and stops there. The LIST page was
+  // never the one that broke: from 2026-09-14 to 2026-09-23, opening any job
+  // threw "ReferenceError: id is not defined" before first paint and showed the
+  // global error boundary instead of the clip review screen. Every route check
+  // in this file stayed green for all nine days, because none of them ever
+  // clicked a job.
+  //
+  // check-undefined-identifiers.cjs now catches that specific cause statically.
+  // This covers the surface: the detail page must actually render, whatever the
+  // reason it might not.
+  test("a video job opens to its detail page, not the error boundary", async ({ page }) => {
+    await login(page);
+    await gotoRoute(page, "/app/video/jobs", /\/app\/video\/jobs/);
+
+    // Each row exposes the job through an aria-label (VideosPage.jsx:496).
+    const firstJob = page.getByRole("button", { name: /^Open / }).first();
+    try {
+      await firstJob.waitFor({ state: "visible", timeout: 20_000 });
+    } catch {
+      test.skip(true, "The QA account has no video jobs, so the detail page cannot be exercised.");
+      return;
+    }
+
+    await firstJob.click();
+    await expect(page).toHaveURL(/\/app\/video\/jobs\/[0-9a-f-]{36}/, { timeout: ROUTE_TIMEOUT });
+
+    // app/global-error.tsx — the screen the ReferenceError produced. Asserted
+    // first and by its own copy, so a regression names itself in the failure.
+    await expect(page.getByText("This has been reported automatically.")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Something went wrong" })).toHaveCount(0);
+
+    // And the page reached its own content, rather than merely avoiding a crash:
+    // the job chip is rendered by JobView, the component that was throwing
+    // (VideoJobPage.jsx:585). A fetch failure renders VideoJobBody's empty state
+    // instead and would not satisfy this.
+    await expect(page.getByText(/^JOB [0-9a-f]{6}$/).first()).toBeVisible({
+      timeout: ROUTE_TIMEOUT,
+    });
+  });
+
   test("logout returns to login and re-protects routes", async ({ page }) => {
     await login(page);
     await gotoRoute(page, "/app/dashboard", /\/app\/dashboard/);

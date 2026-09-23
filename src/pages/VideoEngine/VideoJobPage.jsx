@@ -296,14 +296,19 @@ function JobView({ initialJob, initialClips, userId, ledger, setLedger, navigate
       // Pass the job through so the Library can say which video, and which
       // seconds of it, this clip came from — otherwise a saved clip is
       // indistinguishable from any other upload.
+      //
+      // `job` is the live row from useJobRealtime, not the fetch-time snapshot.
+      // This read used `id` and `detail`, which are VideoJobBody's locals and
+      // have never been in scope here — the dep array below evaluated them on
+      // every render, so the whole page threw before it painted.
       const assetId = await saveClipToLibrary(
         { ...clip, ...overrides },
-        { jobId: id, title: detail?.job ? jobTitle(detail.job) : null },
+        { jobId: job.id, title: jobTitle(job) },
       );
       markSaved(clip.id, assetId);
       return assetId;
     },
-    [savedClips, markSaved, id, detail],
+    [savedClips, markSaved, job],
   );
 
   const handleKeep = useCallback(
