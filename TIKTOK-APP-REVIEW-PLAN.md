@@ -2,7 +2,8 @@
 
 **Date:** 2026-09-05
 **Companion to:** [`FUNCTIONAL-SPECIFICATION-PUBLISHING.md`](FUNCTIONAL-SPECIFICATION-PUBLISHING.md) §7.1
-**Status:** pre-submission. The compose panel this describes is **not built yet.**
+**Status:** pre-submission. Compose panel and TikTok analytics are built; analytics
+is not yet deployed; no real TikTok account has connected yet (§6).
 
 ---
 
@@ -22,9 +23,10 @@ Guidelines. Everything follows from that:
 So the order is fixed and cannot be shortcut:
 
 ```
-1. Freeze the scope list          (§1)  — OPEN decision, see §1
+1. Freeze the scope list          (§1)  — DECIDED 2026-09-22: all five, analytics in
 2. Build the compose panel        (§2)  — DONE, all ten rows met and guarded
-3. Set up the sandbox             (§3)  — founder-side, not started
+2b. Build TikTok analytics        (§1)  — BUILT 2026-09-22, not yet deployed
+3. Set up the sandbox             (§3)  — founder-side, in progress
 4. First real connect + one private post — never done; do it BEFORE filming
 5. Record, following the shot list (§4)
 6. Self-review against the checklist (§5)
@@ -39,75 +41,68 @@ on camera costs a full recording.
 
 ## 1. Freeze the scope list
 
-> **Corrected 2026-09-22 (Law 2).** This section was written 2026-09-05 and the
-> code moved after it. What follows the next subsection describes the **TikTok
-> developer portal** as it stood on 2026-09-05 — it has not been re-checked
-> since and is `UNVERIFIED` today.
+> **Decided 2026-09-22 (founder): TikTok analytics goes into this application.**
+> The scope list is frozen at the five the code requests, plus the one the
+> portal adds on its own. Earlier drafts of this section recommended removing
+> the analytics scopes; that recommendation is withdrawn.
 
-### What the code requests today — verified 2026-09-22
+### The scopes, and where each one is used
 
-`app/api/_lib/socialProviders.js` (`scopes` array, TikTok entry) requests
-**five** scopes at connect, comma-separated:
+| Scope | Product | Used by | Visible in the demo at |
+|---|---|---|---|
+| `user.info.basic` | Login Kit | Connect: open_id, display name, avatar | Shot 2 — account card |
+| `user.info.profile` | Login Kit | @username, verified badge, bio, "Open on TikTok" link — read at connect (`callback/route.js`, `discoverTikTok`) and refreshed every 6h | Shot 2 — account card |
+| `user.info.stats` | Login Kit | Followers, following, total likes, video count | Shot 2 (followers on the card) and Shot 5 (analytics page) |
+| `video.publish` | Content Posting API, **Direct Post ON** | Posting | Shots 3–4 |
+| `video.list` | Login Kit | Per-video views, likes, comments, shares; titles and links | Shot 5 — analytics page |
+| `video.upload` | Content Posting API | **Nothing.** The portal adds it automatically with the Content Posting API and it cannot be removed | Not shown — explained in the application text instead |
 
-`user.info.basic`, `user.info.profile`, `user.info.stats`, `video.publish`, `video.list`
+The code requests exactly the first five (`app/api/_lib/socialProviders.js`,
+TikTok `scopes`). It never requests `video.upload`, so users are never asked
+for it. **Say so in the application's scope explanation**, e.g. *"video.upload
+is included automatically with the Content Posting API; Brandosse does not
+request it and posts directly with video.publish."* That answers "every
+selected scope must appear in the footage" for the one scope that cannot.
 
-Commit `e6dbf7d` (2026-09-11) added the three read scopes back, deliberately:
-TikTok fixes the scope set at authorization, so a scope added later forces every
-connected user to reconnect, and no real TikTok account had ever connected — the
-one moment widening was free.
+**The portal and the code must match.** If a scope the code requests is not
+enabled on the app, TikTok fails the whole authorization, and the error reads
+like a bad client key. Portal state per the founder's screenshot 2026-09-22:
+Login Kit + Content Posting API added; `user.info.basic`, `user.info.profile`,
+`user.info.stats`, `video.publish`, `video.upload` present — **`video.list`
+still to be added** via "+ Add scopes".
 
-**That decision and this plan's target state below now disagree, and the
-disagreement is an open founder decision, not a typo.** Two facts bear on it:
+### What the analytics code does — built 2026-09-22, NOT yet deployed
 
-1. **The authorize request is all-or-nothing.** If any requested scope is not
-   enabled on the TikTok app in the portal, authorization fails for *every*
-   scope — including `video.publish`. The code's list and the portal's list
-   must match exactly, or connecting TikTok breaks outright, publishing with it.
-2. **Every requested scope must be demonstrated in the review video.**
-   `user.info.profile`, `user.info.stats` and `video.list` have no visible use in
-   the product yet — TikTok analytics ingestion does not exist
-   (`ingest-social-analytics/index.ts` hardcodes `PLATFORM = "youtube"`). Whether
-   `video.list` returns anything from a **private** account before audit is
-   `UNVERIFIED`; unaudited clients may only post to private accounts, so the demo
-   account must be private.
+- `supabase/functions/_shared/tiktok.analytics.service.ts` — user/info,
+  video/list (paginated, 20/page, 10-page budget), publish-status lookup.
+  15 unit tests (`tiktok.analytics.service.test.ts`).
+- `supabase/functions/ingest-social-analytics/tiktok.ts` — runs in the existing
+  6-hourly `ingest-social-analytics` cron, isolated from the YouTube pass.
+- `supabase/migrations/20260922120000_tiktok_analytics.sql` — account snapshot
+  table, platform post catalogue, `social_snapshot_summary()`, the
+  `tiktok/analytics` meter, and removal of a false claim that TikTok reports
+  saves (its Video object has no such field).
+- Analytics page (`PlatformPerformance.jsx`) and account card
+  (`ConnectedAccountCard.jsx`) render it.
 
-No real TikTok account has ever been connected — every `connected_accounts` row
-for TikTok is `is_mock` (verified 2026-09-19). None of the above has run against
-TikTok yet.
+### The constraint that shapes the demo: `video.list` is public videos only
 
-### Portal state as of 2026-09-05 — would have been rejected
+TikTok's docs: video.list returns *"the given user's **public** TikTok video
+posts"*. An unaudited app can only post as *Only me* to a private account
+(§3). So the post made in Shot 4 will **not** appear in the analytics list, and
+whether a private account's videos appear at all is `UNVERIFIED` until the
+first real connect. The analytics page says this in words when the list is
+empty rather than showing zeros — but the demo still needs `video.list`
+visibly returning data. Plan for Shot 5, in order of preference:
 
-Selected: `user.info.basic`, `user.info.profile`, `user.info.stats`,
-`video.list`, `video.upload`
-Products: Login Kit, Content Posting API, **Share Kit**
+1. **If the first real connect shows the private account's videos are
+   returned** — record Shot 5 as-is.
+2. **If not** — after Shot 4, switch the TikTok account to public in the TikTok
+   app, wait for the next collection (or have it triggered), and record Shot 5
+   showing its public videos. Switching visibility between shots is honest:
+   it is the user's own setting, and the demo says why.
 
-The written explanation describes `user.info.basic` and `video.publish`. So:
-
-- **`video.publish` is not selected at all.** It only appears after the
-  **Direct Post** toggle under Content Posting API is switched on. Without it,
-  the application requests draft-upload while the explanation describes direct
-  posting.
-- **Four scopes and one product are selected that the explanation never
-  mentions.** The video would have to show Brandosse reading follower counts,
-  bios, verified status, and listing the user's public TikTok videos.
-
-### Target state
-
-| Keep | Why |
-|---|---|
-| **Login Kit** | The connect flow |
-| `user.info.basic` | open_id, nickname, avatar — required to show which account receives the post |
-| **Content Posting API** with **Direct Post ON** | The posting flow |
-| `video.publish` | Direct posting. Appears only once Direct Post is toggled on |
-
-| Remove | Why |
-|---|---|
-| `user.info.profile` | Bio, verified status, profile links — unused |
-| `user.info.stats` | Follower/like/video counts — unused |
-| `video.list` | Reading the user's public videos — unused |
-| `video.upload` | Draft-to-inbox. A different flow; keeping it means demoing it too |
-| **Share Kit** | Not used at all |
-| **Local Service API** + its three `local.*` scopes | Shop/product/voucher management. Nothing to do with this product |
+Test this at the first real connect (§6), before recording anything.
 
 ### Also required before submission
 
@@ -202,7 +197,7 @@ in your app config. A mismatch here is called out in the guidelines.
 
 ---
 
-### Shot 2 — Connect TikTok · Login Kit + `user.info.basic` (~30s)
+### Shot 2 — Connect TikTok · Login Kit + `user.info.basic` / `.profile` / `.stats` (~40s)
 
 1. Navigate to **Settings → Connected accounts**. Pause so the page reads.
 2. Click the **TikTok** tile.
@@ -213,10 +208,14 @@ in your app config. A mismatch here is called out in the guidelines.
    The reviewer needs to see the genuine consent screen and the scopes it lists.
 6. Approve.
 7. Land back in Brandosse. Pause on the connected account card showing your
-   **TikTok nickname and avatar**.
+   **TikTok nickname and avatar** (`user.info.basic`), your **@username, verified
+   badge if you have one, and bio** (`user.info.profile`), and your **follower
+   count** (`user.info.stats`).
+8. Click **Open on TikTok** on the card — it opens your profile from
+   `profile_deep_link` — then come back.
 
-**Proves:** Login Kit, `user.info.basic`, and that the app reads only profile
-basics.
+**Proves:** Login Kit and all three `user.info.*` scopes, each used for
+something the user can see.
 
 ---
 
@@ -251,7 +250,8 @@ be visible and *interacted with*.
 
 ### Shot 4 — Publish and confirm (~30s)
 
-1. Click **Publish**. Show the confirmation step and confirm explicitly.
+1. With the declaration visible above it (§2 row 8), click **Publish**. That
+   press is the express consent TikTok's guidelines define — no separate dialog.
 2. Show the processing notice.
 3. Show the per-target status moving to published.
 4. **Cut to the TikTok app or web**, and show the post actually present on the
@@ -263,7 +263,27 @@ rather than ignored it.
 
 ---
 
-### Shot 5 — Disconnect (~15s)
+### Shot 5 — Analytics · `video.list` + `user.info.stats` (~40s)
+
+Must come BEFORE the disconnect: disconnecting deletes the account's analytics.
+Read §1 "public videos only" first — record this against an account whose
+videos TikTok returns.
+
+1. Go to **Analytics**. Scroll to the TikTok card.
+2. Pause on the account tiles: **Followers, Following, Total likes, Videos
+   published**, each marked "as of" the last check (`user.info.stats`).
+3. Pause on **Per post**: each public video by its TikTok title, with **views,
+   likes, comments and shares** and "lifetime totals" (`video.list`).
+4. Click one title — it opens the video on TikTok. Come back.
+5. Point at the freshness chip ("Checked … ago"): the figures are collected on a
+   schedule, not invented.
+
+**Proves:** `video.list` and `user.info.stats` are read and shown to the user
+who granted them, and nowhere else.
+
+---
+
+### Shot 6 — Disconnect (~15s)
 
 Settings → the TikTok account → **Disconnect**. Show it removed.
 
@@ -295,8 +315,14 @@ rejection.
 - [ ] Declaration wording changes with branded content, verbatim
 - [ ] Duration limit shown and enforced
 - [ ] Content preview shown
-- [ ] Explicit confirmation before upload
+- [ ] Declaration visible before Publish is pressed (express consent)
 - [ ] Processing notice shown
+
+**Analytics**
+- [ ] Account card shows @username, bio/verified, and followers
+- [ ] Analytics page shows TikTok account totals, each "as of" a time
+- [ ] At least one public video listed with views/likes/comments/shares
+- [ ] Analytics shot recorded BEFORE the disconnect shot
 
 **Production**
 - [ ] URL bar shows the domain registered in the app config
@@ -317,7 +343,9 @@ panel was not built and named it the critical path. That was already false on
 | | Status | Evidence |
 |---|---|---|
 | Compose panel | **Built — all ten §2 rows met and guarded** | `src/components/Publishing/TikTokOptionsPanel.jsx`, mounted at `QuickPostComposer.jsx:820` and `components/Generate/PostProductionPanel.jsx:1259`. `node scripts/check-tiktok-ux-compliance.cjs` → PASS, **26** requirements (was 17: five rows were met in code but asserted by nothing, and the check read the panel alone, so it would have passed with the panel unmounted). Every new assertion mutation-tested 2026-09-22 |
-| Scope list | **Open decision** — code requests 5, this plan recommends 2 | §1. Portal and code must match or every connect fails |
+| Scope list | **Decided 2026-09-22** — all five + `video.upload` (automatic) | §1. Portal still needs `video.list` added (founder screenshot 2026-09-22) |
+| TikTok analytics | **Built, tested, not deployed** | 15 adapter tests; `check-metric-aggregation` covers snapshots. Needs migration `20260922120000` applied and `ingest-social-analytics` redeployed |
+| `video.list` on a private account | `UNVERIFIED` | Decides how Shot 5 is recorded (§1) |
 | Redirect URI | Portal value `UNVERIFIED` | Must be the `www` host (§1); register both |
 | ToS / Privacy pages | **Live** | `https://www.brandosse.com/terms` and `/privacy` → 200 |
 | Domain TXT | **Live** on `brandosse.com` | DNS TXT present |
@@ -328,8 +356,8 @@ panel was not built and named it the critical path. That was already false on
 | First real connect + one private post | **Never done** | All TikTok `connected_accounts` rows are `is_mock` |
 | Video | Blocked on the row above | |
 
-**The critical path is no longer engineering.** It is: settle the scope list →
-make the portal match it → configure a private sandbox target user → the first
-real connect and one private post. That first live run is the first time the
+**The critical path is:** apply the migration and deploy analytics → add
+`video.list` in the portal → configure a private sandbox target user → the
+first real connect and one private post (and check what `video.list` returns). That first live run is the first time the
 adapter, chunked upload, token refresh and revoke will ever touch TikTok, so it
 should happen before filming, not during it.
