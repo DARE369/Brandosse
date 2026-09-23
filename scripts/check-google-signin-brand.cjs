@@ -13,10 +13,11 @@
  *      the raw value. Swapped, every sign-in fails with a nonce mismatch that
  *      says nothing about direction.
  *
- *   2. NO FALLBACK. If Google's script is blocked, or the client ID is missing
- *      or not yet authorised in Supabase, the page must render the redirect
- *      flow. Remove that and an ad-blocker user sees a sign-in page with no way
- *      to sign in with Google.
+ *   2. NO FALLBACK. If Google's script is blocked, the client ID is missing or
+ *      not yet authorised in Supabase, or Google refuses this page's origin, the
+ *      page must render the redirect flow. Remove that and an ad-blocker user —
+ *      or anyone on a Vercel preview URL — sees a sign-in page with no way to
+ *      sign in with Google.
  *
  *   3. A PAGE QUIETLY REVERTED to supabase.auth.signInWithOAuth as its only
  *      path — which works, and puts the supabase.co host back on screen, in the
@@ -91,6 +92,23 @@ if (button) {
     findings.push(
       `${BUTTON}: an audience rejection (client ID not authorised in Supabase) must switch\n`
       + "    to the fallback — the redirect flow does not depend on that setting.",
+    );
+  }
+  // A refused origin (not in the client's Authorized JavaScript origins) throws
+  // nothing: renderButton() returns and Google's iframe stays 0×0. "ready" must
+  // wait for evidence the button actually rendered. Measured 2026-09-22.
+  if (!/await\s+waitForRenderedButton\([\s\S]{0,300}throw\s+new\s+Error[\s\S]{0,200}setMode\(["']ready["']\)/.test(button)) {
+    findings.push(
+      `${BUTTON}: setMode("ready") must follow \`await waitForRenderedButton(...)\`, with a throw\n`
+      + "    into the fallback when it resolves false. Without it, an origin missing from the\n"
+      + "    Google client's Authorized JavaScript origins renders a blank where the button\n"
+      + "    should be — every Vercel preview, and production if the env var lands first.",
+    );
+  }
+  if (!/frame\.offsetHeight\s*>\s*0/.test(button)) {
+    findings.push(
+      `${BUTTON}: waitForRenderedButton must test the iframe's height — a refused origin\n`
+      + "    still inserts the iframe, so its mere presence proves nothing.",
     );
   }
   if (!/useState\(\s*clientId\s*\?\s*["']loading["']\s*:\s*["']fallback["']\s*\)/.test(button)) {

@@ -65,3 +65,40 @@ jobs:
             echo "::error::Video worker returned $STATUS — expected 200"
             exit 1
           fi
+
+  # Google refusing our origin throws nothing: the sign-in button silently
+  # degrades to a ~6s blank and then the supabase.co redirect for every user.
+  # Only a real browser on the real origin sees it. Separate job so a missing
+  # browser install cannot mask the ping checks above. See the probe's header.
+  google-signin-origin:
+    name: Google sign-in origin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Scratch directory: `npm i <pkg>` in the repo root would reify the whole
+      # dependency tree without the lockfile just to get one browser.
+      - name: Install Playwright (Chromium only)
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null
+          npm i --no-audit --no-fund playwright@1.60.0
+          npx playwright install --with-deps chromium
+      - name: Probe Authorized JavaScript origins
+        env:
+          PLAYWRIGHT_DIR: ${{ runner.temp }}/pw
+          # Repo variable. Set to 1 once Google sign-in is live, so a lost
+          # NEXT_PUBLIC_GOOGLE_CLIENT_ID in Vercel fails instead of warning.
+          REQUIRE_GOOGLE_CLIENT_ID: ${{ vars.REQUIRE_GOOGLE_CLIENT_ID }}
+        run: |
+          URL="${{ secrets.NEXT_PUBLIC_APP_URL }}"
+          URL="${URL%/}"
+          case "$URL" in
+            https://*) ;;
+            *)
+              echo "::error::NEXT_PUBLIC_APP_URL secret is empty or not https:// — refusing to probe a guessed origin."
+              exit 1 ;;
+          esac
+          node scripts/security/google-signin-origin-probe.mjs "$URL"

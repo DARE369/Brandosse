@@ -9,12 +9,21 @@
  * ./googleIdentity.js.
  *
  * ── It must never be a dead button ──────────────────────────────────────────
- * Three things can stop the Google path, none of them the user's fault:
+ * Four things can stop the Google path, none of them the user's fault:
  *
  *   1. NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set in this environment.
  *   2. Google's script is blocked (ad blockers, corporate proxies, offline).
  *   3. The client ID is not yet in Supabase's authorised list, so Supabase
  *      rejects the token's audience.
+ *   4. This page's origin is not in the client's "Authorized JavaScript
+ *      origins" — every Vercel preview URL, and production if the env var is
+ *      set before the origins are. Nothing throws: initialize() and
+ *      renderButton() succeed, Google answers the button iframe with a 403 and
+ *      logs "[GSI_LOGGER]: The given origin is not allowed", and the iframe
+ *      stays 0×0. Measured 2026-09-22 against the live client. So "ready" is
+ *      only declared once the iframe has actually been given a height; no
+ *      height within BUTTON_RENDER_TIMEOUT_MS means fallback. If that signal
+ *      were ever wrong, the cost is the supabase.co button — never a blank.
  *
  * In every one of those cases the page's ORIGINAL button — passed in as
  * `children`, the redirect flow through Supabase — is rendered instead. It
@@ -41,6 +50,27 @@ import {
 
 const BUTTON_MIN_WIDTH = 200;
 const BUTTON_MAX_WIDTH = 400; // GIS's own ceiling
+// How long Google gets to size its button iframe before we assume the origin
+// was refused (case 4). A healthy render resizes it within a second or two.
+const BUTTON_RENDER_TIMEOUT_MS = 6000;
+const BUTTON_RENDER_POLL_MS = 200;
+
+/**
+ * Resolves true once Google has given the button iframe a real height, false
+ * if it never does. A refused origin leaves the iframe at 0×0 permanently.
+ */
+function waitForRenderedButton(node, { timeoutMs = BUTTON_RENDER_TIMEOUT_MS } = {}) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const check = () => {
+      const frame = node?.querySelector("iframe");
+      if (frame && frame.offsetHeight > 0) return resolve(true);
+      if (!node?.isConnected || Date.now() - started >= timeoutMs) return resolve(false);
+      setTimeout(check, BUTTON_RENDER_POLL_MS);
+    };
+    check();
+  });
+}
 
 function prefersDark() {
   if (typeof window === "undefined") return false;
@@ -112,6 +142,11 @@ export default function GoogleSignInButton({
         width,
       });
 
+      // renderButton() returning is not evidence of a button — see case 4.
+      if (!(await waitForRenderedButton(node))) {
+        if (!node.isConnected) return; // unmounted while waiting; nothing to show
+        throw new Error("gis_button_not_rendered (origin likely not in Authorized JavaScript origins)");
+      }
       setMode("ready");
     } catch (error) {
       // Not an error the user caused, and not one they can fix: fall back.
