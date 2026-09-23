@@ -224,7 +224,20 @@ export async function publishToTikTok({
     });
     bytes = asset.bytes;
   } catch (err) {
-    return fail(`Could not read the video for upload (${(err as Error).message}).`);
+    const message = (err as Error).message || "";
+    // The commonest cause is not a broken file: it is an IMAGE sent to a
+    // video-only endpoint. Observed live 2026-09-23, where the user saw only
+    // "supabase.co returned image/jpeg, which is not what was expected" —
+    // true, and unactionable. The composer now refuses this before sending
+    // (platformsRefusingMediaType), so reaching here means some other path
+    // did not ask; it must still say what is wrong in plain words.
+    if (/returned image\//i.test(message)) {
+      return fail(
+        "TikTok accepts video only, and this post's media is a photo. "
+        + "Attach a video, or post the photo to a platform that takes images.",
+      );
+    }
+    return fail(`Could not read the video for upload (${message}).`);
   }
 
   const videoSize = bytes.byteLength;

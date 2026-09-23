@@ -33,6 +33,7 @@ import { getZonedTodayKey, zonedDateTimeToUTC } from '../../utils/timezone';
 import {
   getPlatformSpec,
   platformNeedsTitle,
+  platformsRefusingMediaType,
   platformsRequiringMedia,
 } from '../../services/platforms/platformCaptionSpecs';
 import { checkScheduleFloor, seedFromNow } from '../scheduleSeed';
@@ -373,6 +374,16 @@ export default function QuickPostComposer({
     : platformsRequiringMedia(activePlatforms);
   const needsMedia = platformsNeedingMedia.length > 0;
 
+  // The other half of the media contract: the post HAS media, of a kind this
+  // platform will not take. TikTok uploads video only, LinkedIn's adapter takes
+  // images only. Without this the send is accepted and fails inside the
+  // adapter, which can only report what it saw — "returned image/jpeg, which is
+  // not what was expected" (observed live 2026-09-23).
+  const mediaTypeMismatches = platformsRefusingMediaType(
+    activePlatforms,
+    selectedAsset?.media_type,
+  );
+
   // An asset IS selected but carries no publishable link — this needs its own
   // message, because "attach media" reads as nonsense next to a filled picker.
   const assetHasNoPublishableMedia = Boolean(selectedAsset) && !attachedGenerationId;
@@ -494,7 +505,8 @@ export default function QuickPostComposer({
   const sendBlocked = isSubmitting
     || activePlatforms.length === 0
     || requiredFieldsMissing
-    || needsMedia;
+    || needsMedia
+    || mediaTypeMismatches.length > 0;
 
   // The schedule floor, from the same module ScheduleModal uses, so a new post
   // and a reschedule cannot disagree about when "too soon" begins.
@@ -1079,6 +1091,18 @@ export default function QuickPostComposer({
                 {' '}accept text-only posts. Attach a Library asset above, or save this as a draft.
               </>
             )}
+          </div>
+        )}
+
+        {/* The media is the wrong KIND for a selected platform. Named here
+            rather than left to the adapter, which can only report the bytes it
+            received: "returned image/jpeg, which is not what was expected". */}
+        {mediaTypeMismatches.length > 0 && (
+          <div className="ui-field-error" role="alert">
+            {mediaTypeMismatches.map((m) => `${m.label} takes ${m.takes} only`).join('; ')}
+            {' — '}this asset is {selectedAsset?.media_type === 'image' ? 'a photo' : `a ${selectedAsset?.media_type}`}.
+            {' '}Pick different media, unselect {mediaTypeMismatches.length > 1 ? 'those platforms' : `${mediaTypeMismatches[0].label}`},
+            {' '}or save this as a draft.
           </div>
         )}
 

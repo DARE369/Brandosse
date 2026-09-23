@@ -104,9 +104,53 @@ assert(
   + 'still claims TikTok requires media. One of the two is now wrong.',
 );
 
+// ── 1b. TRUTH, the other half: the KIND of media each adapter takes ─────────
+//
+// requiresMedia answers "a text-only post is refused". It says nothing about
+// sending a PHOTO to a video-only endpoint, which is what happened on
+// 2026-09-23: an image reached TikTok from the Library and the adapter refused
+// it with "supabase.co returned image/jpeg, which is not what was expected".
+// acceptsMedia already said video-only; nothing on the send path asked.
+const ACCEPTS = [
+  ['tiktok', 'video', tiktokSvc, 'tiktok.service.ts'],
+  ['youtube', 'video', youtubeSvc, 'youtube.service.ts'],
+];
+for (const [key, type, source, file] of ACCEPTS) {
+  const spec = new RegExp(`${key}:\\s*\\{[^}]*acceptsMedia:\\s*\\[([^\\]]*)\\]`).exec(specs);
+  assert(
+    Boolean(spec) && spec[1].includes(`"${type}"`) && !spec[1].includes('"image"'),
+    `platformCaptionSpecs.js no longer declares ${key} as ${type}-only. Its adapter `
+    + 'still refuses anything else, so the composer would offer a send that cannot work.',
+  );
+  assert(
+    /expectContentType:\s*\/\^video\\\//.test(source),
+    `${file} no longer asserts a video content type on the media it fetches, while `
+    + `platformCaptionSpecs still says ${key} takes ${type} only. One of the two is wrong.`,
+  );
+}
+
 // ── 2 & 3. GUARD + LINKAGE ──────────────────────────────────────────────────
 
 const composer = read('src/calendar/components/QuickPostComposer.jsx');
+
+// The media-TYPE contract must gate the same button as the media-PRESENT one.
+//
+// Pinned to the ASSIGNMENT, not to the name appearing anywhere: the first
+// version of this assertion matched the import line, so renaming the call site
+// left it passing while nothing consulted the rule. A guard that cannot fail is
+// the thing it is guarding against.
+assert(
+  /const\s+mediaTypeMismatches\s*=\s*platformsRefusingMediaType\(/.test(composer),
+  'QuickPostComposer.jsx does not derive mediaTypeMismatches from '
+  + 'platformsRefusingMediaType(). It can submit a photo to a video-only platform, '
+  + 'and the user discovers it as a raw content-type error after pressing publish '
+  + '(observed live 2026-09-23).',
+);
+assert(
+  /platformsRefusingMediaType\(\s*activePlatforms\s*,\s*[\s\S]{0,60}media_type/.test(composer),
+  'QuickPostComposer.jsx calls platformsRefusingMediaType() without the selected '
+  + "platforms and the asset's media_type, so it cannot detect a mismatch.",
+);
 
 assert(
   /platformsRequiringMedia/.test(composer),
@@ -136,6 +180,11 @@ assert(
 // `sendBlocked` constant, and every send button is disabled by that constant.
 // A third send button that skips it fails here.
 const sendBlockedDecl = /const\s+sendBlocked\s*=([\s\S]*?);/.exec(composer);
+assert(
+  Boolean(sendBlockedDecl) && /mediaTypeMismatches/.test(sendBlockedDecl[1]),
+  'QuickPostComposer.jsx computes a media-TYPE mismatch but it does not feed the '
+  + 'shared sendBlocked constant, so the send is still allowed.',
+);
 assert(
   Boolean(sendBlockedDecl) && /needsMedia/.test(sendBlockedDecl[1]),
   'QuickPostComposer.jsx computes a media requirement but it does not feed the '

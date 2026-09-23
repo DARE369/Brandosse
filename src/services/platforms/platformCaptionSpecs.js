@@ -113,6 +113,46 @@ export function platformsRequiringMedia(platforms) {
   return out;
 }
 
+/**
+ * Which of these platforms REFUSE this media type, and what each takes instead.
+ *
+ * The sibling of platformsRequiringMedia: that one answers "this post has no
+ * media at all", this one answers "it has media of the wrong kind". Both must
+ * gate the same button.
+ *
+ * Found live 2026-09-23: an image was sent to TikTok from the Library. TikTok
+ * uploads video only, so the adapter refused it with "supabase.co returned
+ * image/jpeg, which is not what was expected" — accurate, unreadable, and
+ * discovered only after the user pressed publish. acceptsMedia already said so;
+ * the composer simply never asked.
+ *
+ * An unknown media type returns NO mismatch: "we cannot tell yet" must not read
+ * as "this is wrong", and the adapters still refuse for real at send time.
+ *
+ * @param {string[]} platforms  platform keys the post targets
+ * @param {string|null} mediaType  'image' | 'video' | null/unknown
+ * @returns {{key: string, label: string, takes: string}[]}
+ */
+export function platformsRefusingMediaType(platforms, mediaType) {
+  const type = String(mediaType || "").trim().toLowerCase();
+  if (!type) return [];
+
+  const seen = new Set();
+  const out = [];
+  for (const p of platforms || []) {
+    const key = String(p || "").trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const spec = getPlatformSpec(key);
+    // No acceptsMedia listed means the platform was never assessed. Say
+    // nothing rather than invent a refusal.
+    if (!spec || !Array.isArray(spec.acceptsMedia)) continue;
+    if (spec.acceptsMedia.includes(type)) continue;
+    out.push({ key, label: spec.label || key, takes: spec.acceptsMedia.join(" or ") });
+  }
+  return out;
+}
+
 // Does this platform expect a separate title for the given media type?
 // mediaType: "image" | "carousel" | "video" | "edit" | undefined
 export function platformNeedsTitle(platform, mediaType) {
