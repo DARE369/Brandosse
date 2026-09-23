@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Pencil, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, ExternalLink, Pencil, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 import PlatformIcon from '../../../components/Shared/PlatformIcon';
 import { Badge, Button, IconButton } from '../../../ui-v2';
 import styles from './ConnectedAccountCard.module.css';
@@ -105,6 +105,14 @@ export default function ConnectedAccountCard({ account, platform, onViewHealth, 
   const statusLabel = status.label;
   const health = Math.max(0, Math.min(100, Number(account.health_score || 0)));
 
+  // TikTok's own profile, read at connect and refreshed by analytics ingestion
+  // (user.info.profile + user.info.stats). Every field is optional: a scope the
+  // user did not grant leaves it null, and null renders as nothing — never as
+  // "0 followers", which is a claim about the account rather than about us.
+  const tiktok = account.platform === 'tiktok' ? account.tiktok_profile || null : null;
+  const handle = tiktok?.username || account.username;
+  const followers = Number.isFinite(tiktok?.followers) ? tiktok.followers : null;
+
   return (
     <article className={styles.card}>
       <span className={styles.iconWrap} style={{ '--tile-accent': platform?.brand_color }}>
@@ -114,13 +122,30 @@ export default function ConnectedAccountCard({ account, platform, onViewHealth, 
       <div className={styles.main}>
         <div className={styles.titleRow}>
           <strong className={styles.name}>{account.display_name || account.account_name}</strong>
-          <span className={styles.handle}>@{account.username}</span>
+          {tiktok?.is_verified === true ? (
+            <BadgeCheck size={14} className={styles.verified} aria-label="Verified on TikTok" role="img" />
+          ) : null}
+          <span className={styles.handle}>@{handle}</span>
         </div>
         <div className={styles.metaRow}>
           <span>{platform?.display_name || account.platform}</span>
           <span>{account.profile_type || 'Business'}</span>
+          {followers !== null ? (
+            <span>{new Intl.NumberFormat().format(followers)} {followers === 1 ? 'follower' : 'followers'}</span>
+          ) : null}
           <span>Connected {formatRelativeDate(account.created_at)}</span>
         </div>
+        {tiktok?.bio ? <p className={styles.bio}>{tiktok.bio}</p> : null}
+        {tiktok?.profile_deep_link ? (
+          <a
+            className={styles.profileLink}
+            href={tiktok.profile_deep_link}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open on TikTok <ExternalLink size={12} aria-hidden="true" />
+          </a>
+        ) : null}
         {/* The cause, in words. A status chip alone tells someone something is
             wrong without telling them what to do about it. */}
         {status.detail ? (

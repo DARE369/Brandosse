@@ -22,6 +22,36 @@
 .titleRow { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .name { font-size: var(--uiv2-text-sm); font-weight: 700; }
 .handle { font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); }
+/* TikTok verified badge: sits on the name's baseline, info-blue like the
+   platforms' own badges rather than the accent, which means "action". */
+.verified { color: var(--uiv2-info); flex-shrink: 0; align-self: center; }
+/* The creator's TikTok bio. Two lines at most: it identifies the account, it
+   is not content to read here. */
+.bio {
+  margin: 4px 0 0;
+  font-size: var(--uiv2-text-xs);
+  line-height: 1.45;
+  color: var(--uiv2-text-secondary);
+  max-width: 52ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.profileLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: var(--uiv2-text-xs);
+  color: var(--uiv2-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  min-height: 24px; /* WCAG 2.2 target size */
+}
+.profileLink:hover { color: inherit; }
+.profileLink:focus-visible { outline: 2px solid var(--uiv2-accent-solid); outline-offset: 2px; border-radius: 2px; }
 .metaRow { display: flex; gap: 10px; flex-wrap: wrap; font-size: var(--uiv2-text-xs); color: var(--uiv2-text-secondary); margin-top: 2px; }
 
 .healthCol { display: flex; flex-direction: column; gap: 4px; width: 100px; flex-shrink: 0; }

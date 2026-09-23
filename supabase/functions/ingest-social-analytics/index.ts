@@ -1,6 +1,12 @@
 // supabase/functions/ingest-social-analytics/index.ts
 //
-// Pulls YouTube analytics into the fact tables from 20260909140000.
+// Pulls YouTube and TikTok analytics into the fact tables from 20260909140000
+// and 20260922120000. TikTok lives in ./tiktok.ts; the YouTube pass is below.
+//
+// ── Platforms are isolated ──────────────────────────────────────────────────
+// Each platform runs in its own try. A missing TikTok meter, or a YouTube
+// outage, must not stop the other platform's collection — one shared failure
+// would silence both, and the freshness view would go stale for everyone.
 //
 // ── The shape of the problem ────────────────────────────────────────────────
 // Quota is per CLOUD PROJECT, shared by every user of the product. So this is
@@ -42,6 +48,8 @@ import {
   QUOTA_COST_PER_REPORT,
   REPORTING_TIMEZONE,
 } from "../_shared/youtube.analytics.service.ts";
+import { type Admin, closeRun } from "./ledger.ts";
+import { ingestTikTok } from "./tiktok.ts";
 
 const SOURCE = "youtube_analytics_reports";
 const PLATFORM = "youtube";
@@ -100,24 +108,6 @@ function reportDate(daysAgo: number): string {
   return local.toISOString().slice(0, 10);
 }
 
-/** Close a run row. A run left `running` is reaped an hour later as abandoned. */
-async function closeRun(
-  admin: ReturnType<typeof createAdminClient>,
-  runId: string,
-  patch: Record<string, unknown>,
-) {
-  const { error } = await admin
-    .from("social_ingestion_runs")
-    .update({ ...patch, finished_at: new Date().toISOString() })
-    .eq("id", runId);
-
-  if (error) {
-    // Loud: an unclosed run makes the freshness view report work in progress
-    // that is not in progress, and blocks the next run's mode decision.
-    console.error(`[ingest-social-analytics] could not close run ${runId}: ${error.message}`);
-  }
-}
-
 serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -127,6 +117,50 @@ serve(async (req) => {
     requireInvokeSecret(req);
 
     const admin = createAdminClient();
+
+    // Optional {account_id}: request_social_ingestion (20260922120000) sends it
+    // right after a connect, so a new account is collected now rather than at
+    // the next 6-hourly cron. The cron sends {}. Only a UUID is honoured.
+    const body = await req.json().catch(() => ({})) as { account_id?: unknown };
+    const onlyAccountId = typeof body?.account_id === "string"
+        && /^[0-9a-f-]{36}$/i.test(body.account_id)
+      ? body.account_id
+      : null;
+
+    // In PARALLEL: the passes share no budget and no tables, and run in
+    // sequence one slow platform consumed the other's share of the edge
+    // runtime's wall clock. allSettled, so one throwing cannot cancel the other.
+    const passes: Array<[string, (a: Admin) => Promise<Record<string, unknown>>]> = [
+      ["youtube", (a) => ingestYouTube(a, { onlyAccountId })],
+      ["tiktok", (a) => ingestTikTok(a, { onlyAccountId })],
+    ];
+    const settled = await Promise.allSettled(passes.map(([, pass]) => pass(admin)));
+    const results: Record<string, Record<string, unknown>> = {};
+    settled.forEach((outcome, i) => {
+      const platform = passes[i][0];
+      if (outcome.status === "fulfilled") {
+        results[platform] = { ok: true, ...outcome.value };
+      } else {
+        console.error(`[ingest-social-analytics] ${platform} pass failed:`, (outcome.reason as Error)?.message);
+        results[platform] = { ok: false, ...toErrorPayload(outcome.reason) };
+      }
+    });
+
+    // Not 200 when any platform failed outright: the edge-function logs and
+    // anything watching status codes must see it, even though the other
+    // platform's rows landed.
+    const ok = Object.values(results).every((r) => r.ok);
+    return jsonResponse({ ok, ...results }, ok ? 200 : 500);
+  } catch (error) {
+    console.error("[ingest-social-analytics] run failed:", (error as Error).message);
+    return jsonResponse(toErrorPayload(error), mapErrorToStatusCode(error));
+  }
+});
+
+async function ingestYouTube(
+  admin: Admin,
+  { onlyAccountId = null }: { onlyAccountId?: string | null } = {},
+) {
     const summary = {
       accounts_considered: 0,
       ingested: 0,
@@ -171,14 +205,15 @@ serve(async (req) => {
     let remaining = Number(quotaRow.remaining) || 0;
 
     // ── Accounts to consider ─────────────────────────────────────────────────
-    const { data: accounts, error: accErr } = await admin
+    let accountQuery = admin
       .from("connected_accounts")
       .select("id, user_id, platform, account_id, connection_status")
       .eq("platform", PLATFORM)
       .eq("provider", PLATFORM)
       .eq("is_mock", false)
-      .in("connection_status", ["active", "connected"])
-      .limit(MAX_ACCOUNTS_PER_RUN);
+      .in("connection_status", ["active", "connected"]);
+    if (onlyAccountId) accountQuery = accountQuery.eq("id", onlyAccountId);
+    const { data: accounts, error: accErr } = await accountQuery.limit(MAX_ACCOUNTS_PER_RUN);
 
     if (accErr) throw accErr;
     summary.accounts_considered = (accounts || []).length;
@@ -459,9 +494,5 @@ serve(async (req) => {
       else summary.failed += 1;
     }
 
-    return jsonResponse({ ok: true, ...summary, quota_remaining: Math.max(remaining, 0) });
-  } catch (error) {
-    console.error("[ingest-social-analytics] run failed:", (error as Error).message);
-    return jsonResponse(toErrorPayload(error), mapErrorToStatusCode(error));
-  }
-});
+    return { ...summary, quota_remaining: Math.max(remaining, 0) };
+}

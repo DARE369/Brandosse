@@ -62,6 +62,25 @@ const TABLES = [
   { table: 'user_notifications', owner: 'user_id' },
   { table: 'content_versions', owner: 'user_id' },
   { table: 'ai_session_logs', owner: 'user_id' },
+  // Platform analytics (20260909140000, 20260922120000). These tables have
+  // composite keys and NO `id` column — selecting one would 400, which this
+  // probe reads as SKIP ("safe"), so every entry names its columns explicitly.
+  // The founder's live YouTube rows exist, so "the probe user sees none of
+  // them" is a real assertion, not an empty one.
+  ...[
+    'social_post_metrics_daily',
+    'social_post_metrics_snapshot',
+    'social_account_metrics_daily',
+    'social_account_metrics_snapshot',
+    'social_post_breakdowns',
+    'social_retention_curves',
+    'social_platform_posts',
+  ].map((table) => ({
+    table,
+    owner: 'user_id',
+    orgCol: 'organization_id',
+    cols: 'connected_account_id,user_id,organization_id',
+  })),
 ];
 
 function loadEnv() {
@@ -146,7 +165,7 @@ async function main() {
   let skipped = 0;
 
   for (const spec of TABLES) {
-    const cols = ['id', spec.owner, spec.orgCol].filter(Boolean).join(',');
+    const cols = spec.cols || ['id', spec.owner, spec.orgCol].filter(Boolean).join(',');
     const res = await fetch(
       `${base}/rest/v1/${spec.table}?select=${cols}&limit=${PAGE}`, { headers: userHeaders });
 
@@ -180,6 +199,45 @@ async function main() {
         `(page of ${rows.length})`);
     } else {
       console.log(`  ${'ok'.padEnd(6)} ${spec.table.padEnd(24)} ${rows.length} row(s), none foreign`);
+    }
+  }
+
+  // ── social_snapshot_summary (20260922120000) ──────────────────────────────
+  //
+  // A FUNCTION, not a table: it is SECURITY INVOKER and RLS on the tables it
+  // reads should scope it — but "should" is a policy reading, and the only
+  // evidence that counts is calling it as an ordinary user and checking every
+  // row belongs to an account that user may see. Its rows carry no user_id,
+  // so ownership is resolved through connected_accounts with the service key.
+  {
+    const res = await fetch(`${base}/rest/v1/rpc/social_snapshot_summary`, {
+      method: 'POST',
+      headers: { ...userHeaders, 'Content-Type': 'application/json', Range: `0-${PAGE - 1}` },
+      body: JSON.stringify({ p_since: '1970-01-01T00:00:00Z' }),
+    });
+    if (!res.ok) {
+      console.log(`  ${'SKIP'.padEnd(6)} ${'rpc social_snapshot_summary'.padEnd(24)} HTTP ${res.status} (not migrated yet?)`);
+    } else if (!svc) {
+      console.log(`  ${'SKIP'.padEnd(6)} ${'rpc social_snapshot_summary'.padEnd(24)} needs SUPABASE_SERVICE_ROLE_KEY to resolve owners`);
+    } else {
+      const rows = await res.json().catch(() => []);
+      const ids = [...new Set((Array.isArray(rows) ? rows : []).map((r) => r.connected_account_id).filter(Boolean))];
+      let illegitimate = [];
+      if (ids.length) {
+        const svcHeaders = { apikey: svc, Authorization: `Bearer ${svc}` };
+        const own = await fetch(
+          `${base}/rest/v1/connected_accounts?select=id,user_id,organization_id&id=in.(${ids.join(',')})`,
+          { headers: svcHeaders });
+        const owners = await own.json().catch(() => []);
+        illegitimate = (Array.isArray(owners) ? owners : []).filter(
+          (a) => a.user_id !== me && !(a.organization_id && myOrgs.has(a.organization_id)));
+      }
+      if (illegitimate.length) {
+        leaks.push({ table: 'rpc social_snapshot_summary', rows: illegitimate.length, owners: illegitimate.length, seen: rows.length });
+        console.log(`  ${'LEAK'.padEnd(6)} ${'rpc social_snapshot_summary'.padEnd(24)} returned ${illegitimate.length} foreign account(s)`);
+      } else {
+        console.log(`  ${'ok'.padEnd(6)} ${'rpc social_snapshot_summary'.padEnd(24)} ${rows.length} row(s), none foreign`);
+      }
     }
   }
 

@@ -195,6 +195,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* TikTok titles link to the video. Same weight and colour as the plain title,
+   so linked and unlinked rows read as one list; the underline appears on
+   hover and on keyboard focus, never only on hover. */
+a.perfPostTitle {
+  color: inherit;
+  text-decoration: none;
+}
+a.perfPostTitle:hover,
+a.perfPostTitle:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+a.perfPostTitle:focus-visible {
+  outline: 2px solid var(--uiv2-accent-solid);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .perfPostMeta {
   display: inline-flex;
   align-items: center;

@@ -451,7 +451,37 @@ export async function getAccountsForUser(userId, scope = 'personal') {
     .order('display_name', { ascending: true });
 
   if (error) throw error;
-  return (data || []).map(normalizeConnectedAccountRow).filter(Boolean);
+  const rows = (data || []).map(normalizeConnectedAccountRow).filter(Boolean);
+  return attachTikTokProfiles(rows);
+}
+
+/**
+ * TikTok's profile (username, verified badge, bio, profile link) lives in
+ * connected_accounts.platform_metadata.tiktok_profile, written at connect and
+ * refreshed by analytics ingestion. connected_accounts_health_summary does not
+ * expose platform_metadata, and that view's live definition has drifted from
+ * the migrations — redefining it to add one column risks more than it gains.
+ * So TikTok rows get the one field they need from the base table, which the
+ * owner can already read under RLS.
+ *
+ * Failure here is cosmetic (the card still renders, without the extras), so it
+ * is logged, never thrown.
+ */
+async function attachTikTokProfiles(rows) {
+  const ids = rows.filter((r) => r.platform === 'tiktok' && !r.is_mock).map((r) => r.id);
+  if (ids.length === 0) return rows;
+
+  const { data, error } = await supabase
+    .from('connected_accounts')
+    .select('id, platform_metadata')
+    .in('id', ids);
+
+  if (error) {
+    console.warn('[connectionService] TikTok profile details unavailable:', error.code || error.message);
+    return rows;
+  }
+  const byId = new Map((data || []).map((r) => [r.id, r.platform_metadata?.tiktok_profile || null]));
+  return rows.map((r) => (byId.has(r.id) ? { ...r, tiktok_profile: byId.get(r.id) } : r));
 }
 
 export async function getAccountsForOrganization(organizationId) {

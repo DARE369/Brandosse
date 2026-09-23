@@ -66,6 +66,17 @@ const REVIEWED = [
       + 'asserts that table still matches app/api/_lib/socialProviders.js.',
   },
   {
+    file: '_shared/tiktok.analytics.service.ts',
+    match: /^url$/,
+    reason:
+      'tiktokRequest() receives only URLs built in this module from three literal '
+      + 'constants — USER_INFO_URL, VIDEO_LIST_URL, PUBLISH_STATUS_URL, all on '
+      + 'https://open.tiktokapis.com/v2 — plus a `fields=` query assembled from '
+      + 'module-level field-name arrays. No caller, user, or TikTok response supplies '
+      + 'any part of a URL. The only caller-supplied value, a publish_id, travels in '
+      + 'the JSON BODY of the status request, never in the URL.',
+  },
+  {
     file: '_shared/tiktok.service.ts',
     match: /^url$/,
     reason:

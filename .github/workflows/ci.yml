@@ -748,6 +748,20 @@ jobs:
       - name: Delete rules
         run: node scripts/security/delete-rule-probe.mjs
 
+      # The analytics half of tenant isolation. cross-tenant-probe reads as the
+      # QA user — but that account OWNS every analytics row in the database
+      # (measured 2026-09-22), so for social_* it cannot fail. This one creates
+      # a throwaway user WITH analytics, proves the QA user cannot see any of
+      # it (directly or via social_snapshot_summary), and deletes it.
+      - name: Analytics tenancy
+        run: node scripts/security/analytics-tenancy-probe.mjs
+
+      # Collection that silently stops is undetectable: the charts keep showing
+      # the last figures they saw. The ingestion ledger exists so this question
+      # has an answer; nothing was asking it.
+      - name: Analytics liveness
+        run: node scripts/security/analytics-liveness-probe.mjs
+
       - name: Remove probe environment
         if: always()
         run: rm -f .env.local

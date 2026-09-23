@@ -190,17 +190,45 @@ async function discoverLinkedIn(accessToken) {
  * username: TikTok usernames are changeable, so keying on one would orphan the
  * connection the first time a user renames themself.
  */
-async function discoverTikTok(accessToken) {
-  const res = await fetchWithTimeout(
-    'https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name',
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
+async function discoverTikTok(accessToken, grantedScopes = []) {
+  const BASIC = ['open_id', 'union_id', 'avatar_url', 'display_name'];
+  // Profile + stats are read at connect, not only by the 6-hourly ingestion,
+  // so the account card shows the real @username, verified badge and follower
+  // count the moment the account is connected. Requested only when granted:
+  // a field whose scope was not granted fails the WHOLE request.
+  const granted = new Set((grantedScopes || []).map(String));
+  const extra = [
+    ...(granted.has('user.info.profile') ? ['username', 'bio_description', 'is_verified', 'profile_deep_link'] : []),
+    ...(granted.has('user.info.stats') ? ['follower_count', 'following_count', 'likes_count', 'video_count'] : []),
+  ];
 
-  const body = await res.json().catch(() => null);
+  const read = async (fields) => {
+    const res = await fetchWithTimeout(
+      `https://open.tiktokapis.com/v2/user/info/?fields=${fields.join(',')}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    const body = await res.json().catch(() => null);
+    return { res, body, code: body?.error?.code };
+  };
+
+  // The extras are a nicety; connecting must never fail because of them. If
+  // the fuller request is refused — or times out — fall back to what connect
+  // actually needs.
+  let res; let body; let code;
+  try {
+    ({ res, body, code } = await read([...BASIC, ...extra]));
+  } catch (err) {
+    if (extra.length === 0) throw err;
+    console.warn(`[tiktok discovery] profile/stats read failed (${err?.message}); retrying basic fields only`);
+    ({ res, body, code } = await read(BASIC));
+  }
+  if (extra.length > 0 && (!res.ok || (code && code !== 'ok')) && res.status !== 401) {
+    console.warn(`[tiktok discovery] profile/stats fields refused (${code || res.status}); retrying basic fields only`);
+    ({ res, body, code } = await read(BASIC));
+  }
 
   // TikTok returns HTTP 200 for real failures, with the code in the body —
   // checking res.ok alone would treat a scope refusal as a healthy response.
-  const code = body?.error?.code;
   if (!res.ok || (code && code !== 'ok')) {
     if (code === 'scope_not_authorized' || res.status === 401) throw new Error('missing_scopes');
     throw new Error(`discovery_failed:${code || `http_${res.status}`}`);
@@ -209,13 +237,32 @@ async function discoverTikTok(accessToken) {
   const u = body?.data?.user || {};
   if (!u.open_id) throw new Error('discovery_failed:no_open_id');
 
+  const followers = Number.isFinite(u.follower_count) && u.follower_count >= 0 ? u.follower_count : null;
+  const hasProfile = typeof u.username === 'string' || typeof u.is_verified === 'boolean'
+    || followers !== null;
+
   return [{
     accountId: u.open_id,
     authorUrn: null,          // TikTok addresses the creator by token, not URN
-    username: u.display_name || u.open_id,
+    username: u.username || u.display_name || u.open_id,
     displayName: u.display_name || 'TikTok account',
     avatarUrl: u.avatar_url || null,
     profileType: 'Creator',
+    followerCount: followers,
+    // Same shape ingest-social-analytics/tiktok.ts writes, so the card reads
+    // one key whichever wrote it last.
+    metadata: hasProfile ? {
+      tiktok_profile: {
+        username: u.username || null,
+        bio: u.bio_description || null,
+        is_verified: typeof u.is_verified === 'boolean' ? u.is_verified : null,
+        profile_deep_link: u.profile_deep_link || null,
+        // Here, not only in connected_accounts.follower_count: that column
+        // DEFAULTS to 0, so it cannot tell "no followers" from "not reported".
+        followers: followers,
+        refreshed_at: new Date().toISOString(),
+      },
+    } : null,
   }];
 }
 
@@ -287,6 +334,9 @@ async function discoverYouTube(accessToken) {
 
 const DISCOVERY = { linkedin: discoverLinkedIn, tiktok: discoverTikTok, youtube: discoverYouTube };
 
+/** Platforms ingest-social-analytics collects; a new connection is collected immediately. */
+const INGESTED_PLATFORMS = new Set(['youtube', 'tiktok']);
+
 // ── Persistence ──────────────────────────────────────────────────────────────
 
 /**
@@ -320,9 +370,12 @@ async function persistAccount(supabase, { userId, platform, scope, account, toke
     last_failure_reason: null,
     token_expires_at: expiresAt,
     scopes: token.grantedScopes,
-    platform_metadata: { author_urn: account.authorUrn },
+    platform_metadata: { author_urn: account.authorUrn, ...(account.metadata || {}) },
     updated_at: now,
   };
+  // Only when the platform reported one: NULL IS NOT ZERO. Writing 0 for "not
+  // reported" would show a real creator as having no followers.
+  if (Number.isFinite(account.followerCount)) row.follower_count = account.followerCount;
 
   const { data: existing, error: lookupErr } = await supabase
     .from('connected_accounts')
@@ -338,8 +391,28 @@ async function persistAccount(supabase, { userId, platform, scope, account, toke
   const isNew = !accountRowId;
 
   if (accountRowId) {
-    const { error } = await supabase.from('connected_accounts').update(row).eq('id', accountRowId);
+    // A reconnect must not REPLACE platform_metadata: ingestion keeps the
+    // TikTok profile there, and a discovery that fell back to basic fields
+    // would otherwise erase it. The update omits the column; the keys this
+    // connect learned are merged in.
+    const { platform_metadata: metadata, ...columns } = row;
+    const { error } = await supabase.from('connected_accounts').update(columns).eq('id', accountRowId);
     if (error) throw error;
+    const { error: mergeErr } = await supabase.rpc('merge_account_platform_metadata', {
+      p_account_id: accountRowId,
+      p_patch: metadata,
+    });
+    if (mergeErr?.code === 'PGRST202') {
+      // The function arrives with migration 20260922120000. Until it is
+      // applied, keep the previous behaviour rather than breaking every
+      // reconnect — Vercel can deploy this file before the migration runs.
+      console.warn('[social callback] merge_account_platform_metadata not deployed yet; replacing platform_metadata');
+      const { error } = await supabase.from('connected_accounts')
+        .update({ platform_metadata: metadata }).eq('id', accountRowId);
+      if (error) throw error;
+    } else if (mergeErr) {
+      throw mergeErr;
+    }
   } else {
     const { data, error } = await supabase
       .from('connected_accounts').insert(row).select('id').single();
@@ -457,7 +530,7 @@ export async function GET(request, context) {
 
     const discover = DISCOVERY[platform];
     if (!discover) throw new Error(`discovery_unimplemented:${platform}`);
-    const accounts = await discover(token.accessToken);
+    const accounts = await discover(token.accessToken, token.grantedScopes);
 
     if (!accounts.length) {
       return bounce(request, returnTo, { social_error: 'no_eligible_targets', platform });
@@ -467,9 +540,21 @@ export async function GET(request, context) {
     // and LinkedIn once Community Management is granted) will stop at a
     // selection step instead — nothing is written until the user confirms.
     const supabase = createServiceClient();
-    const { isNew } = await persistAccount(supabase, {
+    const { isNew, accountRowId } = await persistAccount(supabase, {
       userId, platform, scope, account: accounts[0], token,
     });
+
+    // Collect analytics NOW for platforms that have ingestion, rather than at
+    // the next 6-hourly cron — otherwise a freshly connected account shows
+    // "no collection has run" for hours. Queued through pg_net (the same
+    // authenticated path the cron uses), so this returns immediately. Its
+    // failure is logged and never fails the connect: the cron is the backstop.
+    if (INGESTED_PLATFORMS.has(platform) && accountRowId) {
+      const { error: ingestErr } = await supabase.rpc('request_social_ingestion', { p_account_id: accountRowId });
+      if (ingestErr) {
+        console.error(`[social/${platform}/callback] could not queue first analytics collection:`, ingestErr.message);
+      }
+    }
 
     return bounce(request, returnTo, {
       connected: platform,

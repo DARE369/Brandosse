@@ -45,7 +45,7 @@ try {
   process.exit(1);
 }
 
-const { aggregateMetrics, describeEmptiness, formatMetricValue } = mod;
+const { aggregateMetrics, describeEmptiness, formatMetricValue, snapshotMetrics } = mod;
 
 const failures = [];
 function check(label, actual, expected) {
@@ -164,6 +164,59 @@ if (seenMessages.size !== cases.length) {
 }
 
 check("data present means no empty state", describeEmptiness({ hasRows: true }), null);
+
+/* ── 5b. Snapshot metrics (TikTok): latest value, change between checks ──── */
+//
+// TikTok reports lifetime totals only. Summing two observations of "1,200
+// views" to show "2,400" double-counts every view; it looks entirely plausible.
+
+if (typeof snapshotMetrics !== "function") {
+  failures.push("snapshotMetrics is not exported — TikTok figures have no tested arithmetic");
+} else {
+  const snap = snapshotMetrics(
+    [{
+      metric_key: "views",
+      latest_value: 1200, latest_at: "2026-09-22T12:00:00Z",
+      earliest_value: 900, earliest_at: "2026-09-20T12:00:00Z",
+      observations: 9,
+    }],
+    DEFS,
+  );
+  check("a snapshot reports its LATEST value, never a sum of observations", snap[0]?.value, 1200);
+  check("a snapshot's change is latest minus earliest", snap[0]?.change, 300);
+  check("a snapshot is never marked additive", snap[0]?.additive, false);
+  check("a snapshot says when it was observed", snap[0]?.asOf, "2026-09-22T12:00:00Z");
+
+  const single = snapshotMetrics(
+    [{
+      metric_key: "views",
+      latest_value: 50, latest_at: "2026-09-22T12:00:00Z",
+      earliest_value: 50, earliest_at: "2026-09-22T12:00:00Z",
+      observations: 1,
+    }],
+    DEFS,
+  );
+  check("one observation has NO change (null), not a change of 0", single[0]?.change, null);
+}
+
+const tiktokVideos = describeEmptiness({
+  freshness: { last_attempt_at: "2026-09-22T06:00:00Z", last_status: "succeeded" },
+  hasRows: false,
+  platform: "tiktok",
+  subject: "videos",
+});
+check("an empty TikTok video list names TikTok's public-only rule", tiktokVideos?.reason, "tiktok_public_only");
+
+const tiktokAccount = describeEmptiness({
+  freshness: { last_attempt_at: "2026-09-22T06:00:00Z", last_status: "succeeded" },
+  hasRows: false,
+  platform: "tiktok",
+});
+check(
+  "the public-only reason applies to the VIDEO list only, not to account totals",
+  tiktokAccount?.reason,
+  "platform_reported_nothing",
+);
 
 /* ── 6. Units are formatted as their unit, not as raw numbers ────────────── */
 

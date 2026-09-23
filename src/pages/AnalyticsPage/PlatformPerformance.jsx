@@ -22,13 +22,19 @@
  * prints a metric it does not have — it prints the reason instead, in words a
  * person can act on.
  *
+ * TikTok is different in kind, not degree: it keeps no history, so its figures
+ * are lifetime totals "as of" the last check, with change measured between our
+ * own checks — never summed. And it reports PUBLIC videos only, which is said
+ * out loud when the list is empty.
+ *
  * Accounts on platforms the collector does not yet support are named in one
  * line at the bottom rather than given a card each. An empty card per platform
  * would read as breakage, when the truth is simply "not built yet".
  */
 
 import { AlertTriangle, CheckCircle2, Clock, EyeOff } from "lucide-react";
-import { Card, EmptyState } from "../../ui-v2";
+import { Button, Card, EmptyState } from "../../ui-v2";
+import { useAppNavigation } from "../../Context/AppNavigationContext";
 import { describeEmptiness, formatMetricValue } from "../../services/socialAnalyticsService";
 import styles from "./PersonalAnalyticsPage.module.css";
 
@@ -41,6 +47,20 @@ const PLATFORM_LABELS = {
   pinterest: "Pinterest",
   x: "X",
 };
+
+/**
+ * Only https: links from platform data reach an href. share_url comes from
+ * TikTok's API; React still renders a `javascript:` href, so a hostile or
+ * corrupted value would otherwise be one click from running script here.
+ */
+function safeHttpsUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
 
 function platformLabel(platform) {
   if (!platform) return "Unknown platform";
@@ -86,6 +106,23 @@ function FreshnessChip({ freshness, freshnessKnown = true }) {
     );
   }
 
+  // Skips are decisions with their own remedies, not failures — the reason text
+  // under the chip says what to do; the chip must not shout "failed" over it.
+  if (freshness.last_status === "skipped_no_scope") {
+    return (
+      <span className={[styles.perfChip, styles.perfChipDanger].join(" ")}>
+        <AlertTriangle size={12} aria-hidden="true" /> Reconnect needed
+      </span>
+    );
+  }
+  if (freshness.last_status === "skipped_rate_limited") {
+    return (
+      <span className={styles.perfChip}>
+        <Clock size={12} aria-hidden="true" /> Deferred until the daily reset
+      </span>
+    );
+  }
+
   if (freshness.last_status && freshness.last_status !== "succeeded") {
     return (
       <span className={[styles.perfChip, styles.perfChipDanger].join(" ")}>
@@ -105,15 +142,35 @@ function FreshnessChip({ freshness, freshnessKnown = true }) {
   );
 }
 
+/**
+ * "+12 since Sep 20" for a snapshot metric that has been observed more than
+ * once. Null when there is only one observation: no second look is not the
+ * same as no change, and "+0" would claim the second.
+ */
+function snapshotChange(metric) {
+  if (!metric.snapshot || metric.change === null || metric.change === undefined) return null;
+  const sign = metric.change > 0 ? "+" : metric.change < 0 ? "−" : "±";
+  const since = metric.changeSince
+    ? new Date(metric.changeSince).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : null;
+  return `${sign}${formatMetricValue({ ...metric, value: Math.abs(metric.change) })}${since ? ` since ${since}` : ""}`;
+}
+
 function MetricTile({ metric }) {
+  const change = snapshotChange(metric);
   return (
     <div className={styles.metricTile}>
       <span className={styles.metricLabel}>{metric.label}</span>
       <span className={styles.metricValue}>{formatMetricValue(metric)}</span>
-      {/* Non-additive metrics are a single day's figure, not a total for the
-          window. Saying which day is the difference between a number and a
-          claim. */}
-      {!metric.additive && metric.asOf ? (
+      {/* A snapshot is a running total as it stood when last checked (TikTok
+          keeps no history), so it says WHEN. Non-additive daily metrics are a
+          single day's figure, so they say WHICH day. Either way, the difference
+          between a number and a claim. */}
+      {metric.snapshot ? (
+        <span className={styles.metricNote}>
+          {change ? `${change} · ` : ""}as of {relativeTime(metric.asOf) || "last check"}
+        </span>
+      ) : !metric.additive && metric.asOf ? (
         <span className={styles.metricNote}>on {metric.asOf}</span>
       ) : null}
     </div>
@@ -130,11 +187,24 @@ function PostPerformance({ post, freshness }) {
   return (
     <div className={styles.perfPostRow}>
       <div className={styles.perfPostMain}>
-        <span className={styles.perfPostTitle} title={post.title}>
-          {post.title}
-        </span>
+        {safeHttpsUrl(post.shareUrl) ? (
+          <a
+            className={styles.perfPostTitle}
+            href={safeHttpsUrl(post.shareUrl)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`${post.title} — open on TikTok`}
+          >
+            {post.title}
+          </a>
+        ) : (
+          <span className={styles.perfPostTitle} title={post.title}>
+            {post.title}
+          </span>
+        )}
         <span className={styles.perfPostMeta}>
           {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : "—"}
+          {post.snapshot ? " · lifetime totals" : null}
           {post.privacyStatus && post.privacyStatus !== "public" ? (
             <>
               {" · "}
@@ -170,7 +240,21 @@ function AccountPerformance({ account, displayName, freshnessKnown = true }) {
     : describeEmptiness({
         freshness: account.freshness,
         hasRows: account.metrics.length > 0,
+        platform: account.platform,
       });
+
+  // TikTok reports public videos only. After a successful collection, an empty
+  // video list is almost always "nothing is public", and saying so is the
+  // difference between a user fixing it and a user assuming nobody watched.
+  const videosEmpty = account.posts.length === 0 && freshnessKnown && account.platform === "tiktok"
+    ? describeEmptiness({
+        freshness: account.freshness,
+        hasRows: false,
+        platform: "tiktok",
+        subject: "videos",
+        videoListGranted: account.videoListGranted,
+      })
+    : null;
 
   return (
     <Card>
@@ -199,12 +283,15 @@ function AccountPerformance({ account, displayName, freshnessKnown = true }) {
             <PostPerformance key={post.platformPostId} post={post} freshness={account.freshness} />
           ))}
         </div>
+      ) : videosEmpty && ["tiktok_public_only", "video_list_not_granted"].includes(videosEmpty.reason) ? (
+        <p className={styles.perfReason}>{videosEmpty.message}</p>
       ) : null}
     </Card>
   );
 }
 
 export default function PlatformPerformance({ performance, accounts }) {
+  const { navigate } = useAppNavigation();
   // Driven by the user's CONNECTED ACCOUNTS, not by whatever rows the analytics
   // queries happened to return.
   //
@@ -233,13 +320,29 @@ export default function PlatformPerformance({ performance, accounts }) {
             "Connect a social account and publish something; the collector reads each "
             + "platform's own figures every six hours."
           }
+          actions={
+            <Button size="sm" onClick={() => navigate("/app/settings/connect")}>
+              Connect an account
+            </Button>
+          }
         />
       </Card>
     );
   }
 
+  // Reads that came back partial (timeout or page ceiling). Said on the page,
+  // once, above the figures it affects — a number that is quietly incomplete
+  // is indistinguishable from one that is right.
+  const incomplete = performance?.incomplete || [];
+
   return (
     <>
+      {incomplete.length > 0 ? (
+        <p className={styles.perfReason} role="status">
+          <AlertTriangle size={12} aria-hidden="true" /> Some figures below are incomplete — the
+          platform data took too long to load in full. Reload to try again.
+        </p>
+      ) : null}
       {connected.map((account) => {
         const perf = perfById.get(account.id) || null;
         return (
@@ -249,6 +352,7 @@ export default function PlatformPerformance({ performance, accounts }) {
               accountId: account.id,
               platform: account.platform,
               freshness: perf?.freshness || null,
+              videoListGranted: perf?.videoListGranted ?? null,
               metrics: perf?.metrics || [],
               posts: perf?.posts || [],
             }}
