@@ -72,27 +72,42 @@ const MODE_LIBRARY = 'library';
  * actually credits (vidiq.com, touhfa.art, humbleandbrag.com — 2026):
  * ONE clear subject carrying visible emotion (a face reads 20-30% higher
  * than a flat object shot), high contrast separating subject from
- * background, and a composition that still reads at the size it is actually
- * judged at — a shrunk mobile-feed thumbnail, not full-screen.
+ * background, a short (≤5-word) punchy text overlay, and a composition that
+ * still reads at the size it is actually judged at — a shrunk mobile-feed
+ * thumbnail, not full-screen.
  *
- * Deliberately excludes an instruction to render specific words. Diffusion
- * image models render literal on-image text unreliably; a garbled word baked
- * into a thumbnail is worse than none, and — per the same research — a
- * strong subject is the larger lever besides. Getting legible text right
- * needs a text-capable renderer this pipeline doesn't have wired in today,
- * not a prompt-engineering trick.
+ * The text overlay is an EXACT quoted instruction, not a hope. This
+ * generation is pinned to fal-ai/ideogram/v3 (see the imageModel argument
+ * where this is called) — this codebase's own designated "best exact-text
+ * rendering" model (fal.service.ts FAL_MODELS.imageIdeogramV3), already the
+ * default engine for every OTHER image generation in this app. Ideogram is
+ * built to render a short quoted phrase accurately; a general photographic
+ * model (FLUX) is not, which is why this used to omit text entirely — that
+ * reasoning no longer applies once the model doing the work is the one
+ * actually designed for it.
  */
+function extractHeadline(seed) {
+  const words = String(seed || '').trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, 5).join(' ');
+}
+
 function buildCtrThumbnailPrompt(seed) {
   const topic = String(seed || '').trim().slice(0, 200);
+  const headline = extractHeadline(seed);
+  const textInstruction = headline
+    ? `Exact text rendered large, bold and clearly legible, reading precisely: `
+      + `"${headline}". High-contrast lettering against the background so it `
+      + 'stays readable even shrunk to a small thumbnail.'
+    : 'No text or lettering — composition only.';
   return (
     `YouTube thumbnail for a video about: ${topic}. `
     + 'One clear subject filling most of the frame, with a visibly emotional, '
     + 'expressive face if a person fits the subject — otherwise one bold, '
     + 'unmistakable focal object. Bright, high-contrast colors separating the '
-    + 'subject from the background. Punchy, dynamic framing rather than a '
-    + 'flat, neutral shot. No clutter, no busy background detail, no text or '
-    + 'lettering of any kind — composition only. Must read clearly shrunk to '
-    + 'a small thumbnail, not just at full size. 16:9.'
+    + `subject from the background. Punchy, dynamic framing rather than a `
+    + `flat, neutral shot. ${textInstruction} No clutter, no busy background `
+    + 'detail. Must read clearly shrunk to a small thumbnail, not just at '
+    + 'full size. 16:9.'
   );
 }
 
@@ -149,6 +164,14 @@ export default function YouTubeThumbnailPicker({
         aspectRatio: '16:9', // YouTube's thumbnail ratio
         numImages: 1,
         category: 'image',
+        // Pinned, not left to the default: this is the ONE call in this
+        // component that asks for exact on-image text, and Ideogram v3 is
+        // this codebase's designated model for that (fal.service.ts
+        // FAL_MODELS.imageIdeogramV3, "best exact-text rendering"). It also
+        // happens to already be generateImages()'s own default — pinning it
+        // here means that stays true regardless of what the default becomes
+        // elsewhere.
+        imageModel: 'ideogram',
       });
       emit({ url: image.url, source, cost: image.generationCost });
     } catch (err) {
