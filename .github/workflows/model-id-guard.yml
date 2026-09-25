@@ -1,0 +1,40 @@
+# Model-ID deprecation guard.
+#
+# Providers retire hosted models on their own schedule (Groq decommissioned
+# llama-3.3-70b-versatile on 2026-08-16, taking every AI feature down with no
+# signal). This job checks the model IDs in supabase/functions/_shared/llm.ts
+# against each provider's LIVE /models catalog so the NEXT retirement turns CI
+# red the day it happens — not a week later via a confused user.
+#
+# Requires two GitHub Actions repository secrets: GROQ_API_KEY, ANTHROPIC_API_KEY.
+# Without them the job fails loudly (REQUIRE_KEYS=1) rather than silently no-op'ing.
+
+name: model-id-guard
+
+on:
+  schedule:
+    - cron: '0 13 * * *' # daily, 13:00 UTC — catches retirements with no code change
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'supabase/functions/_shared/llm.ts'
+      - 'scripts/check-model-ids.cjs'
+      - '.github/workflows/model-id-guard.yml'
+
+jobs:
+  verify-model-ids:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify configured model IDs are live at their providers
+        env:
+          REQUIRE_KEYS: '1'
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Verify the same overrides production uses, if they're set as repo secrets.
+          GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
+          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
+        run: node scripts/check-model-ids.cjs

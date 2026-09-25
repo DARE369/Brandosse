@@ -46,9 +46,17 @@ export function stripJsonFence(content: string) {
  * of content the product produced. The output-quality ceiling of the whole
  * product was set by a default nobody had revisited.
  *
- * Claude Sonnet 5 is the right default here: same list price as Claude 3.5
+ * Claude Sonnet 4.6 is the right default here: same list price as Claude 3.5
  * Sonnet ($3/$15 per MTok) for a materially stronger model, so this is a
  * quality upgrade at no additional cost per token.
+ *
+ * NOTE 2026-09-24 — the prior default `claude-sonnet-5` was NOT a real model
+ * ID (Anthropic has no Sonnet 5; the current Sonnet is `claude-sonnet-4-6`).
+ * Combined with the Groq default below being decommissioned, EVERY
+ * content-plan call was hitting a 404 on the preferred provider and a 404 on
+ * the fallback — no working provider at all — which surfaced to users as a
+ * 504 on generate-content-plan and "no image generated". Exactly the
+ * stale-default failure class the rest of this comment warns about.
  *
  * Two rules, per engineering/01-versioning.md:
  *   - Never rely on a code default for production output quality. Set
@@ -62,7 +70,7 @@ export function stripJsonFence(content: string) {
  * rather than changing this default. Raising quality for everything by
  * changing one constant is exactly how the previous default went unexamined.
  */
-const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5";
+const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 function resolveProviders(preferredProvider?: string | null) {
   const groqKey      = readEnv("GROQ_API_KEY",      false);
@@ -83,7 +91,12 @@ function resolveProviders(preferredProvider?: string | null) {
   };
   const groqEntry: ProviderConfig = {
     provider: "groq",
-    model: readEnv("GROQ_MODEL", false) || "llama-3.3-70b-versatile",
+    // `llama-3.3-70b-versatile` was DECOMMISSIONED by Groq on 2026-08-16 and
+    // now 404s ("model does not exist or you do not have access to it"). Groq's
+    // own migration recommendation is `openai/gpt-oss-120b`, which supports the
+    // response_format: json_object path callOpenAiCompatible uses below. Pin
+    // GROQ_MODEL per environment; this default is the backstop, not the plan.
+    model: readEnv("GROQ_MODEL", false) || "openai/gpt-oss-120b",
     url: "https://api.groq.com/openai/v1/chat/completions",
     key: groqKey || "",
   };
