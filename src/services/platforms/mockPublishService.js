@@ -1,12 +1,5 @@
 import { supabase } from '../supabaseClient';
-
-function toErrorMessage(error, fallback) {
-  const message = error?.context?.json?.error
-    || error?.message
-    || error?.error_description
-    || fallback;
-  return String(message || fallback);
-}
+import { normalizeEdgeFunctionError } from '../edgeFunctionClient';
 
 /**
  * Despite the file name, this calls the unified `publish-post` edge function,
@@ -34,7 +27,16 @@ export async function publishPost(postId, connectedAccountId, options = {}) {
   });
 
   if (error) {
-    throw new Error(toErrorMessage(error, 'Could not publish this post.'));
+    // `error.context` is the raw fetch Response FunctionsHttpError was thrown
+    // with (@supabase/functions-js), and `.json` on it is a METHOD, not a
+    // value — reading `error.context.json.error` as a plain property (the
+    // previous code here) always evaluated to undefined, so every real
+    // publish-post failure showed the SDK's fixed generic string ("Edge
+    // Function returned a non-2xx status code") no matter what the edge
+    // function's body actually said. normalizeEdgeFunctionError awaits
+    // context.json() correctly and is already proven by every other edge
+    // function caller in this repo.
+    throw await normalizeEdgeFunctionError(error, 'publish-post');
   }
 
   return {

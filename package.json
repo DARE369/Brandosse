@@ -67,6 +67,7 @@
     "test:schedule-seed": "node scripts/test/schedule-seed.test.mjs",
     "check:nonterminal-reapers": "node scripts/check-nonterminal-state-reapers.cjs",
     "test:publish-outcome": "node scripts/test/publish-outcome.test.mjs",
+    "test:publish-error-message": "node scripts/test/publish-error-message.test.mjs",
     "check:publish-receipt": "node scripts/check-publish-receipt.cjs",
     "test:discovery-preview": "node scripts/test/discovery-and-preview.test.mjs",
     "check:discovery-preview": "node scripts/check-discovery-preview-contract.cjs",

@@ -162,6 +162,16 @@ jobs:
       - name: Publish outcome honesty
         run: node scripts/test/publish-outcome.test.mjs
 
+      # mockPublishService.js's toErrorMessage() read error.context.json.error
+      # — but context.json is Response.prototype.json, a METHOD, not a value,
+      # so that was always undefined and every real publish-post failure with
+      # a genuine non-2xx showed the Supabase SDK's fixed generic string
+      # instead of the provider's actual reason (surfaced 2026-09-25 by a
+      # LinkedIn failure whose only visible text was "edge function returned
+      # a non-2xx status code").
+      - name: Publish error message fidelity
+        run: node scripts/test/publish-error-message.test.mjs
+
       # …and that a send always reaches that receipt. Before it, a publish ended
       # in a toast on the grid, where a half-succeeded multi-destination send
       # looked identical to a clean one, and the live post URL the adapter
