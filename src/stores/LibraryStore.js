@@ -133,6 +133,37 @@ const useLibraryStore = create((set, get) => ({
     return updated;
   },
 
+  // The user's only recovery path for a row stuck at ai_tagging_status
+  // 'pending' (the trigger call was never fired — every clip saved before
+  // 2026-09-25, or a transient failure before personal-asset-ai-tag started
+  // guaranteeing a terminal state) or 'failed'. Sets 'pending' optimistically
+  // so the card's shimmer reappears immediately, then patches in whatever
+  // the retry actually resolves to — requestAssetAiTagging never throws (it
+  // already swallows its own errors and returns null), so this cannot leave
+  // the UI in a broken state, only an honest one if the retry fails again.
+  retryTagging: async (assetId) => {
+    set((state) => ({
+      assets: state.assets.map((row) => (
+        row.id === assetId ? { ...row, ai_tagging_status: 'pending' } : row
+      )),
+    }));
+    const tagResult = await requestAssetAiTagging(assetId);
+    const updatedAsset = tagResult?.asset;
+    if (updatedAsset) {
+      set((state) => ({
+        assets: state.assets.map((row) => (row.id === updatedAsset.id ? updatedAsset : row)),
+      }));
+    } else {
+      set((state) => ({
+        assets: state.assets.map((row) => (
+          row.id === assetId
+            ? { ...row, ai_tagging_status: tagResult?.ai_tagging_status || 'failed' }
+            : row
+        )),
+      }));
+    }
+  },
+
   archiveAsset: async (assetId) => {
     const updated = await archivePersonalAsset(assetId);
     set((state) => ({

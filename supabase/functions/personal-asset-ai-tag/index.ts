@@ -134,6 +134,17 @@ serve(async (req) => {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
+  // Tracks the ONE piece of state this function must never leave stranded:
+  // once we know which row we are touching, every exit path below marks it
+  // terminal (done/not_applicable/failed) — never leaves it sitting at
+  // 'pending' with no way to tell a real failure from "still working".
+  // Before assetId/adminClient exist there is nothing to mark; after, there
+  // always is. This is the "every non-terminal state needs a reaper" rule,
+  // applied to the one path here that can actually run unattended (this
+  // function is invoked fire-and-forget, never awaited, never retried by
+  // its caller — see clipLibraryActions.js and LibraryStore.js).
+  let markFailedOnExit: (() => Promise<void>) | null = null;
+
   try {
     const authClient = createAuthClient(req.headers.get("Authorization"));
     const user = await requireUser(authClient);
@@ -154,6 +165,16 @@ serve(async (req) => {
     if (fetchError) throw fetchError;
     if (!asset) throw createHttpError("Asset not found.", 404);
     if (asset.user_id !== user.id) throw createHttpError("Forbidden.", 403);
+
+    // From here on, any throw is a REAL failure for a row we know exists and
+    // own — mark it failed rather than leaving it at whatever it already was
+    // ('pending', permanently, with nothing else ever able to change it).
+    markFailedOnExit = async () => {
+      await adminClient
+        .from("personal_assets")
+        .update({ ai_tagging_status: "failed" })
+        .eq("id", assetId);
+    };
 
     if (asset.media_type !== "image" || !asset.file_url) {
       // Video/document — no vision tagging in v1 (RESEARCH.md scopes
@@ -197,6 +218,18 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error("[personal-asset-ai-tag] error", error);
+    // Best-effort: an error marking the row failed must not replace the
+    // original error in the response the caller sees, and must not throw
+    // past this handler — a broken safety net is worse than none, because it
+    // would look like this function still guarantees a terminal state when
+    // it no longer does.
+    if (markFailedOnExit) {
+      try {
+        await markFailedOnExit();
+      } catch (markError) {
+        console.error("[personal-asset-ai-tag] could not mark row failed", markError);
+      }
+    }
     return jsonResponse(toErrorPayload(error), mapErrorToStatusCode(error));
   }
 });

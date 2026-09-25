@@ -166,6 +166,7 @@ export default function AssetCard({
   onPublish,
   onArchive,
   onDelete,
+  onRetryTagging,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const title = getItemTitle(asset);
@@ -252,6 +253,21 @@ export default function AssetCard({
             )}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {/* 'pending' shown here too, not just 'failed': a row can be
+                  stuck at pending forever if the tagging call never actually
+                  ran (found live 2026-09-25 — every clip saved before that
+                  fix landed) or failed before this function started
+                  guaranteeing a terminal state. This is the user's only
+                  recovery path until the row resolves on its own. */}
+              {(asset.ai_tagging_status === "failed" || asset.ai_tagging_status === "pending") ? (
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); onRetryTagging?.(asset); }}
+                  style={{ textAlign: "left", padding: "8px 10px", border: "none", background: "transparent", color: "var(--uiv2-text-primary)", fontSize: 13, borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Retry tagging
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => { setMenuOpen(false); onArchive?.(asset); }}

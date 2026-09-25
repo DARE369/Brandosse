@@ -117,6 +117,7 @@ function LibraryBody() {
     archiveAsset,
     unarchiveAsset,
     duplicateAsset,
+    retryTagging,
     softDeleteAsset,
     fetchAssetById,
     fetchUsedIn,
@@ -708,6 +709,7 @@ function LibraryBody() {
                           onPublish={handlePublish}
                           onArchive={handleArchive}
                           onDelete={(a) => setDeleteTarget(a)}
+                          onRetryTagging={(a) => retryTagging(a.id)}
                         />
                       ))}
                     </div>
