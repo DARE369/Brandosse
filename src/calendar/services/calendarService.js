@@ -439,6 +439,24 @@ export async function createQuickPost(scope, {
     throw new Error('A post cannot be scheduled without a time.');
   }
 
+  // The Library grid already refuses to open/publish a card whose
+  // ai_tagging_status is 'pending' (publishability.js's TAGGING gate,
+  // AssetCard.jsx's canOpenComposer) — but that is a button-disable in ONE
+  // surface, not an enforcement in the function every composer actually
+  // calls to send. Any other picker of a Library asset (QuickPostComposer's
+  // own "Pick from Library", Generate/Studio's asset pickers once wired)
+  // reaches this function directly and has never checked this column, so
+  // the same still-tagging asset the Library grid refuses to send could
+  // still go out from here — exactly what the grid's own warning describes
+  // ("Publishing now would send the post without them") as a live risk, not
+  // a hypothetical one. Drafts are unaffected: saving early is harmless,
+  // only SENDING with incomplete tags/alt text is refused.
+  if (isSending && asset?.ai_tagging_status === 'pending') {
+    throw new Error(
+      'This asset is still generating tags and alt text. Wait for tagging to finish, or save as a draft and send it once it has.',
+    );
+  }
+
   // `posts` has no `media_type`/`thumbnail_url`/`media_url` columns — those
   // live on `generations` only (confirmed live against the real Supabase
   // schema, 2026-06-24; see DECISIONS_LOG.md). Media metadata for a row with
