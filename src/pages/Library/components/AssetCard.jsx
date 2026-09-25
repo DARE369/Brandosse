@@ -70,7 +70,14 @@ function PlatformFitRow({ publishability }) {
 function AssetMedia({ asset, publishability, selectable, isSelected, onToggleSelect }) {
   const [failed, setFailed] = useState(false);
   const title = getItemTitle(asset);
-  const hasPreview = Boolean(asset.thumbnail_url && !failed);
+  // A video row's thumbnail_url is null far more often than not (most Library
+  // sources never generate a static frame — see personal-asset-upload's own
+  // header on this), but the <video> element two lines below already falls
+  // back to file_url when it is. That fallback could never run: this gate
+  // required thumbnail_url truthy to reach the branch at all, so a video with
+  // a perfectly good file_url and no thumbnail_url fell straight to the
+  // generic film icon instead of ever attempting a live preview frame.
+  const hasPreview = Boolean((asset.thumbnail_url || asset.file_url) && !failed);
 
   return (
     <div className={styles.assetMedia}>
@@ -79,7 +86,13 @@ function AssetMedia({ asset, publishability, selectable, isSelected, onToggleSel
 
       {hasPreview ? (
         asset.media_type === "video" ? (
-          <video src={asset.thumbnail_url || asset.file_url} muted playsInline onError={() => setFailed(true)} />
+          <video
+            src={asset.thumbnail_url || asset.file_url}
+            muted
+            playsInline
+            preload="metadata"
+            onError={() => setFailed(true)}
+          />
         ) : (
           <img src={asset.thumbnail_url} alt={title} loading="lazy" onError={() => setFailed(true)} />
         )

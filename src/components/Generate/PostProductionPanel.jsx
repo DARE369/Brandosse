@@ -19,6 +19,7 @@ import { POST_STATUS } from '../../constants/statuses';
 import TikTokOptionsPanel from '../Publishing/TikTokOptionsPanel';
 import YouTubeOptionsPanel from '../Publishing/YouTubeOptionsPanel';
 import YouTubeThumbnailPicker from '../Publishing/YouTubeThumbnailPicker';
+import { platformsRefusingMediaType, getPlatformSpec } from '../../services/platforms/platformCaptionSpecs';
 const FALLBACK_VIDEO_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
 function resolveVideoSource(url) {
@@ -343,6 +344,58 @@ export default function PostProductionPanel({
     })
     .filter(Boolean);
   const youtubeSelected = selectedPlatformNames.includes('youtube');
+
+  // The media is the wrong KIND for a selected platform — e.g. an image
+  // selected here with YouTube among selectedPlatforms. Named here rather
+  // than left to the adapter, which can only report the bytes it received:
+  // "returned image/jpeg, which is not what was expected" (observed live
+  // 2026-09-25, this exact surface). QuickPostComposer.jsx already gates on
+  // this same check (built 2026-09-23 for TikTok); it was never wired into
+  // this second composer, so the identical defect recurred here on YouTube.
+  const mediaTypeMismatches = platformsRefusingMediaType(
+    selectedPlatformNames,
+    postProduction.mediaType,
+  );
+
+  // Prevention, not just a blocked button: an account whose platform refuses
+  // the CURRENT media never appears in the picker at all — the user cannot
+  // select a combination that would fail, rather than selecting it and then
+  // reading why it won't work. Accounts already-selected keep their spot
+  // (below) so removing YouTube here can't silently deselect it out from
+  // under a user mid-decision; the effect after this does that deliberately.
+  const publishableAccounts = useMemo(
+    () => accounts.filter((acc) => {
+      const key = String(acc.platform || '').trim().toLowerCase();
+      if (postProduction.selectedPlatforms.includes(acc.id)) return true;
+      const spec = getPlatformSpec(key);
+      if (!spec || !Array.isArray(spec.acceptsMedia)) return true;
+      const type = String(postProduction.mediaType || '').trim().toLowerCase();
+      if (!type) return true; // unknown type: say nothing, don't hide
+      return spec.acceptsMedia.includes(type);
+    }),
+    [accounts, postProduction.selectedPlatforms, postProduction.mediaType],
+  );
+
+  // If the media changes AFTER a mismatched platform was already selected
+  // (e.g. swapping the asset while YouTube is checked), drop it from the
+  // selection rather than leaving an invisible, still-selected account
+  // behind a hidden card — the picker and the actual send target must agree.
+  useEffect(() => {
+    if (mediaTypeMismatches.length === 0) return;
+    const refusingKeys = new Set(mediaTypeMismatches.map((m) => m.key));
+    const next = postProduction.selectedPlatforms.filter((accountId) => {
+      const acc = accounts.find((a) => a.id === accountId);
+      const key = String(acc?.platform || '').trim().toLowerCase();
+      return !refusingKeys.has(key);
+    });
+    if (next.length !== postProduction.selectedPlatforms.length) {
+      updatePostProduction({ selectedPlatforms: next });
+    }
+    // Runs only off the values that decide membership; updatePostProduction
+    // is a store action with a stable identity (see the tiktokSettings effect
+    // above for the same reasoning).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaTypeMismatches, accounts, postProduction.selectedPlatforms]);
   const metadataLoading = postProduction.metadataStatus === 'in_progress';
   const seoBusy = postProduction.seoStatus === 'scoring' || postProduction.seoStatus === 'optimizing';
   const seoScoreReady = postProduction.seoStatus === 'scored';
@@ -1181,9 +1234,18 @@ export default function PostProductionPanel({
                               Connect an account
                             </button>
                           </div>
+                        ) : publishableAccounts.length === 0 ? (
+                          <div className="no-accounts-state">
+                            <Wifi size={24} aria-hidden="true" />
+                            <p>
+                              {postProduction.mediaType === 'image'
+                                ? "None of your connected accounts take a photo — YouTube requires a video."
+                                : "None of your connected accounts take this media."}
+                            </p>
+                          </div>
                         ) : (
                           <div className="platform-list" role="list" aria-label="Platform accounts">
-                            {accounts.map((acc) => {
+                            {publishableAccounts.map((acc) => {
                               const isExpired  = acc.connection_status === 'expired';
                               const isSelected = postProduction.selectedPlatforms.includes(acc.id);
                               return (
@@ -1235,6 +1297,18 @@ export default function PostProductionPanel({
                           </div>
                         )}
                       </div>
+
+                      {/* The media is the wrong KIND for a selected platform.
+                          Named here rather than left to the adapter, which
+                          can only report the bytes it received: "returned
+                          image/jpeg, which is not what was expected". */}
+                      {mediaTypeMismatches.length > 0 && (
+                        <div className="ui-field-error" role="alert">
+                          {mediaTypeMismatches.map((m) => `${m.label} takes ${m.takes} only`).join('; ')}
+                          {' — '}this asset is {postProduction.mediaType === 'image' ? 'a photo' : `a ${postProduction.mediaType}`}.
+                          {' '}Pick different media, or unselect {mediaTypeMismatches.length > 1 ? 'those platforms' : mediaTypeMismatches[0].label}.
+                        </div>
+                      )}
 
                       {/*
                         TikTok Direct Post options.
@@ -1316,6 +1390,7 @@ export default function PostProductionPanel({
                           <YouTubeThumbnailPicker
                             accountId={acc.id}
                             libraryAssets={[]}
+                            contentSeed={postProduction.title || postProduction.caption}
                             onChange={(thumbnailUrl) => setYouTubeSettings((prev) => (
                               { ...prev, [acc.id]: { ...prev[acc.id], thumbnail_url: thumbnailUrl } }
                             ))}
@@ -1565,7 +1640,11 @@ export default function PostProductionPanel({
                         // YouTube requires an actively-chosen made-for-kids
                         // answer. Same reasoning as TikTok above: surface it
                         // while the user can still act on it.
-                        !youtubeReady
+                        !youtubeReady ||
+                        // The media is the wrong kind for a selected platform
+                        // (e.g. an image with YouTube selected). Refuse here,
+                        // not after the adapter's upload fails.
+                        mediaTypeMismatches.length > 0
                       }
                       aria-label={
                         postProduction.scheduleDate ? 'Schedule post' : 'Publish now'

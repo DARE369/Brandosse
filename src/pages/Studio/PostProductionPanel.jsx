@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Save, Calendar, Send, Sparkles, RefreshCw } from "lucide-react";
 import { Card, Button, Dropdown } from "../../ui-v2";
 import { platformNeedsTitle, getPlatformSpec } from "../../services/platforms/platformCaptionSpecs";
@@ -72,6 +72,43 @@ export default function PostProductionPanel({
   const isSeoBusy = postProduction.seoStatus === "scoring" || postProduction.seoStatus === "optimizing";
 
   const mediaType = selectedGeneration?.media_type || "image";
+
+  // Prevention, not just a blocked button: an account whose platform refuses
+  // the current media (YouTube with an image, most often) never appears in
+  // the picker — the user cannot select a combination that would fail deep
+  // inside the adapter ("returned image/jpeg, which is not what was
+  // expected"). Already-selected accounts keep their spot so this can't
+  // silently deselect one out from under an in-progress choice; the effect
+  // below does that deliberately when the media itself changes underneath a
+  // selection already made.
+  const publishableAccounts = useMemo(
+    () => accounts.filter((a) => {
+      if (selectedIds.includes(a.id)) return true;
+      const spec = getPlatformSpec(a.platform);
+      if (!spec || !Array.isArray(spec.acceptsMedia)) return true;
+      const type = String(mediaType || "").trim().toLowerCase();
+      if (!type) return true;
+      return spec.acceptsMedia.includes(type);
+    }),
+    [accounts, selectedIds, mediaType],
+  );
+
+  // If the media changes after a now-mismatched account was already
+  // selected, drop it — the picker and the actual send target must agree.
+  useEffect(() => {
+    const type = String(mediaType || "").trim().toLowerCase();
+    if (!type) return;
+    const next = selectedIds.filter((id) => {
+      const a = accounts.find((acc) => acc.id === id);
+      const spec = a ? getPlatformSpec(a.platform) : null;
+      if (!spec || !Array.isArray(spec.acceptsMedia)) return true;
+      return spec.acceptsMedia.includes(type);
+    });
+    if (next.length !== selectedIds.length) {
+      updatePostProduction({ selectedPlatforms: next });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaType, accounts, selectedIds]);
 
   // One entry per selected account, for the per-platform fit strip. Deduped by
   // platform so two Instagram accounts don't show two identical fit chips.
@@ -268,6 +305,7 @@ export default function PostProductionPanel({
           <YouTubeThumbnailPicker
             accountId={acc.id}
             libraryAssets={[]}
+            contentSeed={postProduction.title || postProduction.caption}
             onChange={(thumbnailUrl) => mergeSettings("youtubeSettings", acc.id, {
               ...(postProduction.youtubeSettings?.[acc.id] || {}),
               thumbnail_url: thumbnailUrl,
@@ -440,8 +478,14 @@ export default function PostProductionPanel({
         >
           {accounts.length === 0 ? (
             <div style={{ padding: "8px 9px", fontSize: 12.5, color: "var(--uiv2-text-secondary)" }}>No connected accounts</div>
+          ) : publishableAccounts.length === 0 ? (
+            <div style={{ padding: "8px 9px", fontSize: 12.5, color: "var(--uiv2-text-secondary)" }}>
+              {mediaType === "image"
+                ? "None of your connected accounts take a photo — YouTube requires a video."
+                : "None of your connected accounts take this media."}
+            </div>
           ) : (
-            accounts.map((a) => {
+            publishableAccounts.map((a) => {
               const on = selectedIds.includes(a.id);
               return (
                 <button

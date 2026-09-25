@@ -882,6 +882,7 @@ export default function QuickPostComposer({
                 key={`thumb-${p.key}`}
                 accountId={p.accountId}
                 libraryAssets={libraryAssets}
+                contentSeed={effectiveTitle(p.key) || captions[p.key]}
                 onChange={handleThumbnailChange}
               />
             ))}
