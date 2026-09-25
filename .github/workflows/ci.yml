@@ -411,6 +411,22 @@ jobs:
       # catch that read like a transient outage.
       - name: check-undefined-identifiers
         run: node scripts/check-undefined-identifiers.cjs
+      # XMLHttpRequest does not settle when a socket goes quiet: onerror is for
+      # transport errors, onload for responses, and a stall is neither. All
+      # three XHR call sites wrapped one in a Promise and resolved only from
+      # those two events, so Keep and Schedule spun forever with no error and
+      # no way back. Three identical omissions, because the lifecycle was
+      # copied twice; only one was ever reported.
+      - name: check-xhr-stall-guard
+        run: node scripts/check-xhr-stall-guard.cjs
+      # YouTubeOptionsPanel's effects called onChange/onValidityChange and also
+      # listed them as dependencies. Every caller passes an inline arrow, a
+      # fresh identity each render, so the effect re-fired every render it
+      # caused — React threw "Maximum update depth exceeded" before first
+      # paint, a white screen on the made-for-kids radio. TikTokOptionsPanel had
+      # already hit and fixed the identical shape in a comment nothing enforced.
+      - name: check-effect-callback-prop-deps
+        run: node scripts/check-effect-callback-prop-deps.cjs
       # --uiv2-accent-text was 3.94:1 on white in light theme, used 62 times as a
       # text colour. Nobody noticed for as long as the token existed, because
       # contrast is invisible to everyone who can already read it. It is

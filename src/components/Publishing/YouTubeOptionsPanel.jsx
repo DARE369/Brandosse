@@ -122,11 +122,20 @@ export default function YouTubeOptionsPanel({
     // half-answered object upward invites a caller to persist it and schedule
     // anyway, which is the failure this panel exists to prevent.
     if (isValid) onChange?.(settings);
-  }, [isValid, settings, onChange]);
+    // onChange/onValidityChange are caller-owned and often inline (an arrow
+    // function written straight into JSX, as Generate/Studio PostProductionPanel
+    // both do at their call sites) — depending on them would loop: effect fires
+    // -> caller's setState -> re-render -> new inline function identity ->
+    // effect fires again, uncaught until React throws "Maximum update depth
+    // exceeded" (error #185). TikTokOptionsPanel hit this first; this mirrors
+    // its fix (tiktok.service.ts's sibling panel, same effect shape).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isValid, settings]);
 
   useEffect(() => {
     onValidityChange?.(isValid);
-  }, [isValid, onValidityChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isValid]);
 
   const answer = useCallback((value) => () => setMadeForKids(value), []);
 

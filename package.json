@@ -41,6 +41,8 @@
     "check:font-metrics": "node scripts/check-font-metrics.cjs",
     "check:compose-wiring": "node scripts/check-compose-wiring.cjs",
     "check:undefined-identifiers": "node scripts/check-undefined-identifiers.cjs",
+    "check:xhr-stall-guard": "node scripts/check-xhr-stall-guard.cjs",
+    "check:effect-callback-prop-deps": "node scripts/check-effect-callback-prop-deps.cjs",
     "check:token-contrast": "node scripts/check-token-contrast.cjs",
     "check:uiv2-tokens": "node scripts/check-uiv2-token-definitions.cjs",
     "test:publishability": "node scripts/test/publishability.test.mjs",
@@ -71,6 +73,7 @@
     "test:copy-review": "node scripts/test/copy-review.test.mjs",
     "check:copy-review": "node scripts/check-copy-review-contract.cjs",
     "check:composer-styles": "node scripts/check-composer-styles-owned.cjs",
+    "check:model-ids": "node scripts/check-model-ids.cjs",
     "measure:caption-fold": "node scripts/measure/measure-caption-fold.mjs",
     "test:copy-review-persistence": "node scripts/test/copy-review-persistence.test.mjs"
   },
