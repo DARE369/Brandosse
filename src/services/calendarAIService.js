@@ -150,6 +150,25 @@ export async function auditPostCaption(post, brandKit = null) {
 //   draftId: string | null,   // linked draft if matched
 //   isNew: boolean,
 // }
+// Short, punchy on-image headline for a thumbnail (calendar-ai's
+// 'thumbnail_headline' action) — distinct from a post's own title/caption,
+// which the caller passes in as `topic` to write FROM, not to truncate.
+// Returns '' (never throws to the caller) on any failure: a missing
+// AI headline degrades to the image having no text overlay, which is a
+// worse thumbnail, not a broken one — see the caller in
+// YouTubeThumbnailPicker.jsx for how that fallback is handled.
+export async function generateThumbnailHeadline(topic) {
+  try {
+    const data = await invokeCalendarAI({
+      action: 'thumbnail_headline',
+      caption: String(topic || '').slice(0, 500),
+    });
+    return String(data?.headline || '').trim();
+  } catch {
+    return '';
+  }
+}
+
 export async function generateWeekPlan(context) {
   const {
     weekStart,

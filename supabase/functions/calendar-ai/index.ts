@@ -8,7 +8,7 @@ type ExistingPost = { id?: string; scheduled_at?: string; platform?: string; sta
 type DraftItem    = { id: string; title?: string; platform?: string; media_type?: string; };
 
 type CalendarAiBody = {
-  action: "slot_suggestions" | "caption_audit" | "week_plan" | "command";
+  action: "slot_suggestions" | "caption_audit" | "week_plan" | "command" | "thumbnail_headline";
   weekStart?: string;
   platforms?: string[];
   existingPosts?: ExistingPost[];
@@ -92,6 +92,35 @@ hashtagSuggestions: up to 8 relevant hashtags (not already in the post's current
     provider: r.provider,
     model: r.model,
   };
+}
+
+// ── thumbnail_headline ───────────────────────────────────────────────────────
+// A short, punchy on-image headline for a YouTube thumbnail — distinct from
+// the video's own title (an SEO-facing metadata field, often a full
+// sentence) and from the caption. Ideogram v3 renders this text exactly as
+// given, so it must already BE the finished words, not raw source text
+// truncated to fit (YouTubeThumbnailPicker.jsx used to just take the post's
+// title's first five words — a crude substring, not a written hook).
+async function thumbnailHeadlineData(body: CalendarAiBody) {
+  const topic = String(body.caption || "").trim();
+
+  const system = `You write short, punchy YouTube thumbnail headlines — the 2-5 words rendered directly ON TOP of the thumbnail image, not the video's title or its caption. Return ONLY valid JSON. Shape: { "headline": "<string>" }
+Rules: 2-5 words. No hashtags, no emoji, no quotation marks or trailing punctuation in the value. Read as a hook — curiosity, a number, a bold claim, or a direct promise — never a bland description of the topic. Must be legible at a glance, shrunk to a small thumbnail.`;
+  const user = `What this video is about:\n"""\n${topic || "no topic given — invent one plausible, punchy hook"}\n"""\n\nWrite ONE thumbnail headline.`;
+
+  const r = await callLlm({
+    systemPrompt: system,
+    messages: [{ role: "user", content: user }],
+    preferredProvider: "groq",
+    maxTokens: 60,
+    temperature: 0.8,
+    jsonMode: true,
+  });
+  const p = safeParseJson(r.content, { headline: "" });
+  const headline = typeof p.headline === "string"
+    ? p.headline.trim().replace(/["'“”‘’]/g, "").slice(0, 60)
+    : "";
+  return { headline, provider: r.provider, model: r.model };
 }
 
 // ── week_plan ─────────────────────────────────────────────────────────────────
@@ -181,6 +210,7 @@ serve(async (req) => {
     if (action === "caption_audit")    return jsonResponse(await captionAuditData(body));
     if (action === "week_plan")        return jsonResponse(await weekPlanData(body));
     if (action === "command")          return jsonResponse(await commandData(body));
+    if (action === "thumbnail_headline") return jsonResponse(await thumbnailHeadlineData(body));
 
     return jsonResponse({ error: `Unknown action: ${action}` }, 400);
   } catch (error) {

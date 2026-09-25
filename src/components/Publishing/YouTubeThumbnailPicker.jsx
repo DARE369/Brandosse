@@ -2,6 +2,7 @@ import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { generateImages } from '../../services/media.service';
+import { generateThumbnailHeadline } from '../../services/calendarAIService';
 import styles from './YouTubeOptionsPanel.module.css';
 
 /**
@@ -58,6 +59,13 @@ import styles from './YouTubeOptionsPanel.module.css';
  * manual generation already shows it — immediately once known, labelled
  * "Auto-generated" so it reads as a default, not a hidden charge, with
  * Remove (reverting to the free platform-picked frame) always one click away.
+ *
+ * The on-image headline is itself auto-generated (2026-09-25, same-day
+ * follow-up) — calendar-ai's 'thumbnail_headline' action writes a real 2-5
+ * word hook from contentSeed, rather than this component truncating the
+ * title/caption to fit. A blunt truncation is the fallback only if that
+ * call fails (truncatedFallbackHeadline below) — a worse headline beats no
+ * headline, but a written one is what actually ships when it can.
  */
 
 const MODE_AUTO = 'auto';
@@ -85,15 +93,22 @@ const MODE_LIBRARY = 'library';
  * model (FLUX) is not, which is why this used to omit text entirely — that
  * reasoning no longer applies once the model doing the work is the one
  * actually designed for it.
+ *
+ * `headline` is passed in already-written (calendar-ai's 'thumbnail_headline'
+ * action, via generateThumbnailHeadline() — a real 2-5 word hook, not a
+ * substring of the post's title/caption truncated to fit). A generation
+ * prompt only quotes it; it does not invent it.
  */
-function extractHeadline(seed) {
+function truncatedFallbackHeadline(seed) {
+  // Used only if the AI headline call fails or the post has no seed text at
+  // all — a rough substring is a worse hook than a written one, but a worse
+  // hook on the thumbnail beats silently having none.
   const words = String(seed || '').trim().split(/\s+/).filter(Boolean);
   return words.slice(0, 5).join(' ');
 }
 
-function buildCtrThumbnailPrompt(seed) {
+function buildCtrThumbnailPrompt(seed, headline) {
   const topic = String(seed || '').trim().slice(0, 200);
-  const headline = extractHeadline(seed);
   const textInstruction = headline
     ? `Exact text rendered large, bold and clearly legible, reading precisely: `
       + `"${headline}". High-contrast lettering against the background so it `
@@ -195,11 +210,27 @@ export default function YouTubeThumbnailPicker({
     const seed = String(contentSeed || '').trim();
     if (!seed) return; // nothing to base a smart prompt on — stays on free Auto
     autoAttempted.current = true;
-    const derived = buildCtrThumbnailPrompt(seed);
     setMode(MODE_GENERATE);
-    setPrompt(derived);
     setIsAutoRun(true);
-    runGenerate(derived, 'auto-generated');
+    setGenerating(true); // covers the headline call below too, not just the image
+
+    // The headline is WRITTEN, not extracted — calendar-ai's
+    // 'thumbnail_headline' action, a real 2-5 word hook, distinct from the
+    // post's own title/caption. Falls back to a blunt substring only if that
+    // call fails; a worse headline still beats silently having none.
+    (async () => {
+      let headline = '';
+      try {
+        headline = await generateThumbnailHeadline(seed);
+      } catch {
+        headline = '';
+      }
+      if (!headline) headline = truncatedFallbackHeadline(seed);
+
+      const derived = buildCtrThumbnailPrompt(seed, headline);
+      setPrompt(derived);
+      await runGenerate(derived, 'auto-generated');
+    })();
     // runGenerate is intentionally omitted: it closes over `prompt`, which
     // would make this fire again on every keystroke in the manual textarea.
     // autoAttempted already guarantees this runs at most once.
