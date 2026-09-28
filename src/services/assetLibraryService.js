@@ -25,6 +25,7 @@
 // ============================================================================
 
 import { supabase } from './supabaseClient';
+import { guardXhrAgainstStalls } from './xhrStallGuard';
 import { getSupabaseFunctionUrl, supabaseAnonKey } from './supabaseConfig';
 
 function safeArray(value) {
@@ -296,18 +297,23 @@ export async function uploadPersonalAsset({
   // Where the file came from, when the caller knows. Whitelisted server-side
   // (personal-asset-upload readOrigin) before it reaches metadata.origin.
   origin = null,
+  // Save a rendered clip by REFERENCE instead of by value. The bytes are
+  // already in this project's `video-clips` bucket, so shipping them up from
+  // the browser moves a file between two buckets by way of the user's phone.
+  // When this is set, `file` is not required and nothing large is transferred.
+  clipId = null,
   onProgress,
 } = {}) {
-  if (!file) throw new Error('Choose a file first.');
+  if (!file && !clipId) throw new Error('Choose a file first.');
 
-  const [checksum, perceptualHash] = await Promise.all([
-    computeFileChecksum(file),
-    computePerceptualHash(file),
-  ]);
+  const [checksum, perceptualHash] = file
+    ? await Promise.all([computeFileChecksum(file), computePerceptualHash(file)])
+    : [null, null];
 
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('title', title || file.name || '');
+  if (file) formData.append('file', file);
+  if (clipId) formData.append('clip_id', clipId);
+  formData.append('title', title || file?.name || '');
   formData.append('description', description || '');
   formData.append('alt_text', altText || '');
   formData.append('tags', JSON.stringify(safeArray(tags).filter(Boolean)));
@@ -327,13 +333,26 @@ export async function uploadPersonalAsset({
       xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
     }
 
+    // Every byte acknowledged is proof the connection is alive, so each one
+    // buys another full STALL_TIMEOUT_MS. The server's own think-time after
+    // the last byte is covered by the same timer, re-armed on upload end.
+    // The stall guard listens for these same events itself; this handler only
+    // reports the percentage.
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
       const pct = Math.round((event.loaded / event.total) * 100);
       if (typeof onProgress === 'function') onProgress(pct);
     };
 
+    // Without this the promise never settles when the connection stalls, and
+    // Keep / Schedule spin forever. See src/services/xhrStallGuard.js.
+    const stallGuard = guardXhrAgainstStalls(xhr, reject, {
+      message: 'The upload stopped responding. Check your connection and try again.',
+    });
+
     xhr.onerror = () => reject(new Error('Network error during upload.'));
+    xhr.onabort = () => reject(new Error('Upload cancelled.'));
+    xhr.ontimeout = () => reject(new Error('The upload timed out.'));
     xhr.onload = () => {
       let payload = null;
       try {
@@ -352,6 +371,9 @@ export async function uploadPersonalAsset({
     };
 
     xhr.send(formData);
+    // Armed only after send, so the window covers the request rather than the
+    // checksum work that precedes it.
+    stallGuard.arm();
   });
 }
 
