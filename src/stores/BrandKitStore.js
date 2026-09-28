@@ -15,6 +15,7 @@
 
 import { create } from 'zustand';
 import { supabase } from '../services/supabaseClient';
+import { guardXhrAgainstStalls } from '../services/xhrStallGuard';
 import { BRAND_KIT_STATUS, ASSET_STATUS } from '../constants/statusEnums';
 import { computeBrandKitHash } from '../utils/brandKitHash';
 import { getRuntimeEnvValue } from '../utils/runtimeEnv';
@@ -70,6 +71,12 @@ async function uploadWithProgress(bucket, storagePath, file, onProgress) {
       if (typeof onProgress === 'function') onProgress(pct);
     };
 
+    // Same omission as the other two XHR call sites: no timeout of any kind,
+    // so a stalled logo upload left the Brand Kit save pending forever.
+    const stallGuard = guardXhrAgainstStalls(xhr, reject, {
+      message: 'The upload stopped responding. Check your connection and try again.',
+    });
+
     xhr.onerror = () => reject(new Error('Network error during upload.'));
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -89,6 +96,7 @@ async function uploadWithProgress(bucket, storagePath, file, onProgress) {
     };
 
     xhr.send(file);
+    stallGuard.arm();
   });
 }
 

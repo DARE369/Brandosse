@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { guardXhrAgainstStalls } from "./xhrStallGuard";
 
 export async function videoEngineFetch(path, options = {}) {
   const { data } = await supabase.auth.getSession();
@@ -283,6 +284,12 @@ export function uploadSourceToWorker(file, ticket, { onProgress, signal } = {}) 
       });
     };
 
+    // A stalled upload used to leave this promise pending forever, which on
+    // the New Job sheet is a progress bar that stops moving and never fails.
+    const stallGuard = guardXhrAgainstStalls(xhr, reject, {
+      message: "The upload to the processor stopped responding. Check your connection and try again.",
+    });
+
     const onAbort = () => xhr.abort();
     signal?.addEventListener("abort", onAbort, { once: true });
 
@@ -332,5 +339,7 @@ export function uploadSourceToWorker(file, ticket, { onProgress, signal } = {}) 
     };
 
     xhr.send(file);
+    // After send, so the silence window covers the transfer itself.
+    stallGuard.arm();
   });
 }
